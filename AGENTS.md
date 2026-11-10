@@ -26,7 +26,9 @@ Monorepo (pnpm workspaces):
 - Pages: route `loader` + `ensureQueryData(convexQuery(...))`, components read
   with `useSuspenseQuery`. Writes: `useMutation` from `convex/react`.
 - Each PR adds a line under `## Unreleased` in CHANGELOG.md (player-facing
-  wording). Maintainers cut releases.
+  wording), labeled with where it changes: `- **Web:** …`, `**App:**`,
+  `**Addon:**` or several (`**Web, App:**`); CI checks it. Maintainers cut
+  releases.
 - Design: minimal, dark only, an app rather than a website (the same React
   app runs on the web and in the Windows app). Tokens live in
   `apps/web/src/styles/app.css`; restyle shadcn primitives there.
