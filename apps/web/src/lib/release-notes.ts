@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 // cached an hour), so notes written after a release still show up.
 
 export type ReleaseNote = {
-	/** Where the change lives: "Web", "App", "Addon" (CHANGELOG.md's "**Web, App:**" prefix). */
+	/** Where the change lives: "Guildie", "App", "Addon" (CHANGELOG.md's "**Guildie, App:**" prefix; older notes say "Web"). */
 	pillars: string[];
 	text: string;
 };
@@ -16,7 +16,7 @@ export type ReleaseNotes = {
 	sections: { title: string; items: ReleaseNote[] }[];
 };
 
-/** "**Web, App:** Text" into its pillars and text (older notes have none). */
+/** "**Guildie, App:** Text" into its pillars and text (older notes have none). */
 export function parseNote(line: string): ReleaseNote {
 	const m = /^\*\*([A-Za-z]+(?:, [A-Za-z]+)*):\*\*\s*(.*)$/.exec(line);
 	return m ? { pillars: m[1].split(", "), text: m[2] } : { pillars: [], text: line };

@@ -88,10 +88,10 @@ jobs:
             echo "::error::Add a line for players under '## Unreleased' in CHANGELOG.md (or label the PR skip-changelog)."
             exit 1
           fi
-          # Each line says where the change lives: Web, App, Addon, or several.
-          unlabeled=$(printf '%s\n' "$added" | grep -vE '^\+- \*\*(Web|App|Addon)(, (Web|App|Addon))*:\*\* ' || true)
+          # Each line says where the change shows: Guildie (the site), App, Addon, or several.
+          unlabeled=$(printf '%s\n' "$added" | grep -vE '^\+- \*\*(Guildie|App|Addon)(, (Guildie|App|Addon))*:\*\* ' || true)
           if [ -n "$unlabeled" ]; then
-            echo "::error::Start each CHANGELOG line with where it changes: **Web:**, **App:**, **Addon:** (or several, e.g. **Web, App:**)."
+            echo "::error::Start each CHANGELOG line with where it changes: **Guildie:**, **App:**, **Addon:** (or several, e.g. **Guildie, App:**)."
             printf '%s\n' "$unlabeled"
             exit 1
           fi
