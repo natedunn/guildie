@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HelperTokens } from "@/components/helper-tokens";
+import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { WhatsNew } from "@/components/whats-new";
@@ -35,6 +36,7 @@ function AppSettings() {
 				<SectionTitle>Connected computers</SectionTitle>
 				<HelperTokens />
 			</section>
+			<OpenSourceNote part="app" />
 		</div>
 	);
 }

@@ -1,6 +1,7 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -20,14 +21,17 @@ export const Route = createFileRoute("/settings/addon")({
 
 function AddonPage() {
 	const inApp = useInDesktopApp();
-	if (!inApp) return <GetTheApp />;
-	if (!desktop()?.addon) return <UpdateTheApp />;
-	return <ManageAddon />;
+	return (
+		<div className="pb-12">
+			{!inApp ? <GetTheApp /> : !desktop()?.addon ? <UpdateTheApp /> : <ManageAddon />}
+			<OpenSourceNote part="addon" />
+		</div>
+	);
 }
 
 function GetTheApp() {
 	return (
-		<div className="max-w-xl pb-12 text-[0.8125rem]">
+		<div className="max-w-xl text-[0.8125rem]">
 			<p className="text-muted-foreground">
 				The Guildie addon shows who in your guild might want an item, right in its tooltip, and keeps your character
 				current on Guildie as you play. It works through the Guildie app for Windows, which installs the addon, keeps it
@@ -42,7 +46,7 @@ function GetTheApp() {
 
 function UpdateTheApp() {
 	return (
-		<div className="max-w-xl pb-12 text-[0.8125rem]">
+		<div className="max-w-xl text-[0.8125rem]">
 			<p className="text-muted-foreground">
 				This version of the Guildie app can't manage the addon from here yet. Install the latest version once; it keeps
 				itself up to date from then on.
@@ -117,7 +121,7 @@ function ManageAddon() {
 					: "missing";
 
 	return (
-		<div className="max-w-3xl pb-12">
+		<div className="max-w-3xl">
 			<section>
 				<SectionTitle>Guildie addon</SectionTitle>
 				<Rows>

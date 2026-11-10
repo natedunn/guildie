@@ -12,6 +12,10 @@ into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- Settings → Addon and → App say Guildie is open source, with links to the code and to report a bug.
+
 ## 0.3.7
 
 ### Improvements
