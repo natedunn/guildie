@@ -13,6 +13,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ago } from "@/lib/format";
+import { shareMeta } from "@/lib/share";
 
 // A guild's pages: the roster (index) and what the guild can craft
 // (crafting), under one header with the guild's facts and the owner's
@@ -23,9 +24,21 @@ export const Route = createFileRoute("/g/$region/$slug")({
 			convexQuery(api.guilds.get, { region: params.region as Region, slug: params.slug }),
 		);
 		if (!data) throw notFound();
-		return { name: data.guild.name };
+		// What a shared link's preview says (members-only guilds say nothing more).
+		let description = `${data.guild.name} is a members-only guild on Guildie.`;
+		if (!data.hidden) {
+			const g = data.guild;
+			const faction = g.faction && g.faction[0] + g.faction.slice(1).toLowerCase();
+			description = `${[g.region.toUpperCase(), faction].filter(Boolean).join(" · ")} guild, ${g.memberCount} members: roster, gear, talents and crafters on Guildie.`;
+		}
+		return { name: data.guild.name, description };
 	},
-	head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? "Guild"} · Guildie` }] }),
+	head: ({ loaderData }) => ({
+		meta: [
+			{ title: `${loaderData?.name ?? "Guild"} · Guildie` },
+			...(loaderData ? shareMeta(loaderData.name, loaderData.description) : []),
+		],
+	}),
 	component: GuildLayout,
 });
 

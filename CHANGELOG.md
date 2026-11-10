@@ -12,6 +12,10 @@ into that version's section.
 
 ## Unreleased
 
+### New
+
+- Links to Guildie show a proper preview when shared (Discord, messages, social sites), with the guild's or character's name where there is one.
+
 ### Improvements
 
 - Settings → Addon and → App say Guildie is open source, with links to the code and to report a bug.

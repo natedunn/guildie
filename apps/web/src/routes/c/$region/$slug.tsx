@@ -5,6 +5,7 @@ import { characterQuery, sourceNote, useCharacter } from "@/components/character
 import { ClassText } from "@/components/class-name";
 import { PageTab, PageTabs } from "@/components/page-tabs";
 import { ago, rankLabel } from "@/lib/format";
+import { shareMeta } from "@/lib/share";
 
 // A character's pages: gear (index), talents and professions. The header and
 // tabs live here so they stay put while the tabs switch.
@@ -12,9 +13,18 @@ export const Route = createFileRoute("/c/$region/$slug")({
 	loader: async ({ context, params }) => {
 		const data = await context.queryClient.ensureQueryData(characterQuery(params.region, params.slug));
 		if (!data) throw notFound();
-		return { name: `${data.character.name} ${data.character.surname ?? ""}`.trim(), guild: data.guild };
+		const c = data.character;
+		const name = `${c.name} ${c.surname ?? ""}`.trim();
+		// What a shared link's preview says.
+		const description = `Level ${c.level} ${raceName(c.raceId)} ${className(c.classId)} in ${data.guild.name}: gear, talents and professions on Guildie.`;
+		return { name, guild: data.guild, description };
 	},
-	head: ({ loaderData }) => ({ meta: [{ title: `${loaderData?.name ?? "Character"} · Guildie` }] }),
+	head: ({ loaderData }) => ({
+		meta: [
+			{ title: `${loaderData?.name ?? "Character"} · Guildie` },
+			...(loaderData ? shareMeta(loaderData.name, loaderData.description) : []),
+		],
+	}),
 	component: CharacterLayout,
 });
 

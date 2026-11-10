@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face { font-family: Inter; src: url(../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
+* { box-sizing: border-box; margin: 0; }
+body { width: 1200px; height: 630px; background: #13110e; font-family: Inter, sans-serif; color: #eee9e1; overflow: hidden; }
+.frame { position: absolute; inset: 0; display: flex; }
+.left { flex: 1; padding: 84px 0 72px 88px; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 22px; }
+.brand svg { width: 72px; height: 72px; }
+.brand span { font-size: 84px; font-weight: 650; letter-spacing: -0.035em; }
+.tag { margin-top: 40px; font-size: 38px; line-height: 1.25; color: #b5ab9c; font-weight: 450; letter-spacing: -0.01em; max-width: 520px; }
+.tag b { color: #eee9e1; font-weight: 550; }
+.foot { margin-top: auto; display: flex; gap: 22px; font-size: 24px; color: #8f8578; }
+.foot strong { color: #eee9e1; font-weight: 550; }
+.card { width: 470px; margin: auto 72px auto 0; background: #1a1815; border: 1px solid rgba(255,235,200,0.10); border-radius: 14px; padding: 26px 28px; display: flex; flex-direction: column; }
+.card h3 { font-size: 22px; font-weight: 600; display: flex; justify-content: space-between; }
+.card h3 small { font-size: 18px; color: #8f8578; font-weight: 450; }
+.row { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-top: 1px solid rgba(255,235,200,0.07); font-size: 20px; }
+.row:first-of-type { border-top: 0; margin-top: 10px; }
+.row img { width: 40px; height: 40px; border-radius: 6px; border: 1.5px solid var(--q); object-fit: cover; }
+.row .n { flex: 1; font-weight: 550; }
+.row .n em { font-style: normal; color: #8f8578; font-weight: 450; }
+.row .l { color: #8f8578; font-variant-numeric: tabular-nums; }
+</style></head><body><div class="frame">
+<div class="left">
+  <div class="brand">
+    <svg viewBox="0 0 32 32"><path d="M16 4l10 4.2v7.3c0 6-4.1 10.4-10 12.1-5.9-1.7-10-6.1-10-12.1V8.2z" fill="#eee9e1"/><path d="M16 10.5v11M10.5 16h11" stroke="#13110e" stroke-width="2.25" stroke-linecap="round"/></svg>
+    <span>Guildie</span>
+  </div>
+  <p class="tag">Your guild's <b>roster</b>, <b>gear</b>, <b>talents</b> and <b>crafters</b>.</p>
+  <div class="foot"><strong>guildie.club</strong><span>World of Warcraft: Forever</span></div>
+</div>
+<div class="card">
+  <h3>Roster <small>38 members</small></h3>
+  <div class="row"><img style="--q:#a335ee" src="https://render.worldofwarcraft.com/forever-us/icons/56/135741.jpg"><span class="n" style="color:#c69b6d">Thornwick <em>Warrior</em></span><span class="l">Lvl 60</span></div>
+  <div class="row"><img style="--q:#0070dd" src="https://render.worldofwarcraft.com/forever-us/icons/56/135145.jpg"><span class="n" style="color:#3fc7eb">Aelira <em>Mage</em></span><span class="l">Lvl 58</span></div>
+  <div class="row"><img style="--q:#0070dd" src="https://render.worldofwarcraft.com/forever-us/icons/56/134908.jpg"><span class="n" style="color:#ff7c0a">Bramble <em>Druid</em></span><span class="l">Lvl 55</span></div>
+  <div class="row"><img style="--q:#a335ee" src="https://render.worldofwarcraft.com/forever-us/icons/56/135614.jpg"><span class="n" style="color:#aad372">Kestrel <em>Hunter</em></span><span class="l">Lvl 52</span></div>
+  <div class="row"><img style="--q:#1eff00" src="https://render.worldofwarcraft.com/forever-us/icons/56/134955.jpg"><span class="n" style="color:#f48cba">Odessa <em>Paladin</em></span><span class="l">Lvl 47</span></div>
+  <div class="row"><img style="--q:#0070dd" src="https://render.worldofwarcraft.com/forever-us/icons/56/133364.jpg"><span class="n" style="color:#8788ee">Grimbald <em>Warlock</em></span><span class="l">Lvl 44</span></div>
+</div>
+</div></body></html>

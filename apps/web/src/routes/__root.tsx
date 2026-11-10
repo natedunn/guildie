@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAuthToken } from "@/lib/convex-auth-start/functions";
 import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
 import { readDesktopInfo } from "@/lib/desktop";
+import { defaultShareMeta } from "@/lib/share";
 import appCss from "@/styles/app.css?url";
 
 export type RouterContext = {
@@ -42,7 +43,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			{ name: "viewport", content: "width=device-width, initial-scale=1" },
 			{ name: "theme-color", content: "#13110e" },
 			{ title: "Guildie" },
-			{ name: "description", content: "A home base for World of Warcraft guilds." },
+			...defaultShareMeta,
 		],
 		links: [
 			{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
