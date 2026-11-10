@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ago, rankLabel } from "@/lib/format";
+import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/g/$region/$slug/")({
@@ -27,7 +27,7 @@ export const Route = createFileRoute("/g/$region/$slug/")({
 	component: GuildPage,
 });
 
-type SortKey = "name" | "level" | "class" | "rank" | "ilvl" | "seen";
+type SortKey = "name" | "level" | "class" | "ilvl" | "seen";
 
 function GuildPage() {
 	const params = Route.useParams();
@@ -76,8 +76,6 @@ function Roster({ members }: { members: Member[] }) {
 					return m.level;
 				case "class":
 					return className(m.classId);
-				case "rank":
-					return m.rank;
 				case "ilvl":
 					return m.averageItemLevel ?? -1;
 				case "seen":
@@ -165,7 +163,6 @@ function Roster({ members }: { members: Member[] }) {
 						{header("level", "Level", "right")}
 						{header("class", "Race and class")}
 						<TableHead className="max-lg:hidden">Talents</TableHead>
-						{header("rank", "Rank")}
 						<TableHead className="max-2xl:hidden">Professions</TableHead>
 						{header("ilvl", "Item level", "right")}
 						{header("seen", "Last synced", "right", "max-md:hidden")}
@@ -229,7 +226,6 @@ function Roster({ members }: { members: Member[] }) {
 									</span>
 								))}
 							</TableCell>
-							<TableCell className="text-muted-foreground">{rankLabel(m.rank)}</TableCell>
 							<TableCell className="num text-muted-foreground max-2xl:hidden">
 								{m.professions?.length
 									? m.professions

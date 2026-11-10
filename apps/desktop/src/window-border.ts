@@ -1,7 +1,7 @@
 // Windows 11 draws a 1px border around every window, in the accent color
 // when "Show accent color on title bars and window borders" is on (a bright
-// blue line around our dark window). DwmSetWindowAttribute(DWMWA_BORDER_COLOR,
-// DWMWA_COLOR_NONE) turns it off for this window only. Electron has no API for
+// blue line around our dark window). DwmSetWindowAttribute(DWMWA_BORDER_COLOR)
+// gives this window our own subtle warm grey line instead, focused or not. Electron has no API for
 // it, so this calls dwmapi.dll through koffi (a prebuilt FFI; its Windows
 // binary ships in resources/koffi, electron-builder.yml).
 //
@@ -12,7 +12,8 @@ import type { Log } from "@guildie/sync";
 import type { BrowserWindow } from "electron";
 
 const DWMWA_BORDER_COLOR = 34;
-const DWMWA_COLOR_NONE = 0xfffffffe;
+/** #4a443c (a light warm grey, faint against the dark app) as a COLORREF, 0x00BBGGRR. */
+const BORDER = 0x003c444a;
 
 type SetAttribute = (hwnd: number, attribute: number, value: number[], size: number) => number;
 let setAttribute: SetAttribute | null | undefined;
@@ -40,13 +41,13 @@ function apply(win: BrowserWindow, set: SetAttribute, log: Log, when: string) {
 	try {
 		const handle = win.getNativeWindowHandle();
 		const hwnd = Number(handle.length >= 8 ? handle.readBigUInt64LE() : BigInt(handle.readUInt32LE()));
-		const result = set(hwnd, DWMWA_BORDER_COLOR, [DWMWA_COLOR_NONE], 4);
+		const result = set(hwnd, DWMWA_BORDER_COLOR, [BORDER], 4);
 		// Once per run, so the log says whether it took (0 is S_OK; Windows 10
 		// says E_INVALIDARG, which is fine: no such border there).
 		if (!reported) {
 			reported = true;
 			log(
-				`Window border: ${result === 0 ? "hidden" : `DwmSetWindowAttribute returned 0x${(result >>> 0).toString(16)}`} (${when})`,
+				`Window border: ${result === 0 ? "set" : `DwmSetWindowAttribute returned 0x${(result >>> 0).toString(16)}`} (${when})`,
 			);
 		}
 	} catch (e) {

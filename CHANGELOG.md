@@ -12,6 +12,11 @@ into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- A subtle border of Guildie's own around the window on Windows 11, instead of none.
+- The roster no longer shows guild rank (character pages still do).
+
 ## 0.3.6
 
 ### New
