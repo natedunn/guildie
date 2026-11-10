@@ -57,6 +57,7 @@ game ── addon saves GuildieDB ──▶ SavedVariables/Guildie.lua (on /relo
 | Shared: SavedVariables reader, uploader, `GuildieData.lua` writer, WoW folder search | `packages/sync` (`@guildie/sync`)                                                                                          |
 | Tokens, ingest                                                                       | `apps/web/convex/helper.ts`                                                                                                |
 | Payload checks, recipe matching                                                      | `apps/web/convex/addonPayload.ts`                                                                                          |
+| Guild requests (rules, handlers; the private inventory behind the mats check)        | `apps/web/convex/shared/requests.ts`, `apps/web/convex/requests.ts`; "Guild requests" below                                |
 | Newest-wins merge with Blizzard's data                                               | `apps/web/convex/profile.ts` (`pickProfile` in helper.ts)                                                                  |
 | What Guildie shows for your own characters, for the addon's "On Guildie" check       | `apps/web/convex/addonView.ts` (in `guildData`), `apps/addon/Guildie/Status.lua`                                           |
 | Addon tests (stubbed WoW API, luajit)                                                | `apps/addon/tests`                                                                                                         |
@@ -88,8 +89,8 @@ used); the account page lists them with Disconnect.
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
-  `{ "version": 2, "characters": [ ... ] }` (version 1, talents and level
-  only, is still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
+  `{ "version": 3, "characters": [ ... ] }` (versions 1, talents and level
+  only, and 2, without `inventory`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
   One upload per 5 s per token, at most 50 characters. A character, version 2:
 
   ```jsonc
@@ -111,7 +112,11 @@ used); the account page lists them with Disconnect.
     "recipes": [ { "profession": "Tailoring", "capturedAt": 1794336900,
                    "known": [ { "name": "Bolt of Silk Cloth", "item": 4305 }, { "name": "Some Enchant" } ] } ],
     "proficiencies": { "capturedAt": 1794336950, "level": 23,
-                       "skills": [ "Cloth", "Daggers", "Staves", "Wands" ], "dualWield": false }
+                       "skills": [ "Cloth", "Daggers", "Staves", "Wands" ], "dualWield": false },
+    "inventory": {                            // version 3 (addon 0.8.0)
+      "bags": { "capturedAt": 1794336950, "items": [ { "id": 2589, "count": 25 } ] },
+      "bank": { "capturedAt": 1794250000, "items": [ { "id": 2589, "count": 40 } ] }
+    }
   }
   ```
 
@@ -120,7 +125,10 @@ used); the account page lists them with Disconnect.
   client gives one, `item` in recipes the crafted item. `proficiencies`
   (addon 0.7.0+): the weapon and armor skills in the game's skill list
   (English names), the level they were read at, and `CanDualWield()`; the
-  site checks them against its rules (docs/game-data.md). Tooltip lines
+  site checks them against its rules (docs/game-data.md). `inventory`
+  (addon 0.8.0+): bags (backpack and bag slots) and the bank as of the last
+  time it was open in game, item id → count (at most 600 items each); see
+  "Guild requests". Tooltip lines
   exclude the name; `color` is omitted for white. Talent `id` is the TraitDefinition ID.
   Each character is checked on its own (types, counts, lengths, clocks no
   more than 10 minutes ahead: `convex/addonPayload.ts`); one that fails is
@@ -140,6 +148,9 @@ What the site does with it (`helper:ingest`):
   item, then by name; unmatched names are counted (`unmatched`), not kept.
 - New gear gets icons through `items.ensure`, with the game's tooltip as the
   fallback when Blizzard's item API has none.
+- Bags and bank go to their own table (`inventories`, newer read wins per
+  part), never into `addonSnapshots`, and re-check the player's open craft
+  requests.
 
 A character is accepted only if the token's owner claimed it: matched by
 Blizzard's character id (the hex number at the end of the in-game GUID), or by
@@ -180,7 +191,7 @@ mounted in `__root.tsx`):
   from the first render when the user agent says so, and once mounted when only
   the bridge does (app builds before 0.2).
 
-## Guild data in game (reagent and gear-upgrade tooltips)
+## Guild data in game (requests, reagent and gear-upgrade tooltips)
 
 The other direction: the helper downloads `GET /api/helper/guild-data` every
 15 minutes (and on connect, on "Upload now", and right after any upload the
@@ -215,6 +226,8 @@ your last login or reload.
 - Your own characters (addon 0.6.0): `characters`, by name, each claimed
   character as Guildie shows it now (the merged profile, below): see "Up to
   date with Guildie". About 0.5 KB per character.
+- Guild requests (addon 0.8.0): `requests` and `myRequests`; see "Guild
+  requests".
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.
 
@@ -288,6 +301,41 @@ is newer and takes over.
 
 Addon data is player-provided; Blizzard's can't be edited by the player.
 
+## Guild requests
+
+Members ask the guild for an item or a craft; a guildmate claims it and
+trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
+"Request this" in the item panel, "Request" on Crafting rows). Rules in
+`apps/web/convex/shared/requests.ts` (tested), handlers in
+`apps/web/convex/requests.ts`.
+
+- **Who:** only signed-in members (a claimed character in the guild's roster
+  now) see, post, claim or close requests, even in a public guild. Items:
+  any other member can claim. Crafts: only a member with a character that
+  knows the recipe (merged professions, so the addon's recipe reads count).
+- **Lifecycle:** open → claimed → done (the requester; the claimant can mark
+  it sent first) or cancelled (the requester). The claimant, or the
+  requester, can release a claim (back to open). 10 open per player per
+  guild, quantity 1-1000, note up to 140 characters.
+- **Stale:** no activity for 7 days shows as stale, with "Still need it?" on
+  the Requests page, in the sidebar and in the addon window. 30 days: the
+  daily cron (`expire stale requests`) closes it as expired.
+- **Mats for crafts:** sending the reagents is on the requester. The addon
+  records bags (on bag changes) and the bank (only while it's open), and the
+  app uploads them with everything else, so Guildie has them **as of the
+  player's last `/reload` or logout**, never live. If the bags and last bank
+  read of any of the player's characters cover the reagents, the request
+  says "Has the mats"; otherwise the player can tick "I have the mats", or
+  leave it "Mats not confirmed". The requester sees have/need per reagent
+  and when bags and bank were last read; nobody else ever sees the counts.
+  Claimed requests keep their mats state (the mats may be in the mail).
+- **In game:** `requests` in the guild data, by item id: `{ kind, quantity,
+  name, classId, claimedBy? }`, at most 5 per item and 300 items. The
+  tooltip line: "**Guildie**: Todd is requesting 20, claimed by Miller",
+  "Brenna wants this crafted (2)". `myRequests` `{ open, stale }` feeds the
+  window's "Your requests: 2 open (1 stale)". Enchants (no item) aren't on
+  tooltips.
+
 ## Verified in game
 
 - Talent reading (names and ranks) in WoW: Forever.
@@ -311,6 +359,14 @@ Addon data is player-provided; Blizzard's can't be edited by the player.
 - The 0.7.0 weapon and armor skill read in Forever: `GetSkillLineInfo`'s
   "Weapon Skills" and "Armor Proficiencies" sections, and `CanDualWield`.
   Once players upload them, `proficiencies:audit` says whether they match.
+
+- The 0.8.0 bag and bank reads in Forever: `C_Container.GetContainerNumSlots`
+  / `GetContainerItemInfo` (or the old globals), the bag index range
+  (`NUM_TOTAL_EQUIPPED_BAG_SLOTS` or `NUM_BAG_SLOTS`, bank `BANK_CONTAINER` and
+  `NUM_BANKBAGSLOTS` after the bags), and the events `BAG_UPDATE`,
+  `BAG_UPDATE_DELAYED`, `BANKFRAME_OPENED`/`_CLOSED`,
+  `PLAYERBANKSLOTS_CHANGED`, `PLAYERBANKBAGSLOTS_CHANGED`. The request line on
+  tooltips and the window's "Your requests" row.
 
 - The desktop app on Windows (built from macOS and smoke-tested there; see
   apps/desktop/README.md).

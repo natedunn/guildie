@@ -53,6 +53,12 @@ export const vProfession = v.object({
 	knownRecipes: v.optional(v.array(v.number())),
 });
 
+/** An item id and how many (inventory scans). */
+export const vItemCount = v.object({ id: v.number(), count: v.number() });
+
+/** A character as a request shows it. */
+export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
+
 export default defineSchema({
 	users: defineTable({
 		battletag: v.optional(v.string()),
@@ -336,6 +342,75 @@ export default defineSchema({
 	})
 		.index("by_specId", ["specId"])
 		.index("by_classId", ["classId"]),
+
+	/**
+	 * Each character's bags and last bank read, from the Guildie addon (payload
+	 * version 3). Private: never shown to anyone. Only used to tell a player,
+	 * for their own craft requests, whether they have the reagents
+	 * (convex/requests.ts). Item id → count.
+	 */
+	inventories: defineTable({
+		userId: v.id("users"),
+		flavor: vFlavor,
+		region: vRegion,
+		slug: v.string(),
+		bags: v.optional(v.object({ capturedAt: v.number(), items: v.array(vItemCount) })),
+		/** The bank as of the last time it was open in game. */
+		bank: v.optional(v.object({ capturedAt: v.number(), items: v.array(vItemCount) })),
+		receivedAt: v.number(),
+	})
+		.index("by_slug", ["flavor", "region", "slug"])
+		.index("by_user", ["userId"]),
+
+	/**
+	 * Guild requests: a member asks for an item or a craft, a guildmate claims
+	 * it, the requester marks it done. Only the guild's signed-in members see
+	 * them. Rules: convex/shared/requests.ts.
+	 */
+	requests: defineTable({
+		guildId: v.id("guilds"),
+		/** The requester, and the character they asked as. */
+		userId: v.id("users"),
+		character: vRequestCharacter,
+		kind: v.union(v.literal("item"), v.literal("craft")),
+		/** The item wanted, or the crafted item (none for enchants). */
+		itemId: v.optional(v.number()),
+		recipeId: v.optional(v.number()),
+		quantity: v.number(),
+		note: v.optional(v.string()),
+		status: v.union(
+			v.literal("open"),
+			v.literal("claimed"),
+			v.literal("done"),
+			v.literal("cancelled"),
+			v.literal("expired"),
+		),
+		claim: v.optional(
+			v.object({
+				userId: v.id("users"),
+				character: vRequestCharacter,
+				claimedAt: v.number(),
+				/** The claimant says it's in the mail (or traded); the requester confirms with done. */
+				sentAt: v.optional(v.number()),
+			}),
+		),
+		/** Crafts: how we know the requester has the reagents (shared/requests.ts, MatsState). */
+		mats: v.optional(
+			v.object({
+				state: v.union(v.literal("inventory"), v.literal("declared"), v.literal("missing")),
+				/** "I have the mats" ticked. */
+				declared: v.boolean(),
+				/** The scan the inventory check used. */
+				checkedAt: v.optional(v.number()),
+			}),
+		),
+		createdAt: v.number(),
+		lastActivityAt: v.number(),
+		closedAt: v.optional(v.number()),
+	})
+		.index("by_guild_status", ["guildId", "status"])
+		.index("by_user_status", ["userId", "status"])
+		.index("by_status_activity", ["status", "lastActivityAt"]),
 
 	/** Cached client-credentials tokens for the Blizzard API. */
 	apiTokens: defineTable({

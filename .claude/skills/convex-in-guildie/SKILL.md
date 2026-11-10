@@ -21,8 +21,9 @@ wrappers, no ORM.
 | `items.ts`, `recipes.ts`, `talents.ts`       | Static game data from Blizzard, synced in staggered batches                                                                                     |
 | `helper.ts`, `addonPayload.ts`, `profile.ts` | Addon uploads, guild data for the addon, newest-wins merge (docs/addon.md)                                                                      |
 | `auth*.ts`, `claims.ts`, `http.ts`           | Sign-in (auth-and-sign-in skill; ask before changing)                                                                                           |
-| `crons.ts`                                   | `sync guild rosters` hourly, `sync recipe catalog` weekly (also talent layouts)                                                                 |
+| `crons.ts`                                   | `sync guild rosters` hourly, `sync recipe catalog` weekly (also talent layouts), `expire stale requests` daily                                  |
 | `dev.ts`                                     | `seed`, `probe`, `addGuild`: dev helpers                                                                                                        |
+| `requests.ts`, `shared/requests.ts`          | Guild requests: handlers, and the rules (permissions, lifecycle, staleness, mats) as pure functions (docs/addon.md, "Guild requests")           |
 | `proficiencies.ts`                           | `audit`: players' in-game weapon/armor skills against the rules in `shared/proficiencies.ts` (docs/game-data.md)                                |
 | `shared/`                                    | Code the site and backend both import (`wow.ts`, gear rules). No Convex imports here, so `node --test` can run it; imports use `.ts` extensions |
 

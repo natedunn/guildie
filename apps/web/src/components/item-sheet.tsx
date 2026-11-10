@@ -9,11 +9,12 @@ import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-ro
 import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
+import { RequestButton, RequestRow } from "@/components/requests";
 
 // The item panel: click any item and it slides in from the right over the
 // page you're on (`?item=<id>`, so Back closes it). What the item is, who in
 // the guild can make it, who it might be an upgrade for, and what it's used
-// for; Wowhead is one click on.
+// for, and the guild's requests for it (members); Wowhead is one click on.
 
 /** The guild the page is about, so the panel can list its crafters. */
 function useGuildContext() {
@@ -61,6 +62,13 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 	const guild = useGuildContext();
 	const { data, isPending } = useQuery(convexQuery(api.crafting.itemDetail, { itemId, guild }));
 	const item = data?.item;
+	// Requests: only for the guild's members (null otherwise).
+	const where = data?.guild ? { region: data.guild.region as Region, slug: data.guild.slug } : undefined;
+	const { data: requests } = useQuery({
+		...convexQuery(api.requests.forItem, { region: where?.region ?? "us", slug: where?.slug ?? "", itemId }),
+		enabled: !!where,
+	});
+	const member = where && requests ? { guild: where, characters: requests.characters } : undefined;
 	return (
 		<>
 			<div className="flex flex-none items-start gap-3 border-b border-border p-4">
@@ -87,6 +95,36 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					<div className="item-tooltip rounded-md border px-3 py-2">
 						<ItemTooltipBody item={{ itemId, name: item.name, quality: item.quality, tooltip: item.tooltip }} />
 					</div>
+				)}
+
+				{member && (
+					<Section title="Requests">
+						{requests && requests.requests.length > 0 && (
+							<ul className="divide-y divide-border rounded-md border border-border px-3">
+								{requests.requests.map((r) => (
+									<RequestRow key={r._id} request={r} compact />
+								))}
+							</ul>
+						)}
+						<div className="flex items-center gap-2">
+							<RequestButton
+								guild={member.guild}
+								characters={member.characters}
+								target={{
+									kind: "item",
+									itemId,
+									name: item?.name ?? `Item ${itemId}`,
+									quality: item?.quality,
+									icon: item?.icon,
+								}}
+							/>
+							<span className="text-xs text-muted-foreground">
+								{requests && requests.requests.length > 0
+									? "Shows on this item's tooltip in game too."
+									: `Ask ${member.guild.slug === data?.guild?.slug ? data?.guild?.name : "the guild"} for it.`}
+							</span>
+						</div>
+					</Section>
 				)}
 
 				{data && data.craftedBy.length > 0 && (
@@ -134,6 +172,22 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 											))
 										)}
 									</p>
+								)}
+								{member && r.crafters.length > 0 && (
+									<RequestButton
+										guild={member.guild}
+										characters={member.characters}
+										size="xs"
+										target={{
+											kind: "craft",
+											recipeId: r.recipeId,
+											name: r.item?.name ?? r.name,
+											itemId: r.item?.itemId,
+											quality: r.item?.quality,
+											icon: r.item?.icon,
+											crafters: r.crafters,
+										}}
+									/>
 								)}
 							</div>
 						))}

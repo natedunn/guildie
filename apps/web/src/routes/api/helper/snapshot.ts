@@ -4,12 +4,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { bearerToken, convex, errorResponse, json } from "@/lib/helper-api";
 
 // POST /api/helper/snapshot: the helper uploads what the addon saved.
-// Body: { "version": 1 | 2, "characters": [ ... ] } (docs/addon.md, "API").
+// Body: { "version": 1 | 2 | 3, "characters": [ ... ] } (docs/addon.md, "API").
 // 200 { accepted: [slug], unmatched: [name], rejected: [name] }. Characters
 // must be claimed by the token's owner; each is checked on its own
 // (convex/addonPayload.ts), so one bad character doesn't sink the rest.
 // Version 2 carries gear with tooltips and every profession's recipes: a few
-// tens of KB per character, so the cap leaves room for a full account.
+// tens of KB per character (version 3 adds bags and bank, a few KB), so the
+// cap leaves room for a full account.
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 export const Route = createFileRoute("/api/helper/snapshot")({

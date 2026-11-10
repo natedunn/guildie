@@ -6,6 +6,7 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { mergeProfile } from "./profile";
+import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
@@ -142,6 +143,7 @@ export const ingest = mutation({
 			.withIndex("by_user", (q) => q.eq("userId", row.userId))
 			.collect();
 		const accepted: string[] = [];
+		let inventoryChanged = false;
 		const unmatched: string[] = [];
 		const rejected: string[] = [];
 		// Each profession's catalog, read once per upload.
@@ -257,6 +259,7 @@ export const ingest = mutation({
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
 			accepted.push(match.slug);
+			if (c.inventory && (await storeInventory(ctx, row.userId, key, c.inventory, now))) inventoryChanged = true;
 
 			// Icons (and names, where Blizzard's item API has none) for gear we
 			// haven't seen yet, with the game's tooltip as the fallback.
@@ -277,9 +280,35 @@ export const ingest = mutation({
 				});
 			}
 		}
+		// A newer bag or bank read: re-check the player's open craft requests.
+		if (inventoryChanged) await refreshMats(ctx, row.userId);
 		return { accepted, unmatched, rejected };
 	},
 });
+
+/**
+ * Bags and the last bank read (payload 3), each kept only when newer. Private
+ * (schema.ts, inventories). Returns whether anything changed.
+ */
+async function storeInventory(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	key: Pick<Doc<"characters">, "flavor" | "region" | "slug">,
+	inventory: NonNullable<AddonCharacter["inventory"]>,
+	now: number,
+) {
+	const existing = await ctx.db
+		.query("inventories")
+		.withIndex("by_slug", (q) => q.eq("flavor", key.flavor).eq("region", key.region).eq("slug", key.slug))
+		.unique();
+	const bags = newer(inventory.bags, existing?.bags);
+	const bank = newer(inventory.bank, existing?.bank);
+	if (existing && bags === existing.bags && bank === existing.bank && existing.userId === userId) return false;
+	const row = { userId, ...key, bags, bank, receivedAt: now };
+	if (existing) await ctx.db.replace(existing._id, row);
+	else await ctx.db.insert("inventories", row);
+	return true;
+}
 
 function matchOwned(owned: Doc<"ownedCharacters">[], c: AddonCharacter) {
 	const id = blizzardIdFromGuid(c.guid);
@@ -464,6 +493,8 @@ type GuildDataBase = {
 	/** Active guildmates (not the token owner's own characters) for gear-upgrade suggestions. */
 	upgradeMembers: UpgradeMember[];
 	characters: GuildData["characters"];
+	requests: GuildData["requests"];
+	myRequests: GuildData["myRequests"];
 };
 
 export type GuildData = {
@@ -489,6 +520,13 @@ export type GuildData = {
 	 * with the live game ("3 changes not on Guildie yet"). See addonView.ts.
 	 */
 	characters: Record<string, AddonView>;
+	/**
+	 * Guild requests (addon 0.8.0+; older addons ignore it): each active
+	 * request by item id ("Todd is requesting 20", "claimed by Miller"), and
+	 * the player's own counts for the addon window.
+	 */
+	requests: Record<string, AddonRequest[]>;
+	myRequests: { open: number; stale: number };
 };
 
 /** The token's guilds (those its claimed characters are in) and their members. */
@@ -550,7 +588,15 @@ export const guildDataBase = internalQuery({
 				})),
 			});
 		}
-		return { mine: owned.map((c) => c.name), guilds, upgradeMembers, characters };
+		const requests = await addonRequests(ctx, [...guildIds], row.userId);
+		return {
+			mine: owned.map((c) => c.name),
+			guilds,
+			upgradeMembers,
+			characters,
+			requests: requests.byItem,
+			myRequests: requests.mine,
+		};
 	},
 });
 
@@ -614,6 +660,8 @@ export const guildData = action({
 			reagents,
 			upgrades: { version: 1, rules: upgradeRules(), members: base.upgradeMembers },
 			characters: base.characters,
+			requests: base.requests,
+			myRequests: base.myRequests,
 		};
 	},
 });

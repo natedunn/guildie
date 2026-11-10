@@ -165,6 +165,31 @@ function wow.reset(state)
         if l.item then return link({ id = l.item, name = l.name }) end
         return "|cffffffff|Henchant:" .. (7000 + i) .. "|h[" .. l.name .. "]|h|r"
     end
+    -- Bags and bank: state.bags = { [bag] = { slots = n, [slot] = { id, count } } };
+    -- state.containerApi "modern" (C_Container), "classic" (globals) or nil (none).
+    state.bags = state.bags or {}
+    _G.C_Container = nil
+    _G.GetContainerNumSlots = nil
+    _G.GetContainerItemInfo = nil
+    local function slots(bag) return state.bags[bag] and state.bags[bag].slots or 0 end
+    local function slotItem(bag, slot) local b = state.bags[bag] return b and b[slot] end
+    if state.containerApi == "modern" then
+        _G.C_Container = {
+            GetContainerNumSlots = slots,
+            GetContainerItemInfo = function(bag, slot)
+                local item = slotItem(bag, slot)
+                if item then return { itemID = item[1], stackCount = item[2] } end
+            end,
+        }
+    elseif state.containerApi == "classic" then
+        _G.GetContainerNumSlots = slots
+        _G.GetContainerItemInfo = function(bag, slot)
+            local item = slotItem(bag, slot)
+            if not item then return nil end
+            -- Older clients have no itemID return: only the link.
+            return "icon", item[2], false, 1, false, false, link({ id = item[1], name = "x" })
+        end
+    end
     -- No talents API: talents keep their last read (or none).
     _G.C_Traits = nil
     _G.C_ClassTalents = nil

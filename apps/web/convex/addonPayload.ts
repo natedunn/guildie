@@ -1,11 +1,12 @@
 // What the Guildie addon uploads (apps/addon, through the desktop app):
 // parsing and strict validation, one character at a time, so one bad
 // character doesn't sink the rest of an upload. Payload versions 1 (talents
-// and level) and 2 (plus guild, XP, gear, professions and known recipes; from
-// addon 0.7.0 also weapon and armor skills) are both accepted. Kept free of Convex and value imports so `node --test` can
-// run it (addonPayload.test.ts).
+// and level), 2 (plus guild, XP, gear, professions and known recipes; from
+// addon 0.7.0 also weapon and armor skills) and 3 (addon 0.8.0: plus bags and
+// the last bank read, for guild requests) are all accepted. Kept free of
+// Convex and value imports so `node --test` can run it (addonPayload.test.ts).
 
-export const PAYLOAD_VERSIONS = [1, 2] as const;
+export const PAYLOAD_VERSIONS = [1, 2, 3] as const;
 
 export const LIMITS = {
 	characters: 50,
@@ -17,6 +18,8 @@ export const LIMITS = {
 	combatSkills: 40,
 	recipeProfessions: 15,
 	recipesPerProfession: 1500,
+	/** Different items in bags, or in the bank (each stack summed by the addon). */
+	inventoryItems: 600,
 	name: 120,
 } as const;
 
@@ -120,7 +123,15 @@ export type AddonCharacter = {
 	 * by `proficiencies:audit`.
 	 */
 	proficiencies?: { capturedAt: number; level?: number; skills: string[]; dualWield?: boolean };
+	/**
+	 * Bags and the bank (as of when it was last open), item id → count
+	 * (payload 3, addon 0.8.0). Private: only used for the player's own craft
+	 * requests (convex/requests.ts).
+	 */
+	inventory?: { bags?: InventoryPart; bank?: InventoryPart };
 };
+
+export type InventoryPart = { capturedAt: number; items: { id: number; count: number }[] };
 
 class Invalid extends Error {}
 
@@ -284,6 +295,27 @@ function proficiencies(x: unknown, now: number): AddonCharacter["proficiencies"]
 	return { capturedAt, ...(level ? { level } : {}), skills, ...(dualWield !== undefined ? { dualWield } : {}) };
 }
 
+function inventoryPart(x: unknown, path: string, now: number): InventoryPart {
+	const e = obj(x, path);
+	const capturedAt = time(e.capturedAt, `${path}.capturedAt`, now);
+	const counts = new Map<number, number>();
+	for (const [i, raw] of arr(e.items, `${path}.items`, LIMITS.inventoryItems).entries()) {
+		const p = `${path}.items[${i}]`;
+		const item = obj(raw, p);
+		const id = int(item.id, `${p}.id`, 1, 100_000_000);
+		const count = int(item.count, `${p}.count`, 1, 1_000_000);
+		counts.set(id, (counts.get(id) ?? 0) + count);
+	}
+	return { capturedAt, items: [...counts].map(([id, count]) => ({ id, count })) };
+}
+
+function inventory(x: unknown, now: number): AddonCharacter["inventory"] {
+	const e = obj(x, "inventory");
+	const bags = opt(e.bags, (b) => inventoryPart(b, "inventory.bags", now));
+	const bank = opt(e.bank, (b) => inventoryPart(b, "inventory.bank", now));
+	return bags || bank ? { ...(bags ? { bags } : {}), ...(bank ? { bank } : {}) } : undefined;
+}
+
 export type Parsed = { ok: true; character: AddonCharacter } | { ok: false; name: string; error: string };
 
 /** One uploaded character, checked field by field. `now`: the server's clock (ms). */
@@ -321,6 +353,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			professions: opt(c.professions, (p) => professions(p, now)),
 			recipes: opt(c.recipes, (r) => recipes(r, now)) ?? [],
 			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
+			inventory: opt(c.inventory, (i) => inventory(i, now)),
 		};
 		return { ok: true, character };
 	} catch (error) {

@@ -80,7 +80,7 @@ test("captures level, XP, guild, gear and professions on login", function()
     wow.load(state)
     wow.fire("PLAYER_ENTERING_WORLD")
     local p = payload(state.db)
-    eq(p.version, 2, "version")
+    eq(p.version, 3, "version")
     eq(#p.characters, 1, "characters")
     local c = p.characters[1]
     eq(c.guid, "Player-4904-004E2B22")
@@ -382,9 +382,102 @@ end)
 -- The end-to-end check's input: a SavedVariables file like the game's, for
 -- Lich with gear, professions and recipes (some the catalog knows, one it
 -- doesn't). Arguments: output path, level, game time, GUID.
+-- ---- Bags and bank (0.8.0, guild requests) ---------------------------------------
+
+--- Lich's bags: linen in two stacks, thread; the bank holds more linen.
+local function withBags(api)
+    return lich({
+        containerApi = api,
+        bags = {
+            [0] = { slots = 16, [1] = { 2589, 20 }, [2] = { 2589, 5 }, [5] = { 2320, 4 } },
+            [1] = { slots = 6, [1] = { 2996, 2 } },
+            [-1] = { slots = 28, [3] = { 2589, 40 } },
+            [5] = { slots = 10, [1] = { 4306, 7 } },
+        },
+    })
+end
+
+local function counts(part)
+    local out = {}
+    for _, item in ipairs(part and part.items or {}) do out[item.id] = item.count end
+    return out
+end
+
+test("bags: summed by item on every read, in payload version 3", function()
+    local state = withBags("modern")
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local c = payload(state.db).characters[1]
+    local bags = counts(c.inventory.bags)
+    eq(bags[2589], 25, "two linen stacks")
+    eq(bags[2320], 4, "thread")
+    eq(bags[2996], 2, "bag 1")
+    eq(bags[4306], nil, "bank bags aren't bags")
+    eq(c.inventory.bags.capturedAt, state.time)
+    eq(c.inventory.bank, nil, "bank never opened")
+end)
+
+test("bags: the classic API (item id from the link) works too", function()
+    local state = withBags("classic")
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(counts(payload(state.db).characters[1].inventory.bags)[2589], 25)
+end)
+
+test("bags: no container API means no inventory, not an empty one", function()
+    local state = withBags(nil)
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(payload(state.db).characters[1].inventory, nil)
+end)
+
+test("bag changes update the save; the payload catches up on logout; never 'not on Guildie'", function()
+    local state = withBags("modern")
+    local ns = wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    state.bags[0][1] = { 2589, 1 }
+    state.time = state.time + 30
+    wow.fire("BAG_UPDATE", 0)
+    local saved = state.db.characters[state.guid].inventory.bags
+    eq(counts(saved)[2589], 6, "saved read updated")
+    eq(saved.capturedAt, state.time)
+    eq(counts(payload(state.db).characters[1].inventory.bags)[2589], 25, "payload not re-encoded on loot")
+    eq(ns.dirty, false, "bags aren't a change to upload")
+    wow.fire("PLAYER_LOGOUT")
+    eq(counts(payload(state.db).characters[1].inventory.bags)[2589], 6, "logout writes it")
+end)
+
+test("bank: read only while open, kept with its time after closing", function()
+    local state = withBags("modern")
+    local ns = wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    wow.fire("PLAYERBANKSLOTS_CHANGED")
+    eq(state.db.characters[state.guid].inventory.bank, nil, "closed: not read")
+    local openedAt = state.time + 60
+    state.time = openedAt
+    wow.fire("BANKFRAME_OPENED")
+    eq(ns.bankOpen, true)
+    local bank = state.db.characters[state.guid].inventory.bank
+    eq(counts(bank)[2589], 40, "bank slots")
+    eq(counts(bank)[4306], 7, "bank bags")
+    eq(counts(bank)[2320], nil, "bags aren't the bank")
+    eq(bank.capturedAt, openedAt)
+    wow.fire("BANKFRAME_CLOSED")
+    eq(ns.bankOpen, false)
+    state.time = state.time + 3600
+    state.bags[-1][3] = nil
+    wow.fire("PLAYER_LOGOUT")
+    local c = payload(state.db).characters[1]
+    eq(counts(c.inventory.bank)[2589], 40, "last bank read kept")
+    eq(c.inventory.bank.capturedAt, openedAt, "with when it was read")
+    eq(c.inventory.bags.capturedAt, state.time, "bags read again on logout")
+end)
+
 local out = arg and arg[1]
 if out then
     local state = lich({ level = tonumber(arg[2]) or 36, time = tonumber(arg[3]) or os.time(), guid = arg[4] or "Player-4904-004E2BA2" })
+    state.containerApi = "modern"
+    state.bags = { [0] = { slots = 16, [1] = { 2589, 20 }, [2] = { 2321, 6 } } }
     state.skillLines = {
         { header = true, name = "Professions" },
         { name = "Tailoring", rank = 215, max = 225, abandonable = true },

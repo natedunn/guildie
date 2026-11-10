@@ -11,8 +11,8 @@
 
 local ADDON, ns = ...
 -- The payload's format. 2 added guild, XP, gear, professions and recipes;
--- the site accepts 1 too.
-local VERSION = 2
+-- 3 (0.8.0) bags and the last bank read. The site accepts all three.
+local VERSION = 3
 
 GuildieDB = GuildieDB or {}
 
@@ -93,6 +93,8 @@ end
 ns.encode = encode
 
 --- A short fingerprint of what we'd upload, to tell whether it changed.
+--- Bags and bank are left out: they change all the time, and they're not
+--- what "changes not on Guildie yet" is about.
 local function fingerprint(character)
     local parts = { "level=" .. tostring(character.level), "guild=" .. tostring(character.guild and character.guild.name) }
     for _, t in ipairs(character.talents or {}) do table.insert(parts, "t" .. t.id .. ":" .. t.rank) end
@@ -208,6 +210,7 @@ local function capture(reason, recipes)
         professions = previous.professions,
         recipes = previous.recipes,
         proficiencies = previous.proficiencies,
+        inventory = previous.inventory,
     }
     if okGear and equipment then
         equipment.capturedAt = now
@@ -226,6 +229,7 @@ local function capture(reason, recipes)
             dualWield = prof.dualWield,
         }
     end
+    character.inventory = ns.readInventory(character.inventory, now)
     if recipes and recipes.profession and recipes.known then
         character.recipes = mergeRecipes(character.recipes, recipes.profession, recipes.known, now)
     end
@@ -253,6 +257,31 @@ local function capture(reason, recipes)
     if ns.onCapture then ns.onCapture() end
 end
 ns.capture = capture
+
+--- Bags (and the bank while it's open) on top of `previous`, each with the
+--- time it was read; a part that can't be read keeps its last read.
+function ns.readInventory(previous, now)
+    local inventory = { bags = previous and previous.bags, bank = previous and previous.bank }
+    local okBags, bags = pcall(ns.readBags)
+    if okBags and bags then inventory.bags = { capturedAt = now, items = bags } end
+    if ns.bankOpen then
+        local okBank, bank = pcall(ns.readBank)
+        if okBank and bank then inventory.bank = { capturedAt = now, items = bank } end
+    end
+    if not inventory.bags and not inventory.bank then return nil end
+    return inventory
+end
+
+--- Bags or bank changed: update the saved read only. The payload is rebuilt
+--- at the next full read (at the latest on logout or /reload, right before
+--- the game saves), so looting doesn't re-encode everything.
+local function captureInventory()
+    local guid = UnitGUID("player")
+    local character = guid and GuildieDB.characters and GuildieDB.characters[guid]
+    if not character then return capture("inventory") end
+    character.inventory = ns.readInventory(character.inventory, GetServerTime())
+end
+ns.captureInventory = captureInventory
 
 --- A profession window is open: read its recipes, then save.
 local function captureRecipes(which, reason)
@@ -289,13 +318,25 @@ local EVENTS = {
     TRADE_SKILL_LIST_UPDATE = "trade",
     CRAFT_SHOW = "craft",
     CRAFT_UPDATE = "craft",
+    BAG_UPDATE = "inventory",
+    BAG_UPDATE_DELAYED = "inventory",
+    BANKFRAME_OPENED = "inventory",
+    PLAYERBANKSLOTS_CHANGED = "inventory",
+    PLAYERBANKBAGSLOTS_CHANGED = "inventory",
+    BANKFRAME_CLOSED = "bankClosed",
     PLAYER_LOGOUT = "all",
 }
 
 -- Events come in bursts (gear swaps, crafting); one read a second is plenty.
 local pending = {}
 local function run(kind, event)
-    if kind == "all" then capture(event) else captureRecipes(kind, event) end
+    if kind == "all" then
+        capture(event)
+    elseif kind == "inventory" then
+        captureInventory()
+    else
+        captureRecipes(kind, event)
+    end
 end
 
 local frame = CreateFrame("Frame")
@@ -305,6 +346,12 @@ for event in pairs(EVENTS) do
 end
 frame:SetScript("OnEvent", function(_, event)
     local kind = EVENTS[event]
+    -- The bank answers only while it's open: track that right away.
+    if event == "BANKFRAME_OPENED" then ns.bankOpen = true end
+    if kind == "bankClosed" then
+        ns.bankOpen = false
+        return
+    end
     -- PLAYER_LOGOUT (also sent on /reload) can't wait: the game saves right after.
     if event == "PLAYER_LOGOUT" or not C_Timer then
         run(kind, event)

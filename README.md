@@ -5,14 +5,15 @@ who's in the guild, their level, class, race, rank, gear, talents,
 professions and recipes, and in game, which guildmates an item would help.
 
 - **The site**, [guildie.club](https://guildie.club): rosters, characters,
-  what the guild can craft. Sign in with Battle.net and claim your characters.
+  what the guild can craft, and guild requests (ask for reagents or a craft,
+  a guildmate claims it). Sign in with Battle.net and claim your characters.
 - **The Windows app** ([download](https://github.com/natedunn/guildie/releases/latest)):
   the site in its own window. It installs and updates the addon, uploads what
   the addon saves, so your character shows up after a `/reload` instead of
   after Blizzard catches up, and updates itself.
 - **The addon**: saves what the game knows about your character, and adds
-  guild hints to item tooltips (who needs this reagent, who this gear is an
-  upgrade for). It comes with the app.
+  guild hints to item tooltips (who's requesting this, who needs this
+  reagent, who this gear is an upgrade for). It comes with the app.
 
 Open source and built by guild members. Want to help?
 [CONTRIBUTING.md](CONTRIBUTING.md). Where it's headed:

@@ -4,6 +4,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import {
 	AnvilIcon,
 	Cancel01Icon,
+	InboxIcon,
 	KnightShieldIcon,
 	Login03Icon,
 	Menu01Icon,
@@ -57,6 +58,11 @@ export function Wordmark() {
 
 function SidebarNav() {
 	const { data: viewer } = useQuery(convexQuery(api.users.viewer, {}));
+	// Requests you could fill, per guild, and yours that went quiet (members only).
+	const { data: requests } = useQuery({ ...convexQuery(api.requests.sidebar, {}), enabled: !!viewer });
+	const requestsIn = (g: { region: string; slug: string }) =>
+		requests?.guilds.find((r) => r.region === g.region && r.slug === g.slug);
+	const stale = (requests?.guilds ?? []).filter((g) => g.stale > 0);
 	// Your guilds, plus the one you're looking at if it isn't yours, so its
 	// pages are always one click away (the guild page itself has no tabs).
 	const current = useCurrentGuild();
@@ -99,6 +105,21 @@ function SidebarNav() {
 											<HugeiconsIcon icon={KnightShieldIcon} size={15} strokeWidth={1.75} />
 											Gear
 										</NavLink>
+										{requestsIn(g) && (
+											<NavLink
+												to="/g/$region/$slug/requests"
+												params={{ region: g.region, slug: g.slug }}
+												className="pl-3"
+											>
+												<HugeiconsIcon icon={InboxIcon} size={15} strokeWidth={1.75} />
+												<span className="flex-1">Requests</span>
+												{(requestsIn(g)?.canHelp ?? 0) > 0 && (
+													<span className="num text-xs text-muted-foreground" title="Open requests you could fill">
+														{requestsIn(g)?.canHelp}
+													</span>
+												)}
+											</NavLink>
+										)}
 									</div>
 								</div>
 							))}
@@ -128,6 +149,22 @@ function SidebarNav() {
 			</div>
 
 			<div className="flex-none space-y-px border-t border-border px-2 pt-2 pb-2">
+				{stale.map((g) => (
+					<Link
+						key={`${g.region}/${g.slug}`}
+						to="/g/$region/$slug/requests"
+						params={{ region: g.region, slug: g.slug }}
+						search={{ view: "mine" }}
+						className="mx-0.5 mb-2 block rounded-md border border-border px-3 py-2 text-[0.8125rem] hover:bg-hover"
+					>
+						<span className="block font-medium">
+							{g.stale === 1 ? "1 request is" : `${g.stale} requests are`} over a week old
+						</span>
+						<span className="block text-xs text-muted-foreground">
+							{stale.length > 1 ? `${g.name}: still` : "Still"} need {g.stale === 1 ? "it" : "them"}?
+						</span>
+					</Link>
+				))}
 				<UpdateReady />
 				<UpdatedNotice />
 				{viewer ? (

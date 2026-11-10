@@ -22,6 +22,7 @@ const TAB_LABELS: Record<string, string> = {
 	"/settings/app": "App",
 	"/g/$region/$slug/crafting": "Crafting",
 	"/g/$region/$slug/gear": "Gear",
+	"/g/$region/$slug/requests": "Requests",
 	"/c/$region/$slug/talents": "Talents",
 	"/c/$region/$slug/professions": "Professions",
 };

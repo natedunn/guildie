@@ -180,6 +180,63 @@ test("rejects bad shapes, sizes and clocks, naming the field", () => {
 	}
 });
 
+test("version 3: bags and the last bank read (addon 0.8.0)", () => {
+	const r = parseCharacter(
+		{
+			...v2,
+			inventory: {
+				bags: {
+					capturedAt: T,
+					items: [
+						{ id: 2589, count: 20 },
+						{ id: 2589, count: 5 },
+						{ id: 2320, count: 1 },
+					],
+				},
+				bank: { capturedAt: T - 86_400, items: [] },
+			},
+		},
+		NOW,
+	);
+	assert.ok(r.ok);
+	assert.deepEqual(r.character.inventory, {
+		bags: {
+			capturedAt: T * 1000,
+			items: [
+				{ id: 2589, count: 25 },
+				{ id: 2320, count: 1 },
+			],
+		},
+		bank: { capturedAt: (T - 86_400) * 1000, items: [] },
+	});
+	const none = parseCharacter({ ...v2, inventory: {} }, NOW);
+	assert.ok(none.ok);
+	assert.equal(none.character.inventory, undefined, "nothing read: not sent");
+	const bags = parseCharacter({ ...v2, inventory: { bags: { capturedAt: T, items: [] } } }, NOW);
+	assert.ok(bags.ok);
+	assert.equal(bags.character.inventory?.bank, undefined, "bank never opened");
+	const bad: [unknown, RegExp][] = [
+		[
+			{ ...v2, inventory: { bags: { capturedAt: T, items: [{ id: 1, count: 0 }] } } },
+			/bags.items\[0\].count: out of range/,
+		],
+		[{ ...v2, inventory: { bank: { capturedAt: T, items: [{ id: "x", count: 1 }] } } }, /bank.items\[0\].id/],
+		[
+			{
+				...v2,
+				inventory: { bags: { capturedAt: T, items: Array.from({ length: 601 }, (_, i) => ({ id: i + 1, count: 1 })) } },
+			},
+			/bags.items: more than 600/,
+		],
+		[{ ...v2, inventory: { bags: { capturedAt: NOW / 1000 + 3600, items: [] } } }, /bags.capturedAt: in the future/],
+	];
+	for (const [raw, error] of bad) {
+		const p = parseCharacter(raw, NOW);
+		assert.equal(p.ok, false);
+		if (!p.ok) assert.match(p.error, error);
+	}
+});
+
 test("null means not sent", () => {
 	const r = parseCharacter({ ...v2, xp: null, guild: null, equipment: null }, NOW);
 	assert.ok(r.ok);

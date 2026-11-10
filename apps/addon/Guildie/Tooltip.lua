@@ -1,5 +1,6 @@
--- Adds lines to item tooltips: guildmates whose known recipes use this item
--- (reagents), and guildmates it might be a gear upgrade for (Upgrades.lua).
+-- Adds lines to item tooltips: guild requests for this item ("Todd is
+-- requesting 20"), guildmates whose known recipes use it (reagents), and
+-- guildmates it might be a gear upgrade for (Upgrades.lua).
 -- Suggestions, not certainties: knowing a recipe doesn't mean they're still
 -- making it. Data comes from GuildieData.lua, which the helper downloads.
 
@@ -50,6 +51,38 @@ local function suggestion(itemID)
 end
 ns.reagentSuggestion = suggestion
 
+--- "Guildie: Todd is requesting 20, claimed by Miller; you want this
+--- crafted", from the guild's open requests (GuildieData.requests, addon
+--- 0.8.0), or nil.
+local function requestLine(itemID)
+    local list = GuildieData and type(GuildieData.requests) == "table" and GuildieData.requests[itemID]
+    if type(list) ~= "table" or #list == 0 then return nil end
+    local parts = {}
+    for _, r in ipairs(list) do
+        if type(r) == "table" and r.name then
+            local mine = isMine(r.name)
+            local who = mine and "you" or classColored(r.name, r.classId)
+            local text
+            if r.kind == "craft" then
+                text = who .. (mine and " want" or " wants") .. " this crafted"
+                if (r.quantity or 1) > 1 then text = text .. string.format(" (%d)", r.quantity) end
+            else
+                text = who .. (mine and " are" or " is") .. string.format(" requesting %d", r.quantity or 1)
+            end
+            if type(r.claimedBy) == "table" and r.claimedBy.name then
+                text = text .. ", claimed by " .. classColored(r.claimedBy.name, r.claimedBy.classId)
+            end
+            table.insert(parts, text)
+        end
+    end
+    if #parts == 0 then return nil end
+    local text = table.concat(parts, "; ")
+    -- "you are requesting" reads oddly first in the line: capitalize.
+    text = text:gsub("^you", "You")
+    return GOLD .. "Guildie|r: " .. text
+end
+ns.requestLine = requestLine
+
 --- The gear-upgrade line for the item in this tooltip, if any.
 local function upgradeLine(tooltip, itemID, data)
     if not ns.upgrades or not tooltip.GetItem then return nil end
@@ -64,6 +97,11 @@ local function addTo(tooltip, itemID, data)
     -- Not our own hidden tooltip, which reads worn gear (Capture.lua).
     if tooltip.GetName and tooltip:GetName() == "GuildieScanTooltip" then return end
     local added = false
+    local request = requestLine(itemID)
+    if request then
+        tooltip:AddLine(request, 1, 1, 1, true)
+        added = true
+    end
     local line = suggestion(itemID)
     if line then
         tooltip:AddLine(line, 1, 1, 1, true)

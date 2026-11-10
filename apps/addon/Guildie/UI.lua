@@ -230,6 +230,17 @@ function ns.windowState()
     else
         s.guildData = "None yet. The Guildie app downloads your guild's data; it loads at login and /reload."
     end
+
+    -- Guild requests (0.8.0): yours, with a nudge when some went quiet.
+    local mine = type(GuildieData) == "table" and type(GuildieData.myRequests) == "table" and GuildieData.myRequests
+    if mine and (mine.open or 0) > 0 then
+        local stale = mine.stale or 0
+        s.requests = "Your requests: " .. string.format("%d open", mine.open)
+            .. (stale > 0 and string.format(" (%d stale)", stale) or "")
+        s.requestsHint = GREY .. (stale > 0
+            and "Still need them? Keep or close them on guildie.club (Requests)."
+            or "Manage them on guildie.club (Requests).") .. "|r"
+    end
     return s
 end
 
@@ -243,6 +254,8 @@ local function refresh()
     setRow(window.synced, s.synced)
     setRow(window.next, s.next)
     setRow(window.guildData, s.guildData)
+    setRow(window.requests, s.requests)
+    setRow(window.requestsHint, s.requestsHint)
     layout()
 end
 ns.onCapture = refresh
@@ -281,6 +294,8 @@ local function buildWindow()
     window.synced = text("GameFontHighlightSmall")
     window.next = text("GameFontHighlightSmall")
     window.guildData = text("GameFontHighlightSmall")
+    window.requests = text("GameFontHighlightSmall")
+    window.requestsHint = text("GameFontHighlightSmall")
 
     local upload = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
     upload:SetSize(170, 22)
@@ -316,6 +331,8 @@ local function buildWindow()
         { el = upload, gap = 6, height = 22 },
         { el = heading("Item tooltips"), gap = 16 },
         { el = window.guildData, gap = 6 },
+        { el = window.requests, gap = 6 },
+        { el = window.requestsHint, gap = 2 },
         { el = heading("Options"), gap = 16 },
         { el = window.afk, gap = 2, dx = -4, height = 24 },
         { el = window.minimap, gap = -2, dx = -4, height = 24 },

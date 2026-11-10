@@ -12,6 +12,10 @@ into that version's section.
 
 ## Unreleased
 
+### New
+
+- Guild requests: ask your guild for reagents or a craft (open an item, or Request on Crafting), and claim what you can make. The requester marks it done; requests over a week old ask "Still need this?", and close after 30 days. In game, tooltips say who's requesting an item (addon 0.8.0). For crafts, the app checks your bags and bank as of your last /reload or logout, so guildmates see "Has the mats"; nobody else sees what's in your bags.
+
 ### Improvements
 
 - The app checks for updates every hour instead of every 6 hours.

@@ -309,3 +309,70 @@ function ns.readRecipes(which)
     if which == "craft" then return readCraft() end
     return readTradeSkill()
 end
+
+-- ---- Bags and bank (guild requests) ------------------------------------------
+-- What's in your bags, and in your bank as of the last time it was open, as
+-- item id -> count. guildie.club uses it only to tell you whether you have
+-- the reagents for your own craft requests; nobody else sees it. Like the
+-- rest, it reaches Guildie when the game saves (/reload or logout).
+
+local function numSlots(bag)
+    if C_Container and C_Container.GetContainerNumSlots then return C_Container.GetContainerNumSlots(bag) or 0 end
+    if GetContainerNumSlots then return GetContainerNumSlots(bag) or 0 end
+    return nil
+end
+
+--- itemID, count in one slot (nil when empty).
+local function slotItem(bag, slot)
+    if C_Container and C_Container.GetContainerItemInfo then
+        local info = C_Container.GetContainerItemInfo(bag, slot)
+        if info then return info.itemID, info.stackCount end
+        return nil
+    end
+    if GetContainerItemInfo then
+        local _, count, _, _, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
+        return id or itemIdOf(link), count
+    end
+end
+
+--- { { id, count }, ... } summed over `bags`, or nil when the game can't say
+--- (no container API, or nothing loaded yet).
+local function readContainers(bags)
+    local counts, order, slots = {}, {}, 0
+    for _, bag in ipairs(bags) do
+        local n = numSlots(bag)
+        if n == nil then return nil end
+        slots = slots + n
+        for slot = 1, n do
+            local id, count = slotItem(bag, slot)
+            if id and id > 0 then
+                if not counts[id] then table.insert(order, id) end
+                counts[id] = (counts[id] or 0) + (count and count > 0 and count or 1)
+            end
+        end
+    end
+    if slots == 0 then return nil end
+    local items = {}
+    for _, id in ipairs(order) do table.insert(items, { id = id, count = counts[id] }) end
+    return items
+end
+
+--- The last bag on your character: the backpack is 0, then bag slots (and a
+--- reagent bag on clients that have one).
+local function lastBag()
+    return NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4
+end
+
+function ns.readBags()
+    local bags = {}
+    for bag = 0, lastBag() do table.insert(bags, bag) end
+    return readContainers(bags)
+end
+
+--- Only while the bank is open (the game doesn't answer otherwise).
+function ns.readBank()
+    local bank = BANK_CONTAINER or -1
+    local bags = { bank }
+    for i = 1, NUM_BANKBAGSLOTS or 6 do table.insert(bags, lastBag() + i) end
+    return readContainers(bags)
+end

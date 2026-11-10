@@ -11,4 +11,7 @@ crons.weekly(
 	{},
 );
 
+// Guild requests with no activity for 30 days close as expired (requests.ts).
+crons.daily("expire stale requests", { hourUTC: 8, minuteUTC: 30 }, internal.requests.expireStale, {});
+
 export default crons;

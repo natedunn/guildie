@@ -1,7 +1,7 @@
 import { api } from "@convex/_generated/api";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
@@ -13,6 +13,7 @@ import {
 	RecipeItem,
 	searchIndex,
 } from "@/components/recipe-row";
+import { RequestButton } from "@/components/requests";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -83,6 +84,12 @@ function CraftingPage() {
 	useEffect(() => {
 		if (window.matchMedia("(min-width: 768px) and (pointer: fine)").matches) inputRef.current?.focus();
 	}, []);
+
+	// Members can request a craft from a row.
+	const { data: me } = useQuery(convexQuery(api.requests.me, { region: params.region as Region, slug: params.slug }));
+	const member = me
+		? { guild: { region: params.region as Region, slug: params.slug }, characters: me.characters }
+		: undefined;
 
 	const index = useMemo(() => buildIndex(data ?? []), [data]);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
@@ -167,7 +174,7 @@ function CraftingPage() {
 					</div>
 					<ul>
 						{results.slice(0, limit).map((r) => (
-							<ResultRow key={r.recipeId} recipe={r} region={params.region} />
+							<ResultRow key={r.recipeId} recipe={r} region={params.region} member={member} />
 						))}
 					</ul>
 					{results.length > limit ? (
@@ -214,7 +221,12 @@ function Chip({
 	);
 }
 
-function ResultRow({ recipe, region }: { recipe: GuildRecipe; region: string }) {
+type Member = {
+	guild: { region: Region; slug: string };
+	characters: { slug: string; name: string; classId: number }[];
+};
+
+function ResultRow({ recipe, region, member }: { recipe: GuildRecipe; region: string; member?: Member }) {
 	const [expanded, setExpanded] = useState(false);
 	const shown = expanded ? recipe.crafters : recipe.crafters.slice(0, CRAFTERS);
 	const hidden = recipe.crafters.length - shown.length;
@@ -243,6 +255,25 @@ function ResultRow({ recipe, region }: { recipe: GuildRecipe; region: string }) 
 					>
 						+{hidden} more
 					</button>
+				) : null}
+				{member && recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug)) ? (
+					<RequestButton
+						guild={member.guild}
+						characters={member.characters}
+						size="xs"
+						variant="ghost"
+						label="Request"
+						className="ml-auto"
+						target={{
+							kind: "craft",
+							recipeId: recipe.recipeId,
+							name: recipe.item?.name ?? recipe.name,
+							itemId: recipe.item?.itemId,
+							quality: recipe.item?.quality,
+							icon: recipe.item?.icon,
+							crafters: recipe.crafters,
+						}}
+					/>
 				) : null}
 			</div>
 		</li>
