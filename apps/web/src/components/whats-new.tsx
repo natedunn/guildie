@@ -36,7 +36,12 @@ function Release({ release, current }: { release: ReleaseNotes; current: boolean
 					<p className="text-xs font-medium text-muted-foreground">{s.title}</p>
 					<ul className="mt-1 list-disc space-y-0.5 pl-5">
 						{s.items.map((item) => (
-							<li key={item}>{item}</li>
+							<li key={item.text}>
+								{item.pillars.length > 0 && (
+									<span className="mr-1.5 text-xs font-medium text-muted-foreground">{item.pillars.join(" · ")}</span>
+								)}
+								{item.text}
+							</li>
 						))}
 					</ul>
 				</div>

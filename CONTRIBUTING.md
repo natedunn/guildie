@@ -63,9 +63,12 @@ semicolons; Biome formats the rest.
 - **Tests** when you change logic: next to the code (`*.test.ts`, run with
   `node --test`) or in `apps/addon/tests` for Lua.
 - **A CHANGELOG line** under `## Unreleased` in [CHANGELOG.md](CHANGELOG.md),
-  written for players ("The roster sorts by level"), under `### New`,
-  `### Improvements` or `### Fixes`. Skip it only for changes players can't
-  see (docs, tests, refactors).
+  written for players, under `### New`, `### Improvements` or `### Fixes`,
+  starting with where the change lives: `**Web:**` (the site, which the app's
+  window also shows), `**App:**` (the Windows app itself), `**Addon:**` (in
+  game), or several: `- **Web, App:** The roster sorts by level.` CI checks
+  the label. Skip the line only for changes players can't see (docs, tests,
+  refactors), with the `skip-changelog` label.
 - **Screenshots** (or a short clip) for anything visible, and a preview link
   if you have one.
 - **No secrets**, no production data, no generated noise (`routeTree.gen.ts`

@@ -4,11 +4,23 @@ import { useQuery } from "@tanstack/react-query";
 // workflow takes from CHANGELOG.md. Read from GitHub's public API (no token;
 // cached an hour), so notes written after a release still show up.
 
+export type ReleaseNote = {
+	/** Where the change lives: "Web", "App", "Addon" (CHANGELOG.md's "**Web, App:**" prefix). */
+	pillars: string[];
+	text: string;
+};
+
 export type ReleaseNotes = {
 	version: string;
 	date: string;
-	sections: { title: string; items: string[] }[];
+	sections: { title: string; items: ReleaseNote[] }[];
 };
+
+/** "**Web, App:** Text" into its pillars and text (older notes have none). */
+export function parseNote(line: string): ReleaseNote {
+	const m = /^\*\*([A-Za-z]+(?:, [A-Za-z]+)*):\*\*\s*(.*)$/.exec(line);
+	return m ? { pillars: m[1].split(", "), text: m[2] } : { pillars: [], text: line };
+}
 
 /** "### New\n- a\n- b" into sections; anything else is ignored. */
 export function parseNotes(body: string): ReleaseNotes["sections"] {
@@ -19,7 +31,7 @@ export function parseNotes(body: string): ReleaseNotes["sections"] {
 		const item = /^[-*]\s+(.+)$/.exec(line);
 		if (item) {
 			if (!sections.length) sections.push({ title: "Changes", items: [] });
-			sections[sections.length - 1].items.push(item[1].trim());
+			sections[sections.length - 1].items.push(parseNote(item[1].trim()));
 		}
 	}
 	return sections;

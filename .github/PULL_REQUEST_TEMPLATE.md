@@ -12,7 +12,7 @@
 
 ## CHANGELOG
 
-<!-- The line you added under "## Unreleased" in CHANGELOG.md, or "none: <why>" (docs, tests, refactor). -->
+<!-- The line you added under "## Unreleased" in CHANGELOG.md, starting with where it changes ("- **Web:** …", "**App:**", "**Addon:**", or "**Web, App:**"), or "none: <why>" (docs, tests, refactor). -->
 
 ## Checklist
 
