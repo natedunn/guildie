@@ -131,7 +131,11 @@ export type AddonCharacter = {
 	inventory?: { bags?: InventoryPart; bank?: InventoryPart };
 };
 
-export type InventoryPart = { capturedAt: number; items: { id: number; count: number }[] };
+export type InventoryPart = {
+	capturedAt: number;
+	/** `name`/`quality` (0-7) from the game (addon 0.9+): only to label items Blizzard's API doesn't list. */
+	items: { id: number; count: number; name?: string; quality?: number }[];
+};
 
 class Invalid extends Error {}
 
@@ -156,6 +160,15 @@ function str(x: unknown, path: string, max: number, min = 0) {
 	if (x.length > max) fail(path, `longer than ${max}`);
 	if (x.length < min) fail(path, "empty");
 	return x;
+}
+
+/** An item's name from the game: plain text only (no color codes or control characters). */
+function itemName(x: unknown, path: string) {
+	const name = str(x, path, 100, 1);
+	for (const ch of name) {
+		if (ch === "|" || ch.charCodeAt(0) < 32) fail(path, "not plain text");
+	}
+	return name;
 }
 
 function int(x: unknown, path: string, min: number, max: number) {
@@ -299,14 +312,29 @@ function inventoryPart(x: unknown, path: string, now: number): InventoryPart {
 	const e = obj(x, path);
 	const capturedAt = time(e.capturedAt, `${path}.capturedAt`, now);
 	const counts = new Map<number, number>();
+	const labels = new Map<number, { name?: string; quality?: number }>();
 	for (const [i, raw] of arr(e.items, `${path}.items`, LIMITS.inventoryItems).entries()) {
 		const p = `${path}.items[${i}]`;
 		const item = obj(raw, p);
 		const id = int(item.id, `${p}.id`, 1, 100_000_000);
 		const count = int(item.count, `${p}.count`, 1, 1_000_000);
 		counts.set(id, (counts.get(id) ?? 0) + count);
+		const name = opt(item.name, (n) => itemName(n, `${p}.name`));
+		const quality = opt(item.quality, (q) => int(q, `${p}.quality`, 0, 7));
+		if (name !== undefined || quality !== undefined) labels.set(id, { name, quality });
 	}
-	return { capturedAt, items: [...counts].map(([id, count]) => ({ id, count })) };
+	return {
+		capturedAt,
+		items: [...counts].map(([id, count]) => {
+			const label = labels.get(id);
+			return {
+				id,
+				count,
+				...(label?.name !== undefined ? { name: label.name } : {}),
+				...(label?.quality !== undefined ? { quality: label.quality } : {}),
+			};
+		}),
+	};
 }
 
 function inventory(x: unknown, now: number): AddonCharacter["inventory"] {

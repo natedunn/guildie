@@ -237,6 +237,39 @@ test("version 3: bags and the last bank read (addon 0.8.0)", () => {
 	}
 });
 
+test("bag items carry the game's name and quality (addon 0.9.0)", () => {
+	const r = parseCharacter(
+		{
+			...v2,
+			inventory: {
+				bags: {
+					capturedAt: T,
+					items: [
+						{ id: 15488, count: 1, name: "Bloodbone Band", quality: 2 },
+						{ id: 2589, count: 3 },
+					],
+				},
+			},
+		},
+		NOW,
+	);
+	assert.equal(r.ok, true);
+	if (!r.ok) return;
+	assert.deepEqual(r.character.inventory?.bags?.items, [
+		{ id: 15488, count: 1, name: "Bloodbone Band", quality: 2 },
+		{ id: 2589, count: 3 },
+	]);
+	for (const [item, error] of [
+		[{ id: 1, count: 1, name: "|cff1eff00Evil|r" }, /items\[0\].name: not plain text/],
+		[{ id: 1, count: 1, name: "" }, /items\[0\].name/],
+		[{ id: 1, count: 1, quality: 9 }, /items\[0\].quality: out of range/],
+	] as const) {
+		const p = parseCharacter({ ...v2, inventory: { bags: { capturedAt: T, items: [item] } } }, NOW);
+		assert.equal(p.ok, false);
+		if (!p.ok) assert.match(p.error, error);
+	}
+});
+
 test("null means not sent", () => {
 	const r = parseCharacter({ ...v2, xp: null, guild: null, equipment: null }, NOW);
 	assert.ok(r.ok);

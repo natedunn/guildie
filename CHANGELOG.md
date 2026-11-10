@@ -15,6 +15,11 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** Items in the Inventory tab missing their name and icon. Guildie now also fills in any it's missing once a day.
+- **Addon:** The addon saves each bag and bank item's name, so items Blizzard's website data doesn't list still show by name. Addon 0.9.0.
+
 ### New
 
 - **Guildie:** An Inventory tab on your own characters: what's in their bags and bank, as the addon last read them (bags at your last /reload or logout, the bank as of the last time you opened it). Only you can see it.

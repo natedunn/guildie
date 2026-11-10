@@ -54,7 +54,13 @@ export const vProfession = v.object({
 });
 
 /** An item id and how many (inventory scans). */
-export const vItemCount = v.object({ id: v.number(), count: v.number() });
+/** An item and how many, from the addon's bag/bank read; name and quality (0-7) as the game shows them (addon 0.9+). */
+export const vItemCount = v.object({
+	id: v.number(),
+	count: v.number(),
+	name: v.optional(v.string()),
+	quality: v.optional(v.number()),
+});
 
 /** A character as a request shows it. */
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });

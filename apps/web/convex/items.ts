@@ -169,28 +169,65 @@ export const syncBatch = internalAction({
 		const token = await appToken(ctx, "us");
 		const common = { flavor: "forever" as const, region: "us" as const, namespace: "static" as const, token };
 		const fetched = await Promise.all(
+			// One failed lookup (a Blizzard hiccup) shouldn't drop the rest of the batch.
 			itemIds.map(async (itemId) => {
-				const [item, media] = await Promise.all([
-					blizzardGet<Item>({ ...common, path: `/data/wow/item/${itemId}` }),
-					blizzardGet<Media>({ ...common, path: `/data/wow/media/item/${itemId}` }),
-				]);
-				if (!item.ok) {
-					const hint = hintOf.get(itemId);
-					const icon = media.ok ? media.data.assets?.find((a) => a.key === "icon")?.value : undefined;
-					if (!hint?.name || !icon) return null;
-					return { itemId, name: hint.name, quality: hint.quality ?? "COMMON", icon, tooltip: hint.tooltip ?? [] };
+				try {
+					return await fetchItem(itemId);
+				} catch (e) {
+					console.warn(`items: ${itemId}: ${(e as Error).message}`);
+					return null;
 				}
-				return {
-					itemId,
-					name: item.data.name ?? item.data.preview_item?.name ?? `Item ${itemId}`,
-					quality: item.data.quality?.type ?? "COMMON",
-					icon: media.ok ? media.data.assets?.find((a) => a.key === "icon")?.value : undefined,
-					kind: item.data.item_subclass?.name,
-					tooltip: tooltipLines(item.data.preview_item ?? {}),
-				};
 			}),
 		);
 		await ctx.runMutation(internal.items.save, { items: fetched.filter((x) => x !== null) });
+
+		async function fetchItem(itemId: number) {
+			const [item, media] = await Promise.all([
+				blizzardGet<Item>({ ...common, path: `/data/wow/item/${itemId}` }),
+				blizzardGet<Media>({ ...common, path: `/data/wow/media/item/${itemId}` }),
+			]);
+			if (!item.ok) {
+				const hint = hintOf.get(itemId);
+				const icon = media.ok ? media.data.assets?.find((a) => a.key === "icon")?.value : undefined;
+				if (!hint?.name || !icon) return null;
+				return { itemId, name: hint.name, quality: hint.quality ?? "COMMON", icon, tooltip: hint.tooltip ?? [] };
+			}
+			return {
+				itemId,
+				name: item.data.name ?? item.data.preview_item?.name ?? `Item ${itemId}`,
+				quality: item.data.quality?.type ?? "COMMON",
+				icon: media.ok ? media.data.assets?.find((a) => a.key === "icon")?.value : undefined,
+				kind: item.data.item_subclass?.name,
+				tooltip: tooltipLines(item.data.preview_item ?? {}),
+			};
+		}
+	},
+});
+
+/** Every item id in players' bags and banks and on characters' gear (for the daily backfill). */
+export const referencedItemIds = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		const ids = new Set<number>();
+		for await (const row of ctx.db.query("inventories")) {
+			for (const i of [...(row.bags?.items ?? []), ...(row.bank?.items ?? [])]) ids.add(i.id);
+		}
+		for await (const c of ctx.db.query("characters")) {
+			for (const e of c.equipment ?? []) ids.add(e.itemId);
+		}
+		return [...ids];
+	},
+});
+
+/**
+ * Daily: look up any item in bags, banks or gear we still have no row for (an
+ * upload that came before a lookup existed, or a lookup that failed).
+ */
+export const backfill = internalAction({
+	args: {},
+	handler: async (ctx): Promise<{ queued: number }> => {
+		const itemIds: number[] = await ctx.runQuery(internal.items.referencedItemIds, {});
+		return await ctx.runAction(internal.items.ensure, { itemIds });
 	},
 });
 

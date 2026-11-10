@@ -286,6 +286,9 @@ export const ingest = mutation({
 	},
 });
 
+/** The game's item quality numbers as Blizzard's API names them. */
+const QUALITY_TYPES = ["POOR", "COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "ARTIFACT", "HEIRLOOM"];
+
 /**
  * Bags and the last bank read (payload 3), each kept only when newer. Private
  * (schema.ts, inventories). Returns whether anything changed.
@@ -308,8 +311,17 @@ async function storeInventory(
 	if (existing) await ctx.db.replace(existing._id, row);
 	else await ctx.db.insert("inventories", row);
 	// Names and icons for the owner's Inventory tab (items we haven't seen yet).
-	const itemIds = [...new Set([...(bags?.items ?? []), ...(bank?.items ?? [])].map((i) => i.id))];
-	if (itemIds.length) await ctx.scheduler.runAfter(0, internal.items.ensure, { itemIds });
+	// The game's own name and quality label items Blizzard's API doesn't list.
+	const all = [...(inventory.bags?.items ?? []), ...(inventory.bank?.items ?? [])];
+	const itemIds = [...new Set(all.map((i) => i.id))];
+	const hints = all
+		.filter((i) => i.name)
+		.map((i) => ({
+			itemId: i.id,
+			name: i.name,
+			quality: i.quality !== undefined ? QUALITY_TYPES[i.quality] : undefined,
+		}));
+	if (itemIds.length) await ctx.scheduler.runAfter(0, internal.items.ensure, { itemIds, hints });
 	return true;
 }
 

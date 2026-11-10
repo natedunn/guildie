@@ -322,38 +322,48 @@ local function numSlots(bag)
     return nil
 end
 
---- itemID, count in one slot (nil when empty).
+--- The name inside an item link: "|cff...|Hitem:...|h[Silk Cloth]|h|r" -> "Silk Cloth".
+local function linkName(link)
+    return type(link) == "string" and link:match("|h%[(.-)%]|h") or nil
+end
+
+--- itemID, count, name, quality (0-7) in one slot (nil when empty). The name
+--- and quality let Guildie show items Blizzard's web API doesn't list.
 local function slotItem(bag, slot)
     if C_Container and C_Container.GetContainerItemInfo then
         local info = C_Container.GetContainerItemInfo(bag, slot)
-        if info then return info.itemID, info.stackCount end
+        if info then return info.itemID, info.stackCount, linkName(info.hyperlink), info.quality end
         return nil
     end
     if GetContainerItemInfo then
-        local _, count, _, _, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
-        return id or itemIdOf(link), count
+        local _, count, _, quality, _, _, link, _, _, id = GetContainerItemInfo(bag, slot)
+        return id or itemIdOf(link), count, linkName(link), quality
     end
 end
 
 --- { { id, count }, ... } summed over `bags`, or nil when the game can't say
 --- (no container API, or nothing loaded yet).
 local function readContainers(bags)
-    local counts, order, slots = {}, {}, 0
+    local counts, order, slots, names, qualities = {}, {}, 0, {}, {}
     for _, bag in ipairs(bags) do
         local n = numSlots(bag)
         if n == nil then return nil end
         slots = slots + n
         for slot = 1, n do
-            local id, count = slotItem(bag, slot)
+            local id, count, name, quality = slotItem(bag, slot)
             if id and id > 0 then
                 if not counts[id] then table.insert(order, id) end
                 counts[id] = (counts[id] or 0) + (count and count > 0 and count or 1)
+                names[id] = names[id] or name
+                if type(quality) == "number" and quality >= 0 and quality <= 7 then qualities[id] = quality end
             end
         end
     end
     if slots == 0 then return nil end
     local items = {}
-    for _, id in ipairs(order) do table.insert(items, { id = id, count = counts[id] }) end
+    for _, id in ipairs(order) do
+        table.insert(items, { id = id, count = counts[id], name = names[id], quality = qualities[id] })
+    end
     return items
 end
 
