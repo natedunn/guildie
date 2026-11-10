@@ -17,7 +17,9 @@ into that version's section.
 
 ### New
 
-- Guild requests: ask your guild for reagents or a craft (open an item, or Request on Crafting), and claim what you can make. The requester marks it done; requests over a week old ask "Still need this?", and close after 30 days. In game, tooltips say who's requesting an item (addon 0.8.0). For crafts, the app checks your bags and bank as of your last /reload or logout, so guildmates see "Has the mats"; nobody else sees what's in your bags.
+- **Web:** Guild requests: ask your guild for reagents or a craft (open an item, or Request on Crafting), and claim what you can provide or make. The requester marks it done; requests over a week old ask "Still need this?", and close after 30 days.
+- **Addon:** Tooltips say who in your guild is requesting an item, and the Guildie window shows your open requests. Addon 0.8.0; restart WoW once to load it.
+- **Addon, App:** For craft requests, Guildie checks your bags and bank as of your last /reload or logout, so guildmates see "Has the mats". Nobody else sees what's in your bags.
 
 ### Improvements
 
