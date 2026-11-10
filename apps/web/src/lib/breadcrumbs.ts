@@ -25,6 +25,7 @@ const TAB_LABELS: Record<string, string> = {
 	"/g/$region/$slug/requests": "Requests",
 	"/c/$region/$slug/talents": "Talents",
 	"/c/$region/$slug/professions": "Professions",
+	"/c/$region/$slug/inventory": "Inventory",
 };
 
 function crumbsOf(matches: Match[]): Crumb[] | null {

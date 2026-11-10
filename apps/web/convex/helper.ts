@@ -307,6 +307,9 @@ async function storeInventory(
 	const row = { userId, ...key, bags, bank, receivedAt: now };
 	if (existing) await ctx.db.replace(existing._id, row);
 	else await ctx.db.insert("inventories", row);
+	// Names and icons for the owner's Inventory tab (items we haven't seen yet).
+	const itemIds = [...new Set([...(bags?.items ?? []), ...(bank?.items ?? [])].map((i) => i.id))];
+	if (itemIds.length) await ctx.scheduler.runAfter(0, internal.items.ensure, { itemIds });
 	return true;
 }
 

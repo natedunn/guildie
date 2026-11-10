@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** An Inventory tab on your own characters: what's in their bags and bank, as the addon last read them (bags at your last /reload or logout, the bank as of the last time you opened it). Only you can see it.
+
 ### Improvements
 
 - **Guildie, App:** Release notes label changes to the site "Guildie" (in a browser or the app's window) instead of "Web".

@@ -34,6 +34,7 @@ import { Route as CRegionSlugRouteImport } from './routes/c/$region/$slug'
 import { Route as GRegionSlugRouteImport } from './routes/g/$region/$slug'
 import { Route as ApiHelperPairPollRouteImport } from './routes/api/helper/pair/poll'
 import { Route as CRegionSlugIndexRouteImport } from './routes/c/$region/$slug/index'
+import { Route as CRegionSlugInventoryRouteImport } from './routes/c/$region/$slug/inventory'
 import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$slug/professions'
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
@@ -166,6 +167,11 @@ const CRegionSlugIndexRoute = CRegionSlugIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CRegionSlugRoute,
 } as any)
+const CRegionSlugInventoryRoute = CRegionSlugInventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => CRegionSlugRoute,
+} as any)
 const CRegionSlugProfessionsRoute = CRegionSlugProfessionsRouteImport.update({
   id: '/professions',
   path: '/professions',
@@ -222,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/c/$region/$slug': typeof CRegionSlugRouteWithChildren
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -252,6 +259,7 @@ export interface FileRoutesByTo {
   '/api/helper/signout': typeof ApiHelperSignoutRoute
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -286,6 +294,7 @@ export interface FileRoutesById {
   '/c/$region/$slug': typeof CRegionSlugRouteWithChildren
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug'
     | '/g/$region/$slug'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/api/helper/signout'
     | '/api/helper/snapshot'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug'
     | '/g/$region/$slug'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -592,6 +604,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CRegionSlugIndexRouteImport
       parentRoute: typeof CRegionSlugRoute
     }
+    '/c/$region/$slug/inventory': {
+      id: '/c/$region/$slug/inventory'
+      path: '/inventory'
+      fullPath: '/c/$region/$slug/inventory'
+      preLoaderRoute: typeof CRegionSlugInventoryRouteImport
+      parentRoute: typeof CRegionSlugRoute
+    }
     '/c/$region/$slug/professions': {
       id: '/c/$region/$slug/professions'
       path: '/professions'
@@ -668,12 +687,14 @@ const ApiHelperPairRouteWithChildren = ApiHelperPairRoute._addFileChildren(
 )
 
 interface CRegionSlugRouteChildren {
+  CRegionSlugInventoryRoute: typeof CRegionSlugInventoryRoute
   CRegionSlugProfessionsRoute: typeof CRegionSlugProfessionsRoute
   CRegionSlugTalentsRoute: typeof CRegionSlugTalentsRoute
   CRegionSlugIndexRoute: typeof CRegionSlugIndexRoute
 }
 
 const CRegionSlugRouteChildren: CRegionSlugRouteChildren = {
+  CRegionSlugInventoryRoute: CRegionSlugInventoryRoute,
   CRegionSlugProfessionsRoute: CRegionSlugProfessionsRoute,
   CRegionSlugTalentsRoute: CRegionSlugTalentsRoute,
   CRegionSlugIndexRoute: CRegionSlugIndexRoute,

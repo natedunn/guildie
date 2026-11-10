@@ -23,6 +23,7 @@ import type * as dev from "../dev.js";
 import type * as guilds from "../guilds.js";
 import type * as helper from "../helper.js";
 import type * as http from "../http.js";
+import type * as inventory from "../inventory.js";
 import type * as items from "../items.js";
 import type * as origins from "../origins.js";
 import type * as proficiencies from "../proficiencies.js";
@@ -64,6 +65,7 @@ declare const fullApi: ApiFromModules<{
   guilds: typeof guilds;
   helper: typeof helper;
   http: typeof http;
+  inventory: typeof inventory;
   items: typeof items;
   origins: typeof origins;
   proficiencies: typeof proficiencies;
