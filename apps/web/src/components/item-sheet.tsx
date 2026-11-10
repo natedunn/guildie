@@ -49,7 +49,7 @@ export function ItemSheet() {
 				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/40 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup
 					initialFocus={false}
-					className="fixed inset-y-0 right-0 z-50 flex w-[min(420px,100vw)] flex-col border-l border-border bg-background shadow-2xl transition-transform data-ending-style:translate-x-full data-starting-style:translate-x-full desktop:top-10"
+					className="fixed inset-y-0 right-0 z-50 flex w-[min(420px,100vw)] flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] border-l border-border bg-background shadow-2xl transition-transform data-ending-style:translate-x-full data-starting-style:translate-x-full desktop:top-10"
 				>
 					{itemId !== undefined && <ItemPanel itemId={itemId} onClose={close} />}
 				</Dialog.Popup>
@@ -83,7 +83,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					{item?.kind && <p className="mt-0.5 text-xs text-muted-foreground">{item.kind}</p>}
 				</div>
 				<Dialog.Close
-					className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+					className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground pointer-coarse:size-10 hover:bg-accent hover:text-foreground"
 					aria-label="Close"
 				>
 					<HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} />

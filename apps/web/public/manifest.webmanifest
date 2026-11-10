@@ -1,0 +1,17 @@
+{
+	"id": "/",
+	"name": "Guildie",
+	"short_name": "Guildie",
+	"description": "Your World of Warcraft guild's roster, gear, talents and crafters, for WoW: Forever.",
+	"lang": "en",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#13110e",
+	"theme_color": "#13110e",
+	"icons": [
+		{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+		{ "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+	]
+}

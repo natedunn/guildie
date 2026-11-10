@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CharacterTree, TalentLayout, TalentNode } from "@/components/character-data";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -129,10 +130,15 @@ function Arrow({ from, to }: { from: PlacedNode; to: PlacedNode }) {
 function Talent({ node }: { node: PlacedNode }) {
 	const { rank, maxRank } = node;
 	const maxed = rank >= maxRank;
+	// Hover shows the tooltip; a tap (phones have no hover) or click does too,
+	// and a tap anywhere else closes it.
+	const [open, setOpen] = useState(false);
 	return (
-		<Tooltip>
+		<Tooltip open={open} onOpenChange={setOpen}>
 			<TooltipTrigger
 				render={<button type="button" />}
+				closeOnClick={false}
+				onClick={() => setOpen(true)}
 				className="absolute rounded-[4px] outline-none focus-visible:ring-1 focus-visible:ring-ring"
 				style={{ left: x0(node.c), top: y0(node.r), width: CELL, height: CELL }}
 				aria-label={`${node.name}, rank ${rank} of ${maxRank}`}
@@ -178,7 +184,7 @@ function TalentTooltipBody({ node }: { node: PlacedNode }) {
 	const current = ranks[Math.max(rank, 1) - 1];
 	const next = rank > 0 && rank < maxRank ? ranks[rank] : undefined;
 	return (
-		<div className="w-72 space-y-1 text-[13px] leading-snug text-white">
+		<div className="w-72 max-w-[calc(100vw-2rem)] space-y-1 text-[13px] leading-snug text-white">
 			<div className="font-semibold">{node.name}</div>
 			<div className="num">
 				Rank {rank}/{maxRank}

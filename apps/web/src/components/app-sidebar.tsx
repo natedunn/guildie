@@ -236,7 +236,7 @@ export function NavSheet({ className }: { className?: string }) {
 				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup
 					initialFocus={false}
-					className="app-sidebar fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] border-r border-border bg-chrome! shadow-2xl transition-transform data-ending-style:-translate-x-full data-starting-style:-translate-x-full"
+					className="app-sidebar fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] border-r border-border bg-chrome! shadow-2xl transition-transform data-ending-style:-translate-x-full data-starting-style:-translate-x-full"
 				>
 					<div className="flex h-12 flex-none items-center justify-between px-3 desktop:h-10">
 						<Wordmark />

@@ -137,7 +137,7 @@ function AddGuild() {
 					aria-label="Region"
 					value={region}
 					onChange={(e) => setRegion(e.target.value as Region)}
-					className="h-8 rounded-md border px-1.5 text-[0.8125rem]"
+					className="h-8 rounded-md border px-1.5 text-[0.8125rem] pointer-coarse:h-10"
 				>
 					{REGIONS.map((r) => (
 						<option key={r} value={r}>

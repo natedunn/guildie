@@ -121,7 +121,7 @@ export function RequestButton({
 			</Dialog.Trigger>
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
-				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-background shadow-2xl transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-md border border-border bg-background shadow-2xl transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					{open && <RequestForm guild={guild} target={target} characters={characters} onDone={() => setOpen(false)} />}
 				</Dialog.Popup>
 			</Dialog.Portal>
@@ -198,7 +198,7 @@ function RequestForm({
 					</p>
 				</div>
 				<Dialog.Close
-					className="grid size-7 flex-none place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground"
+					className="grid size-7 flex-none place-items-center rounded-md text-muted-foreground pointer-coarse:size-9 hover:bg-hover hover:text-foreground"
 					aria-label="Close"
 				>
 					<HugeiconsIcon icon={Cancel01Icon} size={15} strokeWidth={1.75} />

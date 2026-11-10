@@ -12,7 +12,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { UNFETCHED_NOTE } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { Input } from "@/components/ui/input";
@@ -95,7 +95,7 @@ function Roster({ members }: { members: Member[] }) {
 		return counts;
 	}, [members]);
 
-	const header = (key: SortKey, label: string, align?: "right", className?: string) => (
+	const header = (key: SortKey, label: ReactNode, align?: "right", className?: string) => (
 		<TableHead
 			className={cn(align === "right" && "text-right", className)}
 			aria-sort={sort.key === key ? (sort.desc ? "descending" : "ascending") : undefined}
@@ -123,9 +123,14 @@ function Roster({ members }: { members: Member[] }) {
 	);
 
 	return (
-		<section className="pb-10">
+		<section className="@container pb-10">
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-				<Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="w-64" />
+				<Input
+					value={search}
+					onChange={(e) => setSearch(e.target.value)}
+					placeholder="Search"
+					className="w-full sm:w-64"
+				/>
 				<div className="flex flex-wrap gap-1">
 					<button
 						type="button"
@@ -156,22 +161,48 @@ function Roster({ members }: { members: Member[] }) {
 				</label>
 			</div>
 
-			<Table className="table-sticky">
+			<Table className="table-sticky @max-sm:[&_:is(th,td)]:px-1.5">
 				<TableHeader>
 					<TableRow>
 						{header("name", "Name")}
-						{header("level", "Level", "right")}
-						{header("class", "Race and class")}
-						<TableHead className="max-lg:hidden">Talents</TableHead>
-						<TableHead className="max-2xl:hidden">Professions</TableHead>
-						{header("ilvl", "Item level", "right")}
-						{header("seen", "Last synced", "right", "max-md:hidden")}
+						{header(
+							"level",
+							<>
+								<span className="@max-sm:hidden">Level</span>
+								<span className="@sm:hidden" title="Level">
+									Lvl
+								</span>
+							</>,
+							"right",
+						)}
+						{/* Columns come and go with the pane's width (container queries), so the
+						    table always fits: its head is sticky, so it can't scroll sideways. */}
+						{header(
+							"class",
+							<>
+								<span className="@max-lg:hidden">Race and class</span>
+								<span className="@lg:hidden">Class</span>
+							</>,
+						)}
+						<TableHead className="@max-4xl:hidden">Talents</TableHead>
+						<TableHead className="@max-6xl:hidden">Professions</TableHead>
+						{header(
+							"ilvl",
+							<>
+								<span className="@max-lg:hidden">Item level</span>
+								<span className="@lg:hidden" title="Item level">
+									iLvl
+								</span>
+							</>,
+							"right",
+						)}
+						{header("seen", "Last synced", "right", "@max-2xl:hidden")}
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{rows.map((m) => (
 						<TableRow key={m._id}>
-							<TableCell>
+							<TableCell className="@max-sm:whitespace-normal">
 								<Tooltip disabled={!m.battletag && !!m.synced}>
 									<TooltipTrigger
 										render={
@@ -185,7 +216,7 @@ function Roster({ members }: { members: Member[] }) {
 										<ClassText classId={m.classId} className="font-medium">
 											{m.name}
 										</ClassText>{" "}
-										<span className="text-muted-foreground">{m.surname}</span>
+										<span className="text-muted-foreground @max-xs:hidden">{m.surname}</span>
 									</TooltipTrigger>
 									{/* Only guild members get BattleTags (guilds.get), and only from players who haven't hidden theirs. */}
 									<TooltipContent side="right" className="block max-w-72 space-y-1">
@@ -215,10 +246,10 @@ function Roster({ members }: { members: Member[] }) {
 							</TableCell>
 							<TableCell className="num text-right">{m.level}</TableCell>
 							<TableCell>
-								<span className="text-muted-foreground">{raceName(m.raceId)}</span>{" "}
+								<span className="text-muted-foreground @max-lg:hidden">{raceName(m.raceId)} </span>
 								<ClassText classId={m.classId}>{className(m.classId)}</ClassText>
 							</TableCell>
-							<TableCell className="num max-lg:hidden">
+							<TableCell className="num @max-4xl:hidden">
 								{m.talentTrees?.map((t, i) => (
 									<span key={t.id} className={cn(i > 0 && "text-muted-foreground")}>
 										{i > 0 && " · "}
@@ -226,7 +257,7 @@ function Roster({ members }: { members: Member[] }) {
 									</span>
 								))}
 							</TableCell>
-							<TableCell className="num text-muted-foreground max-2xl:hidden">
+							<TableCell className="num text-muted-foreground @max-6xl:hidden">
 								{m.professions?.length
 									? m.professions
 											.filter((p) => !p.secondary)
@@ -237,7 +268,7 @@ function Roster({ members }: { members: Member[] }) {
 										: ""}
 							</TableCell>
 							<TableCell className="num text-right">{m.averageItemLevel ?? ""}</TableCell>
-							<TableCell className="num text-right text-muted-foreground max-md:hidden">
+							<TableCell className="num text-right text-muted-foreground @max-2xl:hidden">
 								<LastSynced synced={m.synced} />
 							</TableCell>
 						</TableRow>

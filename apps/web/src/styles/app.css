@@ -173,6 +173,23 @@ html[data-desktop="true"] {
 	}
 }
 
+/* Phones and tablets zoom into a text field under 16px when it gets focus,
+   and stay zoomed. Touch screens get 16px fields; mice keep the 13px UI.
+   Outside the layers, so it wins over text-* utilities. */
+@media (pointer: coarse) {
+	:is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select) {
+		font-size: 16px;
+	}
+}
+
+/* A table that fills the pane keeps its head in view (.table-sticky, below):
+   its container mustn't scroll, or it would hold the sticky head instead of
+   the pane. So these tables have to fit the pane at every width. Outside the
+   layers, so it wins over the container's overflow-x-auto. */
+[data-slot="table-container"]:has(> .table-sticky) {
+	overflow: visible;
+}
+
 /* Class colors are the game's; a touch of white keeps Shaman blue legible. */
 .class-color {
 	color: color-mix(in oklab, var(--class) 88%, white);
@@ -208,15 +225,22 @@ html[data-desktop="true"] {
 		overflow: hidden;
 		overscroll-behavior: none;
 	}
+	/* On phones the page can reach under the notch, the status bar and the
+	   home indicator (viewport-fit=cover, and a home screen app draws under a
+	   translucent status bar): keep the shell inside the safe area. The strips
+	   outside it show the chrome color, the same as the phone's top bar. All
+	   zero in browsers without those, and in the Windows app. */
 	.app-shell {
 		display: flex;
 		height: 100dvh;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 	}
 	.app-sidebar {
 		display: flex;
 		width: 220px;
 		flex: none;
 		flex-direction: column;
+		padding-bottom: env(safe-area-inset-bottom);
 		background-color: var(--chrome);
 		border-right: 1px solid var(--border);
 	}
@@ -232,6 +256,8 @@ html[data-desktop="true"] {
 		flex: 1;
 		overflow-y: auto;
 		overscroll-behavior: contain;
+		/* Scrolls under the home indicator, but the last line clears it. */
+		padding-bottom: env(safe-area-inset-bottom);
 		background-color: var(--background);
 		scrollbar-color: rgb(255 255 255 / 0.16) transparent;
 		scrollbar-width: thin;
@@ -372,10 +398,6 @@ html[data-desktop="true"] {
 	[data-slot="table"] tbody tr:hover {
 		background-color: var(--hover);
 	}
-	/* A table that fills the pane keeps its head in view. */
-	[data-slot="table-container"]:has(> .table-sticky) {
-		overflow: visible;
-	}
 	.table-sticky thead th {
 		position: sticky;
 		top: 0;
@@ -407,5 +429,16 @@ html[data-desktop="true"] {
 		border-color: var(--border-strong);
 		background-color: var(--selected);
 		color: var(--foreground);
+	}
+
+	/* Touch screens: rows and chips tall enough to hit with a thumb. */
+	@media (pointer: coarse) {
+		.nav-item {
+			height: 2.5rem;
+		}
+		.chip {
+			height: 2.25rem;
+			padding-inline: 0.625rem;
+		}
 	}
 }

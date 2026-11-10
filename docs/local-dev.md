@@ -164,6 +164,34 @@ Every run sets the backend's `SITE_URL` to the checkout's URL. The first push
 waits for the settings and goes through by itself a few seconds later (a
 "not set" error from Convex before that is expected).
 
+### Phones
+
+`apps/web/scripts/check-mobile.mjs` opens every page at 390, 360 and 768px
+wide (as a touch screen) and fails when something overflows sideways (the page
+or the content pane), a dialog doesn't fit the screen, or a text field is
+under 16px (iOS zooms into those). It needs `pnpm dev` running and
+Playwright, which isn't a repo dependency (install it in a folder of its own):
+
+```sh
+mkdir -p /tmp/pw && (cd /tmp/pw && npm i playwright && npx playwright install chromium)
+PLAYWRIGHT_DIR=/tmp/pw node apps/web/scripts/check-mobile.mjs \
+	--base https://<name>.guildie.localhost:1355 --guest --shots /tmp/mobile
+```
+
+Signed out pages always run. `--guest` signs in as a guest for the rest
+(Settings, Requests); `--code <session code>` signs in with a desktop session
+code instead, and `--state <file>` keeps the sign-in for the next run. It
+visits the first guild and character in the sidebar, or `--guild /g/eu/x
+--character /c/eu/y`. `--shots` saves a screenshot of each page. It isn't in
+CI.
+
+Guildie installs as an app from a phone's browser (Add to Home Screen) through
+`apps/web/public/manifest.webmanifest`; its icons are in
+`apps/web/icons/README.md`. There's no service worker on purpose: pages are
+rendered by the Worker with live data from Convex, so a cache could only serve
+old pages and old code after a deploy, and browsers no longer need one to
+install the app.
+
 ### Notes
 
 - Portless's proxy runs on port 1355 (set `PORTLESS_PORT` to change it).

@@ -31,6 +31,24 @@ on guildie.club and inside the Windows app, so every page must work in both.
   from Blizzard's media URLs. Item tooltips look like the game's.
 - **Copy:** short, plain, sentence case. Say what happened and what to do.
 
+## Phones
+
+- Nothing scrolls sideways but a wide grid in its own `overflow-x-auto` box
+  (give it `relative`, or `sr-only` labels inside widen the pane). A table
+  with a sticky head (`.table-sticky`) can't scroll sideways at all: drop
+  columns by the pane's width with container queries (`@container`,
+  `@max-2xl:hidden`; the roster does), since the sidebar and the Windows app
+  change the pane's width, not the viewport's.
+- Touch screens (`pointer-coarse:`) get ~40px buttons, nav rows and chips
+  (`ui/button.tsx`, `app.css`) and 16px text fields (no iOS zoom). Small icon
+  buttons outside `Button` add `pointer-coarse:size-9` or so.
+- Hover-only things need a tap path: item icons open the item panel; talent
+  tooltips open on tap.
+- Fixed sheets and dialogs keep to the safe area (`env(safe-area-inset-*)`)
+  and fit the screen (`max-h-[…dvh]` with their own scroll). The app shell
+  already pads for the notch and home indicator.
+- `apps/web/scripts/check-mobile.mjs` checks every page (docs/local-dev.md).
+
 ## Tokens
 
 All in `apps/web/src/styles/app.css` (`:root`, mapped into Tailwind by
@@ -63,7 +81,8 @@ the shadcn CLI (`components.json`), then restyle them through the tokens in
 ## Checking your change
 
 1. `pnpm dev`, open the page (docs/local-dev.md; sample data and guest sign-in).
-2. Look at it three ways: a wide window, a phone width (~390px), and the app
+2. Look at it three ways: a wide window, a phone width (~390px; the
+   `check-mobile.mjs` script covers every page), and the app
    layout (devtools → override the user agent with
    `Mozilla/5.0 GuildieDesktop/0.3.5`, add ` (Mica)` for the transparent
    chrome).

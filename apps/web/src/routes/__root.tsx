@@ -40,13 +40,23 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 	head: () => ({
 		meta: [
 			{ charSet: "utf-8" },
-			{ name: "viewport", content: "width=device-width, initial-scale=1" },
+			// viewport-fit=cover: phones draw the page under the notch and home
+			// indicator; .app-shell keeps to the safe area (styles/app.css).
+			{ name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
 			{ name: "theme-color", content: "#13110e" },
+			// Installable from the home screen (public/manifest.webmanifest). On iOS
+			// the status bar goes translucent over the chrome color.
+			{ name: "mobile-web-app-capable", content: "yes" },
+			{ name: "apple-mobile-web-app-capable", content: "yes" },
+			{ name: "apple-mobile-web-app-title", content: "Guildie" },
+			{ name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
 			{ title: "Guildie" },
 			...defaultShareMeta,
 		],
 		links: [
 			{ rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+			{ rel: "manifest", href: "/manifest.webmanifest" },
+			{ rel: "apple-touch-icon", href: "/icons/apple-touch-icon.png" },
 			{ rel: "stylesheet", href: appCss },
 		],
 	}),

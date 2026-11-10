@@ -164,12 +164,16 @@ function MemberList({
 /** Types down, classes across: a check from level 1, else the level it unlocks. */
 function ClassGrid({ selected, onSelect }: { selected?: string; onSelect: (key: string) => void }) {
 	return (
-		// The grid scrolls sideways on its own on narrow panes; the page doesn't.
-		<div className="mt-2 max-w-4xl overflow-x-auto">
+		// The grid scrolls sideways on its own on narrow panes; the page doesn't
+		// (relative: holds the sr-only labels, which would widen the pane). The
+		// type column stays put while it scrolls.
+		<div className="relative mt-2 max-w-4xl overflow-x-auto">
 			<table className="w-full min-w-[40rem] border-collapse text-[0.8125rem]">
 				<thead>
 					<tr className="border-b border-border text-xs">
-						<th className="py-1.5 pr-3 text-left font-normal text-muted-foreground">Type</th>
+						<th className="sticky left-0 z-[1] bg-background py-1.5 pr-3 text-left font-normal text-muted-foreground">
+							Type
+						</th>
 						{CLASS_IDS.map((id) => (
 							<th key={id} className="px-1 py-1.5 text-center font-medium">
 								<ClassText classId={id}>{CLASSES[id]?.name}</ClassText>
@@ -188,7 +192,14 @@ function ClassGrid({ selected, onSelect }: { selected?: string; onSelect: (key: 
 									selected === t.key && "bg-selected",
 								)}
 							>
-								<th scope="row" className="py-0 pr-3 text-left font-normal">
+								<th
+									scope="row"
+									className={cn(
+										"sticky left-0 z-[1] bg-background py-0 pr-3 text-left font-normal",
+										// The row's fill, over the cell's own background.
+										selected === t.key && "shadow-[inset_0_0_0_100vmax_var(--selected)]",
+									)}
+								>
 									<button
 										type="button"
 										onClick={() => onSelect(t.key)}

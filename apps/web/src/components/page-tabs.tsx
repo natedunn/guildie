@@ -14,7 +14,7 @@ export function PageTab(props: LinkProps & { children: ReactNode }) {
 		<Link
 			{...props}
 			activeOptions={{ exact: true, includeSearch: false }}
-			className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground data-[status=active]:border-foreground data-[status=active]:text-foreground"
+			className="-mb-px border-b-2 border-transparent px-3 py-2 text-sm pointer-coarse:py-2.5 text-muted-foreground transition-colors hover:text-foreground data-[status=active]:border-foreground data-[status=active]:text-foreground"
 		/>
 	);
 }

@@ -178,7 +178,8 @@ function NewRequest({
 							<li key={item.itemId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-[13px]">
 								<ItemHover
 									item={{ itemId: item.itemId, name: item.name, quality: item.quality, icon: item.icon }}
-									className="flex min-w-0 flex-1 items-center gap-2.5"
+									// Room for the name; the buttons wrap below it on phones.
+									className="flex min-w-0 flex-[1_1_14rem] items-center gap-2.5"
 								>
 									<ItemIcon icon={item.icon} quality={item.quality} size={28} />
 									<span className="min-w-0">

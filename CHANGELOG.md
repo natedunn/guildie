@@ -18,6 +18,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Guildie, App:** Release notes label changes to the site "Guildie" (in a browser or the app's window) instead of "Web".
+- **Guildie:** Works better on phones: add Guildie to your home screen as an app, nothing runs off the side of the screen, the roster fits, talents show their tooltip when tapped, buttons are easier to tap, and typing in a search box no longer zooms in on iPhones.
+- **Guildie:** The roster's column names stay in view as you scroll.
 - **Guildie:** Search for what you need right on the Requests page ("What do you need?"), then request the item, or a craft when someone in the guild can make it.
 
 ## 0.3.9
