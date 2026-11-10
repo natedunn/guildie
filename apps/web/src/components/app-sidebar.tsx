@@ -70,11 +70,11 @@ function SidebarNav() {
 			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-2 pt-2 pb-4">
 				{guilds.length > 0 && (
 					<NavSection title="Guilds">
-						<div className="space-y-2">
+						<div className="space-y-4">
 							{guilds.map((g) => (
 								<div key={`${g.region}/${g.slug}`}>
 									{/* Each guild's name labels its pages; there can be several. */}
-									<div className="truncate px-2 pt-0.5 pb-0.5 text-xs font-medium text-muted-foreground" title={g.name}>
+									<div className="truncate px-2 pt-0.5 pb-1.5 text-xs font-medium text-muted-foreground" title={g.name}>
 										{g.name}
 									</div>
 									<div className="space-y-px">

@@ -28,7 +28,7 @@ Electron + TypeScript. Windows first; it runs on macOS for development.
   addon, never half. If WoW is running it still updates and says so: the new
   files load at `/reload` (a first install, at the game's next start).
 - **App updates:** the installed app checks GitHub Releases at start and every
-  6 hours, downloads an update in the background, and installs it when you
+  hour, downloads an update in the background, and installs it when you
   quit, or right away with **Restart to update** in the tray (it also
   notifies once it's downloaded). The zip build, development and the smoke
   test never update.

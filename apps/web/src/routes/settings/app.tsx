@@ -106,7 +106,7 @@ function UpdateLine({ update, ready }: { update?: UpdateState; ready?: string })
 		default:
 			return (
 				<span className="text-muted-foreground">
-					Checked automatically every few hours, and downloaded in the background
+					Checked automatically every hour, and downloaded in the background
 				</span>
 			);
 	}

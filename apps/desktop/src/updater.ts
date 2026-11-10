@@ -9,7 +9,8 @@ import type { Log } from "@guildie/sync";
 import { app } from "electron";
 import { autoUpdater } from "electron-updater";
 
-const CHECK_EVERY_MS = 6 * 60 * 60_000;
+// Hourly: a check is one small file (latest.yml) from GitHub.
+const CHECK_EVERY_MS = 60 * 60_000;
 
 /**
  * Only the NSIS install can update itself: it's what the downloaded installer

@@ -12,6 +12,11 @@ into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- The app checks for updates every hour instead of every 6 hours.
+- A little more room under each guild's name in the sidebar.
+
 ## 0.3.8
 
 ### New
