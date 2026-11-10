@@ -585,3 +585,54 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 		mine: { open: mine.length, stale: mine.filter((r) => isStale(r, now)).length },
 	};
 }
+
+/**
+ * Requests → "What do you need?": items by name, and for those someone else in
+ * the guild can craft, the recipe and who knows it. Members only (null else).
+ */
+export const search = query({
+	args: { region: vRegion, slug: v.string(), q: v.string() },
+	handler: async (ctx, { region, slug, q }) => {
+		const text = q.trim().slice(0, 64);
+		const guild = await guildByKey(ctx, region, slug);
+		const member = guild && (await membership(ctx, guild));
+		if (!guild || !member) return null;
+		if (text.length < 2) return [];
+		const items = await ctx.db
+			.query("items")
+			.withSearchIndex("search_name", (s) => s.search("name", text))
+			.take(12);
+		// Recipes that make these items; crafters only when there are any.
+		const recipesByItem = new Map<number, Doc<"recipes">[]>();
+		for (const item of items) {
+			const made = await ctx.db
+				.query("recipes")
+				.withIndex("by_craftedItemId", (r) => r.eq("craftedItemId", item.itemId))
+				.collect();
+			if (made.length) recipesByItem.set(item.itemId, made);
+		}
+		const mine = new Set(member.characters.map((c) => c.slug));
+		let known = new Map<Id<"characters">, Set<number>>();
+		let roster: Doc<"characters">[] = [];
+		if (recipesByItem.size) {
+			roster = (
+				await ctx.db
+					.query("characters")
+					.withIndex("by_guild", (r) => r.eq("guildId", guild._id).eq("inRoster", true))
+					.collect()
+			).filter((c) => !mine.has(c.slug));
+			known = await knownRecipes(ctx, roster);
+		}
+		return items.map((item) => {
+			const craft = (recipesByItem.get(item.itemId) ?? [])
+				.map((recipe) => ({
+					recipeId: recipe.recipeId,
+					name: recipe.name,
+					profession: recipe.profession,
+					crafters: roster.filter((c) => known.get(c._id)?.has(recipe.recipeId)).map(brief),
+				}))
+				.find((r) => r.crafters.length > 0);
+			return { itemId: item.itemId, name: item.name, quality: item.quality, icon: item.icon, kind: item.kind, craft };
+		});
+	},
+});

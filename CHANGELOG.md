@@ -15,6 +15,10 @@ into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Web:** Search for what you need right on the Requests page ("What do you need?"), then request the item, or a craft when someone in the guild can make it.
+
 ## 0.3.9
 
 ### New

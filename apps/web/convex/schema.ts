@@ -313,7 +313,10 @@ export default defineSchema({
 		kind: v.optional(v.string()),
 		tooltip: v.array(vTooltipLine),
 		syncedAt: v.number(),
-	}).index("by_itemId", ["itemId"]),
+	})
+		.index("by_itemId", ["itemId"])
+		// Requests → "what do you need?" search.
+		.searchIndex("search_name", { searchField: "name" }),
 
 	/**
 	 * Each talent tree's layout, from Blizzard's talent-tree data (talents.ts).
