@@ -23,6 +23,7 @@ wrappers, no ORM.
 | `auth*.ts`, `claims.ts`, `http.ts`           | Sign-in (auth-and-sign-in skill; ask before changing)                                                                                           |
 | `crons.ts`                                   | `sync guild rosters` hourly, `sync recipe catalog` weekly (also talent layouts)                                                                 |
 | `dev.ts`                                     | `seed`, `probe`, `addGuild`: dev helpers                                                                                                        |
+| `proficiencies.ts`                           | `audit`: players' in-game weapon/armor skills against the rules in `shared/proficiencies.ts` (docs/game-data.md)                                |
 | `shared/`                                    | Code the site and backend both import (`wow.ts`, gear rules). No Convex imports here, so `node --test` can run it; imports use `.ts` extensions |
 
 ## Rules

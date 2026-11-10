@@ -20,7 +20,7 @@ export type ItemInfo = {
 	invType: string;
 	/** Item class: 2 weapon, 4 armor. */
 	cls: 2 | 4;
-	/** Subclass id within the class (weights.ts ARMOR_SUBCLASS / WEAPON_SUBCLASS). */
+	/** Subclass id within the class (proficiencies.ts ARMOR_SUBCLASS / WEAPON_SUBCLASS). */
 	subclass?: number;
 	/** Stat type -> value (Blizzard's stat types, as in weights.ts). */
 	stats: Record<string, number>;

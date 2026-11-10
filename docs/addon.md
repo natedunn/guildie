@@ -109,14 +109,19 @@ used); the account page lists them with Disconnect.
     },
     "professions": { "capturedAt": 1794336950, "skills": [ { "name": "Tailoring", "id": 197, "rank": 215, "max": 225 } ] },
     "recipes": [ { "profession": "Tailoring", "capturedAt": 1794336900,
-                   "known": [ { "name": "Bolt of Silk Cloth", "item": 4305 }, { "name": "Some Enchant" } ] } ]
+                   "known": [ { "name": "Bolt of Silk Cloth", "item": 4305 }, { "name": "Some Enchant" } ] } ],
+    "proficiencies": { "capturedAt": 1794336950, "level": 23,
+                       "skills": [ "Cloth", "Daggers", "Staves", "Wands" ], "dualWield": false }
   }
   ```
 
   `slot` is the inventory slot (1 head … 19 tabard), `quality` the game's
   index (0 poor … 7 heirloom), `id` in skills the skill line id where the
-  client gives one, `item` in recipes the crafted item. Tooltip lines exclude
-  the name; `color` is omitted for white. Talent `id` is the TraitDefinition ID.
+  client gives one, `item` in recipes the crafted item. `proficiencies`
+  (addon 0.7.0+): the weapon and armor skills in the game's skill list
+  (English names), the level they were read at, and `CanDualWield()`; the
+  site checks them against its rules (docs/game-data.md). Tooltip lines
+  exclude the name; `color` is omitted for white. Talent `id` is the TraitDefinition ID.
   Each character is checked on its own (types, counts, lengths, clocks no
   more than 10 minutes ahead: `convex/addonPayload.ts`); one that fails is
   listed in `rejected` and the rest still go in.
@@ -129,6 +134,8 @@ What the site does with it (`helper:ingest`):
 - Professions are mapped to Blizzard's skill line ids by skill line id or
   English name; unknown ones (Riding, other languages) are dropped. If none
   are recognised the section is ignored and Blizzard's stays.
+- Weapon and armor skills are stored as sent (newer wins), for
+  `proficiencies:audit` (docs/game-data.md).
 - Recipes are matched to the catalog (`recipes`, by profession) by crafted
   item, then by name; unmatched names are counted (`unmatched`), not kept.
 - New gear gets icons through `items.ensure`, with the game's tooltip as the
@@ -300,6 +307,10 @@ Addon data is player-provided; Blizzard's can't be edited by the player.
   the addon reads the English tooltip), `GetItemInfoInstant`'s equip location
   and subclass, and the tooltip lines it scans (`ITEM_SOULBOUND`,
   `ITEM_UNIQUE*`, `ITEM_CLASSES_ALLOWED`).
+
+- The 0.7.0 weapon and armor skill read in Forever: `GetSkillLineInfo`'s
+  "Weapon Skills" and "Armor Proficiencies" sections, and `CanDualWield`.
+  Once players upload them, `proficiencies:audit` says whether they match.
 
 - The desktop app on Windows (built from macOS and smoke-tested there; see
   apps/desktop/README.md).

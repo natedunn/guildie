@@ -219,6 +219,7 @@ export const ingest = mutation({
 				list: c.professions.list,
 			};
 			const professions = newer(incomingProfessions, existing?.professions);
+			const proficiencies = newer(c.proficiencies, existing?.proficiencies);
 
 			// Known recipes, per profession: the newer read, matched to the catalog
 			// (an unchanged read keeps its earlier match).
@@ -251,6 +252,7 @@ export const ingest = mutation({
 				equipment,
 				professions,
 				recipes: keptRecipes.length ? keptRecipes : undefined,
+				proficiencies,
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);

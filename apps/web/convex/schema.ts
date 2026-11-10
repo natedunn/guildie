@@ -252,6 +252,19 @@ export default defineSchema({
 				}),
 			),
 		),
+		/**
+		 * Weapon and armor skills the game listed (English names), with the
+		 * level they were read at; `proficiencies:audit` checks them against
+		 * shared/proficiencies.ts.
+		 */
+		proficiencies: v.optional(
+			v.object({
+				capturedAt: v.number(),
+				level: v.optional(v.number()),
+				skills: v.array(v.string()),
+				dualWield: v.optional(v.boolean()),
+			}),
+		),
 	}).index("by_slug", ["flavor", "region", "slug"]),
 
 	/**

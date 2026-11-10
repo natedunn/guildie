@@ -239,6 +239,48 @@ test("an unlearned profession drops its recipes; a collapsed header doesn't", fu
     eq(#c.recipes, 0, "tailoring's recipes dropped")
 end)
 
+test("weapon and armor skills, with dual wield; a collapsed header keeps the last", function()
+    local state = lich({ canDualWield = false })
+    state.skillLines = {
+        { header = true, name = "Professions" },
+        { name = "Tailoring", rank = 120, max = 150, abandonable = true },
+        { header = true, name = "Weapon Skills" },
+        { name = "Staves", rank = 100, max = 115 },
+        { name = "Daggers", rank = 80, max = 115 },
+        { name = "Some New Weapon", rank = 1, max = 115 },
+        { header = true, name = "Armor Proficiencies" },
+        { name = "Cloth", rank = 1, max = 1 },
+        { header = true, name = "Languages" },
+        { name = "Language: Darnassian", rank = 300, max = 300 },
+    }
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local p = payload(state.db).characters[1].proficiencies
+    eq(p.capturedAt, state.time, "capturedAt")
+    eq(p.level, 23, "level read at")
+    eq(table.concat(p.skills, ","), "Cloth,Daggers,Some New Weapon,Staves", "skills (sorted, no languages or professions)")
+    eq(p.dualWield, false, "dual wield")
+    -- Collapsed weapon header: what it hides is kept.
+    state.canDualWield = true
+    state.skillLines = {
+        { header = true, name = "Weapon Skills", expanded = false },
+        { header = true, name = "Armor Proficiencies" },
+        { name = "Cloth", rank = 1, max = 1 },
+    }
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    p = payload(state.db).characters[1].proficiencies
+    eq(table.concat(p.skills, ","), "Cloth,Daggers,Dual Wield,Some New Weapon,Staves", "kept, plus Dual Wield")
+    eq(p.dualWield, true)
+end)
+
+test("no skill list: no proficiencies", function()
+    local state = lich({ skillLines = {} })
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(payload(state.db).characters[1].proficiencies, nil)
+end)
+
 test("guild unknown right after login keeps the last; leaving clears it", function()
     local state = lich()
     wow.load(state)

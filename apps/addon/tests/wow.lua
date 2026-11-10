@@ -136,6 +136,7 @@ function wow.reset(state)
         return s.name, false, false, s.rank, 0, 0, s.max, s.abandonable
     end
     _G.GetProfessions = nil
+    _G.CanDualWield = state.canDualWield ~= nil and function() return state.canDualWield end or nil
     -- Trade skills (closed unless state.trade is set).
     _G.GetTradeSkillLine = function()
         if not state.trade then return "UNKNOWN", 0, 0 end

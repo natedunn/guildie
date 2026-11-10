@@ -1,6 +1,7 @@
 // Gear-upgrade suggestions: how much each stat is worth to each class and
-// talent tree, what each class can wear and wield, and the thresholds the
-// decision uses (shared/upgrades.ts). Plain data, meant to be tweaked by hand.
+// talent tree, and the thresholds the decision uses (shared/upgrades.ts).
+// What each class can wear and wield is in shared/proficiencies.ts (from the
+// game's data). Plain data, meant to be tweaked by hand.
 // The addon gets all of this in GuildieData.lua (helper.ts), so changing a
 // number here changes the game's tooltips with the next download, no addon
 // release needed.
@@ -390,113 +391,6 @@ export const DEFAULT_TREE: Record<string, number> = {
 	MAGE: 2, // Frost
 	WARLOCK: 0, // Affliction
 	DRUID: 1, // Feral
-};
-
-// Item subclass ids (Blizzard's and the game's GetItemInfoInstant).
-export const ARMOR_SUBCLASS = {
-	MISC: 0,
-	CLOTH: 1,
-	LEATHER: 2,
-	MAIL: 3,
-	PLATE: 4,
-	SHIELD: 6,
-	LIBRAM: 7,
-	IDOL: 8,
-	TOTEM: 9,
-} as const;
-export const WEAPON_SUBCLASS = {
-	AXE: 0,
-	AXE_2H: 1,
-	BOW: 2,
-	GUN: 3,
-	MACE: 4,
-	MACE_2H: 5,
-	POLEARM: 6,
-	SWORD: 7,
-	SWORD_2H: 8,
-	STAFF: 10,
-	FIST: 13,
-	MISC: 14,
-	DAGGER: 15,
-	THROWN: 16,
-	CROSSBOW: 18,
-	WAND: 19,
-	FISHING_POLE: 20,
-} as const;
-
-const A = ARMOR_SUBCLASS;
-const W = WEAPON_SUBCLASS;
-
-/**
- * What each class can wear and wield, as `subclass id: from level`. Armor:
- * hunters and shamans get mail at 40, warriors and paladins plate at 40.
- * Weapons: what the class can train (a trainer away counts). `dualWield`: the
- * level an off-hand weapon becomes possible. Cloaks, rings, necks, trinkets and
- * held-in-off-hand items (subclass Miscellaneous) are for everyone.
- */
-export type ClassRules = { armor: Record<number, number>; weapons: Record<number, number>; dualWield?: number };
-
-const from1 = (...ids: number[]) => Object.fromEntries(ids.map((id) => [id, 1]));
-
-export const CLASS_RULES: Record<number, ClassRules> = {
-	1: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1, [A.MAIL]: 1, [A.PLATE]: 40, [A.SHIELD]: 1 },
-		weapons: from1(
-			W.AXE,
-			W.AXE_2H,
-			W.MACE,
-			W.MACE_2H,
-			W.SWORD,
-			W.SWORD_2H,
-			W.POLEARM,
-			W.STAFF,
-			W.FIST,
-			W.DAGGER,
-			W.BOW,
-			W.GUN,
-			W.CROSSBOW,
-			W.THROWN,
-		),
-		dualWield: 20,
-	},
-	2: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1, [A.MAIL]: 1, [A.PLATE]: 40, [A.SHIELD]: 1, [A.LIBRAM]: 1 },
-		weapons: from1(W.AXE, W.AXE_2H, W.MACE, W.MACE_2H, W.SWORD, W.SWORD_2H, W.POLEARM),
-	},
-	3: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1, [A.MAIL]: 40 },
-		weapons: from1(
-			W.AXE,
-			W.AXE_2H,
-			W.SWORD,
-			W.SWORD_2H,
-			W.POLEARM,
-			W.STAFF,
-			W.FIST,
-			W.DAGGER,
-			W.BOW,
-			W.GUN,
-			W.CROSSBOW,
-			W.THROWN,
-		),
-		dualWield: 20,
-	},
-	4: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1 },
-		weapons: from1(W.DAGGER, W.SWORD, W.MACE, W.FIST, W.BOW, W.GUN, W.CROSSBOW, W.THROWN),
-		dualWield: 10,
-	},
-	5: { armor: { [A.CLOTH]: 1 }, weapons: from1(W.MACE, W.STAFF, W.DAGGER, W.WAND) },
-	7: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1, [A.MAIL]: 40, [A.SHIELD]: 1, [A.TOTEM]: 1 },
-		weapons: from1(W.AXE, W.AXE_2H, W.MACE, W.MACE_2H, W.STAFF, W.FIST, W.DAGGER),
-	},
-	8: { armor: { [A.CLOTH]: 1 }, weapons: from1(W.SWORD, W.STAFF, W.DAGGER, W.WAND) },
-	9: { armor: { [A.CLOTH]: 1 }, weapons: from1(W.SWORD, W.STAFF, W.DAGGER, W.WAND) },
-	11: {
-		armor: { [A.CLOTH]: 1, [A.LEATHER]: 1, [A.IDOL]: 1 },
-		weapons: from1(W.MACE, W.MACE_2H, W.STAFF, W.DAGGER, W.FIST),
-	},
 };
 
 /**

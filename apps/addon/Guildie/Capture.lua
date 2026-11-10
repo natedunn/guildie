@@ -1,5 +1,6 @@
 -- Reads what Guildie uploads besides talents: gear (with each item's tooltip
--- as the game shows it), professions and known recipes. Each reader returns
+-- as the game shows it), professions, weapon and armor skills, and known
+-- recipes. Each reader returns
 -- nil when the game can't answer right now, so Guildie.lua keeps the last good
 -- read (and its time) instead of uploading a hole.
 --
@@ -202,6 +203,49 @@ function ns.readProfessions()
         end
     end
     return skills, complete
+end
+
+-- ---- Weapon and armor skills ---------------------------------------------------------
+-- What the character has trained, as the game's skill list names them
+-- (English). The site checks these against its rules for who can use what
+-- (apps/web/convex/shared/proficiencies.ts); a skill the rules say a class
+-- can't have is how a wrong rule shows up.
+
+local COMBAT_SKILLS = {
+    Cloth = true, Leather = true, Mail = true, ["Plate Mail"] = true, Shield = true,
+    Axes = true, ["Two-Handed Axes"] = true, Maces = true, ["Two-Handed Maces"] = true,
+    Swords = true, ["Two-Handed Swords"] = true, Polearms = true, Staves = true,
+    Daggers = true, ["Fist Weapons"] = true, Bows = true, Guns = true, Crossbows = true,
+    Thrown = true, Wands = true, ["Dual Wield"] = true, ["Feral Combat"] = true,
+    Defense = true, Unarmed = true,
+}
+local COMBAT_HEADERS = { ["Weapon Skills"] = true, ["Armor Proficiencies"] = true }
+
+--- { skills = { name, ... } (sorted), dualWield = bool? }, and whether the
+--- list is complete (a collapsed header hides what's under it); nil if the
+--- client has no skill list.
+function ns.readProficiencies()
+    if not GetNumSkillLines or not GetSkillLineInfo then return nil end
+    local skills, seen, complete, header = {}, {}, true, nil
+    for i = 1, GetNumSkillLines() do
+        local name, isHeader, isExpanded = GetSkillLineInfo(i)
+        if isHeader then
+            header = name
+            if not isExpanded and COMBAT_HEADERS[name] then complete = false end
+        elseif name and not seen[name] and not PROFESSIONS[name]
+            and (COMBAT_SKILLS[name] or COMBAT_HEADERS[header]) then
+            seen[name] = true
+            table.insert(skills, name)
+        end
+    end
+    local dualWield = nil
+    if CanDualWield then
+        local ok, can = pcall(CanDualWield)
+        if ok then dualWield = can and true or false end
+    end
+    if dualWield and not seen["Dual Wield"] then table.insert(skills, "Dual Wield") end
+    table.sort(skills)
+    return { skills = skills, dualWield = dualWield }, complete
 end
 
 -- ---- Known recipes -----------------------------------------------------------------

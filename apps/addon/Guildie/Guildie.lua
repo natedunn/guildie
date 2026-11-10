@@ -105,6 +105,9 @@ local function fingerprint(character)
     for _, section in ipairs(character.recipes or {}) do
         table.insert(parts, "r" .. section.profession .. ":" .. #section.known)
     end
+    for _, skill in ipairs(character.proficiencies and character.proficiencies.skills or {}) do
+        table.insert(parts, "s" .. skill)
+    end
     table.sort(parts)
     return table.concat(parts, ",")
 end
@@ -125,6 +128,19 @@ local function mergeSkills(previous, skills, complete)
         if not seen[skill.name] then table.insert(skills, skill) end
     end
     return skills
+end
+
+--- Weapon and armor skills are never lost, so a partial read (a collapsed
+--- header) adds to the last.
+local function mergeNames(previous, names, complete)
+    if complete or not previous then return names end
+    local seen, out = {}, {}
+    for _, name in ipairs(names) do seen[name] = true; table.insert(out, name) end
+    for _, name in ipairs(previous.skills or {}) do
+        if not seen[name] then seen[name] = true; table.insert(out, name) end
+    end
+    table.sort(out)
+    return out
 end
 
 --- Known recipes for one profession: recipes are only ever lost with the
@@ -172,6 +188,7 @@ local function capture(reason, recipes)
     local okTalents, talents = pcall(readTalents)
     local okGear, equipment = pcall(ns.readEquipment)
     local okSkills, skills, complete = pcall(ns.readProfessions)
+    local okProf, prof, profComplete = pcall(ns.readProficiencies)
     local _, classToken = UnitClass("player")
     local _, raceToken = UnitRace("player")
     local character = {
@@ -190,6 +207,7 @@ local function capture(reason, recipes)
         equipment = previous.equipment,
         professions = previous.professions,
         recipes = previous.recipes,
+        proficiencies = previous.proficiencies,
     }
     if okGear and equipment then
         equipment.capturedAt = now
@@ -197,6 +215,16 @@ local function capture(reason, recipes)
     end
     if okSkills and skills then
         character.professions = { capturedAt = now, skills = mergeSkills(previous.professions, skills, complete) }
+    end
+    if okProf and prof and #prof.skills > 0 then
+        character.proficiencies = {
+            capturedAt = now,
+            -- The level they were read at: the site compares skills with
+            -- what the class can have at that level.
+            level = character.level,
+            skills = mergeNames(previous.proficiencies, prof.skills, profComplete),
+            dualWield = prof.dualWield,
+        }
     end
     if recipes and recipes.profession and recipes.known then
         character.recipes = mergeRecipes(character.recipes, recipes.profession, recipes.known, now)

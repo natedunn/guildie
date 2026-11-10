@@ -1,0 +1,146 @@
+name: Game data
+
+# Daily: reads WoW: Forever's newest build from wago.tools and regenerates
+# apps/web/convex/shared/proficiencies.generated.ts (who can wear and wield
+# what; apps/web/scripts/gen-proficiencies.mjs). If the data changed, it
+# commits to the fixed branch bot/game-data and opens (or updates) a pull
+# request labeled game-data with what changed per class. A maintainer reviews
+# it: a change can need an override in shared/proficiencies.ts, and a CHANGELOG
+# line if players will notice. Nothing changed: it does nothing.
+#
+# GITHUB_TOKEN caveats (docs/game-data.md):
+# - Pull requests and pushes made with GITHUB_TOKEN don't trigger other
+#   workflows, so this starts CI itself (workflow_dispatch on bot/game-data,
+#   which is allowed). The "CHANGELOG entry" check is skipped on such runs;
+#   a maintainer's own push to the branch runs the full CI.
+# - Opening pull requests needs the repository setting "Allow GitHub Actions
+#   to create and approve pull requests". Without it, this opens (or updates)
+#   an issue labeled game-data with a link to open the pull request by hand
+#   (which then runs CI normally).
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      build:
+        description: "A Forever build (like 1.60.1.70888); empty for the newest"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: game-data
+  cancel-in-progress: false
+
+env:
+  BRANCH: bot/game-data
+  FILE: apps/web/convex/shared/proficiencies.generated.ts
+
+jobs:
+  proficiencies:
+    name: Armor and weapon rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      # The generator formats its output with the repo's Biome.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Start from the open bot branch, else from main
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pr=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          if [ -n "$pr" ]; then
+            # Keep what a maintainer added to the open pull request.
+            git fetch origin "$BRANCH"
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+          else
+            git checkout -B "$BRANCH" origin/main
+          fi
+
+      - name: Generate
+        id: gen
+        env:
+          BUILD: ${{ inputs.build }}
+        run: |
+          node apps/web/scripts/gen-proficiencies.mjs ${BUILD:+--build "$BUILD"} --summary "$RUNNER_TEMP/summary.md"
+          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          if git diff --quiet -- "$FILE"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "build=$(sed -n 's/.*version: "\([^"]*\)".*/\1/p' "$FILE" | head -1)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.gen.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$FILE"
+          git commit -m "Game data: armor and weapon rules from Forever build ${{ steps.gen.outputs.build }}"
+          if [ -n "${{ steps.base.outputs.pr }}" ]; then
+            git push origin "$BRANCH"
+          else
+            # No open pull request: the branch (if any) is stale.
+            git push --force origin "$BRANCH"
+          fi
+
+      - name: Open or update the pull request
+        if: steps.gen.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build="${{ steps.gen.outputs.build }}"
+          title="Game data: armor and weapon rules from Forever build $build"
+          {
+            echo "WoW: Forever's game data changed who can wear or wield what (apps/web/scripts/gen-proficiencies.mjs, run by .github/workflows/game-data.yml)."
+            echo
+            cat "$RUNNER_TEMP/summary.md"
+            echo
+            echo "### Review"
+            echo
+            echo "- [ ] Does each change look like the real game? Data that's wrong for Forever (Season of Discovery leftovers, say) gets an override in \`apps/web/convex/shared/proficiencies.ts\` with a reason and how it'll be confirmed."
+            echo "- [ ] \`proficiencies:audit\` on production shows what players' games say (docs/game-data.md)."
+            echo "- [ ] A CHANGELOG line under \`## Unreleased\` if players will notice, else the skip-changelog label."
+            echo
+            echo "CI: started by the workflow on each bot commit (pull requests from GITHUB_TOKEN don't start it); the CHANGELOG check runs once a maintainer pushes or closes and reopens this."
+          } > "$RUNNER_TEMP/body.md"
+          gh label create game-data --color 1d76db --description "Game data changed (bot); needs a maintainer's review" --force
+          pr="${{ steps.base.outputs.pr }}"
+          if [ -n "$pr" ]; then
+            gh pr edit "$pr" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+            echo "opened=true" >> "$GITHUB_ENV"
+          elif gh pr create --base main --head "$BRANCH" --title "$title" --body-file "$RUNNER_TEMP/body.md" --label game-data; then
+            echo "opened=true" >> "$GITHUB_ENV"
+          else
+            # Actions may not open pull requests here: an issue instead.
+            echo "::warning::Couldn't open a pull request (repository setting); opening an issue instead."
+            compare="${{ github.server_url }}/${{ github.repository }}/compare/main...$BRANCH?expand=1"
+            { echo "Open the pull request: $compare"; echo; cat "$RUNNER_TEMP/body.md"; } > "$RUNNER_TEMP/issue.md"
+            issue=$(gh issue list --label game-data --state open --json number --jq '.[0].number // empty')
+            if [ -n "$issue" ]; then
+              gh issue edit "$issue" --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+            else
+              gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md" --label game-data
+            fi
+          fi
+
+      - name: Run CI on the bot branch
+        if: steps.gen.outputs.changed == 'true' && env.opened == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref "$BRANCH"

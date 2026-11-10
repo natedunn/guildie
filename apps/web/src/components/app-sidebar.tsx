@@ -4,6 +4,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import {
 	AnvilIcon,
 	Cancel01Icon,
+	KnightShieldIcon,
 	Login03Icon,
 	Menu01Icon,
 	Settings02Icon,
@@ -93,6 +94,10 @@ function SidebarNav() {
 										>
 											<HugeiconsIcon icon={AnvilIcon} size={15} strokeWidth={1.75} />
 											Crafting
+										</NavLink>
+										<NavLink to="/g/$region/$slug/gear" params={{ region: g.region, slug: g.slug }} className="pl-3">
+											<HugeiconsIcon icon={KnightShieldIcon} size={15} strokeWidth={1.75} />
+											Gear
 										</NavLink>
 									</div>
 								</div>

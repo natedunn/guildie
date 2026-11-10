@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { itemInfoFromTooltip } from "./shared/itemInfo.ts";
+import { CLASS_RULES } from "./shared/proficiencies.ts";
 import {
 	explain,
 	judge,
@@ -13,7 +14,7 @@ import {
 	upgradeRules,
 	usableAt,
 } from "./shared/upgrades.ts";
-import { CLASS_RULES, SPECS } from "./shared/weights.ts";
+import { SPECS } from "./shared/weights.ts";
 
 // The shared cases: the addon's Lua port runs the same file
 // (apps/addon/tests/upgrades_test.lua).

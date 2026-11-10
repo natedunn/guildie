@@ -32,15 +32,15 @@ docs/addon.md first; this is the short version.
 
 ## Files
 
-| File              | What                                                                                              |
-| ----------------- | ------------------------------------------------------------------------------------------------- |
-| `Guildie.toc`     | Load order, `## Version` (what the app compares to update players' copies)                        |
-| `Guildie.lua`     | Events, the debounced read, talents, building `GuildieDB.payload` (JSON, `version` 2)             |
-| `Capture.lua`     | Gear (with tooltips), professions, recipes; modern API first, classic fallback                    |
-| `Upgrades.lua`    | Gear-upgrade suggestions, a port of `apps/web/convex/shared/upgrades.ts` (gear-and-weights skill) |
-| `Tooltip.lua`     | The lines added to item tooltips (reagents, upgrades)                                             |
-| `UI.lua`          | `/guildie` window and minimap button                                                              |
-| `GuildieData.lua` | Placeholder; the app overwrites it per player                                                     |
+| File              | What                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| `Guildie.toc`     | Load order, `## Version` (what the app compares to update players' copies)                          |
+| `Guildie.lua`     | Events, the debounced read, talents, building `GuildieDB.payload` (JSON, `version` 2)               |
+| `Capture.lua`     | Gear (with tooltips), professions, weapon/armor skills, recipes; modern API first, classic fallback |
+| `Upgrades.lua`    | Gear-upgrade suggestions, a port of `apps/web/convex/shared/upgrades.ts` (gear-and-weights skill)   |
+| `Tooltip.lua`     | The lines added to item tooltips (reagents, upgrades)                                               |
+| `UI.lua`          | `/guildie` window and minimap button                                                                |
+| `GuildieData.lua` | Placeholder; the app overwrites it per player                                                       |
 
 ## Forever's API is uncertain
 

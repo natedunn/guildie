@@ -12,17 +12,18 @@ rules: TypeScript on the site, Lua in the addon. Overview: docs/addon.md,
 
 ## Pieces
 
-| File                                         | What                                                                                                                                                                       |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/web/convex/shared/weights.ts`          | Plain data: `SPECS` (3 trees per class, stat weights, main stat = 1), `DEFAULT_TREE`, `CLASS_RULES` (armor/weapon types by level, dual wield), `STAT_POINTS`, `THRESHOLDS` |
-| `apps/web/convex/shared/upgrades.ts`         | The rules: `specsOf`, `scoreItem`, `suits`, `usableAt`, `baseline`, `judge`, `suggest`, `explain`, `upgradeMember`, `upgradeRules()`                                       |
-| `apps/web/convex/shared/itemInfo.ts`         | Reads an item from its (English) tooltip lines: slot, armor/weapon type, stats, class restriction, Unique                                                                  |
-| `apps/web/convex/upgradeProfiles.ts`         | A guildmate as the rules see them: spec(s) and the score of what they wear per slot                                                                                        |
-| `apps/web/convex/crafting.ts` (`itemDetail`) | The site's item panel ("Upgrade for", with the reason)                                                                                                                     |
-| `apps/web/convex/helper.ts` (guild data)     | Puts `upgradeRules()` and each active member into `GuildieData.lua`                                                                                                        |
-| `apps/addon/Guildie/Upgrades.lua`            | Lua port of `upgrades.ts`; reads the hovered item with the game's APIs                                                                                                     |
-| `apps/addon/tests/upgrade_vectors.json`      | Shared cases, run by both test suites                                                                                                                                      |
-| `apps/web/scripts/gen-upgrade-vectors.ts`    | Writes the vectors from the TypeScript                                                                                                                                     |
+| File                                         | What                                                                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/convex/shared/weights.ts`          | Plain data: `SPECS` (3 trees per class, stat weights, main stat = 1), `DEFAULT_TREE`, `STAT_POINTS`, `THRESHOLDS`                                             |
+| `apps/web/convex/shared/proficiencies.ts`    | `CLASS_RULES` (armor/weapon types by level, dual wield): WoW: Forever's game data (`proficiencies.generated.ts`) plus reviewed `OVERRIDES`; docs/game-data.md |
+| `apps/web/convex/shared/upgrades.ts`         | The rules: `specsOf`, `scoreItem`, `suits`, `usableAt`, `baseline`, `judge`, `suggest`, `explain`, `upgradeMember`, `upgradeRules()`                          |
+| `apps/web/convex/shared/itemInfo.ts`         | Reads an item from its (English) tooltip lines: slot, armor/weapon type, stats, class restriction, Unique                                                     |
+| `apps/web/convex/upgradeProfiles.ts`         | A guildmate as the rules see them: spec(s) and the score of what they wear per slot                                                                           |
+| `apps/web/convex/crafting.ts` (`itemDetail`) | The site's item panel ("Upgrade for", with the reason)                                                                                                        |
+| `apps/web/convex/helper.ts` (guild data)     | Puts `upgradeRules()` and each active member into `GuildieData.lua`                                                                                           |
+| `apps/addon/Guildie/Upgrades.lua`            | Lua port of `upgrades.ts`; reads the hovered item with the game's APIs                                                                                        |
+| `apps/addon/tests/upgrade_vectors.json`      | Shared cases, run by both test suites                                                                                                                         |
+| `apps/web/scripts/gen-upgrade-vectors.ts`    | Writes the vectors from the TypeScript                                                                                                                        |
 
 ## The decision, in short
 
@@ -41,7 +42,7 @@ gain ≥ `upgrade` (15%), usable now, main spec. **Maybe:** gain ≥ `maybe`
 Weights and thresholds are **data**: they reach the addon through
 `GuildieData.lua` on the next download, so no addon release is needed.
 
-1. Edit `SPECS` / `THRESHOLDS` / `CLASS_RULES` in `weights.ts`. Keep each
+1. Edit `SPECS` / `THRESHOLDS` in `weights.ts`. Keep each
    tree's main stat at 1; note your source in the comment (WowSims presets,
    theorycrafting links).
 2. `pnpm --filter @guildie/web test`. "real weights: plausible picks" in
@@ -51,6 +52,19 @@ Weights and thresholds are **data**: they reach the addon through
    so weight-only changes don't touch `upgrade_vectors.json`.
 4. Check it on the site: the item panel (`?item=<id>` on a guild page) shows
    who it's for and why.
+
+## Who can wear and wield what
+
+Not hand-written: `CLASS_RULES` comes from the game's own tables
+(docs/game-data.md). Never edit `proficiencies.generated.ts`; regenerate it
+(`node apps/web/scripts/gen-proficiencies.mjs`), and a daily workflow opens a
+`game-data` pull request when a Forever build changes it. Where the data is
+wrong for Forever (Season of Discovery leftovers: Shaman Dual Wield, Druid
+Polearms), add or remove an entry in `OVERRIDES` (shared/proficiencies.ts)
+with a reason and how it's confirmed; `proficiencies:audit` compares the
+skills players' addons upload with the rules. The shape (`armor`, `weapons`,
+`dualWield`) reaches the addon in `upgrades.rules.classes`, so rule changes
+need no addon release, and the shared vectors use their own test rules.
 
 ## Changing the rules (logic)
 

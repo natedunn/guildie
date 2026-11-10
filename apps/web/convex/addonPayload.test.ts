@@ -116,6 +116,29 @@ test("professions in a language we can't read fall back to Blizzard's", () => {
 	assert.deepEqual(none.character.professions?.list, [], "no professions at all is a real answer");
 });
 
+test("weapon and armor skills (addon 0.7.0)", () => {
+	const r = parseCharacter(
+		{
+			...v2,
+			proficiencies: { capturedAt: T, level: 23, skills: ["Staves", "Cloth", "Daggers", "Cloth"], dualWield: false },
+		},
+		NOW,
+	);
+	assert.ok(r.ok);
+	assert.deepEqual(r.character.proficiencies, {
+		capturedAt: T * 1000,
+		level: 23,
+		skills: ["Cloth", "Daggers", "Staves"],
+		dualWield: false,
+	});
+	const older = parseCharacter(v2, NOW);
+	assert.ok(older.ok);
+	assert.equal(older.character.proficiencies, undefined, "older addons don't send them");
+	const bad = parseCharacter({ ...v2, proficiencies: { capturedAt: T, skills: ["Axes"], dualWield: "yes" } }, NOW);
+	assert.ok(!bad.ok);
+	assert.match(bad.error, /proficiencies.dualWield/);
+});
+
 test("rejects bad shapes, sizes and clocks, naming the field", () => {
 	const bad: [unknown, RegExp][] = [
 		[{ ...v1, capturedAt: NOW / 1000 + 3600 }, /capturedAt: in the future/],

@@ -1,15 +1,7 @@
 import { FOREVER_TALENT_TREES, TALENT_TREE_BY_ID } from "./foreverTalents.ts";
 import { type ItemInfo, WEAPON_INV_TYPES } from "./itemInfo.ts";
-import {
-	CLASS_RULES,
-	CLASS_TOKENS,
-	type ClassRules,
-	DEFAULT_TREE,
-	SPECS,
-	STAT_POINTS,
-	THRESHOLDS,
-	type Weights,
-} from "./weights.ts";
+import { CLASS_RULES, type ClassRules } from "./proficiencies.ts";
+import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weights } from "./weights.ts";
 
 // Gear-upgrade suggestions: would this item help a guildmate? A best guess
 // from stat weights (weights.ts), not a sim.

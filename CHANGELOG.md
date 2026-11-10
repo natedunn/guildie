@@ -15,10 +15,14 @@ into that version's section.
 ### New
 
 - Links to Guildie show a proper preview when shared (Discord, messages, social sites), with the guild's or character's name where there is one.
+- A Gear page for each guild: which class can wear and wield what (and from which level), and "Who can use…": pick an armor or weapon type to see the guildmates who can use it now and who will.
+- Character pages show what they can use under their gear ("Mail at 40" until then).
+- The addon sends your weapon and armor skills, so Guildie can check its rules against the game.
 
 ### Improvements
 
 - Settings → Addon and → App say Guildie is open source, with links to the code and to report a bug.
+- Who can use what now comes from WoW: Forever's own game data, checked daily. Gear suggestions now count Rogues for axes, and polearms only from level 20.
 
 ## 0.3.7
 

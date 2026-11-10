@@ -2,11 +2,14 @@ name: CI
 
 # Every pull request (and every push to main): style, types, tests, the
 # addon's Lua tests, the desktop app's smoke test, and a CHANGELOG line.
-# Branch protection on main requires these to pass.
+# Branch protection on main requires these to pass. workflow_dispatch: the
+# game-data workflow starts it on its bot branch (its own pull requests don't
+# trigger pull_request; the CHANGELOG check is skipped there).
 on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

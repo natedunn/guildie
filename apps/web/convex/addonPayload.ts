@@ -1,8 +1,8 @@
 // What the Guildie addon uploads (apps/addon, through the desktop app):
 // parsing and strict validation, one character at a time, so one bad
 // character doesn't sink the rest of an upload. Payload versions 1 (talents
-// and level) and 2 (plus guild, XP, gear, professions and known recipes) are
-// both accepted. Kept free of Convex and value imports so `node --test` can
+// and level) and 2 (plus guild, XP, gear, professions and known recipes; from
+// addon 0.7.0 also weapon and armor skills) are both accepted. Kept free of Convex and value imports so `node --test` can
 // run it (addonPayload.test.ts).
 
 export const PAYLOAD_VERSIONS = [1, 2] as const;
@@ -14,6 +14,7 @@ export const LIMITS = {
 	tooltipLines: 40,
 	tooltipText: 400,
 	skills: 20,
+	combatSkills: 40,
 	recipeProfessions: 15,
 	recipesPerProfession: 1500,
 	name: 120,
@@ -113,6 +114,12 @@ export type AddonCharacter = {
 		capturedAt: number;
 		known: { name: string; itemId?: number }[];
 	}[];
+	/**
+	 * Weapon and armor skills as the game's skill list names them (English),
+	 * read at `level`; `dualWield`: CanDualWield(). Checked against the rules
+	 * by `proficiencies:audit`.
+	 */
+	proficiencies?: { capturedAt: number; level?: number; skills: string[]; dualWield?: boolean };
 };
 
 class Invalid extends Error {}
@@ -260,6 +267,23 @@ function recipes(x: unknown, now: number): AddonCharacter["recipes"] {
 	return out;
 }
 
+function proficiencies(x: unknown, now: number): AddonCharacter["proficiencies"] {
+	const e = obj(x, "proficiencies");
+	const capturedAt = time(e.capturedAt, "proficiencies.capturedAt", now);
+	const level = opt(e.level, (l) => int(l, "proficiencies.level", 1, 100));
+	const skills = [
+		...new Set(
+			arr(e.skills, "proficiencies.skills", LIMITS.combatSkills).map((s, i) =>
+				str(s, `proficiencies.skills[${i}]`, 48, 1),
+			),
+		),
+	].sort();
+	const dualWield = opt(e.dualWield, (d) =>
+		typeof d === "boolean" ? d : fail("proficiencies.dualWield", "expected true or false"),
+	);
+	return { capturedAt, ...(level ? { level } : {}), skills, ...(dualWield !== undefined ? { dualWield } : {}) };
+}
+
 export type Parsed = { ok: true; character: AddonCharacter } | { ok: false; name: string; error: string };
 
 /** One uploaded character, checked field by field. `now`: the server's clock (ms). */
@@ -296,6 +320,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			equipment: opt(c.equipment, (e) => equipment(e, now)),
 			professions: opt(c.professions, (p) => professions(p, now)),
 			recipes: opt(c.recipes, (r) => recipes(r, now)) ?? [],
+			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
 		};
 		return { ok: true, character };
 	} catch (error) {
