@@ -276,11 +276,13 @@ html[data-desktop="true"] {
 		background-color: var(--hover);
 		color: var(--foreground);
 	}
-	/* Centered by the box, an icon looks high next to text, whose letters sit
-	   low in their line (more so in Segoe UI): nudge it to the letters. */
 	.nav-item > svg {
 		flex: none;
-		translate: 0 1px;
+	}
+	/* Segoe UI (the app's font) sits its letters high in the line box, so a
+	   box-centered icon reads low next to them there: lift it to the letters. */
+	html[data-desktop="true"] .nav-item > svg {
+		translate: 0 -1px;
 	}
 	.nav-item[data-status="active"] {
 		background-color: var(--selected);

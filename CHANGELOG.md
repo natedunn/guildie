@@ -16,6 +16,7 @@ into that version's section.
 
 - A subtle border of Guildie's own around the window on Windows 11, instead of none.
 - The roster no longer shows guild rank (character pages still do).
+- Sidebar icons line up with their labels in the app.
 
 ## 0.3.6
 
