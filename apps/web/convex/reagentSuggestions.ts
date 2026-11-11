@@ -15,16 +15,28 @@ const EVERYONE_HAS = new Set(["Cooking", "Fishing", "First Aid"]);
 /**
  * Gathering professions. Forever gives each three camping recipes (Incense
  * Candle, Camp Chair, Lodestone and their upgrades) that every herbalist,
- * skinner and miner learns, made mostly from what they gather themselves:
- * they'd put every herbalist on every common herb. Only Mining's smelting
- * counts.
+ * skinner and miner learns. Their simple mats (common herbs, leather, stone)
+ * would put every gatherer on every common material, so a camping recipe
+ * only counts for its green-or-better reagents (Silver Bar, Truesilver Bar).
+ * Mining's smelting counts in full.
  */
 const GATHERING = new Set(["Herbalism", "Skinning", "Mining"]);
+const NOTABLE = new Set(["UNCOMMON", "RARE", "EPIC", "LEGENDARY", "ARTIFACT"]);
 
-export function countsAsReagentUse(profession: string, recipeName: string) {
-	if (EVERYONE_HAS.has(profession)) return false;
-	if (GATHERING.has(profession)) return profession === "Mining" && recipeName.startsWith("Smelt ");
-	return true;
+/** How a known recipe's reagents count: all of them, green-or-better only, or none. */
+export function reagentUse(profession: string, recipeName: string): "all" | "notable" | "none" {
+	if (EVERYONE_HAS.has(profession)) return "none";
+	if (GATHERING.has(profession) && !(profession === "Mining" && recipeName.startsWith("Smelt "))) return "notable";
+	return "all";
+}
+
+/** Reagents whose quality reagentSuggestions needs (camping recipes'). */
+export function reagentsNeedingQuality(recipes: Iterable<[number, ReagentRecipe & { profession: string }]>) {
+	const ids = new Set<number>();
+	for (const [, r] of recipes) {
+		if (reagentUse(r.profession, r.name) === "notable") for (const x of r.reagents) ids.add(x.itemId);
+	}
+	return [...ids];
 }
 
 /** Most users listed per reagent. */
@@ -39,10 +51,14 @@ export type ReagentMember = {
 };
 export type ReagentUser = { name: string; classId: number; profession: string; recipes: number };
 
-/** itemId -> { name, users }, leaving out vendor-sold reagents. */
+/**
+ * itemId -> { name, users }, leaving out vendor-sold reagents. `quality`:
+ * item quality by id, for camping recipes' reagents (unknown: left out).
+ */
 export function reagentSuggestions(
 	guilds: { region: string; members: ReagentMember[] }[],
 	recipes: Map<number, ReagentRecipe>,
+	quality: Map<number, string> = new Map(),
 ): Record<string, { name: string; users: ReagentUser[] }> {
 	const uses = new Map<number, { name: string; users: Map<string, ReagentUser> }>();
 	for (const g of guilds) {
@@ -50,9 +66,11 @@ export function reagentSuggestions(
 			for (const p of m.professions) {
 				for (const recipeId of p.knownRecipes) {
 					const recipe = recipes.get(recipeId);
-					if (!recipe || !countsAsReagentUse(p.name, recipe.name)) continue;
+					const use = recipe ? reagentUse(p.name, recipe.name) : "none";
+					if (!recipe || use === "none") continue;
 					for (const reagent of recipe.reagents) {
 						if (VENDOR_REAGENTS[reagent.itemId]) continue;
+						if (use === "notable" && !NOTABLE.has(quality.get(reagent.itemId) ?? "")) continue;
 						let entry = uses.get(reagent.itemId);
 						if (!entry) uses.set(reagent.itemId, (entry = { name: reagent.name, users: new Map() }));
 						const key = `${g.region}:${m.slug}:${p.name}`;

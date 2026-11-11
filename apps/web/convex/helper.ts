@@ -7,7 +7,7 @@ import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
 import { mergeProfile } from "./profile";
-import { type ReagentRecipe, type ReagentUser, reagentSuggestions } from "./reagentSuggestions";
+import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
@@ -650,13 +650,19 @@ export const guildData = action({
 		const ids = [
 			...new Set(base.guilds.flatMap((g) => g.members.flatMap((m) => m.professions.flatMap((p) => p.knownRecipes)))),
 		];
-		const recipes = new Map<number, ReagentRecipe>();
+		const recipes = new Map<number, ReagentRecipe & { profession: string }>();
 		for (let i = 0; i < ids.length; i += 400) {
 			for (const r of await ctx.runQuery(internal.recipes.byIds, { ids: ids.slice(i, i + 400) })) {
 				recipes.set(r.recipeId, r);
 			}
 		}
-		const reagents = reagentSuggestions(base.guilds, recipes);
+		const quality = new Map(
+			(await ctx.runQuery(internal.items.qualities, { itemIds: reagentsNeedingQuality(recipes) })).map((i) => [
+				i.itemId,
+				i.quality,
+			]),
+		);
+		const reagents = reagentSuggestions(base.guilds, recipes, quality);
 		return {
 			version: 1,
 			generatedAt: Date.now(),

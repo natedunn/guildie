@@ -95,6 +95,22 @@ export const missing = internalQuery({
 	},
 });
 
+/** Item qualities ("COMMON", "UNCOMMON"...) by id, for the items we have. */
+export const qualities = internalQuery({
+	args: { itemIds: v.array(v.number()) },
+	handler: async (ctx, { itemIds }) => {
+		const out: { itemId: number; quality: string }[] = [];
+		for (const itemId of new Set(itemIds)) {
+			const row = await ctx.db
+				.query("items")
+				.withIndex("by_itemId", (q) => q.eq("itemId", itemId))
+				.unique();
+			if (row) out.push({ itemId, quality: row.quality });
+		}
+		return out;
+	},
+});
+
 const BATCH = 20;
 const BATCH_STAGGER_MS = 2_000;
 

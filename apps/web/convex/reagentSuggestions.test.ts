@@ -1,71 +1,78 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { countsAsReagentUse, type ReagentRecipe, reagentSuggestions } from "./reagentSuggestions.ts";
+import { type ReagentRecipe, reagentSuggestions, reagentsNeedingQuality, reagentUse } from "./reagentSuggestions.ts";
 
-// Real Forever recipes (from production's recipe catalog).
-const RECIPES = new Map<number, ReagentRecipe>([
+// Real Forever recipes and qualities (from production's catalog and items).
+const r = (name: string, profession: string, reagents: [number, string][]) => ({
+	name,
+	profession,
+	reagents: reagents.map(([itemId, n]) => ({ itemId, name: n })),
+});
+const RECIPES = new Map<number, ReagentRecipe & { profession: string }>([
 	[
 		100,
-		{
-			name: "Elixir of Minor Fortitude",
-			reagents: [
-				{ itemId: 2447, name: "Peacebloom" },
-				{ itemId: 3371, name: "Empty Vial" },
-			],
-		},
+		r("Elixir of Minor Fortitude", "Alchemy", [
+			[2447, "Peacebloom"],
+			[3371, "Empty Vial"],
+		]),
 	],
 	[
 		101,
-		{
-			name: "Minor Healing Potion",
-			reagents: [
-				{ itemId: 2447, name: "Peacebloom" },
-				{ itemId: 765, name: "Silverleaf" },
-			],
-		},
+		r("Minor Healing Potion", "Alchemy", [
+			[2447, "Peacebloom"],
+			[765, "Silverleaf"],
+		]),
 	],
 	[
 		52642,
-		{
-			name: "Incense Candle",
-			reagents: [
-				{ itemId: 2447, name: "Peacebloom" },
-				{ itemId: 765, name: "Silverleaf" },
-			],
-		},
+		r("Incense Candle", "Herbalism", [
+			[2447, "Peacebloom"],
+			[765, "Silverleaf"],
+		]),
 	],
 	[
 		52644,
-		{
-			name: "Camp Chair",
-			reagents: [
-				{ itemId: 2318, name: "Light Leather" },
-				{ itemId: 4470, name: "Simple Wood" },
-			],
-		},
+		r("Camp Chair", "Skinning", [
+			[2318, "Light Leather"],
+			[4470, "Simple Wood"],
+		]),
 	],
 	[
 		52643,
-		{
-			name: "Lodestone",
-			reagents: [
-				{ itemId: 2835, name: "Rough Stone" },
-				{ itemId: 2840, name: "Copper Bar" },
-			],
-		},
+		r("Lodestone", "Mining", [
+			[2835, "Rough Stone"],
+			[2840, "Copper Bar"],
+		]),
 	],
-	[3324, { name: "Smelt Copper", reagents: [{ itemId: 2770, name: "Copper Ore" }] }],
+	[
+		57016,
+		r("Rock Garden", "Mining", [
+			[2838, "Heavy Stone"],
+			[2772, "Iron Ore"],
+			[2842, "Silver Bar"],
+		]),
+	],
+	[3324, r("Smelt Copper", "Mining", [[2770, "Copper Ore"]])],
 	[
 		200,
-		{
-			name: "Runed Copper Rod",
-			reagents: [
-				{ itemId: 6217, name: "Copper Rod" },
-				{ itemId: 2840, name: "Copper Bar" },
-			],
-		},
+		r("Runed Copper Rod", "Enchanting", [
+			[6217, "Copper Rod"],
+			[2840, "Copper Bar"],
+		]),
 	],
-	[300, { name: "Herb Baked Egg", reagents: [{ itemId: 6889, name: "Small Egg" }] }],
+	[300, r("Herb Baked Egg", "Cooking", [[6889, "Small Egg"]])],
+]);
+// Every camping reagent is white except Silver Bar and Truesilver Bar.
+const QUALITY = new Map([
+	[2447, "COMMON"],
+	[765, "COMMON"],
+	[2318, "COMMON"],
+	[4470, "COMMON"],
+	[2835, "COMMON"],
+	[2840, "COMMON"],
+	[2838, "COMMON"],
+	[2772, "COMMON"],
+	[2842, "UNCOMMON"],
 ]);
 
 const member = (name: string, classId: number, professions: [string, number[]][]) => ({
@@ -88,55 +95,69 @@ const GUILD = {
 		]),
 		member("Stinkycarp", 9, [
 			["Enchanting", [200]],
-			["Mining", [52643, 3324]],
+			["Mining", [52643, 57016, 3324]],
 			["Cooking", [300]],
 		]),
 	],
 };
 
-test("camping recipes don't count; Mining's smelting does", () => {
-	assert.equal(countsAsReagentUse("Herbalism", "Incense Candle"), false);
-	assert.equal(countsAsReagentUse("Skinning", "Camp Chair"), false);
-	assert.equal(countsAsReagentUse("Mining", "Lodestone"), false);
-	assert.equal(countsAsReagentUse("Mining", "Smelt Copper"), true);
-	assert.equal(countsAsReagentUse("Cooking", "Herb Baked Egg"), false);
-	assert.equal(countsAsReagentUse("Alchemy", "Minor Healing Potion"), true);
+test("camping recipes count only for green-or-better reagents; smelting counts in full", () => {
+	assert.equal(reagentUse("Herbalism", "Incense Candle"), "notable");
+	assert.equal(reagentUse("Skinning", "Camp Chair"), "notable");
+	assert.equal(reagentUse("Mining", "Lodestone"), "notable");
+	assert.equal(reagentUse("Mining", "Smelt Copper"), "all");
+	assert.equal(reagentUse("Cooking", "Herb Baked Egg"), "none");
+	assert.equal(reagentUse("Alchemy", "Minor Healing Potion"), "all");
+});
+
+test("only camping recipes' reagents need a quality lookup", () => {
+	assert.deepEqual(
+		reagentsNeedingQuality(RECIPES).sort((a, b) => a - b),
+		[765, 2318, 2447, 2772, 2835, 2838, 2840, 2842, 4470],
+	);
 });
 
 test("herbs list the alchemist, not every herbalist", () => {
-	const r = reagentSuggestions([GUILD], RECIPES);
-	assert.deepEqual(r[2447].users, [{ name: "Healing", classId: 5, profession: "Alchemy", recipes: 2 }]);
+	const out = reagentSuggestions([GUILD], RECIPES, QUALITY);
+	assert.deepEqual(out[2447].users, [{ name: "Healing", classId: 5, profession: "Alchemy", recipes: 2 }]);
 	assert.deepEqual(
-		r[765].users.map((u) => `${u.name} (${u.profession})`),
+		out[765].users.map((u) => `${u.name} (${u.profession})`),
 		["Healing (Alchemy)"],
 	);
-	assert.equal(r[2318], undefined, "Light Leather: only a Camp Chair");
-	assert.equal(r[2835], undefined, "Rough Stone: only a Lodestone");
-	assert.equal(r[6889], undefined, "Cooking left out");
+	assert.equal(out[2318], undefined, "Light Leather: only a Camp Chair");
+	assert.equal(out[2835], undefined, "Rough Stone: only a Lodestone");
+	assert.equal(out[2838], undefined, "Heavy Stone: white");
+	assert.equal(out[6889], undefined, "Cooking left out");
+});
+
+test("a camping recipe's green reagent lists the miner; unknown quality doesn't", () => {
+	const out = reagentSuggestions([GUILD], RECIPES, QUALITY);
+	assert.deepEqual(out[2842].users, [{ name: "Stinkycarp", classId: 9, profession: "Mining", recipes: 1 }]);
+	assert.equal(reagentSuggestions([GUILD], RECIPES)[2842], undefined, "no quality known");
 });
 
 test("smelting and other crafts still count; vendor reagents never listed", () => {
-	const r = reagentSuggestions([GUILD], RECIPES);
+	const out = reagentSuggestions([GUILD], RECIPES, QUALITY);
 	assert.deepEqual(
-		r[2770].users.map((u) => u.profession),
+		out[2770].users.map((u) => u.profession),
 		["Mining"],
 	);
 	assert.deepEqual(
-		r[2840].users.map((u) => u.profession),
+		out[2840].users.map((u) => u.profession),
 		["Enchanting"],
 		"Copper Bar: the rod, not the Lodestone",
 	);
-	assert.equal(r[3371], undefined, "Empty Vial");
-	assert.equal(r[4470], undefined, "Simple Wood");
-	assert.equal(r[6217], undefined, "Copper Rod");
+	assert.equal(out[3371], undefined, "Empty Vial");
+	assert.equal(out[4470], undefined, "Simple Wood");
+	assert.equal(out[6217], undefined, "Copper Rod");
 });
 
 test("at most 8 users, most recipes first", () => {
 	const members = Array.from({ length: 10 }, (_, i) => member(`M${i}`, 1, [["Alchemy", i % 2 ? [100, 101] : [100]]]));
-	const r = reagentSuggestions([{ region: "us", members }], RECIPES);
-	assert.equal(r[2447].users.length, 8);
+	const out = reagentSuggestions([{ region: "us", members }], RECIPES);
+	assert.equal(out[2447].users.length, 8);
 	assert.deepEqual(
-		r[2447].users.slice(0, 5).map((u) => u.recipes),
+		out[2447].users.slice(0, 5).map((u) => u.recipes),
 		[2, 2, 2, 2, 2],
 	);
 });
