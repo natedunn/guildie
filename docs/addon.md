@@ -223,7 +223,8 @@ your last login or reload.
   `convex/reagentSuggestions.ts`. Left out: Cooking, Fishing and First Aid
   (nearly everyone has them), the gathering professions' camping recipes
   (Incense Candle, Camp Chair, Lodestone and upgrades) except for their
-  green-or-better reagents (Silver Bar, Truesilver Bar; Mining's smelting
+  green-or-better reagents (Silver Bar, Truesilver Bar, listed as
+  "Camping+Mining"; Mining's smelting
   counts in full), and reagents vendors sell (`VENDOR_REAGENTS` in `shared/wow.ts`:
   thread, vials, flux, dyes, Simple Wood...).
 - Tooltips end with a Guildie block: a blank line, a gold "Guildie" header

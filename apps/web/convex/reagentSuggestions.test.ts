@@ -102,9 +102,9 @@ const GUILD = {
 };
 
 test("camping recipes count only for green-or-better reagents; smelting counts in full", () => {
-	assert.equal(reagentUse("Herbalism", "Incense Candle"), "notable");
-	assert.equal(reagentUse("Skinning", "Camp Chair"), "notable");
-	assert.equal(reagentUse("Mining", "Lodestone"), "notable");
+	assert.equal(reagentUse("Herbalism", "Incense Candle"), "camping");
+	assert.equal(reagentUse("Skinning", "Camp Chair"), "camping");
+	assert.equal(reagentUse("Mining", "Lodestone"), "camping");
 	assert.equal(reagentUse("Mining", "Smelt Copper"), "all");
 	assert.equal(reagentUse("Cooking", "Herb Baked Egg"), "none");
 	assert.equal(reagentUse("Alchemy", "Minor Healing Potion"), "all");
@@ -132,7 +132,7 @@ test("herbs list the alchemist, not every herbalist", () => {
 
 test("a camping recipe's green reagent lists the miner; unknown quality doesn't", () => {
 	const out = reagentSuggestions([GUILD], RECIPES, QUALITY);
-	assert.deepEqual(out[2842].users, [{ name: "Stinkycarp", classId: 9, profession: "Mining", recipes: 1 }]);
+	assert.deepEqual(out[2842].users, [{ name: "Stinkycarp", classId: 9, profession: "Camping+Mining", recipes: 1 }]);
 	assert.equal(reagentSuggestions([GUILD], RECIPES)[2842], undefined, "no quality known");
 });
 

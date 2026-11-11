@@ -17,16 +17,17 @@ const EVERYONE_HAS = new Set(["Cooking", "Fishing", "First Aid"]);
  * Candle, Camp Chair, Lodestone and their upgrades) that every herbalist,
  * skinner and miner learns. Their simple mats (common herbs, leather, stone)
  * would put every gatherer on every common material, so a camping recipe
- * only counts for its green-or-better reagents (Silver Bar, Truesilver Bar).
+ * only counts for its green-or-better reagents (Silver Bar, Truesilver Bar),
+ * listed as "Camping+Mining".
  * Mining's smelting counts in full.
  */
 const GATHERING = new Set(["Herbalism", "Skinning", "Mining"]);
 const NOTABLE = new Set(["UNCOMMON", "RARE", "EPIC", "LEGENDARY", "ARTIFACT"]);
 
-/** How a known recipe's reagents count: all of them, green-or-better only, or none. */
-export function reagentUse(profession: string, recipeName: string): "all" | "notable" | "none" {
+/** How a known recipe's reagents count: all of them, green-or-better only (camping), or none. */
+export function reagentUse(profession: string, recipeName: string): "all" | "camping" | "none" {
 	if (EVERYONE_HAS.has(profession)) return "none";
-	if (GATHERING.has(profession) && !(profession === "Mining" && recipeName.startsWith("Smelt "))) return "notable";
+	if (GATHERING.has(profession) && !(profession === "Mining" && recipeName.startsWith("Smelt "))) return "camping";
 	return "all";
 }
 
@@ -34,7 +35,7 @@ export function reagentUse(profession: string, recipeName: string): "all" | "not
 export function reagentsNeedingQuality(recipes: Iterable<[number, ReagentRecipe & { profession: string }]>) {
 	const ids = new Set<number>();
 	for (const [, r] of recipes) {
-		if (reagentUse(r.profession, r.name) === "notable") for (const x of r.reagents) ids.add(x.itemId);
+		if (reagentUse(r.profession, r.name) === "camping") for (const x of r.reagents) ids.add(x.itemId);
 	}
 	return [...ids];
 }
@@ -70,11 +71,13 @@ export function reagentSuggestions(
 					if (!recipe || use === "none") continue;
 					for (const reagent of recipe.reagents) {
 						if (VENDOR_REAGENTS[reagent.itemId]) continue;
-						if (use === "notable" && !NOTABLE.has(quality.get(reagent.itemId) ?? "")) continue;
+						if (use === "camping" && !NOTABLE.has(quality.get(reagent.itemId) ?? "")) continue;
 						let entry = uses.get(reagent.itemId);
 						if (!entry) uses.set(reagent.itemId, (entry = { name: reagent.name, users: new Map() }));
-						const key = `${g.region}:${m.slug}:${p.name}`;
-						const user = entry.users.get(key) ?? { name: m.name, classId: m.classId, profession: p.name, recipes: 0 };
+						// "Camping+Mining": what the tooltip says they'd make with it.
+						const profession = use === "camping" ? `Camping+${p.name}` : p.name;
+						const key = `${g.region}:${m.slug}:${profession}`;
+						const user = entry.users.get(key) ?? { name: m.name, classId: m.classId, profession, recipes: 0 };
 						user.recipes += 1;
 						entry.users.set(key, user);
 					}
