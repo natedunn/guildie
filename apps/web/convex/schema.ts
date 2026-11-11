@@ -185,6 +185,17 @@ export default defineSchema({
 		 * (shared/statPriority.ts). Unset: from their talents.
 		 */
 		statPriority: v.optional(v.object({ tree: v.optional(v.number()), stats: v.optional(v.array(v.string())) })),
+		/**
+		 * The armor and weapon types this character prefers, if the player
+		 * chose (armor and weapon subclass ids): others count less in gear
+		 * suggestions, or (strict) aren't suggested (shared/upgrades.ts).
+		 */
+		gearPreference: v.optional(
+			v.object({
+				armor: v.optional(v.object({ type: v.number(), strict: v.boolean() })),
+				weapon: v.optional(v.object({ type: v.number(), strict: v.boolean() })),
+			}),
+		),
 	})
 		.index("by_user", ["userId"])
 		.index("by_slug", ["flavor", "region", "slug"]),

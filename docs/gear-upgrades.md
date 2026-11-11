@@ -179,6 +179,25 @@ addon's tooltips (`specsFor` in `shared/upgrades.ts`):
 In game, a change shows in guildmates' tooltips after their Guildie app's
 next guild data refresh (every 15 minutes) and a `/reload`.
 
+### Gear types
+
+The player who claimed a character can also pick one armor type (cloth to
+plate) and one weapon type they prefer, each with "Only this type" or not
+(`ownedCharacters.gearPreference`, the character page's Gear types panel).
+Members carry it as `armorPref`/`armorStrict` and `weaponPref`/`weaponStrict`
+(`gearPrefs` in `shared/upgrades.ts`; types the class can't use are dropped):
+
+- **Preferred:** other types of that kind count `preferBestFactor` (0.8),
+  for the items suggested and for what they wear. An armor preference
+  replaces "the best type they can wear from level 40".
+- **Only this type:** other types aren't suggested at all.
+- A weapon type counts within its group: melee, or ranged (bows, guns,
+  crossbows, thrown, wands). A hunter who picks Bows still gets melee
+  weapons suggested as before.
+
+The addon runs the same rule (`U.preferred` in `Upgrades.lua`); the shared
+vectors have cases for it. Older addons ignore the fields.
+
 Weapon DPS weights are per point of DPS, so they look large: a Combat Rogue
 values 1 main-hand DPS like about 5 Agility. Blank: the spec ignores that
 stat.

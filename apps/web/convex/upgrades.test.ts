@@ -63,11 +63,16 @@ test("shared vectors: scores, usable levels, suggestions", () => {
 		);
 	}
 	for (const c of vectors.suggest) {
-		const picks = suggest(vectors.items[c.item], Object.values(vectors.members), rules, {
-			now: c.now,
-			skip: c.skip,
-			max: c.max,
-		});
+		const picks = suggest(
+			vectors.items[c.item],
+			(vectors.suggestMembers as string[]).map((n) => vectors.members[n]),
+			rules,
+			{
+				now: c.now,
+				skip: c.skip,
+				max: c.max,
+			},
+		);
 		assert.deepEqual(
 			picks.map((p) => `${p.member.name}:${p.verdict.kind}`),
 			c.expect,

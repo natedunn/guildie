@@ -353,6 +353,62 @@
 			"spec": "DRUID:1",
 			"seen": 0,
 			"slots": {}
+		},
+		"Chainmail": {
+			"name": "Chainmail",
+			"classId": 1,
+			"level": 45,
+			"spec": "WARRIOR:1",
+			"seen": 2000000,
+			"slots": {
+				"5": 10,
+				"16": 60,
+				"17": 10
+			},
+			"armorPref": 3
+		},
+		"MailOnly": {
+			"name": "MailOnly",
+			"classId": 1,
+			"level": 45,
+			"spec": "WARRIOR:1",
+			"seen": 2000000,
+			"slots": {
+				"5": 10,
+				"16": 60,
+				"17": 10
+			},
+			"armorPref": 3,
+			"armorStrict": true,
+			"weaponPref": 15,
+			"weaponStrict": true
+		},
+		"Stabby": {
+			"name": "Stabby",
+			"classId": 1,
+			"level": 45,
+			"spec": "WARRIOR:1",
+			"seen": 2000000,
+			"slots": {
+				"5": 10,
+				"16": 60,
+				"17": 10
+			},
+			"weaponPref": 15
+		},
+		"Bowman": {
+			"name": "Bowman",
+			"classId": 3,
+			"level": 39,
+			"spec": "HUNTER:0",
+			"seen": 2000000,
+			"slots": {
+				"5": 8,
+				"16": 10,
+				"18": 40
+			},
+			"weaponPref": 2,
+			"weaponStrict": true
 		}
 	},
 	"judge": [
@@ -582,6 +638,96 @@
 				"second": false,
 				"against": [16, 17]
 			}
+		},
+		{
+			"name": "prefers mail: mail on a level 45 warrior counts in full",
+			"item": "mailChest",
+			"member": "Chainmail",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.5199999999999999,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [5]
+			}
+		},
+		{
+			"name": "prefers mail: leather still counts less",
+			"item": "leatherChest",
+			"member": "Chainmail",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.18400000000000016,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [5]
+			}
+		},
+		{
+			"name": "mail only: leather left out",
+			"item": "leatherChest",
+			"member": "MailOnly",
+			"expect": null
+		},
+		{
+			"name": "daggers only: a greatsword left out",
+			"item": "greatsword",
+			"member": "MailOnly",
+			"expect": null
+		},
+		{
+			"name": "daggers only: a dagger is fine",
+			"item": "dagger",
+			"member": "MailOnly",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.9999999999999997,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [17]
+			}
+		},
+		{
+			"name": "prefers daggers: a greatsword counts less",
+			"item": "greatsword",
+			"member": "Stabby",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.20971428571428583,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [16, 17]
+			}
+		},
+		{
+			"name": "bows only: melee weapons aren't covered",
+			"item": "dagger",
+			"member": "Bowman",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 4,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [17]
+			}
+		},
+		{
+			"name": "bows only: a bow",
+			"item": "bow",
+			"member": "Bowman",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.2,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [18]
+			}
 		}
 	],
 	"scores": [
@@ -697,6 +843,7 @@
 			"expect": 1
 		}
 	],
+	"suggestMembers": ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale"],
 	"suggest": [
 		{
 			"name": "agility gloves, everyone",

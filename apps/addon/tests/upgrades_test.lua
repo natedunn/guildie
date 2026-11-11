@@ -90,7 +90,7 @@ test("shared vectors: scores, usable levels, suggestions", function()
         eq(U.usableAt(vectors.items[c.item], vectors.members[c.member], rules), c.expect, c.item .. " for " .. c.member)
     end
     local members = {}
-    for _, name in ipairs({ "Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale" }) do
+    for _, name in ipairs(vectors.suggestMembers) do
         table.insert(members, vectors.members[name])
     end
     for _, c in ipairs(vectors.suggest) do

@@ -254,6 +254,12 @@ function CraftingPage() {
 					{upgrades.noGear.length === upgrades.characters.length
 						? "Nothing to compare with until we've read your gear."
 						: "Nothing the guild can craft beats what you wear right now."}
+					{upgrades.strict.length > 0 ? (
+						<span className="mt-1 block text-xs">
+							{names(upgrades.strict)} {upgrades.strict.length > 1 ? "have" : "has"} "Only this type" set under Gear
+							types, which leaves other armor or weapon types out.
+						</span>
+					) : null}
 				</p>
 			) : showUpgrades ? (
 				results.length === 0 ? (
@@ -359,7 +365,7 @@ function Footnote({ region, characters }: { region: string; characters?: { slug:
 	const first = characters?.[0];
 	return (
 		<p className="mt-3 text-xs text-muted-foreground">
-			A best guess from stat weights, what each character wears and their stat priority, not a sim.
+			A best guess from stat weights, what each character wears, their stat priority and gear types, not a sim.
 			{first ? (
 				<>
 					{" "}

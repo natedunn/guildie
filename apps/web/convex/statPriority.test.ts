@@ -2,7 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { itemInfoFromTooltip } from "./shared/itemInfo.ts";
 import { PRIORITY_STATS, statPriority, validStats } from "./shared/statPriority.ts";
-import { customWeights, judge, STAT_SHORT, specsFor, upgradeMember, upgradeRules } from "./shared/upgrades.ts";
+import {
+	customWeights,
+	gearPrefs,
+	judge,
+	STAT_SHORT,
+	specsFor,
+	upgradeMember,
+	upgradeRules,
+} from "./shared/upgrades.ts";
 import { SPECS } from "./shared/weights.ts";
 
 test("every tree's priority: three known stats, each weighted in that tree", () => {
@@ -119,4 +127,49 @@ test("a custom priority changes the verdict: Intellect gloves for an Enhancement
 	const custom = judge(intGloves, shaman({ stats: ["STRENGTH", "INTELLECT", "AGILITY"] }), r);
 	assert.equal(custom?.kind, "upgrade", "Strength, Intellect, Agility: worth it");
 	assert.equal(r.specs[custom!.spec].name, "Str/Int/Agi");
+});
+
+test("gear types: only types the class can use; strict leaves the rest out", () => {
+	const r = upgradeRules();
+	// Mage (8): daggers yes, plate no.
+	assert.deepEqual(gearPrefs(8, { armor: { type: 4, strict: true }, weapon: { type: 15, strict: false } }, r), {
+		weaponPref: 15,
+	});
+	assert.deepEqual(gearPrefs(7, { armor: { type: 3, strict: true } }, r), { armorPref: 3, armorStrict: true });
+	assert.deepEqual(gearPrefs(7, undefined, r), {});
+
+	// A level 45 shaman (mail from 40) who wants leather only: mail isn't suggested.
+	const worn = [
+		{
+			slot: "CHEST",
+			itemId: 1,
+			name: "Old Vest",
+			quality: "UNCOMMON",
+			info: itemInfoFromTooltip([{ left: "Chest", right: "Leather" }, { left: "80 Armor" }, { left: "+4 Strength" }]),
+		},
+	];
+	const shaman = (gearPreference?: { armor: { type: number; strict: boolean } }) =>
+		upgradeMember(
+			{
+				name: "Nate",
+				classId: 7,
+				level: 45,
+				seenMs: 0,
+				talentTrees: [tree("Enhancement", 31)],
+				equipment: worn,
+				gearPreference,
+			},
+			r,
+		)!;
+	const mail = itemInfoFromTooltip([
+		{ left: "Chest", right: "Mail" },
+		{ left: "220 Armor" },
+		{ left: "+9 Strength" },
+		{ left: "+6 Stamina" },
+	])!;
+	assert.equal(judge(mail, shaman(), r)?.kind, "upgrade");
+	assert.equal(judge(mail, shaman({ armor: { type: 2, strict: true } }), r), undefined, "leather only");
+	const soft = judge(mail, shaman({ armor: { type: 2, strict: false } }), r);
+	const free = judge(mail, shaman(), r);
+	assert.ok(soft && free && soft.gain < free.gain, "leather preferred: mail counts less");
 });

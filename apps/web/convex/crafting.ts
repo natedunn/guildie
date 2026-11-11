@@ -210,6 +210,10 @@ export const upgradesForMe = query({
 		return {
 			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId })),
 			noGear,
+			/** The viewer's characters whose gear types leave other types out ("Only this type"). */
+			strict: mine
+				.filter((f) => f.member.armorStrict || f.member.weaponStrict)
+				.map((f) => ({ slug: f.character.slug, name: f.character.name })),
 			hits,
 		};
 	},

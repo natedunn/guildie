@@ -5,8 +5,8 @@ import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
 import { type Rules, type UpgradeMember, upgradeMember, type WornItem } from "./shared/upgrades";
 
 // Guild members as gear-upgrade suggestions see them (shared/upgrades.ts):
-// what they wear, read from each item's tooltip, and the stat priority their
-// player chose (specsFor), for the addon's guild data (helper.ts) and the
+// what they wear, read from each item's tooltip, and the stat priority and
+// armor and weapon types their player chose (specsFor, gearPrefs), for the addon's guild data (helper.ts) and the
 // site's item panel and crafting views (crafting.ts).
 
 /** An item's info from our items table (English, from Blizzard), cached per call. */
@@ -75,6 +75,7 @@ export async function memberForUpgrades(
 			talentTrees: profile.talentTrees,
 			equipment: worn,
 			statPriority: claim?.statPriority,
+			gearPreference: claim?.gearPreference,
 		},
 		rules,
 	);

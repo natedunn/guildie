@@ -22,6 +22,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Guildie, Addon:** Gear suggestions follow each character's stat priority. Pick another talent tree or your own three stats on your character page, and Upgrades for me, Upgrades I can craft, the item panel and guildmates' tooltips in game (after their Guildie app refreshes) use it.
+- **Guildie, Addon:** Gear types: on your character page, pick the armor and weapon type you prefer, and whether to see only that type. Gear suggestions on the site and in game count other types less, or leave them out.
 
 ## 0.3.14
 
