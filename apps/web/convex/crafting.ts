@@ -4,9 +4,10 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type QueryCtx, query } from "./_generated/server";
 import { access, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
+import { membership } from "./requests";
 import { vRegion } from "./schema";
 import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
-import { explain, suggest, upgradeRules } from "./shared/upgrades";
+import { explain, judge, suggest, upgradeRules } from "./shared/upgrades";
 import { CLASS_TOKENS } from "./shared/weights";
 import { memberForUpgrades } from "./upgradeProfiles";
 
@@ -106,33 +107,106 @@ export const guildCrafting = query({
 	handler: async (ctx, { region, slug }) => {
 		const guild = await guildByKey(ctx, region, slug);
 		if (!guild || !(await access(ctx, guild)).canView) return null;
-		const members = await ctx.db
-			.query("characters")
-			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
-			.collect();
-		const crafters = new Map<number, { name: string; slug: string; classId: number; skill?: number }[]>();
-		for (const m of members) {
-			for (const p of (await pickProfile(ctx, m)).professions) {
-				for (const id of p.knownRecipes ?? []) {
-					const list = crafters.get(id) ?? [];
-					list.push({ name: m.name, slug: m.slug, classId: m.classId, skill: p.skill });
-					crafters.set(id, list);
-				}
-			}
-		}
+		const crafters = await guildCrafters(ctx, guild);
 		const items = new Map<number, Doc<"items"> | null>();
 		const out = [];
 		for (const [recipeId, who] of crafters) {
 			const recipe = await recipeRow(ctx, recipeId);
 			if (!recipe) continue;
-			out.push({
-				...(await recipeView(ctx, recipe, items)),
-				crafters: who.sort((a, b) => (b.skill ?? 0) - (a.skill ?? 0)),
-			});
+			out.push({ ...(await recipeView(ctx, recipe, items)), crafters: who });
 		}
 		return out.sort((a, b) => a.profession.localeCompare(b.profession) || a.name.localeCompare(b.name));
 	},
 });
+
+/** Recipe id -> the roster characters who know it, highest skill first. */
+async function guildCrafters(ctx: QueryCtx, guild: Doc<"guilds">) {
+	const members = await ctx.db
+		.query("characters")
+		.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
+		.collect();
+	const crafters = new Map<number, { name: string; slug: string; classId: number; skill?: number }[]>();
+	for (const m of members) {
+		for (const p of (await pickProfile(ctx, m)).professions) {
+			for (const id of p.knownRecipes ?? []) {
+				const list = crafters.get(id) ?? [];
+				list.push({ name: m.name, slug: m.slug, classId: m.classId, skill: p.skill });
+				crafters.set(id, list);
+			}
+		}
+	}
+	for (const list of crafters.values()) list.sort((a, b) => (b.skill ?? 0) - (a.skill ?? 0));
+	return crafters;
+}
+
+/**
+ * "Upgrades for me": what someone in the guild can craft that would be an
+ * upgrade (or a maybe) for the viewer's characters in this guild, by the same
+ * rules as the item panel and the addon (shared/upgrades.ts). Each hit is a
+ * recipe with its crafters and, per character it helps, the verdict and a
+ * short why. Null for anyone who isn't a member; `noGear` lists the viewer's
+ * characters whose gear we haven't read (they can't be judged).
+ */
+export const upgradesForMe = query({
+	args: { region: vRegion, slug: v.string() },
+	handler: async (ctx, { region, slug }) => {
+		const guild = await guildByKey(ctx, region, slug);
+		const viewer = guild && (await membership(ctx, guild));
+		if (!guild || !viewer) return null;
+
+		const rules = upgradeRules();
+		const cache = new Map<number, ItemInfo | undefined>();
+		const mine: (NonNullable<Awaited<ReturnType<typeof memberForUpgrades>>> & { character: Doc<"characters"> })[] = [];
+		const noGear: { slug: string; name: string; classId: number }[] = [];
+		for (const c of viewer.characters) {
+			const f = await memberForUpgrades(ctx, c, await pickProfile(ctx, c), rules, cache);
+			if (f) mine.push({ ...f, character: c });
+			else noGear.push({ slug: c.slug, name: c.name, classId: c.classId });
+		}
+
+		const items = new Map<number, Doc<"items"> | null>();
+		const hits = [];
+		for (const [recipeId, crafters] of await guildCrafters(ctx, guild)) {
+			if (mine.length === 0) break;
+			const recipe = await recipeRow(ctx, recipeId);
+			if (!recipe?.craftedItemId) continue;
+			if (!items.has(recipe.craftedItemId)) items.set(recipe.craftedItemId, await itemRow(ctx, recipe.craftedItemId));
+			const made = items.get(recipe.craftedItemId);
+			const info = made ? itemInfoFromTooltip(made.tooltip) : undefined;
+			if (!info) continue;
+			const helps = [];
+			for (const f of mine) {
+				const verdict = judge(info, f.member, rules, recipe.craftedItemId);
+				if (!verdict) continue;
+				helps.push({
+					slug: f.character.slug,
+					name: f.character.name,
+					classId: f.character.classId,
+					level: f.member.level,
+					kind: verdict.kind,
+					gain: verdict.gain,
+					spec: rules.specs[verdict.spec]?.name ?? CLASS_TOKENS[f.member.classId],
+					at: verdict.at,
+					why: explain(info, verdict, f.worn, rules),
+				});
+			}
+			if (helps.length === 0) continue;
+			helps.sort((a, b) => rank(a) - rank(b) || b.gain - a.gain);
+			hits.push({ ...(await recipeView(ctx, recipe, items)), crafters, for: helps });
+		}
+		hits.sort(
+			(a, b) => rank(a.for[0]) - rank(b.for[0]) || b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name),
+		);
+		return {
+			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId })),
+			noGear,
+			hits,
+		};
+	},
+});
+
+/** Upgrades before maybes. */
+const rank = (h: { kind: "upgrade" | "maybe" }) => (h.kind === "upgrade" ? 0 : 1);
 
 /** Most names the item panel's "Upgrade for" lists (the addon's tooltip line shows 3). */
 const PANEL_UPGRADES = 5;

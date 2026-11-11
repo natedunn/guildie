@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** Upgrades for me, on a guild's Crafting page: everything guildmates can craft that would be an upgrade for your characters, with why ("+4 Agility, +4 Stamina over Archery Training Gloves"), who can make it and a Request button.
+
 ## 0.3.13
 
 ### New

@@ -26,7 +26,7 @@ export function compareProfessions(a: string, b: string) {
  */
 export function RecipeItem({ recipe, size = 28, className }: { recipe: Recipe; size?: number; className?: string }) {
 	const { item } = recipe;
-	const showRecipeName = item && item.name !== recipe.name;
+	const showRecipeName = item && item.name.toLowerCase() !== recipe.name.toLowerCase();
 	return (
 		<div className={cn("flex min-w-0 items-center gap-2.5", className)}>
 			{item ? (

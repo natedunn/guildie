@@ -63,7 +63,7 @@ async function charactersIn(ctx: Ctx, userId: Id<"users">, guildId: Id<"guilds">
 }
 
 /** The signed-in viewer as a member of this guild, or null (signed out, or no character in it). */
-async function membership(ctx: Ctx, guild: Doc<"guilds">) {
+export async function membership(ctx: Ctx, guild: Doc<"guilds">) {
 	const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 	if (!userId) return null;
 	const characters = await charactersIn(ctx, userId, guild._id);
