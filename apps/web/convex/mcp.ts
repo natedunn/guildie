@@ -303,9 +303,14 @@ export const character = internalQuery({
 		}
 		if (priority) {
 			lines.push(
-				`Stat priority: ${priority.stats.map((s) => PRIORITY_STATS[s] ?? s).join(" > ")}${priority.tree ? ` (${priority.tree})` : ""}${
+				`Stat priority: ${priority.stats
+					.map((s, i) => {
+						const share = priority.shares[i];
+						return `${PRIORITY_STATS[s] ?? s}${share !== undefined && i > 0 ? ` ×${Math.round(share * 100) / 100}` : ""}`;
+					})
+					.join(" > ")}${priority.tree ? ` (${priority.tree})` : ""}${
 					priority.chosen ? ", chosen by the player" : ", from talents"
-				}`,
+				} (×: worth per point next to the first)`,
 			);
 		}
 		if (p.professions.length) {
