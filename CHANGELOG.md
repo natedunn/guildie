@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Guildie:** A clearer dungeon page: big Ready, Partly ready and Completed tiles that switch who's listed, guildmates with avatars and a square per quest (done, in their log, not picked up), and a quest table with the guild's progress and rewards (where Blizzard lists them).
+- **Guildie:** A clearer dungeon page: big Ready, Partly ready and Completed tiles that switch who's listed, guildmates with avatars and a square per quest (done, in their log, not picked up),, and a quest table with the guild's progress. Quest rewards are gone: Blizzard's data leaves out many of them.
 
 ### New
 

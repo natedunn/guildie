@@ -82,8 +82,6 @@ export const syncDungeon = internalAction({
 		}
 		await ctx.runMutation(internal.quests.save, { quests: rows });
 		await ctx.runMutation(internal.dungeons.saveQuests, { key, questIds: rows.map((r) => r.questId) });
-		const items = [...new Set(rows.flatMap((r) => r.rewardItems ?? []))];
-		if (items.length) await ctx.scheduler.runAfter(0, internal.items.ensure, { itemIds: items });
 	},
 });
 
@@ -211,7 +209,7 @@ export const guild = query({
 	},
 });
 
-/** One dungeon in full: its bosses, quests (with rewards) and everyone's status. */
+/** One dungeon in full: its bosses, quests and everyone's status. */
 export const detail = query({
 	args: { region: vRegion, slug: v.string(), key: v.string() },
 	handler: async (ctx, { region, slug, key }) => {
@@ -222,15 +220,6 @@ export const detail = query({
 		const side = sideOf(data.guild.faction);
 		const rows = (await dungeonQuestRows(ctx, key)).filter((q) => !q.faction || !side || q.faction === side);
 		const quests = asQuests(rows);
-		const itemIds = [...new Set(rows.flatMap((q) => q.rewardItems ?? []))];
-		const items = new Map<number, Doc<"items">>();
-		for (const id of itemIds) {
-			const item = await ctx.db
-				.query("items")
-				.withIndex("by_itemId", (q) => q.eq("itemId", id))
-				.unique();
-			if (item) items.set(id, item);
-		}
 		const people = data.members
 			.map((m) => {
 				const r = readiness(dungeon, quests, m.quests);
@@ -270,16 +259,6 @@ export const detail = query({
 					level: q.level,
 					classes: q.classes,
 					faction: q.faction,
-					rewards: (q.rewardItems ?? []).map((id) => {
-						const item = items.get(id);
-						return {
-							itemId: id,
-							name: item?.name ?? `Item ${id}`,
-							quality: item?.quality,
-							icon: item?.icon,
-							tooltip: item?.tooltip,
-						};
-					}),
 					/** Members (in this guild) for whom it's done or in their log. */
 					done: people.filter((p) => p.done.includes(q.questId)).length,
 					inLog: people.filter((p) => p.inLog.includes(q.questId)).length,

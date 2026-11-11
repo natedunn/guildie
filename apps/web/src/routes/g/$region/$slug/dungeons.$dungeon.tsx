@@ -9,13 +9,12 @@ import { useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { DungeonArt, MembersOnly } from "@/components/dungeon";
-import { ItemHover, ItemIcon } from "@/components/item";
 import { SectionTitle } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 
 // A dungeon's page: its art, three tiles (ready, partly ready, completed)
 // that pick whose list shows, each person with a square per quest (done, in
-// their log, missing), the quests with the guild's progress and rewards, and
+// their log, missing), the quests with the guild's progress, and
 // the bosses. Members only (dungeons:detail).
 
 export const Route = createFileRoute("/g/$region/$slug/dungeons/$dungeon")({
@@ -130,12 +129,11 @@ function Dungeon({ data }: { data: Detail }) {
 						</p>
 					) : (
 						<div className="mt-2 overflow-x-auto rounded-md border border-border">
-							<table className="w-full min-w-[34rem] text-[0.8125rem]">
+							<table className="w-full min-w-[26rem] text-[0.8125rem]">
 								<thead>
 									<tr className="border-b border-border text-left text-xs text-muted-foreground">
 										<th className="px-3 py-2 font-medium">Quest</th>
-										<th className="w-40 px-3 py-2 font-medium">Guild</th>
-										<th className="w-36 px-3 py-2 font-medium">Rewards</th>
+										<th className="w-48 px-3 py-2 font-medium">Guild</th>
 									</tr>
 								</thead>
 								<tbody className="divide-y divide-border">
@@ -194,8 +192,7 @@ function mergeQuests(quests: Quest[]): QuestGroup[] {
 			same.ids.push(q.id);
 			same.done += q.done;
 			same.inLog += q.inLog;
-			for (const r of q.rewards) if (!same.rewards.some((x) => x.itemId === r.itemId)) same.rewards.push(r);
-		} else out.push({ ...q, ids: [q.id], rewards: [...q.rewards] });
+		} else out.push({ ...q, ids: [q.id] });
 	}
 	return out;
 }
@@ -356,27 +353,6 @@ function QuestRow({ quest: q, members }: { quest: QuestGroup; members: number })
 				<div className="num mt-1 text-xs text-muted-foreground">
 					{q.done} done{q.inLog ? ` · ${q.inLog} in log` : ""}
 				</div>
-			</td>
-			<td className="px-3 py-2.5">
-				{q.rewards.length ? (
-					<div className="flex flex-wrap gap-1">
-						{q.rewards.map((r) => (
-							<ItemHover
-								key={r.itemId}
-								item={{ itemId: r.itemId, name: r.name, quality: r.quality, icon: r.icon, tooltip: r.tooltip }}
-							>
-								<ItemIcon icon={r.icon} quality={r.quality} size={26} />
-							</ItemHover>
-						))}
-					</div>
-				) : (
-					<span
-						className="text-xs text-muted-foreground"
-						title="Blizzard's data doesn't list item rewards for every quest, so this one may still have some. Wowhead has the full list."
-					>
-						Not listed
-					</span>
-				)}
 			</td>
 		</tr>
 	);
