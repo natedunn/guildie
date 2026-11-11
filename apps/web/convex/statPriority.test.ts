@@ -52,7 +52,14 @@ test("the player's choice wins: their own three, else another tree", () => {
 	const five = ["INTELLECT", "SPIRIT", "STAMINA", "CRIT_RATING", "ARMOR"];
 	assert.deepEqual(statPriority(2, talents, { stats: five, tiers: [1, 0.55, 0.35, 0.25, 0.2] })?.steepness, "steep");
 	assert.deepEqual(statPriority(2, talents, { stats: five, tiers: [1, 0.7, 0.7, 0.3, 0.1] })?.steepness, "custom");
-	assert.equal(statPriority(2, talents, { stats: [...five, "HIT_RATING"] })?.chosen, false, "six is too many");
+	const ten = [...five, "HIT_RATING", "STRENGTH", "AGILITY", "ATTACK_POWER", "MANA_REGENERATION"];
+	assert.equal(statPriority(2, talents, { stats: ten })?.chosen, true, "ten is fine");
+	assert.equal(statPriority(2, talents, { stats: ten })?.shares.length, 10);
+	assert.equal(
+		statPriority(2, talents, { stats: [...ten, "SPELL_HEALING_DONE"] })?.chosen,
+		false,
+		"eleven is too many",
+	);
 	assert.equal(statPriority(2, talents, { tree: 0 })?.tree, "Holy");
 	// Bad choices fall back to the talents.
 	assert.equal(statPriority(2, talents, { tree: 7 })?.chosen, false);
@@ -109,6 +116,16 @@ test("specsFor: talents, another tree, or a custom spec added to the rules", () 
 	assert.equal(r.specs[own!.spec].w.INTELLECT, 0.8);
 	// Bad choices: the talents.
 	assert.equal(specsFor(7, enhTalents, { stats: ["STRENGTH", "STRENGTH", "AGILITY"] }, r)?.spec, "SHAMAN:1");
+	// Up to ten stats all get a weight; a trade-off only looks at the first five.
+	const ten = ["STRENGTH", "ATTACK_POWER", "INTELLECT", "AGILITY", "SPELL_DAMAGE_DONE"];
+	const many = specsFor(
+		7,
+		enhTalents,
+		{ stats: [...ten, "SPIRIT", "STAMINA", "CRIT_RATING", "HIT_RATING", "ARMOR"] },
+		r,
+	);
+	assert.deepEqual(r.specs[many!.spec].stats, ten);
+	assert.ok((r.specs[many!.spec].w.HIT_RATING ?? 0) > 0);
 });
 
 test("a custom priority changes the verdict: Intellect gloves for an Enhancement shaman", () => {

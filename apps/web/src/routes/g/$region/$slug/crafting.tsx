@@ -1,11 +1,12 @@
 import { api } from "@convex/_generated/api";
-import type { Region } from "@convex/shared/wow";
+import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
-import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
+import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import {
 	buildIndex,
 	compareProfessions,
@@ -15,7 +16,13 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
-import { PriorityStrip } from "@/components/stat-priority";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
@@ -31,7 +38,8 @@ import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 //   an upgrade for someone in the guild (their own other characters included).
 
 type View = "upgrades" | "craft";
-type Search = { q?: string; profession?: string; view?: View };
+/** `char`: which of the viewer's characters the upgrade views are about (slug; default their first). */
+type Search = { q?: string; profession?: string; view?: View; char?: string };
 
 export const Route = createFileRoute("/g/$region/$slug/crafting")({
 	validateSearch: (search: Record<string, unknown>): Search => {
@@ -40,6 +48,7 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		if (typeof search.q === "string" || typeof search.q === "number") out.q = String(search.q);
 		if (typeof search.profession === "string") out.profession = search.profession;
 		if (search.view === "upgrades" || search.view === "craft") out.view = search.view;
+		if (typeof search.char === "string") out.char = search.char;
 		return out;
 	},
 	loader: async ({ context, params }) => {
@@ -112,10 +121,27 @@ function CraftingPage() {
 	);
 	const showUpgrades = view === "upgrades" && upgrades !== null;
 	const showCraft = view === "craft" && canCraft !== null;
+	// The upgrade views are about one of the viewer's characters at a time.
+	const characters = upgrades?.characters ?? [];
+	const char = characters.find((c) => c.slug === search.char) ?? characters[0];
+	const forChar = useMemo(
+		() =>
+			(upgrades?.hits ?? [])
+				.flatMap((h) => {
+					const mine = h.for.filter((x) => x.slug === char?.slug);
+					return mine.length ? [{ ...h, for: mine }] : [];
+				})
+				.sort((a, b) => b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name)),
+		[upgrades, char],
+	);
+	const asChar = useMemo(
+		() => (canCraft?.hits ?? []).filter((h) => h.crafters.some((c) => c.slug === char?.slug)),
+		[canCraft, char],
+	);
 	const source: (GuildRecipe & { for?: UpgradeHit["for"] } & Partial<Pick<CraftHit, "requested">>)[] = showUpgrades
-		? (upgrades?.hits ?? [])
+		? forChar
 		: showCraft
-			? (canCraft?.hits ?? [])
+			? asChar
 			: (data ?? []);
 
 	const index = useMemo(() => buildIndex(source), [source]);
@@ -150,6 +176,8 @@ function CraftingPage() {
 
 	const setProfession = (p?: string) =>
 		navigate({ search: (prev) => ({ ...prev, profession: p }), replace: true, resetScroll: false });
+	const setChar = (slug: string) =>
+		navigate({ search: (prev) => ({ ...prev, char: slug }), replace: true, resetScroll: false });
 	const setView = (v?: View) =>
 		navigate({ search: (prev) => ({ ...prev, view: v, profession: undefined }), replace: true, resetScroll: false });
 	const loading = (showUpgrades && upgrades === undefined) || (showCraft && canCraft === undefined);
@@ -159,75 +187,66 @@ function CraftingPage() {
 		<div className="@container w-full space-y-4 pb-6">
 			<div className="space-y-3">
 				{upgrades ? (
-					<div className="flex flex-wrap gap-1" role="group" aria-label="View">
-						<Chip active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
+					<PageTabs>
+						<PageTabButton active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
 							All recipes
-						</Chip>
-						<Chip active={showUpgrades} onClick={() => setView("upgrades")} count={upgrades.hits.length}>
-							Upgrades for me
-						</Chip>
+						</PageTabButton>
+						<PageTabButton active={showUpgrades} onClick={() => setView("upgrades")} count={forChar.length}>
+							{/* Short labels where the three don't fit on one line (phones). */}
+							<span className="@max-md:hidden">Upgrades for me</span>
+							<span className="@md:hidden">For me</span>
+						</PageTabButton>
 						{canCraft ? (
-							<Chip active={showCraft} onClick={() => setView("craft")} count={canCraft.hits.length}>
-								Upgrades I can craft
-							</Chip>
+							<PageTabButton active={showCraft} onClick={() => setView("craft")} count={asChar.length}>
+								<span className="@max-md:hidden">Upgrades I can craft</span>
+								<span className="@md:hidden">I can craft</span>
+							</PageTabButton>
 						) : null}
-					</div>
+					</PageTabs>
 				) : null}
-				<Input
-					ref={inputRef}
-					type="search"
-					value={query}
-					onChange={(e) => setQuery(e.target.value)}
-					onKeyDown={(e) => {
-						if (e.key === "Escape") setQuery("");
-					}}
-					placeholder={
-						showUpgrades
-							? "Search your upgrades... (boots, Agility)"
-							: showCraft
-								? "Search what you can make... (gloves, Brisket)"
-								: "Who can make... (bag, Mageweave, 8 slot bag)"
-					}
-					aria-label="Search recipes the guild can craft"
-					className="h-10 text-[15px]"
-				/>
-				<div className="flex flex-wrap gap-1" role="group" aria-label="Profession">
-					<Chip active={!profession} onClick={() => setProfession(undefined)} count={matches.length}>
-						All
-					</Chip>
-					{professions.map((p) => (
-						<Chip
-							key={p}
-							active={profession === p}
-							onClick={() => setProfession(profession === p ? undefined : p)}
-							count={counts.get(p) ?? 0}
-						>
-							{p}
-						</Chip>
-					))}
+				{/* One row: whose upgrades (upgrade views), the search, the profession. Wraps on phones. */}
+				<div className="flex flex-wrap gap-2">
+					{(showUpgrades || showCraft) && char ? (
+						<CharacterPicker
+							label={showCraft ? "Crafting as" : "For"}
+							characters={characters}
+							value={char.slug}
+							onChange={setChar}
+						/>
+					) : null}
+					<Input
+						ref={inputRef}
+						type="search"
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+						onKeyDown={(e) => {
+							if (e.key === "Escape") setQuery("");
+						}}
+						placeholder={
+							showUpgrades
+								? "Search upgrades... (boots, Agility)"
+								: showCraft
+									? "Search what you can make... (gloves, Brisket)"
+									: "Who can make... (bag, Mageweave, 8 slot bag)"
+						}
+						aria-label="Search recipes the guild can craft"
+						className="h-10 min-w-0 flex-1 basis-64 text-[15px]"
+					/>
+					<select
+						aria-label="Profession"
+						value={profession ?? ""}
+						onChange={(e) => setProfession(e.target.value || undefined)}
+						className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:flex-1"
+					>
+						<option value="">All professions ({matches.length})</option>
+						{professions.map((p) => (
+							<option key={p} value={p}>
+								{p} ({counts.get(p) ?? 0})
+							</option>
+						))}
+					</select>
 				</div>
 			</div>
-
-			{showUpgrades && upgrades && upgrades.priorities.length > 0 ? (
-				<div className="space-y-1.5">
-					{upgrades.priorities.map((p) => (
-						<PriorityStrip
-							key={p.slug}
-							region={params.region}
-							slug={p.slug}
-							name={<ClassText classId={p.classId}>{p.name}</ClassText>}
-							priority={p.priority}
-						/>
-					))}
-				</div>
-			) : null}
-
-			{showUpgrades && upgrades && upgrades.noGear.length > 0 ? (
-				<p className="text-xs text-muted-foreground">
-					No gear read yet for {names(upgrades.noGear)}, so they're left out. Gear comes from Blizzard after a logout,
-					or from the Guildie app.
-				</p>
-			) : null}
 
 			{loading ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
@@ -235,9 +254,9 @@ function CraftingPage() {
 						? "Checking your recipes against the guild's gear..."
 						: "Checking what the guild can make for you..."}
 				</p>
-			) : showCraft && canCraft && canCraft.hits.length === 0 ? (
+			) : showCraft && canCraft && asChar.length === 0 ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
-					None of your recipes beats what anyone in the guild wears right now.
+					None of {char?.name ?? "your character"}'s recipes beats what anyone in the guild wears right now.
 				</p>
 			) : showCraft ? (
 				results.length === 0 ? (
@@ -265,15 +284,14 @@ function CraftingPage() {
 						<Footnote region={params.region} characters={me?.characters} />
 					</div>
 				)
-			) : showUpgrades && upgrades && upgrades.hits.length === 0 ? (
+			) : showUpgrades && upgrades && forChar.length === 0 ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
-					{upgrades.noGear.length === upgrades.characters.length
-						? "Nothing to compare with until we've read your gear."
-						: "Nothing the guild can craft beats what you wear right now."}
-					{upgrades.strict.length > 0 ? (
+					{upgrades.noGear.some((c) => c.slug === char?.slug)
+						? `Nothing to compare with until we've read ${char?.name}'s gear.`
+						: `Nothing the guild can craft beats what ${char?.name} wears right now.`}
+					{upgrades.strict.some((c) => c.slug === char?.slug) ? (
 						<span className="mt-1 block text-xs">
-							{names(upgrades.strict)} {upgrades.strict.length > 1 ? "have" : "has"} "Only this type" set under Gear
-							types, which leaves other armor or weapon types out.
+							"Only these" in {char?.name}'s Preferences leaves other armor or weapon types out.
 						</span>
 					) : null}
 				</p>
@@ -347,35 +365,6 @@ function CraftingPage() {
 	);
 }
 
-function Chip({
-	active,
-	count,
-	onClick,
-	children,
-}: {
-	active: boolean;
-	count: number;
-	onClick: () => void;
-	children: ReactNode;
-}) {
-	return (
-		<button
-			type="button"
-			aria-pressed={active}
-			onClick={onClick}
-			className={cn(
-				"rounded-md border px-2.5 py-1 text-[13px] transition-colors",
-				active
-					? "border-border bg-accent text-foreground"
-					: "border-transparent text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-				count === 0 && !active && "opacity-50",
-			)}
-		>
-			{children} <span className="num text-xs text-muted-foreground">{count}</span>
-		</button>
-	);
-}
-
 type Member = {
 	guild: { region: Region; slug: string };
 	characters: { slug: string; name: string; classId: number }[];
@@ -420,12 +409,6 @@ const KIND_GROUPS = [
 ] as const;
 
 const UPGRADE_GRID = "grid grid-cols-1 gap-x-4 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)]";
-
-/** "Brisket", "Brisket and Miller", "Brisket, Miller and Pip". */
-function names(list: { name: string }[]) {
-	const n = list.map((c) => c.name);
-	return n.length > 1 ? `${n.slice(0, -1).join(", ")} and ${n.at(-1)}` : (n[0] ?? "");
-}
 
 function ShowAll({ count, onClick }: { count: number; onClick: () => void }) {
 	return (
@@ -576,8 +559,7 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 				<RequestButton
 					guild={member.guild}
 					characters={member.characters}
-					size="xs"
-					variant="ghost"
+					size="sm"
 					label="Request"
 					className="ml-auto"
 					target={{
@@ -592,5 +574,48 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 				/>
 			) : null}
 		</div>
+	);
+}
+
+/**
+ * Which of the viewer's characters the upgrade views are about: a dropdown
+ * that looks like the page's selects ("For Todd"), names in class colors
+ * (a native select can't color its options).
+ */
+function CharacterPicker({
+	label,
+	characters,
+	value,
+	onChange,
+}: {
+	label: string;
+	characters: { slug: string; name: string; classId: number }[];
+	value: string;
+	onChange: (slug: string) => void;
+}) {
+	const current = characters.find((c) => c.slug === value);
+	// Inline color: the menu's highlight restyles descendants' text color through classes.
+	const named = (c: { name: string; classId: number }) => (
+		<span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>
+	);
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				aria-label={`${label}: ${current?.name ?? ""}`}
+				className="h-10 min-w-0 whitespace-nowrap rounded-md border border-input bg-well bg-(image:--select-chevron) bg-size-[0.75rem] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-3 text-left text-sm @max-md:flex-1"
+			>
+				<span className="text-muted-foreground">{label} </span>
+				{current ? named(current) : null}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent className="w-auto min-w-(--anchor-width)">
+				<DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(String(v))}>
+					{characters.map((c) => (
+						<DropdownMenuRadioItem key={c.slug} value={c.slug}>
+							{named(c)}
+						</DropdownMenuRadioItem>
+					))}
+				</DropdownMenuRadioGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

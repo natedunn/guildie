@@ -6,29 +6,29 @@ how to add it.
 Players can ask Claude, ChatGPT or any other app that speaks MCP about their
 guild: "who can craft a Mooncloth Bag?", "what's Brisket wearing?", "which
 requests are open?". The app connects to Guildie's MCP server at
-`https://mcp.guildie.club/mcp`, the player signs in with their Guildie
+`https://mcp.guildie.club/connect`, the player signs in with their Guildie
 account, and the app reads what that player can see on the site, nothing more.
 If the player allows it, it can also set their own characters' stat priority
 and gear preferences, and nothing else.
 
 ## The pieces
 
-| Where                                                    | What                                                                                                     |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `apps/mcp` (Worker `guildie-mcp`, `mcp.guildie.club`)    | OAuth 2.1 (`@cloudflare/workers-oauth-provider`, KV `OAUTH_KV`) and the MCP endpoint (stateless, `/mcp`) |
-| `apps/mcp/src/tools.ts`                                  | The tools the app sees: names, descriptions, argument schemas                                            |
-| `apps/web/convex/mcp.ts`                                 | What each tool answers (short plain text), connecting, the connection list                               |
-| `apps/web/convex/http.ts` (`/mcp/exchange`, `/mcp/tool`) | The Worker's way in, guarded by `MCP_SECRET`                                                             |
-| `apps/web/src/routes/connect/ai.tsx`                     | Where the player confirms which account the app gets                                                     |
-| Settings → Account → AI apps                             | The address to copy, how to add it in Claude and ChatGPT, connected apps with Disconnect                 |
+| Where                                                    | What                                                                                                         |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `apps/mcp` (Worker `guildie-mcp`, `mcp.guildie.club`)    | OAuth 2.1 (`@cloudflare/workers-oauth-provider`, KV `OAUTH_KV`) and the MCP endpoint (stateless, `/connect`) |
+| `apps/mcp/src/tools.ts`                                  | The tools the app sees: names, descriptions, argument schemas                                                |
+| `apps/web/convex/mcp.ts`                                 | What each tool answers (short plain text), connecting, the connection list                                   |
+| `apps/web/convex/http.ts` (`/mcp/exchange`, `/mcp/tool`) | The Worker's way in, guarded by `MCP_SECRET`                                                                 |
+| `apps/web/src/routes/connect/ai.tsx`                     | Where the player confirms which account the app gets                                                         |
+| Settings → Account → AI apps                             | The address to copy, how to add it in Claude and ChatGPT, connected apps with Disconnect                     |
 
 The Worker holds no game data and no Battle.net tokens. It knows a player only
 as `{ userId, connectionId }`, encrypted in the OAuth grant.
 
 ## How connecting flows
 
-1. The app calls `/mcp` without a token, gets a `401` pointing at
-   `/.well-known/oauth-protected-resource/mcp`, registers itself (dynamic
+1. The app calls `/connect` without a token, gets a `401` pointing at
+   `/.well-known/oauth-protected-resource/connect`, registers itself (dynamic
    registration at `/oauth/register`, or a client metadata document), and
    opens `/authorize` in the player's browser.
 2. `/authorize` shows our consent page: the app's name (self-declared unless
@@ -131,6 +131,6 @@ variables before or after, it stays off until both are there.
    ```
 
    The site port is `VITE_CONVEX_SITE_URL` in `apps/web/.env.local`.
-4. `pnpm --filter @guildie/mcp dev` serves `http://localhost:8788/mcp`. Point
+4. `pnpm --filter @guildie/mcp dev` serves `http://localhost:8788/connect`. Point
    an MCP client at it (MCP Inspector: `npx @modelcontextprotocol/inspector`),
-   or Claude Code: `claude mcp add --transport http guildie http://localhost:8788/mcp`.
+   or Claude Code: `claude mcp add --transport http guildie http://localhost:8788/connect`.

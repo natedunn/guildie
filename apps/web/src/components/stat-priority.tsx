@@ -11,9 +11,10 @@ import {
 } from "@convex/shared/statPriority";
 import { CLASS_TOKENS, SPECS } from "@convex/shared/weights";
 import { className, type Region } from "@convex/shared/wow";
+import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useState } from "react";
 import { Panel, panelAction } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ const STEEPNESS_NAMES: Record<Steepness, string> = {
 	even: "Even",
 	balanced: "Balanced",
 	steep: "Steep",
-	custom: "Custom",
+	custom: "Manual",
 };
 
 /** Shares for `n` stats from a preset. */
@@ -116,18 +117,17 @@ const wowheadGuides = (classId: number) =>
 function sourceText(p: StatPriority) {
 	if (!p.chosen) return `From ${p.tree} talents`;
 	if (p.tree) return `${p.tree}, set by the player`;
-	return `Set by the player${p.steepness ? ` · ${STEEPNESS_NAMES[p.steepness]}` : ""}`;
+	return `Custom${p.steepness ? ` · ${STEEPNESS_NAMES[p.steepness]}` : ""}`;
 }
 
 type Choice = { tree: number } | { stats: string[]; tiers?: number[] } | null;
 
-/** The character page's panel, with the claimant's picker. */
+/** The Gear tab's panel: what the character looks for. The claimant edits it on Preferences. */
 export function StatPrioritySection({
 	region,
 	slug,
 	classId,
 	priority,
-	talentTrees,
 	canEdit,
 	className: cls,
 }: {
@@ -135,11 +135,9 @@ export function StatPrioritySection({
 	slug: string;
 	classId: number;
 	priority: StatPriority | undefined;
-	talentTrees: Parameters<typeof statPriority>[1];
 	canEdit: boolean;
 	className?: string;
 }) {
-	const [editing, setEditing] = useState(false);
 	if (!priority) return null;
 	const more = priority.stats.slice(SHOWN_STATS);
 	return (
@@ -147,50 +145,33 @@ export function StatPrioritySection({
 			title="Stats to look for"
 			className={cls}
 			action={
-				canEdit &&
-				!editing && (
-					<button type="button" onClick={() => setEditing(true)} className={panelAction}>
-						Change
-					</button>
+				canEdit && (
+					<Link to="/c/$region/$slug/preferences" params={{ region, slug }} className={panelAction}>
+						Edit
+					</Link>
 				)
 			}
 		>
-			{editing ? (
-				<StatPicker
-					region={region}
-					slug={slug}
-					classId={classId}
-					priority={priority}
-					fromTalents={statPriority(classId, talentTrees)}
-					onDone={() => setEditing(false)}
-				/>
-			) : (
-				<>
-					<RankedStats
-						stats={priority.stats}
-						shares={priority.chosen && !priority.tree ? priority.shares : undefined}
-					/>
-					{canEdit && more.length > 0 && (
-						<p className="mt-2 text-xs text-muted-foreground">Also counted: {more.map(label).join(", ")}</p>
-					)}
-					<div className="mt-3 flex items-baseline justify-between gap-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
-						<span
-							className="min-w-0 truncate"
-							title="A general guide for leveling and dungeons. Gear suggestions use it too."
-						>
-							{sourceText(priority)}
-						</span>
-						<a
-							href={wowheadGuides(classId)}
-							target="_blank"
-							rel="noreferrer"
-							className="flex-none text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
-						>
-							Wowhead
-						</a>
-					</div>
-				</>
+			<RankedStats stats={priority.stats} shares={priority.chosen && !priority.tree ? priority.shares : undefined} />
+			{canEdit && more.length > 0 && (
+				<p className="mt-2 text-xs text-muted-foreground">Also counted: {more.map(label).join(", ")}</p>
 			)}
+			<div className="mt-3 flex items-baseline justify-between gap-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
+				<span
+					className="min-w-0 truncate"
+					title="A general guide for leveling and dungeons. Gear suggestions use it too."
+				>
+					{sourceText(priority)}
+				</span>
+				<a
+					href={wowheadGuides(classId)}
+					target="_blank"
+					rel="noreferrer"
+					className="flex-none text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground"
+				>
+					Wowhead
+				</a>
+			</div>
 		</Panel>
 	);
 }
@@ -252,7 +233,7 @@ export function SteepnessControl({
 }) {
 	const options: { key: Steepness; name: string }[] = [
 		...STEEPNESS,
-		...(custom || value === "custom" ? [{ key: "custom" as const, name: "Custom" }] : []),
+		...(custom || value === "custom" ? [{ key: "custom" as const, name: STEEPNESS_NAMES.custom }] : []),
 	];
 	return (
 		<div
@@ -344,24 +325,37 @@ export function Grip() {
 	);
 }
 
-function StatPicker({
+/** The choice a priority stands for, to tell whether the editor changed it. */
+function choiceOf(p: StatPriority, trees: { name: string }[]): Choice {
+	if (!p.chosen) return null;
+	if (p.tree) return { tree: trees.findIndex((t) => t.name === p.tree) };
+	return ownChoice(p.stats, p.shares);
+}
+
+/** The first three stats, "Strength, Agility, Stamina". */
+const topStats = (p: StatPriority | undefined) => p?.stats.slice(0, SHOWN_STATS).map(label).join(", ");
+
+/**
+ * Preferences: where the stats to look for come from (talents, a tree, or the
+ * player's own), and for their own: which, in what order, and how much each
+ * counts. Saved with Save; gear suggestions follow.
+ */
+export function StatPriorityEditor({
 	region,
 	slug,
 	classId,
 	priority,
-	fromTalents,
-	onDone,
+	talentTrees,
 }: {
 	region: string;
 	slug: string;
 	classId: number;
 	priority: StatPriority;
-	fromTalents: StatPriority | undefined;
-	onDone: () => void;
+	talentTrees: Parameters<typeof statPriority>[1];
 }) {
 	const trees = SPECS[CLASS_TOKENS[classId] ?? ""] ?? [];
+	const fromTalents = statPriority(classId, talentTrees);
 	const set = useMutation(api.statPriority.set);
-	// What the picker starts on: the current choice, if any.
 	const startTree = priority.chosen && priority.tree ? trees.findIndex((t) => t.name === priority.tree) : -1;
 	const isOwn = priority.chosen && !priority.tree;
 	const [mode, setMode] = useState<"talents" | "own" | number>(
@@ -374,13 +368,26 @@ function StatPicker({
 	);
 	const [error, setError] = useState<string>();
 	const [saving, setSaving] = useState(false);
-	const reorder = useReorder((from, to) => {
-		setOwn((o) => moved(o, from, to));
-	});
+	const [saved, setSaved] = useState(false);
+	const reorder = useReorder((from, to) => setOwn((o) => moved(o, from, to)));
 
 	const tiers = steepness === "custom" ? custom : presetTiers(steepness, own.length);
+	const choice: Choice = mode === "talents" ? null : mode === "own" ? ownChoice(own, tiers) : { tree: mode };
+	const changed = JSON.stringify(choice) !== JSON.stringify(choiceOf(priority, trees));
+	const duplicate = mode === "own" && new Set(own).size < own.length;
 
+	const edit =
+		<T,>(fn: (v: T) => void) =>
+		(v: T) => {
+			setSaved(false);
+			fn(v);
+		};
+	const pick = (m: "talents" | "own" | number) => {
+		setSaved(false);
+		setMode(m);
+	};
 	const resize = (stats: string[]) => {
+		setSaved(false);
 		setOwn(stats);
 		setCustom((c) => {
 			const next = c.slice(0, stats.length);
@@ -388,7 +395,8 @@ function StatPicker({
 			return next;
 		});
 	};
-	const setShare = (i: number, value: number) =>
+	const setShare = (i: number, value: number) => {
+		setSaved(false);
 		setCustom((c) => {
 			const next = [...c];
 			next[i] = value;
@@ -397,47 +405,56 @@ function StatPicker({
 			for (let j = i - 1; j >= 1; j--) next[j] = Math.max(next[j], next[j + 1]);
 			return next;
 		});
-
+	};
 	const save = async () => {
-		const choice: Choice = mode === "talents" ? null : mode === "own" ? ownChoice(own, tiers) : { tree: mode };
 		setSaving(true);
 		setError(undefined);
 		try {
 			await set({ region: region as Region, slug, choice });
-			onDone();
+			setSaved(true);
 		} catch (err) {
 			setError(err instanceof ConvexError ? String(err.data) : "Couldn't save. Try again.");
 		} finally {
 			setSaving(false);
 		}
 	};
-	const duplicate = mode === "own" && new Set(own).size < own.length;
 	const preview =
 		mode === "talents" ? fromTalents : typeof mode === "number" ? statPriority(classId, [], { tree: mode }) : undefined;
 
 	return (
-		<div className="space-y-3">
-			<div className="flex flex-wrap gap-1" role="group" aria-label="Stat priority from">
-				<Chip active={mode === "talents"} onClick={() => setMode("talents")}>
-					From talents
-				</Chip>
+		<div className="space-y-5">
+			<div role="radiogroup" aria-label="Where the stats come from" className="grid gap-2 @xl:grid-cols-2">
+				<OptionCard
+					active={mode === "talents"}
+					onClick={() => pick("talents")}
+					title="From talents"
+					detail={fromTalents ? `${fromTalents.tree}: ${topStats(fromTalents)}` : "Follows their main tree"}
+				/>
 				{trees.map((t, i) => (
-					<Chip key={t.name} active={mode === i} onClick={() => setMode(i)}>
-						{t.name}
-					</Chip>
+					<OptionCard
+						key={t.name}
+						active={mode === i}
+						onClick={() => pick(i)}
+						title={t.name}
+						detail={topStats(statPriority(classId, [], { tree: i }))}
+					/>
 				))}
-				<Chip active={mode === "own"} onClick={() => setMode("own")}>
-					My own
-				</Chip>
+				<OptionCard
+					active={mode === "own"}
+					onClick={() => pick("own")}
+					title="Custom"
+					detail={`Pick ${MIN_STATS} to ${MAX_STATS} stats and how much each counts`}
+				/>
 			</div>
+
 			{mode === "own" ? (
-				<>
-					<ol className="space-y-1.5">
+				<div className="space-y-4">
+					<ol className="divide-y divide-border rounded-md border border-border">
 						{own.map((stat, i) => (
 							<li
 								key={stat}
 								{...reorder.target(i)}
-								className={cn("flex items-center gap-2", reorder.dragging === i && "opacity-50")}
+								className={cn("flex items-center gap-2.5 px-2 py-1.5", reorder.dragging === i && "opacity-50")}
 							>
 								<button
 									type="button"
@@ -451,8 +468,8 @@ function StatPicker({
 								<select
 									aria-label={`Stat ${i + 1}`}
 									value={stat}
-									onChange={(e) => setOwn((o) => o.map((s, j) => (j === i ? e.target.value : s)))}
-									className="h-8 min-w-0 flex-1 rounded-md border bg-well px-1.5 text-[0.8125rem] pointer-coarse:h-10 pointer-coarse:text-base"
+									onChange={(e) => edit(setOwn)(own.map((s, j) => (j === i ? e.target.value : s)))}
+									className="h-8 w-40 min-w-0 flex-none rounded-md border bg-well px-1.5 text-[0.8125rem] pointer-coarse:h-10 pointer-coarse:text-base @max-md:w-auto @max-md:flex-1"
 								>
 									{Object.entries(PRIORITY_STATS).map(([key, name]) => (
 										<option key={key} value={key} disabled={key !== stat && own.includes(key)}>
@@ -460,6 +477,27 @@ function StatPicker({
 										</option>
 									))}
 								</select>
+								<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground @max-md:hidden">
+									{STAT_HINTS[stat]}
+									{i >= SHOWN_STATS && " · not shown"}
+								</span>
+								{steepness === "custom" && i > 0 && stat !== "ARMOR" ? (
+									<span className="flex w-[7.5rem] flex-none items-center gap-2 @max-md:w-24">
+										<input
+											type="range"
+											min={10}
+											max={100}
+											step={5}
+											value={Math.round(custom[i] * 100)}
+											aria-label={`How much ${label(stat)} counts next to ${label(own[0])}`}
+											onChange={(e) => setShare(i, Number(e.target.value) / 100)}
+											className="min-w-0 flex-1 accent-[var(--foreground)]"
+										/>
+										<span className="num w-8 text-right text-xs text-muted-foreground">{pct(custom[i])}</span>
+									</span>
+								) : (
+									<ShareBar stat={stat} share={tiers[i] ?? 1} />
+								)}
 								{own.length > MIN_STATS ? (
 									<button
 										type="button"
@@ -469,181 +507,95 @@ function StatPicker({
 									>
 										×
 									</button>
-								) : null}
+								) : (
+									<span className="size-8 flex-none" />
+								)}
 							</li>
 						))}
 					</ol>
 					{own.length < MAX_STATS ? (
-						<button
-							type="button"
+						<Button
+							variant="outline"
+							size="sm"
 							onClick={() => {
 								const next = Object.keys(PRIORITY_STATS).find((k) => !own.includes(k));
 								if (next) resize([...own, next]);
 							}}
-							className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
 						>
-							Add a stat ({own.length} of {MAX_STATS}; pages show the first {SHOWN_STATS})
-						</button>
+							Add a stat
+						</Button>
 					) : null}
-					<div className="space-y-2 border-t border-border pt-3">
-						<p className="text-xs text-muted-foreground">How much more does your first stat count?</p>
-						<SteepnessControl
-							value={steepness}
-							onChange={(next) => {
-								// Custom starts from where the preset was.
-								if (next === "custom" && steepness !== "custom") setCustom(presetTiers(steepness, own.length));
-								setSteepness(next);
-							}}
-							custom
-						/>
-						{steepness === "custom" ? (
-							<ol className="space-y-1.5 pt-1">
-								{own.map((stat, i) => (
-									<li key={stat} className="flex items-center gap-2.5 text-[0.8125rem]">
-										<span className={RANK}>{i + 1}</span>
-										<span className="min-w-0 flex-1 truncate">{label(stat)}</span>
-										<input
-											type="range"
-											min={10}
-											max={100}
-											step={5}
-											value={Math.round(custom[i] * 100)}
-											disabled={i === 0}
-											aria-label={`How much ${label(stat)} counts next to ${label(own[0])}`}
-											onChange={(e) => setShare(i, Number(e.target.value) / 100)}
-											className="w-24 flex-none accent-[var(--foreground)] disabled:opacity-60"
-										/>
-										<span className="num w-9 text-right text-xs text-muted-foreground">{pct(custom[i])}</span>
-									</li>
-								))}
-							</ol>
-						) : null}
+					{duplicate && <p className="text-xs text-muted-foreground">Pick different stats.</p>}
+
+					<div className="space-y-2.5">
+						<p className="text-[0.8125rem]">How much more does your first stat count?</p>
+						<div className="max-w-md">
+							<SteepnessControl
+								value={steepness}
+								onChange={edit((next: Steepness) => {
+									// Custom starts from where the preset was.
+									if (next === "custom" && steepness !== "custom") setCustom(presetTiers(steepness, own.length));
+									setSteepness(next);
+								})}
+								custom
+							/>
+						</div>
+						{steepness === "custom" && (
+							<p className="text-xs text-muted-foreground">
+								Drag each stat's slider. A stat can count at most as much as the one above it.
+							</p>
+						)}
 						{!duplicate && <SharesInWords stats={own} tiers={tiers} />}
 					</div>
-				</>
+				</div>
 			) : preview ? (
-				<RankedStats stats={preview.stats} />
+				<div className="rounded-md border border-border px-3 py-2.5">
+					<RankedStats stats={preview.stats} />
+				</div>
 			) : null}
-			{duplicate && <p className="text-xs text-muted-foreground">Pick different stats.</p>}
-			<p className="text-xs text-muted-foreground">
-				Gear suggestions follow it: Upgrades for me and the item panel right away, guildmates' tooltips in game after
-				their Guildie app's next refresh.
-			</p>
+
 			{error && <p className="text-sm text-destructive">{error}</p>}
-			<div className="flex gap-2 border-t border-border pt-3">
-				<Button size="sm" onClick={save} disabled={saving || duplicate}>
-					Save
+			<div className="flex items-center gap-3 border-t border-border pt-4">
+				<Button onClick={save} disabled={saving || duplicate || !changed}>
+					{saving ? "Saving…" : "Save"}
 				</Button>
-				<Button size="sm" variant="ghost" onClick={onDone} disabled={saving}>
-					Cancel
-				</Button>
+				<span className="text-xs text-muted-foreground">
+					{saved && !changed
+						? "Saved. Gear suggestions follow it now; guildmates' addons after their next refresh."
+						: changed
+							? "Not saved yet."
+							: "Gear suggestions follow these: Upgrades for me, the item panel and the addon."}
+				</span>
 			</div>
 		</div>
 	);
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-	return (
-		<button type="button" aria-pressed={active} className="chip" data-active={active} onClick={onClick}>
-			{children}
-		</button>
-	);
-}
-
-/**
- * "Upgrades for me": a character's first three stats, dragged into another
- * order, and the steepness, saved to the character right away (the same
- * choice as the character page; suggestions follow on the next query). A
- * tree's priority becomes the player's own on the first change.
- */
-export function PriorityStrip({
-	region,
-	slug,
-	name,
-	priority,
+/** One choice of where the stats come from: a name and what it means. */
+function OptionCard({
+	active,
+	onClick,
+	title,
+	detail,
 }: {
-	region: string;
-	slug: string;
-	name: ReactNode;
-	priority: StatPriority;
+	active: boolean;
+	onClick: () => void;
+	title: string;
+	detail?: string;
 }) {
-	const set = useMutation(api.statPriority.set);
-	const [order, setOrder] = useState<string[]>();
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string>();
-	const stats = order ?? priority.stats;
-	const own = priority.chosen && !priority.tree;
-	const tiers = own ? priority.shares : presetTiers("balanced", priority.stats.length);
-
-	const save = async (next: string[], nextTiers: number[]) => {
-		setSaving(true);
-		setError(undefined);
-		try {
-			await set({ region: region as Region, slug, choice: ownChoice(next, nextTiers) });
-		} catch (err) {
-			setError(err instanceof ConvexError ? String(err.data) : "Couldn't save.");
-		} finally {
-			setSaving(false);
-			setOrder(undefined);
-		}
-	};
-	// The order while dragging (state for the render, a ref for the drop).
-	const dragged = useRef<string[]>(undefined);
-	const reorder = useReorder(
-		(from, to) => {
-			dragged.current = moved(dragged.current ?? priority.stats, from, to);
-			setOrder(dragged.current);
-		},
-		() => {
-			const o = dragged.current;
-			dragged.current = undefined;
-			if (o?.some((s, i) => s !== priority.stats[i])) void save(o, tiers);
-			else setOrder(undefined);
-		},
-	);
-
 	return (
-		<div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface px-3 py-2">
-			<span className="text-[0.8125rem] font-medium">{name}</span>
-			<ol className="flex flex-wrap items-center gap-1" aria-label="Stats to look for, first to third">
-				{stats.slice(0, SHOWN_STATS).map((stat, i) => (
-					<li key={stat} {...reorder.target(i)} className="flex items-center gap-1">
-						{i > 0 ? <span className="text-xs text-muted-foreground/60">›</span> : null}
-						<button
-							type="button"
-							disabled={saving}
-							aria-label={`${i + 1}. ${label(stat)}: drag, or Alt+arrow keys, to move`}
-							title="Drag to reorder"
-							className={cn(
-								"flex h-6 cursor-grab items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-well px-2 text-[0.8125rem] active:cursor-grabbing",
-								reorder.dragging === i && "opacity-50",
-							)}
-							{...reorder.handle(i, SHOWN_STATS, "x")}
-						>
-							<span className="text-muted-foreground/60">
-								<Grip />
-							</span>
-							{label(stat)}
-						</button>
-					</li>
-				))}
-			</ol>
-			{!own ? (
-				<span className="text-xs text-muted-foreground">
-					{priority.chosen ? priority.tree : `From ${priority.tree} talents`}
-				</span>
-			) : null}
-			{error ? <span className="text-xs text-destructive">{error}</span> : null}
-			<span className="ml-auto">
-				<SteepnessControl
-					size="sm"
-					value={own ? priority.steepness : undefined}
-					disabled={saving}
-					onChange={(s) => {
-						if (s !== "custom") void save(stats, presetTiers(s, stats.length));
-					}}
-				/>
-			</span>
-		</div>
+		<button
+			type="button"
+			role="radio"
+			aria-checked={active}
+			onClick={onClick}
+			className={cn(
+				"rounded-md border border-border px-3 py-2 text-left transition-colors hover:bg-hover",
+				active && "border-border-strong bg-selected hover:bg-selected",
+			)}
+		>
+			<span className={cn("block text-[0.8125rem]", active && "font-semibold")}>{title}</span>
+			{detail && <span className="block truncate text-xs text-muted-foreground">{detail}</span>}
+		</button>
 	);
 }

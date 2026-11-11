@@ -18,7 +18,7 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 // 3. Compared with what they wear where it would go: the weaker ring or
 //    trinket, main hand plus off hand for a two-hander, and so on.
 // 4. Upgrade: gain of `upgrade` or more, usable now, main spec, and none of
-//    the spec's priority stats (`stats`, up to five) lower than what it
+//    the spec's priority stats (`stats`, the first five) lower than what it
 //    replaces. Trade-off: the same gain, but it gives up some of one of
 //    those stats for more of another (worth it only by the weights, which
 //    the player can make steeper or flatter: customWeights). Maybe: a
@@ -46,12 +46,18 @@ export type Rules = {
 	minFit: number;
 	preferBestFrom: number;
 	preferBestFactor: number;
+	/**
+	 * Each step down a player's list of preferred types counts this much less
+	 * (the second of two 0.95), never less than another type (preferBestFactor).
+	 * Missing (older GuildieData.lua): 0.
+	 */
+	preferStep?: number;
 	minBase: number;
 	/** Stat -> plain stat points per point, for the raw total (missing: 1). */
 	points: Record<string, number>;
 	/**
 	 * "DRUID:1" (class token, tree index) -> name, weights and its priority
-	 * stats, first to last (up to five; what a trade-off gives up).
+	 * stats, first to last (the first five of a player's own: what a trade-off gives up).
 	 */
 	specs: Record<string, { name: string; w: Weights; stats?: string[] }>;
 	classes: Record<number, ClassRules>;
@@ -87,14 +93,24 @@ export type UpgradeMember = {
 	 * they can wear from `preferBestFrom`".
 	 */
 	armorPref?: number;
+	/**
+	 * Several preferred types, first to last (armorPref is the first, for addons
+	 * from before lists): each step down counts `preferStep` less. Only set
+	 * when there's more than one.
+	 */
+	armorPrefs?: number[];
 	armorStrict?: true;
-	/** The same for a weapon type (weapon subclass), within its group: melee, or ranged (bows to wands). */
+	/** The same for weapon types (weapon subclass), each within its group: melee, or ranged (bows to wands). */
 	weaponPref?: number;
+	weaponPrefs?: number[];
 	weaponStrict?: true;
 };
 
 /** A player's armor and weapon type preference, as members carry it. */
-export type GearPrefs = Pick<UpgradeMember, "armorPref" | "armorStrict" | "weaponPref" | "weaponStrict">;
+export type GearPrefs = Pick<
+	UpgradeMember,
+	"armorPref" | "armorPrefs" | "armorStrict" | "weaponPref" | "weaponPrefs" | "weaponStrict"
+>;
 
 export type Verdict = {
 	/** Upgrade (nothing of their priority stats lost), trade-off (some lost), maybe. */
@@ -178,13 +194,26 @@ export function specsOf(classId: number, trees: Tree[] | undefined) {
 
 /**
  * A player's stat priority choice (ownedCharacters.statPriority): another
- * tree, or their own three to five stats with how much each counts next to
+ * tree, or their own three to ten stats with how much each counts next to
  * the first (`tiers`, first 1; missing: BALANCED).
  */
 export type StatChoice = { tree?: number; stats?: string[]; tiers?: number[] };
 
-/** A player's preferred armor and weapon types (ownedCharacters.gearPreference): subclass ids, strict or not. */
-export type GearChoice = { armor?: { type: number; strict: boolean }; weapon?: { type: number; strict: boolean } };
+/**
+ * One kind's preferred types (ownedCharacters.gearPreference): subclass ids,
+ * first to last, and whether others are left out (strict). `type` is the
+ * one-type shape from before lists; `typesOf` reads either.
+ */
+export type TypeChoice = { types?: number[]; type?: number; strict: boolean };
+/** A player's preferred armor and weapon types. */
+export type GearChoice = { armor?: TypeChoice; weapon?: TypeChoice };
+
+/** The preferred types, first to last, from either shape. */
+export function typesOf(choice: TypeChoice | undefined): number[] {
+	if (!choice) return [];
+	if (choice.types) return choice.types;
+	return choice.type !== undefined ? [choice.type] : [];
+}
 
 /** The armor types a preference can name: body armor, cloth to plate (ARMOR_SUBCLASS). */
 export const PREFERABLE_ARMOR = [1, 2, 3, 4];
@@ -202,13 +231,17 @@ export function canPrefer(cls: ClassRules | undefined, kind: "armor" | "weapon",
 export function gearPrefs(classId: number, choice: GearChoice | undefined, rules: Rules): GearPrefs {
 	const cls = rules.classes[classId];
 	const out: GearPrefs = {};
-	if (choice?.armor && canPrefer(cls, "armor", choice.armor.type)) {
-		out.armorPref = choice.armor.type;
-		if (choice.armor.strict) out.armorStrict = true;
+	const armor = typesOf(choice?.armor).filter((t) => canPrefer(cls, "armor", t));
+	if (armor.length) {
+		out.armorPref = armor[0];
+		if (armor.length > 1) out.armorPrefs = armor;
+		if (choice?.armor?.strict) out.armorStrict = true;
 	}
-	if (choice?.weapon && canPrefer(cls, "weapon", choice.weapon.type)) {
-		out.weaponPref = choice.weapon.type;
-		if (choice.weapon.strict) out.weaponStrict = true;
+	const weapon = typesOf(choice?.weapon).filter((t) => canPrefer(cls, "weapon", t));
+	if (weapon.length) {
+		out.weaponPref = weapon[0];
+		if (weapon.length > 1) out.weaponPrefs = weapon;
+		if (choice?.weapon?.strict) out.weaponStrict = true;
 	}
 	return out;
 }
@@ -236,9 +269,9 @@ export const STAT_SHORT: Record<string, string> = {
  * another or set their own (validTiers).
  */
 export const TIER_PRESETS = {
-	even: [1, 0.9, 0.8, 0.75, 0.7],
-	balanced: [1, 0.8, 0.6, 0.5, 0.4],
-	steep: [1, 0.55, 0.35, 0.25, 0.2],
+	even: [1, 0.9, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5, 0.45],
+	balanced: [1, 0.8, 0.6, 0.5, 0.4, 0.35, 0.3, 0.25, 0.2, 0.15],
+	steep: [1, 0.55, 0.35, 0.25, 0.2, 0.17, 0.14, 0.12, 0.1, 0.1],
 } as const;
 export type Steepness = keyof typeof TIER_PRESETS | "custom";
 /** Smallest share a stat can be set to. */
@@ -246,7 +279,7 @@ export const MIN_TIER = 0.1;
 /** Stats left out of the player's own: at most this share of their last. */
 const PRIORITY_OTHERS = 0.9;
 /** Armor named in the stats: its weight times this, first to fifth (armor is per point of armor, not a stat). */
-const ARMOR_TIERS = [2, 1.6, 1.3, 1.15, 1.05];
+const ARMOR_TIERS = [2, 1.6, 1.3, 1.15, 1.05, 1, 1, 1, 1, 1];
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -317,9 +350,11 @@ export function customWeights(
 
 /** Fewest and most stats a player's own priority names. */
 export const MIN_STATS = 3;
-export const MAX_STATS = 5;
+export const MAX_STATS = 10;
+/** A trade-off gives up one of the first this many (more would make nearly everything a trade-off). */
+export const TRADEOFF_STATS = 5;
 
-/** Three to five distinct stats a priority can name, or undefined. */
+/** Three to ten distinct stats a priority can name, or undefined. */
 export function validStats(stats: unknown): string[] | undefined {
 	if (!Array.isArray(stats) || stats.length < MIN_STATS || stats.length > MAX_STATS) return undefined;
 	if (!stats.every((s) => typeof s === "string" && s in STAT_SHORT)) return undefined;
@@ -355,7 +390,7 @@ export function specsFor(classId: number, trees: Tree[] | undefined, choice: Sta
 				.map((s) => STAT_SHORT[s])
 				.join("/"),
 			w: customWeights(base.w, own, rules.points, tiers),
-			stats: own,
+			stats: own.slice(0, TRADEOFF_STATS),
 		};
 		return { spec, spec2: talents.spec2 };
 	}
@@ -439,15 +474,22 @@ const isBodyArmor = (item: ItemInfo) =>
 const RANGED_WEAPONS = new Set([2, 3, 16, 18, 19]);
 
 /**
- * Whether the player's preference covers the item: true for the preferred
- * type, false for another type of the same kind (body armor; melee or
- * ranged weapons), undefined when no preference covers it.
+ * Whether the player's preference covers the item: its place among the
+ * preferred types (0 for the first), false for another type of the same kind
+ * (body armor; melee or ranged weapons, each ranked among its own group),
+ * undefined when no preference covers it.
  */
-export function preferred(item: ItemInfo, p: GearPrefs | undefined): boolean | undefined {
-	if (p?.armorPref !== undefined && isBodyArmor(item)) return item.subclass === p.armorPref;
+export function preferred(item: ItemInfo, p: GearPrefs | undefined): number | false | undefined {
+	if (p?.armorPref !== undefined && isBodyArmor(item)) {
+		const i = (p.armorPrefs ?? [p.armorPref]).indexOf(item.subclass ?? -1);
+		return i >= 0 ? i : false;
+	}
 	if (p?.weaponPref !== undefined && item.cls === 2 && item.subclass !== undefined) {
-		if (RANGED_WEAPONS.has(item.subclass) !== RANGED_WEAPONS.has(p.weaponPref)) return undefined;
-		return item.subclass === p.weaponPref;
+		const ranged = RANGED_WEAPONS.has(item.subclass);
+		const group = (p.weaponPrefs ?? [p.weaponPref]).filter((t) => RANGED_WEAPONS.has(t) === ranged);
+		if (!group.length) return undefined;
+		const i = group.indexOf(item.subclass);
+		return i >= 0 ? i : false;
 	}
 	return undefined;
 }
@@ -470,7 +512,7 @@ export function scoreItem(
 	w: Weights,
 	level: number,
 	classRules: ClassRules,
-	rules: Pick<Rules, "preferBestFrom" | "preferBestFactor" | "points">,
+	rules: Pick<Rules, "preferBestFrom" | "preferBestFactor" | "preferStep" | "points">,
 	offHand = false,
 	prefs?: GearPrefs,
 ) {
@@ -499,6 +541,12 @@ export function scoreItem(
 	if (pref === false || belowBest) {
 		score *= rules.preferBestFactor;
 		stat *= rules.preferBestFactor;
+	} else if (pref !== undefined && pref > 0) {
+		// Further down their list: a little less, never below another type.
+		let factor = 1 - (rules.preferStep ?? 0) * pref;
+		if (factor < rules.preferBestFactor) factor = rules.preferBestFactor;
+		score *= factor;
+		stat *= factor;
 	}
 	return { score, stat, total };
 }

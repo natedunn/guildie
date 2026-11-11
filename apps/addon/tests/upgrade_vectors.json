@@ -8,6 +8,7 @@
 		"minFit": 0.3,
 		"preferBestFrom": 40,
 		"preferBestFactor": 0.8,
+		"preferStep": 0.05,
 		"minBase": 1,
 		"points": {
 			"ATTACK_POWER": 0.5,
@@ -488,6 +489,36 @@
 			},
 			"weaponPref": 15
 		},
+		"LeatherThenMail": {
+			"name": "LeatherThenMail",
+			"classId": 1,
+			"level": 45,
+			"spec": "WARRIOR:1",
+			"seen": 2000000,
+			"slots": {
+				"5": 10,
+				"16": 60,
+				"17": 10
+			},
+			"armorPref": 2,
+			"armorPrefs": [2, 3]
+		},
+		"MacesSwordsBows": {
+			"name": "MacesSwordsBows",
+			"classId": 1,
+			"level": 45,
+			"spec": "WARRIOR:1",
+			"seen": 2000000,
+			"slots": {
+				"5": 10,
+				"16": 60,
+				"17": 10,
+				"18": 10
+			},
+			"weaponPref": 5,
+			"weaponPrefs": [5, 8, 2],
+			"weaponStrict": true
+		},
 		"Bowman": {
 			"name": "Bowman",
 			"classId": 3,
@@ -820,6 +851,63 @@
 				"second": false,
 				"against": [18]
 			}
+		},
+		{
+			"name": "leather then mail: leather counts in full",
+			"item": "leatherChest",
+			"member": "LeatherThenMail",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.4800000000000001,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [5]
+			}
+		},
+		{
+			"name": "leather then mail: mail second, a little less",
+			"item": "mailChest",
+			"member": "LeatherThenMail",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.44399999999999995,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [5]
+			}
+		},
+		{
+			"name": "maces, swords, bows only: a two-handed mace first",
+			"item": "apMace",
+			"member": "MacesSwordsBows",
+			"expect": null
+		},
+		{
+			"name": "maces, swords, bows only: a greatsword second",
+			"item": "greatsword",
+			"member": "MacesSwordsBows",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.43653571428571414,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [16, 17]
+			}
+		},
+		{
+			"name": "maces, swords, bows only: a dagger left out",
+			"item": "dagger",
+			"member": "MacesSwordsBows",
+			"expect": null
+		},
+		{
+			"name": "maces, swords, bows only: a bow first among ranged",
+			"item": "bow",
+			"member": "MacesSwordsBows",
+			"expect": null
 		},
 		{
 			"name": "more of every priority stat: an upgrade",

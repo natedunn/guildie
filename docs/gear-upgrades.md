@@ -124,8 +124,9 @@ Agility but no Stamina is weighed against both.
 | **Maybe**     | Gain of 3% to 15%; or only their second spec; or usable within 3 levels                  |
 | Nothing       | Under 3%                                                                                 |
 
-Priority stats are the spec's `stats` (a tree's three, or a player's own
-three to five). A trade-off is only worth it by the weights: +8 Agility for
+Priority stats are the spec's `stats` (a tree's three, or the first five of
+a player's own three to ten: `TRADEOFF_STATS`; the rest still count in the
+weights). A trade-off is only worth it by the weights: +8 Agility for
 −4 Strength wins for a Strength-first shaman at Balanced, not at Steep. To
 tell the two apart, members carry their priority stats on what they wear
 (`keys`, per slot; `keyValue` counts armor for Armor and spell power toward
@@ -169,13 +170,13 @@ Each stat in it must have a weight in that spec (`statPriority.test.ts`).
 The weights decide the gain; the priority decides Upgrade or Trade-off.
 
 A player who claimed a character can choose another tree's priority or their
-own three to five instead (`convex/statPriority.ts`), and suggestions follow that
+own three to ten instead (`convex/statPriority.ts`), and suggestions follow that
 choice everywhere: the item panel, the Crafting page's upgrade views and the
 addon's tooltips (`specsFor` in `shared/upgrades.ts`):
 
 - **Another tree:** that tree's weights. The tree their talents put them in
   becomes the second spec (maybes) if it has 10+ points.
-- **Their own three to five:** their talents' tree, bent by `customWeights`.
+- **Their own three to ten:** their talents' tree, bent by `customWeights`.
   Per plain stat point (Attack Power counts half), the first stat is worth as
   much as the spec's best stat and each next one its share of that, never
   above the one before. The shares are the player's steepness
@@ -189,25 +190,29 @@ addon's tooltips (`specsFor` in `shared/upgrades.ts`):
   `SHAMAN:1:STRENGTH,INTELLECT,AGILITY` (shares other than Balanced's are
   added: `…:1,0.55,0.35`), named after the first three, "Str/Int/Agi"
   (tooltips say "upgrade (Str/Int/Agi)"). The site adds it to the rules in
-  `GuildieData.lua`. Pages show the first three stats; the fourth and fifth
-  count only in suggestions (the character page's editor lists them all).
-  The steepness and order can also be changed on Crafting → Upgrades for me.
+  `GuildieData.lua`. Pages show the first three stats; the rest
+  count only in suggestions (the Preferences tab lists them all).
 
 In game, a change shows in guildmates' tooltips after their Guildie app's
 next guild data refresh (every 15 minutes) and a `/reload`.
 
 ### Gear types
 
-The player who claimed a character can also pick one armor type (cloth to
-plate) and one weapon type they prefer, each with "Only this type" or not
-(`ownedCharacters.gearPreference`, the character page's Gear types panel).
-Members carry it as `armorPref`/`armorStrict` and `weaponPref`/`weaponStrict`
-(`gearPrefs` in `shared/upgrades.ts`; types the class can't use are dropped):
+The player who claimed a character can also list the armor types (cloth to
+plate) and weapon types they prefer, first to last, each kind with "Prefer
+these" or "Only these" (`ownedCharacters.gearPreference` `{ types, strict }`;
+rows from before lists have one `type`, read by `typesOf`; the character's
+Preferences tab). Members carry the first as `armorPref`/`weaponPref` (what
+addons from before lists read), the whole list as `armorPrefs`/`weaponPrefs`
+when there's more than one, and `armorStrict`/`weaponStrict` (`gearPrefs` in
+`shared/upgrades.ts`; types the class can't use are dropped):
 
-- **Preferred:** other types of that kind count `preferBestFactor` (0.8),
+- **Prefer these:** other types of that kind count `preferBestFactor` (0.8),
   for the items suggested and for what they wear. An armor preference
   replaces "the best type they can wear from level 40".
-- **Only this type:** other types aren't suggested at all.
+- **Order:** each step down the list counts `preferStep` (0.05) less: the
+  second type 0.95, the third 0.9, never below another type's 0.8.
+- **Only these:** other types aren't suggested at all.
 - A weapon type counts within its group: melee, or ranged (bows, guns,
   crossbows, thrown, wands). A hunter who picks Bows still gets melee
   weapons suggested as before.

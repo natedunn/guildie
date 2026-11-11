@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ago } from "@/lib/format";
 
 /** The MCP server's address; AI apps add it as a connector (docs/mcp.md). */
-export const MCP_URL = "https://mcp.guildie.club/mcp";
+export const MCP_URL = "https://mcp.guildie.club/connect";
 
 /**
  * Settings → Account: connect Claude, ChatGPT or another AI app to read this

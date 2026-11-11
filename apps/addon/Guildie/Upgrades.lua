@@ -44,15 +44,37 @@ end
 -- Weapon subclasses for the ranged slot: a weapon preference counts within its group.
 local RANGED_WEAPONS = { [2] = true, [3] = true, [16] = true, [18] = true, [19] = true }
 
---- The player's preferred armor or weapon type (member fields armorPref,
---- weaponPref): true for that type, false for another of the same kind,
---- nil when no preference covers the item (preferred in upgrades.ts).
+-- 0-based place of `value` in `list`, or nil.
+local function indexOf(list, value)
+    for i, v in ipairs(list) do
+        if v == value then return i - 1 end
+    end
+    return nil
+end
+
+--- The player's preferred armor or weapon types (member fields armorPref,
+--- armorPrefs, weaponPref, weaponPrefs): the item's place among them (0 for
+--- the first), false for another type of the same kind (weapons ranked
+--- within melee or ranged), nil when no preference covers the item
+--- (preferred in upgrades.ts). Data from before lists only has armorPref and
+--- weaponPref.
 function U.preferred(item, p)
     if not p then return nil end
-    if p.armorPref and isBodyArmor(item) then return item.subclass == p.armorPref end
+    if p.armorPref and isBodyArmor(item) then
+        local i = indexOf(p.armorPrefs or { p.armorPref }, item.subclass or -1)
+        if i == nil then return false end
+        return i
+    end
     if p.weaponPref and item.cls == 2 and item.subclass then
-        if (RANGED_WEAPONS[item.subclass] == true) ~= (RANGED_WEAPONS[p.weaponPref] == true) then return nil end
-        return item.subclass == p.weaponPref
+        local ranged = RANGED_WEAPONS[item.subclass] == true
+        local group = {}
+        for _, t in ipairs(p.weaponPrefs or { p.weaponPref }) do
+            if (RANGED_WEAPONS[t] == true) == ranged then table.insert(group, t) end
+        end
+        if #group == 0 then return nil end
+        local i = indexOf(group, item.subclass)
+        if i == nil then return false end
+        return i
     end
     return nil
 end
@@ -92,6 +114,12 @@ function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
     if pref == false or belowBest then
         score = score * rules.preferBestFactor
         stat = stat * rules.preferBestFactor
+    elseif pref ~= nil and pref > 0 then
+        -- Further down their list: a little less, never below another type.
+        local factor = 1 - (rules.preferStep or 0) * pref
+        if factor < rules.preferBestFactor then factor = rules.preferBestFactor end
+        score = score * factor
+        stat = stat * factor
     end
     return score, stat, total
 end

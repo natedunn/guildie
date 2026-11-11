@@ -98,12 +98,12 @@ The two implementations must match exactly:
 - Shared code stays free of Convex imports (`node --test` runs it).
 - A player's stat priority choice (`ownedCharacters.statPriority`) picks the
   spec: `specsFor` (another tree, or a custom spec from `customWeights` added
-  to `rules.specs`, with up to five `stats` and the steepness `tiers`;
+  to `rules.specs`, with the first five of up to ten `stats` and the steepness `tiers`;
   pages show three). Build members with `memberForUpgrades` (it reads the
   claim), and when rules leave the call (helper.ts guild data) carry the
   custom specs along, or the addon can't find them.
 - Preferred armor and weapon types (`ownedCharacters.gearPreference`) ride on
-  the member (`armorPref`, `weaponPref`, `...Strict`; `gearPrefs`) and are
+  the member (`armorPref`, `weaponPref`, ordered `armorPrefs`/`weaponPrefs`, `...Strict`; `gearPrefs`) and are
   read by `scoreItem` and `judge` in both TS and Lua (`preferred`): a rule
   change, so it goes through the vectors and needs an addon release.
 - Trading is the callers' part, not `judge`/`suggest`: `untradeable()` in

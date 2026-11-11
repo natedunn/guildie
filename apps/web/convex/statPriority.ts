@@ -1,16 +1,16 @@
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { type MutationCtx, mutation } from "./_generated/server";
-import { vRegion } from "./schema";
+import { vRegion, vTypeChoice } from "./schema";
 import { CLASS_RULES } from "./shared/proficiencies";
 import { steepnessOf, validStats, validTiers } from "./shared/statPriority";
-import { canPrefer } from "./shared/upgrades";
+import { canPrefer, type TypeChoice as GearTypeChoice, typesOf } from "./shared/upgrades";
 import { CLASS_TOKENS, SPECS } from "./shared/weights";
 import { requireUserId } from "./users";
 
 /**
  * The player who claimed a character chooses what its stat priority shows:
- * another talent tree's, their own three to five stats with how much each
+ * another talent tree's, their own three to ten stats with how much each
  * counts next to the first (`tiers`; left out: Balanced), or (null) back to
  * their talents. Shown on the roster and the character page; gear
  * suggestions follow it.
@@ -30,7 +30,10 @@ export const set = mutation({
 	},
 });
 
-const vTypeChoice = v.union(v.null(), v.object({ type: v.number(), strict: v.boolean() }));
+/** Types first to last (or one `type`, from older clients), or null for none. */
+const vTypeArg = v.union(v.null(), vTypeChoice);
+/** Most types a preference can list. */
+const MAX_TYPES = 8;
 
 /**
  * The player who claimed a character chooses the armor and weapon types it
@@ -38,7 +41,7 @@ const vTypeChoice = v.union(v.null(), v.object({ type: v.number(), strict: v.boo
  * or with `strict`, aren't suggested at all. Only types the class can use.
  */
 export const setGear = mutation({
-	args: { region: vRegion, slug: v.string(), armor: vTypeChoice, weapon: vTypeChoice },
+	args: { region: vRegion, slug: v.string(), armor: vTypeArg, weapon: vTypeArg },
 	handler: async (ctx, { region, slug, armor, weapon }) => {
 		await setGearPreference(ctx, await requireUserId(ctx), region, slug, armor, weapon);
 	},
@@ -46,7 +49,7 @@ export const setGear = mutation({
 
 type Region = "us" | "eu" | "kr" | "tw";
 export type Choice = null | { tree: number } | { stats: string[]; tiers?: number[] };
-export type TypeChoice = null | { type: number; strict: boolean };
+export type TypeChoice = null | GearTypeChoice;
 
 /** `set`, for a given player (the site, or an AI app acting for them: convex/mcp.ts). */
 export async function setStatPriority(
@@ -64,7 +67,7 @@ export async function setStatPriority(
 	).find((c) => c.userId === userId);
 	if (!claim) throw new ConvexError("Only the player who claimed this character can change it.");
 	if (choice && "stats" in choice) {
-		if (!validStats(choice.stats)) throw new ConvexError("Pick three to five different stats.");
+		if (!validStats(choice.stats)) throw new ConvexError("Pick three to ten different stats.");
 		if (choice.tiers) {
 			const tiers = validTiers(choice.tiers, choice.stats.length);
 			if (tiers !== choice.tiers) throw new ConvexError("Each stat can count at most as much as the one before.");
@@ -105,9 +108,21 @@ export async function setGearPreference(
 		.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
 		.first();
 	const cls = CLASS_RULES[character?.classId ?? claim.classId ?? 0];
-	if (armor && !canPrefer(cls, "armor", armor.type)) throw new ConvexError("This class can't wear that armor.");
-	if (weapon && !canPrefer(cls, "weapon", weapon.type)) throw new ConvexError("This class can't use that weapon.");
-	const gearPreference = { ...(armor ? { armor } : {}), ...(weapon ? { weapon } : {}) };
+	const clean = (kind: "armor" | "weapon", choice: TypeChoice) => {
+		const types = typesOf(choice ?? undefined);
+		if (!choice || !types.length) return undefined;
+		if (types.length > MAX_TYPES) throw new ConvexError(`Pick at most ${MAX_TYPES} types.`);
+		if (new Set(types).size < types.length) throw new ConvexError("Each type once.");
+		if (types.some((t) => !canPrefer(cls, kind, t))) {
+			throw new ConvexError(
+				kind === "armor" ? "This class can't wear that armor." : "This class can't use that weapon.",
+			);
+		}
+		return { types, strict: choice.strict };
+	};
+	const a = clean("armor", armor);
+	const w = clean("weapon", weapon);
+	const gearPreference = { ...(a ? { armor: a } : {}), ...(w ? { weapon: w } : {}) };
 	await ctx.db.patch(claim._id, {
 		gearPreference: Object.keys(gearPreference).length ? gearPreference : undefined,
 	});

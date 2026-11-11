@@ -485,6 +485,8 @@ export const THRESHOLDS = {
 	preferBestFrom: 40,
 	/** ...this much (leather on a level 45 warrior). */
 	preferBestFactor: 0.8,
+	/** Each step down a player's list of preferred armor or weapon types counts this much less. */
+	preferStep: 0.05,
 	/** Gains are relative to what they wear, but never to less than this (an empty slot). */
 	minBase: 1,
 } as const;
