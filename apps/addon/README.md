@@ -50,6 +50,7 @@ Per character, in `GuildieDB` (`Guildie.lua`, `Capture.lua`):
 | Each item's tooltip as the game shows it (colors, enchant, durability, set) | `C_TooltipInfo.GetInventoryItem`, else a hidden `GameTooltip` (`SetInventoryItem`) read line by line, name line skipped                | every read                                                        |
 | Professions with skill and max                                              | `GetProfessions`/`GetProfessionInfo` (skill line ids), else `GetSkillLineInfo`                                                         | every read                                                        |
 | Known recipes (name, crafted item id)                                       | `GetTradeSkillInfo`/`GetTradeSkillItemLink`, `C_TradeSkillUI`, or the Craft API (`GetCraftInfo`, Enchanting in classic-era clients)    | **only when you open that profession's window**                   |
+| The quest log (id, title, level, tag, header, complete, objectives)         | `C_QuestLog.GetInfo`/`GetQuestObjectives`/`GetQuestTagInfo`, else `GetQuestLogTitle`, `GetQuestLogLeaderBoard`, `GetQuestTagInfo`      | every read, and on `QUEST_LOG_UPDATE` (saved read only)           |
 
 A read happens at login, on level up, gear changes, skill and guild changes,
 talent changes, when a profession window opens or updates, and on logout and
@@ -64,9 +65,10 @@ a second later.
   you haven't opened since keeps its old list; an unlearned one drops off
   with its recipes. Open each profession's window once to send its recipes.
 - A collapsed header in the skills tab hides what's under it; those
-  professions keep their last read.
+  professions keep their last read. Same for the quest log: quests under a
+  collapsed header keep their last read.
 
-The payload (`GuildieDB.payload`, JSON, `version` 2; docs/addon.md, "API")
+The payload (`GuildieDB.payload`, JSON, `version` 4; docs/addon.md, "API")
 is rebuilt on every read for all of the account's characters, and the app
 uploads it when the game writes the file.
 

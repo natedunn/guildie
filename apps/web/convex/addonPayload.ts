@@ -2,11 +2,12 @@
 // parsing and strict validation, one character at a time, so one bad
 // character doesn't sink the rest of an upload. Payload versions 1 (talents
 // and level), 2 (plus guild, XP, gear, professions and known recipes; from
-// addon 0.7.0 also weapon and armor skills) and 3 (addon 0.8.0: plus bags and
-// the last bank read, for guild requests) are all accepted. Kept free of
+// addon 0.7.0 also weapon and armor skills), 3 (addon 0.8.0: plus bags and
+// the last bank read, for guild requests) and 4 (addon 0.10.0: plus the quest
+// log) are all accepted. Kept free of
 // Convex and value imports so `node --test` can run it (addonPayload.test.ts).
 
-export const PAYLOAD_VERSIONS = [1, 2, 3] as const;
+export const PAYLOAD_VERSIONS = [1, 2, 3, 4] as const;
 
 export const LIMITS = {
 	characters: 50,
@@ -20,6 +21,9 @@ export const LIMITS = {
 	recipesPerProfession: 1500,
 	/** Different items in bags, or in the bank (each stack summed by the addon). */
 	inventoryItems: 600,
+	/** Quests in the log (the game allows 25), objectives per quest. */
+	quests: 60,
+	objectives: 12,
 	name: 120,
 } as const;
 
@@ -129,6 +133,21 @@ export type AddonCharacter = {
 	 * requests (convex/requests.ts).
 	 */
 	inventory?: { bags?: InventoryPart; bank?: InventoryPart };
+	/** The quest log (payload 4, addon 0.10.0). Public like Blizzard's quest list, to guildmates. */
+	quests?: { capturedAt: number; list: QuestEntry[] };
+};
+
+export type QuestEntry = {
+	id: number;
+	title?: string;
+	level?: number;
+	/** "Dungeon", "Elite", "Raid", "Group", "PvP"... as the game tags it. */
+	tag?: string;
+	/** The quest log header it's under: a zone, a dungeon or a category. */
+	zone?: string;
+	complete?: boolean;
+	failed?: boolean;
+	objectives?: { text: string; done: boolean }[];
 };
 
 export type InventoryPart = {
@@ -162,14 +181,17 @@ function str(x: unknown, path: string, max: number, min = 0) {
 	return x;
 }
 
-/** An item's name from the game: plain text only (no color codes or control characters). */
-function itemName(x: unknown, path: string) {
-	const name = str(x, path, 100, 1);
-	for (const ch of name) {
+/** Text from the game shown as-is: plain text only (no color codes or control characters). */
+function plain(x: unknown, path: string, max: number) {
+	const text = str(x, path, max, 1);
+	for (const ch of text) {
 		if (ch === "|" || ch.charCodeAt(0) < 32) fail(path, "not plain text");
 	}
-	return name;
+	return text;
 }
+
+/** An item's name from the game. */
+const itemName = (x: unknown, path: string) => plain(x, path, 100);
 
 function int(x: unknown, path: string, min: number, max: number) {
 	if (typeof x !== "number" || !Number.isInteger(x)) return fail(path, "expected a whole number");
@@ -344,6 +366,47 @@ function inventory(x: unknown, now: number): AddonCharacter["inventory"] {
 	return bags || bank ? { ...(bags ? { bags } : {}), ...(bank ? { bank } : {}) } : undefined;
 }
 
+function bool(x: unknown, path: string) {
+	return typeof x === "boolean" ? x : fail(path, "expected true or false");
+}
+
+function quests(x: unknown, now: number): AddonCharacter["quests"] {
+	const e = obj(x, "quests");
+	const capturedAt = time(e.capturedAt, "quests.capturedAt", now);
+	const list: QuestEntry[] = [];
+	for (const [i, raw] of arr(e.list, "quests.list", LIMITS.quests).entries()) {
+		const p = `quests.list[${i}]`;
+		const q = obj(raw, p);
+		const id = int(q.id, `${p}.id`, 1, 10_000_000);
+		if (list.some((l) => l.id === id)) continue;
+		const title = opt(q.title, (t) => plain(t, `${p}.title`, LIMITS.name));
+		const level = opt(q.level, (l) => int(l, `${p}.level`, -1, 100));
+		const tag = opt(q.tag, (t) => plain(t, `${p}.tag`, 32));
+		const zone = opt(q.zone, (z) => plain(z, `${p}.zone`, 64));
+		const complete = opt(q.complete, (c) => bool(c, `${p}.complete`));
+		const failed = opt(q.failed, (f) => bool(f, `${p}.failed`));
+		const objectives = opt(q.objectives, (o) =>
+			arr(o, `${p}.objectives`, LIMITS.objectives).map((raw, j) => {
+				const op = `${p}.objectives[${j}]`;
+				const ob = obj(raw, op);
+				return { text: plain(ob.text, `${op}.text`, 200), done: bool(ob.done ?? false, `${op}.done`) };
+			}),
+		);
+		list.push({
+			id,
+			...(title !== undefined ? { title } : {}),
+			// Level 0 or -1: scaling quests, which the game shows without a level.
+			...(level !== undefined && level > 0 ? { level } : {}),
+			...(tag !== undefined ? { tag } : {}),
+			...(zone !== undefined ? { zone } : {}),
+			...(complete ? { complete } : {}),
+			...(failed ? { failed } : {}),
+			...(objectives?.length ? { objectives } : {}),
+		});
+	}
+	return { capturedAt, list };
+}
+
 export type Parsed = { ok: true; character: AddonCharacter } | { ok: false; name: string; error: string };
 
 /** One uploaded character, checked field by field. `now`: the server's clock (ms). */
@@ -382,6 +445,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			recipes: opt(c.recipes, (r) => recipes(r, now)) ?? [],
 			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
 			inventory: opt(c.inventory, (i) => inventory(i, now)),
+			quests: opt(c.quests, (q) => quests(q, now)),
 		};
 		return { ok: true, character };
 	} catch (error) {

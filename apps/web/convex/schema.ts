@@ -62,6 +62,24 @@ export const vItemCount = v.object({
 	quality: v.optional(v.number()),
 });
 
+/**
+ * A quest in a character's log as the Guildie addon read it in game (payload
+ * version 4, addon 0.10.0): the game's title, level, tag ("Dungeon",
+ * "Elite", "Raid"...) and the quest log header it was under (a zone or
+ * dungeon), whether it's complete (or failed), and each objective's text
+ * ("Defias Pillager slain: 3/8") as the game shows it.
+ */
+export const vQuestLogEntry = v.object({
+	id: v.number(),
+	title: v.optional(v.string()),
+	level: v.optional(v.number()),
+	tag: v.optional(v.string()),
+	zone: v.optional(v.string()),
+	complete: v.optional(v.boolean()),
+	failed: v.optional(v.boolean()),
+	objectives: v.optional(v.array(v.object({ text: v.string(), done: v.boolean() }))),
+});
+
 /** A character as a request shows it. */
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
 
@@ -130,6 +148,12 @@ export default defineSchema({
 		avatarUrl: v.optional(v.string()),
 		/** Full-body render on a transparent background ("main-raw"). */
 		renderUrl: v.optional(v.string()),
+		/**
+		 * Quests in progress (ids), from Blizzard's profile: as of the
+		 * character's last logout, like the rest of it; `syncedAt` is when we
+		 * fetched it. Titles and types are in the quests table.
+		 */
+		quests: v.optional(v.object({ syncedAt: v.number(), ids: v.array(v.number()) })),
 		profileSyncedAt: v.optional(v.number()),
 		/** 404 from the profile endpoint: under level 10 or not logged out yet. */
 		profileMissing: v.optional(v.boolean()),
@@ -277,6 +301,8 @@ export default defineSchema({
 				dualWield: v.optional(v.boolean()),
 			}),
 		),
+		/** The quest log (payload 4): shown instead of Blizzard's quest list while newer (convex/profile.ts). */
+		quests: v.optional(v.object({ capturedAt: v.number(), list: v.array(vQuestLogEntry) })),
 	}).index("by_slug", ["flavor", "region", "slug"]),
 
 	/**
@@ -325,6 +351,25 @@ export default defineSchema({
 		.searchIndex("search_name", { searchField: "name" }),
 
 	/**
+	 * Forever's quests that characters have in progress: title, type
+	 * ("Dungeon", "Raid"; most quests have none) and area (a zone, or the
+	 * dungeon) from Blizzard's static data (quests.ts). `level` is the quest's
+	 * level as the game shows it (Blizzard's API has none; learned from addon
+	 * uploads). `partial`: Blizzard's quest endpoint 404'd, so title (and
+	 * type, area) are what the game or Blizzard's in-progress list called it.
+	 */
+	quests: defineTable({
+		questId: v.number(),
+		title: v.string(),
+		type: v.optional(v.string()),
+		area: v.optional(v.string()),
+		level: v.optional(v.number()),
+		minLevel: v.optional(v.number()),
+		partial: v.optional(v.boolean()),
+		syncedAt: v.number(),
+	}).index("by_questId", ["questId"]),
+
+	/**
 	 * Each talent tree's layout, from Blizzard's talent-tree data (talents.ts).
 	 * `specId` is the id characters' talentTrees use.
 	 */
@@ -354,9 +399,9 @@ export default defineSchema({
 
 	/**
 	 * Each character's bags and last bank read, from the Guildie addon (payload
-	 * version 3). Private: never shown to anyone. Only used to tell a player,
-	 * for their own craft requests, whether they have the reagents
-	 * (convex/requests.ts). Item id → count.
+	 * version 3). Private: only its own player sees it (Inventory,
+	 * convex/inventory.ts), and it tells them, for their own craft requests,
+	 * whether they have the reagents (convex/requests.ts). Item id → count.
 	 */
 	inventories: defineTable({
 		userId: v.id("users"),

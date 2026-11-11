@@ -12,7 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AddonRouteImport } from './routes/addon'
 import { Route as DataRouteImport } from './routes/data'
+import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MeRouteImport } from './routes/me'
+import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as AuthRefreshRouteImport } from './routes/auth/refresh'
@@ -39,6 +41,7 @@ import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
 import { Route as GRegionSlugCraftingRouteImport } from './routes/g/$region/$slug/crafting'
+import { Route as GRegionSlugDungeonsRouteImport } from './routes/g/$region/$slug/dungeons'
 import { Route as GRegionSlugGearRouteImport } from './routes/g/$region/$slug/gear'
 import { Route as GRegionSlugRequestsRouteImport } from './routes/g/$region/$slug/requests'
 
@@ -57,9 +60,19 @@ const DataRoute = DataRouteImport.update({
   path: '/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InventoryRoute = InventoryRouteImport.update({
+  id: '/inventory',
+  path: '/inventory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MeRoute = MeRouteImport.update({
   id: '/me',
   path: '/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuestsRoute = QuestsRouteImport.update({
+  id: '/quests',
+  path: '/quests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -192,6 +205,11 @@ const GRegionSlugCraftingRoute = GRegionSlugCraftingRouteImport.update({
   path: '/crafting',
   getParentRoute: () => GRegionSlugRoute,
 } as any)
+const GRegionSlugDungeonsRoute = GRegionSlugDungeonsRouteImport.update({
+  id: '/dungeons',
+  path: '/dungeons',
+  getParentRoute: () => GRegionSlugRoute,
+} as any)
 const GRegionSlugGearRoute = GRegionSlugGearRouteImport.update({
   id: '/gear',
   path: '/gear',
@@ -207,7 +225,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
   '/data': typeof DataRoute
+  '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/auth/refresh': typeof AuthRefreshRoute
@@ -232,6 +252,7 @@ export interface FileRoutesByFullPath {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
@@ -241,7 +262,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
   '/data': typeof DataRoute
+  '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/quests': typeof QuestsRoute
   '/sign-in': typeof SignInRoute
   '/auth/refresh': typeof AuthRefreshRoute
   '/auth/signin': typeof AuthSigninRoute
@@ -263,6 +286,7 @@ export interface FileRoutesByTo {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug': typeof CRegionSlugIndexRoute
@@ -273,7 +297,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
   '/data': typeof DataRoute
+  '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/auth/refresh': typeof AuthRefreshRoute
@@ -298,6 +324,7 @@ export interface FileRoutesById {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
@@ -309,7 +336,9 @@ export interface FileRouteTypes {
     | '/'
     | '/addon'
     | '/data'
+    | '/inventory'
     | '/me'
+    | '/quests'
     | '/settings'
     | '/sign-in'
     | '/auth/refresh'
@@ -334,6 +363,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
@@ -343,7 +373,9 @@ export interface FileRouteTypes {
     | '/'
     | '/addon'
     | '/data'
+    | '/inventory'
     | '/me'
+    | '/quests'
     | '/sign-in'
     | '/auth/refresh'
     | '/auth/signin'
@@ -365,6 +397,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug'
@@ -374,7 +407,9 @@ export interface FileRouteTypes {
     | '/'
     | '/addon'
     | '/data'
+    | '/inventory'
     | '/me'
+    | '/quests'
     | '/settings'
     | '/sign-in'
     | '/auth/refresh'
@@ -399,6 +434,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
@@ -409,7 +445,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AddonRoute: typeof AddonRoute
   DataRoute: typeof DataRoute
+  InventoryRoute: typeof InventoryRoute
   MeRoute: typeof MeRoute
+  QuestsRoute: typeof QuestsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SignInRoute: typeof SignInRoute
   AuthRefreshRoute: typeof AuthRefreshRoute
@@ -450,11 +488,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inventory': {
+      id: '/inventory'
+      path: '/inventory'
+      fullPath: '/inventory'
+      preLoaderRoute: typeof InventoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/me': {
       id: '/me'
       path: '/me'
       fullPath: '/me'
       preLoaderRoute: typeof MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quests': {
+      id: '/quests'
+      path: '/quests'
+      fullPath: '/quests'
+      preLoaderRoute: typeof QuestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -639,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GRegionSlugCraftingRouteImport
       parentRoute: typeof GRegionSlugRoute
     }
+    '/g/$region/$slug/dungeons': {
+      id: '/g/$region/$slug/dungeons'
+      path: '/dungeons'
+      fullPath: '/g/$region/$slug/dungeons'
+      preLoaderRoute: typeof GRegionSlugDungeonsRouteImport
+      parentRoute: typeof GRegionSlugRoute
+    }
     '/g/$region/$slug/gear': {
       id: '/g/$region/$slug/gear'
       path: '/gear'
@@ -706,6 +765,7 @@ const CRegionSlugRouteWithChildren = CRegionSlugRoute._addFileChildren(
 
 interface GRegionSlugRouteChildren {
   GRegionSlugCraftingRoute: typeof GRegionSlugCraftingRoute
+  GRegionSlugDungeonsRoute: typeof GRegionSlugDungeonsRoute
   GRegionSlugGearRoute: typeof GRegionSlugGearRoute
   GRegionSlugRequestsRoute: typeof GRegionSlugRequestsRoute
   GRegionSlugIndexRoute: typeof GRegionSlugIndexRoute
@@ -713,6 +773,7 @@ interface GRegionSlugRouteChildren {
 
 const GRegionSlugRouteChildren: GRegionSlugRouteChildren = {
   GRegionSlugCraftingRoute: GRegionSlugCraftingRoute,
+  GRegionSlugDungeonsRoute: GRegionSlugDungeonsRoute,
   GRegionSlugGearRoute: GRegionSlugGearRoute,
   GRegionSlugRequestsRoute: GRegionSlugRequestsRoute,
   GRegionSlugIndexRoute: GRegionSlugIndexRoute,
@@ -726,7 +787,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddonRoute: AddonRoute,
   DataRoute: DataRoute,
+  InventoryRoute: InventoryRoute,
   MeRoute: MeRoute,
+  QuestsRoute: QuestsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SignInRoute: SignInRoute,
   AuthRefreshRoute: AuthRefreshRoute,

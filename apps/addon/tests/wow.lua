@@ -190,6 +190,60 @@ function wow.reset(state)
             return "icon", item[2], false, 1, false, false, link({ id = item[1], name = "x" })
         end
     end
+    -- The quest log: state.quests = { { header = "Zone", collapsed = bool } or
+    -- { id, title, level, tag, complete (1, -1 or nil), objectives = { { text, done } } }, ... };
+    -- state.questApi "modern" (C_QuestLog), "classic" (GetQuestLogTitle) or nil (none).
+    _G.C_QuestLog = nil
+    _G.GetNumQuestLogEntries = nil
+    _G.GetQuestLogTitle = nil
+    _G.GetQuestTagInfo = nil
+    _G.GetNumQuestLeaderBoards = nil
+    _G.GetQuestLogLeaderBoard = nil
+    local function quest(i) return (state.quests or {})[i] end
+    local function byId(id)
+        for _, q in ipairs(state.quests or {}) do if q.id == id then return q end end
+    end
+    if state.questApi == "modern" then
+        _G.C_QuestLog = {
+            GetNumQuestLogEntries = function() return #(state.quests or {}) end,
+            GetInfo = function(i)
+                local q = quest(i)
+                if not q then return nil end
+                if q.header then return { title = q.header, isHeader = true, isCollapsed = q.collapsed } end
+                return { title = q.title, level = q.level, questID = q.id, isHeader = false }
+            end,
+            IsComplete = function(id) local q = byId(id) return q and q.complete == 1 or false end,
+            IsFailed = function(id) local q = byId(id) return q and q.complete == -1 or false end,
+            GetQuestTagInfo = function(id)
+                local q = byId(id)
+                if q and q.tag then return { tagID = 81, tagName = q.tag } end
+            end,
+            GetQuestObjectives = function(id)
+                local out = {}
+                for _, o in ipairs(byId(id) and byId(id).objectives or {}) do
+                    table.insert(out, { text = o[1], finished = o[2] })
+                end
+                return out
+            end,
+        }
+    elseif state.questApi == "classic" then
+        _G.GetNumQuestLogEntries = function() return #(state.quests or {}), 0 end
+        _G.GetQuestLogTitle = function(i)
+            local q = quest(i)
+            if not q then return nil end
+            if q.header then return q.header, 0, nil, true, q.collapsed end
+            return q.title, q.level, 0, false, false, q.complete, 0, q.id
+        end
+        _G.GetQuestTagInfo = function(id)
+            local q = byId(id)
+            if q and q.tag then return 81, q.tag end
+        end
+        _G.GetNumQuestLeaderBoards = function(i) return #(quest(i).objectives or {}) end
+        _G.GetQuestLogLeaderBoard = function(j, i)
+            local o = quest(i).objectives[j]
+            return o[1], "monster", o[2]
+        end
+    end
     -- No talents API: talents keep their last read (or none).
     _G.C_Traits = nil
     _G.C_ClassTalents = nil

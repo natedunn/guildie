@@ -5,8 +5,10 @@ who's in the guild, their level, class, race, rank, gear, talents,
 professions and recipes, and in game, which guildmates an item would help.
 
 - **The site**, [guildie.club](https://guildie.club): rosters, characters,
-  what the guild can craft, and guild requests (ask for reagents or a craft,
-  a guildmate claims it). Sign in with Battle.net and claim your characters.
+  what the guild can craft, guild requests (ask for reagents or a craft,
+  a guildmate claims it), and who's on which dungeon quest. Your own bags,
+  banks and quest logs in one place. Sign in with Battle.net and claim your
+  characters.
 - **The Windows app** ([download](https://github.com/natedunn/guildie/releases/latest)):
   the site in its own window. It installs and updates the addon, uploads what
   the addon saves, so your character shows up after a `/reload` instead of
@@ -66,8 +68,8 @@ More docs:
 
 - **Rosters**: `apps/web/convex/sync.ts` pulls each guild's roster from
   Blizzard's API every hour (and on "Sync now"), then each member's profile,
-  equipment, professions, talents and avatar, staggered under Blizzard's rate
-  limits. Recipes, items and talent trees sync weekly.
+  equipment, professions, talents, quests in progress and avatar, staggered
+  under Blizzard's rate limits. Recipes, items and talent trees sync weekly.
 - **Sign-in**: Battle.net OpenID Connect with `wow.profile`. Right after,
   a second Battle.net hop (approved without asking) reads the account's
   characters in every region; we store the names and drop the token. That's

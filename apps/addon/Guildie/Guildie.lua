@@ -1,5 +1,6 @@
 -- guildie: saves this character as the game sees it (level, guild, gear with
--- its tooltips, professions, known recipes, talents) so the Guildie desktop
+-- its tooltips, professions, known recipes, talents, bags and bank, the quest
+-- log) so the Guildie desktop
 -- app can upload it to guildie.club. Addons can't use the
 -- internet; the game writes GuildieDB to disk on /reload and on logout, and the
 -- helper watches that file. Source: https://github.com/natedunn/guildie
@@ -11,8 +12,9 @@
 
 local ADDON, ns = ...
 -- The payload's format. 2 added guild, XP, gear, professions and recipes;
--- 3 (0.8.0) bags and the last bank read. The site accepts all three.
-local VERSION = 3
+-- 3 (0.8.0) bags and the last bank read; 4 (0.10.0) the quest log. The site
+-- accepts all four.
+local VERSION = 4
 
 GuildieDB = GuildieDB or {}
 
@@ -171,6 +173,25 @@ local function mergeRecipes(sections, profession, known, now)
 end
 ns.mergeRecipes = mergeRecipes
 
+--- The quest log on top of `previous`: quests under a collapsed header aren't
+--- listed by the game, so the last read's quests under it are kept (as far
+--- as we know they're still in the log). nil when it can't be read now.
+function ns.readQuestLog(previous, now)
+    local ok, list, collapsed = pcall(ns.readQuests)
+    if not ok or not list then return previous end
+    if previous and collapsed and next(collapsed) then
+        local seen = {}
+        for _, q in ipairs(list) do seen[q.id] = true end
+        for _, q in ipairs(previous.list or {}) do
+            if q.zone and collapsed[q.zone] and not seen[q.id] then
+                seen[q.id] = true
+                table.insert(list, q)
+            end
+        end
+    end
+    return { capturedAt = now, list = list }
+end
+
 local function readGuild(previous)
     if IsInGuild and not IsInGuild() then return nil end
     local name, rank, rankIndex = GetGuildInfo("player")
@@ -211,6 +232,7 @@ local function capture(reason, recipes)
         recipes = previous.recipes,
         proficiencies = previous.proficiencies,
         inventory = previous.inventory,
+        quests = previous.quests,
     }
     if okGear and equipment then
         equipment.capturedAt = now
@@ -230,6 +252,7 @@ local function capture(reason, recipes)
         }
     end
     character.inventory = ns.readInventory(character.inventory, now)
+    character.quests = ns.readQuestLog(character.quests, now)
     if recipes and recipes.profession and recipes.known then
         character.recipes = mergeRecipes(character.recipes, recipes.profession, recipes.known, now)
     end
@@ -283,6 +306,16 @@ local function captureInventory()
 end
 ns.captureInventory = captureInventory
 
+--- The quest log changed: update the saved read only (like bags; the
+--- payload catches up at the next full read, at the latest on logout).
+local function captureQuests()
+    local guid = UnitGUID("player")
+    local character = guid and GuildieDB.characters and GuildieDB.characters[guid]
+    if not character then return capture("quests") end
+    character.quests = ns.readQuestLog(character.quests, GetServerTime())
+end
+ns.captureQuests = captureQuests
+
 --- A profession window is open: read its recipes, then save.
 local function captureRecipes(which, reason)
     local ok, profession, known = pcall(ns.readRecipes, which)
@@ -324,6 +357,7 @@ local EVENTS = {
     PLAYERBANKSLOTS_CHANGED = "inventory",
     PLAYERBANKBAGSLOTS_CHANGED = "inventory",
     BANKFRAME_CLOSED = "bankClosed",
+    QUEST_LOG_UPDATE = "quests",
     PLAYER_LOGOUT = "all",
 }
 
@@ -334,6 +368,8 @@ local function run(kind, event)
         capture(event)
     elseif kind == "inventory" then
         captureInventory()
+    elseif kind == "quests" then
+        captureQuests()
     else
         captureRecipes(kind, event)
     end
@@ -348,6 +384,8 @@ frame:SetScript("OnEvent", function(_, event)
     local kind = EVENTS[event]
     -- The bank answers only while it's open: track that right away.
     if event == "BANKFRAME_OPENED" then ns.bankOpen = true end
+    -- At login the quest log is empty until the game has loaded it.
+    if event == "QUEST_LOG_UPDATE" then ns.questLogReady = true end
     if kind == "bankClosed" then
         ns.bankOpen = false
         return

@@ -122,7 +122,7 @@ const baseName = (item: { name: string; suffixId?: number }) =>
 
 /**
  * Called by the /api/helper/snapshot route with the helper's token and the
- * addon's characters (payload version 1 or 2). Each character is checked
+ * addon's characters (payload versions 1 to 4). Each character is checked
  * (addonPayload.ts) and kept only if the token's owner claimed it. Each part
  * of the stored snapshot keeps whichever copy is newer, so an older upload
  * (another computer, say) never replaces newer data.
@@ -222,6 +222,7 @@ export const ingest = mutation({
 			};
 			const professions = newer(incomingProfessions, existing?.professions);
 			const proficiencies = newer(c.proficiencies, existing?.proficiencies);
+			const quests = newer(c.quests, existing?.quests);
 
 			// Known recipes, per profession: the newer read, matched to the catalog
 			// (an unchanged read keeps its earlier match).
@@ -255,6 +256,7 @@ export const ingest = mutation({
 				professions,
 				recipes: keptRecipes.length ? keptRecipes : undefined,
 				proficiencies,
+				quests,
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
@@ -276,6 +278,24 @@ export const ingest = mutation({
 						name: baseName(i),
 						quality: i.quality,
 						tooltip: i.tooltip,
+					})),
+				});
+			}
+			// Titles, types and areas for quests the catalog doesn't have yet,
+			// with what the game showed as the fallback.
+			const questsChanged =
+				quests === c.quests &&
+				c.quests &&
+				c.quests.list.map((q) => q.id).join() !== (existing?.quests?.list ?? []).map((q) => q.id).join();
+			if (questsChanged && c.quests?.list.length) {
+				await ctx.scheduler.runAfter(0, internal.quests.ensure, {
+					questIds: c.quests.list.map((q) => q.id),
+					hints: c.quests.list.map((q) => ({
+						questId: q.id,
+						title: q.title,
+						type: q.tag,
+						area: q.zone,
+						level: q.level,
 					})),
 				});
 			}

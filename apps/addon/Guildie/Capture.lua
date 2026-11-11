@@ -1,6 +1,6 @@
 -- Reads what Guildie uploads besides talents: gear (with each item's tooltip
 -- as the game shows it), professions, weapon and armor skills, and known
--- recipes. Each reader returns
+-- recipes, bags and bank, and the quest log. Each reader returns
 -- nil when the game can't answer right now, so Guildie.lua keeps the last good
 -- read (and its time) instead of uploading a hole.
 --
@@ -385,4 +385,120 @@ function ns.readBank()
     local bags = { bank }
     for i = 1, NUM_BANKBAGSLOTS or 6 do table.insert(bags, lastBag() + i) end
     return readContainers(bags)
+end
+
+-- ---- Quests --------------------------------------------------------------------
+-- The quest log: each quest's id, title, level, tag (Dungeon, Elite, Raid...),
+-- the header it's under (a zone or a dungeon), whether it's complete (or
+-- failed), and its objectives as the game words them. Quests are public on
+-- Blizzard's profiles too; guildies see who's on which (for grouping), and
+-- only you see your progress. Collapsed headers hide their quests from the
+-- API, so the reader also says which headers were collapsed and Guildie.lua
+-- keeps the last read's quests under them.
+
+local MAX_QUESTS = 60
+local MAX_OBJECTIVES = 12
+
+--- Plain text the site accepts: no markup, no pipes or control characters, at most `max` long.
+local function plainText(text, max)
+    local s = clean(text)
+    if not s then return nil end
+    s = s:gsub("|", ""):gsub("%c", " ")
+    if #s > max then s = s:sub(1, max) end
+    if s == "" then return nil end
+    return s
+end
+
+--- "Dungeon", "Raid", "Elite"... or nil for an ordinary quest.
+local function questTag(questID)
+    if C_QuestLog and C_QuestLog.GetQuestTagInfo then
+        local ok, info = pcall(C_QuestLog.GetQuestTagInfo, questID)
+        if ok and type(info) == "table" then return plainText(info.tagName, 32) end
+    end
+    if GetQuestTagInfo then
+        local ok, _, name = pcall(GetQuestTagInfo, questID)
+        if ok then return plainText(name, 32) end
+    end
+end
+
+local function questObjectives(questID, logIndex)
+    local list = {}
+    local function add(text, done)
+        text = plainText(text, 200)
+        if text and #list < MAX_OBJECTIVES then table.insert(list, { text = text, done = done and true or false }) end
+    end
+    if C_QuestLog and C_QuestLog.GetQuestObjectives then
+        local ok, objectives = pcall(C_QuestLog.GetQuestObjectives, questID)
+        if ok and type(objectives) == "table" then
+            for _, o in ipairs(objectives) do add(o.text, o.finished) end
+            return list
+        end
+    end
+    if GetNumQuestLeaderBoards and GetQuestLogLeaderBoard then
+        for i = 1, GetNumQuestLeaderBoards(logIndex) or 0 do
+            local text, _, finished = GetQuestLogLeaderBoard(i, logIndex)
+            add(text, finished)
+        end
+    end
+    return list
+end
+
+--- The quest log's entries through the modern API (C_QuestLog) or the
+--- classic one (GetQuestLogTitle), whichever the client has; nil without either.
+local function questLogApi()
+    if C_QuestLog and C_QuestLog.GetInfo and C_QuestLog.GetNumQuestLogEntries then
+        return C_QuestLog.GetNumQuestLogEntries(), function(i)
+            local info = C_QuestLog.GetInfo(i)
+            if not info then return nil end
+            local id = info.questID
+            local complete = info.isComplete
+            if id and C_QuestLog.IsComplete then complete = C_QuestLog.IsComplete(id) end
+            local failed = id and C_QuestLog.IsFailed and C_QuestLog.IsFailed(id)
+            return {
+                title = info.title, level = info.level, header = info.isHeader, collapsed = info.isCollapsed,
+                id = id, hidden = info.isHidden,
+                complete = complete == true or complete == 1, failed = failed == true or complete == -1,
+            }
+        end
+    end
+    if GetQuestLogTitle and GetNumQuestLogEntries then
+        return GetNumQuestLogEntries(), function(i)
+            local title, level, _, isHeader, isCollapsed, isComplete, _, questID = GetQuestLogTitle(i)
+            if not title then return nil end
+            return {
+                title = title, level = level, header = isHeader, collapsed = isCollapsed, id = questID,
+                complete = isComplete == 1 or isComplete == true, failed = isComplete == -1,
+            }
+        end
+    end
+end
+
+--- The quest log: { { id, title, level, tag, zone, complete, failed, objectives }, ... }
+--- and the set of collapsed headers, or nil when the game can't say (no quest
+--- log API, or an empty log before the game has loaded it at login).
+function ns.readQuests()
+    local n, entry = questLogApi()
+    if not entry or type(n) ~= "number" then return nil end
+    if n == 0 and not ns.questLogReady then return nil end
+    local list, collapsed, header = {}, {}, nil
+    for i = 1, n do
+        local e = entry(i)
+        if e and e.header then
+            header = plainText(e.title, 64)
+            if header and e.collapsed then collapsed[header] = true end
+        elseif e and type(e.id) == "number" and e.id > 0 and not e.hidden and #list < MAX_QUESTS then
+            local objectives = questObjectives(e.id, i)
+            table.insert(list, {
+                id = e.id,
+                title = plainText(e.title, 120),
+                level = type(e.level) == "number" and e.level > 0 and e.level or nil,
+                tag = questTag(e.id),
+                zone = header,
+                complete = e.complete or nil,
+                failed = e.failed or nil,
+                objectives = #objectives > 0 and objectives or nil,
+            })
+        end
+    end
+    return list, collapsed
 end

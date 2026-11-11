@@ -295,3 +295,62 @@ test("recipes match by crafted item, then name; the Blizzard-known duplicate win
 	assert.deepEqual(matchRecipes(known, catalog), { recipeIds: [1, 2, 3, 4], unmatched: 1 });
 	assert.deepEqual(matchRecipes(known, catalog, new Set([5])).recipeIds, [1, 2, 3, 5]);
 });
+
+test("the quest log (payload 4, addon 0.10.0)", () => {
+	const r = parseCharacter(
+		{
+			...v2,
+			quests: {
+				capturedAt: T,
+				list: [
+					{
+						id: 166,
+						title: "The Defias Brotherhood",
+						level: 22,
+						tag: "Dungeon",
+						zone: "The Deadmines",
+						complete: false,
+						objectives: [{ text: "Edwin VanCleef's head: 0/1", done: false }],
+					},
+					{ id: 214, title: "Red Silk Bandanas", level: 17, complete: true, objectives: [] },
+					{ id: 214, title: "twice" },
+					{ id: 9, level: -1, failed: true },
+				],
+			},
+		},
+		NOW,
+	);
+	assert.ok(r.ok, !r.ok ? r.error : "");
+	assert.deepEqual(r.character.quests, {
+		capturedAt: T * 1000,
+		list: [
+			{
+				id: 166,
+				title: "The Defias Brotherhood",
+				level: 22,
+				tag: "Dungeon",
+				zone: "The Deadmines",
+				objectives: [{ text: "Edwin VanCleef's head: 0/1", done: false }],
+			},
+			{ id: 214, title: "Red Silk Bandanas", level: 17, complete: true },
+			{ id: 9, failed: true },
+		],
+	});
+	const older = parseCharacter(v2, NOW);
+	assert.ok(older.ok);
+	assert.equal(older.character.quests, undefined, "older addons don't send it");
+	const empty = parseCharacter({ ...v2, quests: { capturedAt: T, list: [] } }, NOW);
+	assert.ok(empty.ok);
+	assert.deepEqual(empty.character.quests?.list, [], "an empty quest log is a real answer");
+	const colored = parseCharacter(
+		{ ...v2, quests: { capturedAt: T, list: [{ id: 1, title: "|cffff0000Red|r" }] } },
+		NOW,
+	);
+	assert.ok(!colored.ok);
+	assert.match(colored.error, /quests.list\[0\].title/);
+	const tooMany = parseCharacter(
+		{ ...v2, quests: { capturedAt: T, list: Array.from({ length: 61 }, (_, i) => ({ id: i + 1 })) } },
+		NOW,
+	);
+	assert.ok(!tooMany.ok);
+});

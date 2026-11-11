@@ -80,7 +80,7 @@ test("captures level, XP, guild, gear and professions on login", function()
     wow.load(state)
     wow.fire("PLAYER_ENTERING_WORLD")
     local p = payload(state.db)
-    eq(p.version, 3, "version")
+    eq(p.version, 4, "version")
     eq(#p.characters, 1, "characters")
     local c = p.characters[1]
     eq(c.guid, "Player-4904-004E2B22")
@@ -506,6 +506,101 @@ if out then
     file:close()
     print("wrote " .. out)
 end
+
+-- ---- Quests ----------------------------------------------------------------------
+
+local function withQuests(api)
+    return lich({
+        questApi = api,
+        quests = {
+            { header = "The Deadmines" },
+            {
+                id = 166, title = "The Defias Brotherhood", level = 22, tag = "Dungeon",
+                objectives = { { "Edwin VanCleef's head: 0/1", false } },
+            },
+            { id = 214, title = "|cffffff00Red Silk Bandanas|r", level = 17, tag = "Dungeon", complete = 1 },
+            { header = "Westfall" },
+            { id = 12, title = "The People's Militia", level = 14, objectives = { { "Defias Trapper slain: 15/15", true }, { "Defias Smuggler slain: 3/15", false } } },
+            { id = 99, title = "Failed escort", level = 0, complete = -1 },
+        },
+    })
+end
+
+local function byId(list)
+    local out = {}
+    for _, q in ipairs(list or {}) do out[q.id] = q end
+    return out
+end
+
+for _, api in ipairs({ "modern", "classic" }) do
+    test("quests (" .. api .. " API): titles, levels, tags, zones, complete, objectives", function()
+        local state = withQuests(api)
+        wow.load(state)
+        wow.fire("QUEST_LOG_UPDATE")
+        wow.fire("PLAYER_ENTERING_WORLD")
+        local c = payload(state.db).characters[1]
+        eq(c.quests.capturedAt, state.time)
+        eq(#c.quests.list, 4, "headers aren't quests")
+        local q = byId(c.quests.list)
+        eq(q[166].title, "The Defias Brotherhood")
+        eq(q[166].tag, "Dungeon")
+        eq(q[166].zone, "The Deadmines")
+        eq(q[166].level, 22)
+        eq(q[166].complete, nil)
+        eq(q[166].objectives[1].text, "Edwin VanCleef's head: 0/1")
+        eq(q[166].objectives[1].done, false)
+        eq(q[214].title, "Red Silk Bandanas", "color codes stripped")
+        eq(q[214].complete, true)
+        eq(q[12].zone, "Westfall")
+        eq(q[12].tag, nil)
+        eq(q[12].objectives[1].done, true)
+        eq(#q[12].objectives, 2)
+        eq(q[99].level, nil, "no level for scaling quests")
+        eq(q[99].failed, true)
+    end)
+end
+
+test("quests: an empty log at login isn't read until the game loads it", function()
+    local state = lich({ questApi = "modern", quests = {} })
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(payload(state.db).characters[1].quests, nil, "not loaded yet")
+    wow.fire("QUEST_LOG_UPDATE")
+    wow.fire("PLAYER_LOGOUT")
+    eq(#payload(state.db).characters[1].quests.list, 0, "an empty log, once loaded, is a real answer")
+end)
+
+test("quests: no quest log API means no quests, not an empty log", function()
+    local state = lich({})
+    wow.load(state)
+    wow.fire("QUEST_LOG_UPDATE")
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(payload(state.db).characters[1].quests, nil)
+end)
+
+test("quests: changes update the save; a collapsed header keeps its quests; logout writes the payload", function()
+    local state = withQuests("classic")
+    local ns = wow.load(state)
+    wow.fire("QUEST_LOG_UPDATE")
+    wow.fire("PLAYER_ENTERING_WORLD")
+    -- Turn in the bandanas, collapse Westfall (its quests disappear from the API).
+    state.time = state.time + 60
+    state.quests = {
+        { header = "The Deadmines" },
+        { id = 166, title = "The Defias Brotherhood", level = 22, tag = "Dungeon" },
+        { header = "Westfall", collapsed = true },
+    }
+    wow.fire("QUEST_LOG_UPDATE")
+    local saved = byId(state.db.characters[state.guid].quests.list)
+    eq(saved[214], nil, "turned in")
+    eq(saved[12] ~= nil, true, "under a collapsed header: kept")
+    eq(saved[99] ~= nil, true, "under a collapsed header: kept")
+    eq(state.db.characters[state.guid].quests.capturedAt, state.time)
+    eq(byId(payload(state.db).characters[1].quests.list)[214] ~= nil, true, "payload not re-encoded on every change")
+    eq(ns.dirty, false, "quests aren't a change to upload")
+    wow.fire("PLAYER_LOGOUT")
+    eq(byId(payload(state.db).characters[1].quests.list)[214], nil, "logout writes it")
+end)
 
 print(string.format("%d passed, %d failed", passed, failures))
 os.exit(failures == 0 and 0 or 1)

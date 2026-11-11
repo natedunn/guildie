@@ -13,7 +13,7 @@ import { FLAVORS, type Region } from "./shared/wow";
 
 // Roster sync (hourly cron + on demand) and per-character profile sync.
 // Blizzard allows 100 requests/s and 36,000/hour per client; a character
-// costs 5 requests, so profile syncs are staggered.
+// costs 6 requests, so profile syncs are staggered.
 
 const PROFILE_STAGGER_MS = 150;
 /** Re-fetch a character's profile at most this often. */
@@ -206,6 +206,7 @@ type ProfessionEntry = {
 };
 type Professions = { primaries?: ProfessionEntry[]; secondaries?: ProfessionEntry[] };
 type Media = { assets?: { key: string; value: string }[] };
+type Quests = { in_progress?: { id: number; name?: string }[] };
 type Specializations = {
 	specialization_groups?: {
 		is_active?: boolean;
@@ -279,13 +280,16 @@ export const syncCharacter = internalAction({
 			await ctx.runMutation(internal.sync.applyProfile, { characterId, missing: true });
 			return;
 		}
-		const [equipment, professions, specializations, media] = await Promise.all([
+		const [equipment, professions, specializations, media, quests] = await Promise.all([
 			blizzardGet<Equipment>({ ...common, path: `${base}/equipment` }),
 			blizzardGet<Professions>({ ...common, path: `${base}/professions` }),
 			blizzardGet<Specializations>({ ...common, path: `${base}/specializations` }),
 			// Media can 404 for a day after a character first appears.
 			blizzardGet<Media>({ ...common, path: `${base}/character-media` }),
+			// Quests in progress (ids and names); `completed` is a separate list we don't need.
+			blizzardGet<Quests>({ ...common, path: `${base}/quests` }),
 		]);
+		const inProgress = quests.ok ? (quests.data.in_progress ?? []) : undefined;
 		await ctx.runMutation(internal.sync.applyProfile, {
 			characterId,
 			missing: false,
@@ -306,7 +310,15 @@ export const syncCharacter = internalAction({
 			talentTrees: specializations.ok ? mapTalentTrees(specializations.data) : undefined,
 			avatarUrl: media.ok ? media.data.assets?.find((a) => a.key === "avatar")?.value : undefined,
 			renderUrl: media.ok ? media.data.assets?.find((a) => a.key === "main-raw")?.value : undefined,
+			questIds: inProgress?.map((q) => q.id),
 		});
+		// Titles, types and areas for quests the catalog doesn't have yet.
+		if (inProgress?.length && inProgress.map((q) => q.id).join() !== character.quests?.ids.join()) {
+			await ctx.scheduler.runAfter(0, internal.quests.ensure, {
+				questIds: inProgress.map((q) => q.id),
+				hints: inProgress.map((q) => ({ questId: q.id, title: q.name })),
+			});
+		}
 		// Icons and names for gear we haven't seen yet.
 		if (equipment.ok) {
 			const worn = equipment.data.equipped_items ?? [];
@@ -348,8 +360,9 @@ export const applyProfile = internalMutation({
 		talentTrees: v.optional(v.array(vTalentTree)),
 		avatarUrl: v.optional(v.string()),
 		renderUrl: v.optional(v.string()),
+		questIds: v.optional(v.array(v.number())),
 	},
-	handler: async (ctx, { characterId, missing, ...data }) => {
+	handler: async (ctx, { characterId, missing, questIds, ...data }) => {
 		const character = await ctx.db.get(characterId);
 		if (!character) return;
 		const now = Date.now();
@@ -362,6 +375,7 @@ export const applyProfile = internalMutation({
 		for (const [key, value] of Object.entries(data)) {
 			if (value !== undefined) (patch as Record<string, unknown>)[key] = value;
 		}
+		if (questIds) patch.quests = { syncedAt: now, ids: questIds };
 		await ctx.db.patch(characterId, patch);
 		if (data.talentTrees) await learnTreeInfo(ctx, data.talentTrees);
 	},

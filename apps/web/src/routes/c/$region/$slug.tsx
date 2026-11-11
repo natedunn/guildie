@@ -1,7 +1,4 @@
-import { api } from "@convex/_generated/api";
 import { className, raceName } from "@convex/shared/wow";
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import { CharacterAvatar, UNFETCHED_NOTE } from "@/components/character-avatar";
 import { characterQuery, sourceNote, useCharacter } from "@/components/character-data";
@@ -33,8 +30,6 @@ export const Route = createFileRoute("/c/$region/$slug")({
 
 function CharacterLayout() {
 	const params = Route.useParams();
-	const { data: viewer } = useQuery(convexQuery(api.users.viewer, {}));
-	const isMine = !!viewer?.characters.some((c) => c.region === params.region && c.slug === params.slug);
 	const data = useCharacter();
 	if (!data) return null;
 	const { character: c, guild } = data;
@@ -97,12 +92,6 @@ function CharacterLayout() {
 						<PageTab to="/c/$region/$slug/professions" params={params}>
 							Professions
 						</PageTab>
-						{/* Bags and bank: only the character's own player sees this (inventory:mine). */}
-						{isMine && (
-							<PageTab to="/c/$region/$slug/inventory" params={params}>
-								Inventory
-							</PageTab>
-						)}
 					</PageTabs>
 
 					<div className="pt-5">

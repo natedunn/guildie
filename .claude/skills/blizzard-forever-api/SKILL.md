@@ -39,7 +39,9 @@ if (!res.ok) {
 - Keys: `AUTH_BATTLENET_CLIENT_ID` / `_SECRET` on the Convex deployment, never
   in the repo (docs/blizzard-setup.md). Local work doesn't need them (sample
   data). `npx convex run dev:probe '{"guild": "Name", "region": "us"}'`
-  checks keys and shows which fields come back.
+  checks keys and shows which fields come back;
+  `npx convex run dev:get '{"path": "/data/wow/quest/166", "namespace": "static"}'`
+  prints one raw response.
 
 ## Names and slugs
 
@@ -57,6 +59,8 @@ if (!res.ok) {
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Guild + roster                                                          | `/data/wow/guild/{slug}`, `/roster` (profile)                                                                   | Rank numbers only (0 = guild master), no rank names. Members under 10 are listed                                                                                         |
 | Character profile                                                       | `/profile/wow/character/{slug}` + `/equipment`, `/professions`, `/specializations`, `/character-media`          | **Only from level 10, and only after the character logs out** at 10+. Until then 404 (`UNFETCHED_NOTE`). Updated on logout, so it lags play                              |
+| Quests in progress                                                      | `/profile/wow/character/{slug}/quests` → `in_progress: [{ id, name }]`, `completed` (a link)                    | With the profile sync; as of the last logout like the rest. No progress or complete state (the addon has those)                                                          |
+| A quest                                                                 | `/data/wow/quest/{id}` (static)                                                                                 | `title`, `area` (zone, or the dungeon), `type` only for some (`Dungeon`, id 81), `requirements` mostly empty, no quest level (`quests.ts`)                               |
 | Character renders                                                       | `/character-media` assets: `avatar`, `main-raw`                                                                 | Can 404 for a day after a character first appears                                                                                                                        |
 | Items                                                                   | `/data/wow/item/{id}`, `/data/wow/media/item/{id}` (static)                                                     | The item endpoint **404s for many Forever items whose media works**: fall back to what we already know (`items.ts` hints: name, quality, tooltip from the equipped item) |
 | Item tooltips                                                           | `preview_item` display strings → `tooltipLines()` (`items.ts`)                                                  | English; `shared/itemInfo.ts` reads them back                                                                                                                            |

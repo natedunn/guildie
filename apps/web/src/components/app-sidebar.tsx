@@ -3,11 +3,14 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import {
 	AnvilIcon,
+	Backpack01Icon,
 	Cancel01Icon,
+	Castle01Icon,
 	InboxIcon,
 	KnightShieldIcon,
 	Login03Icon,
 	Menu01Icon,
+	ScrollTextIcon,
 	Settings02Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
@@ -68,6 +71,9 @@ function SidebarNav() {
 	const current = useCurrentGuild();
 	const guilds: { name: string; region: string; slug: string }[] = [...(viewer?.guilds ?? [])];
 	if (current && !guilds.some((g) => g.region === current.region && g.slug === current.slug)) guilds.push(current);
+	// Dungeons (who's on which dungeon quest) is for the guild's members.
+	const isMember = (g: { region: string; slug: string }) =>
+		!!viewer?.guilds.some((m) => m.region === g.region && m.slug === g.slug);
 	const characters = [...(viewer?.characters ?? [])].sort(
 		(a, b) => (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name),
 	);
@@ -105,6 +111,16 @@ function SidebarNav() {
 											<HugeiconsIcon icon={KnightShieldIcon} size={15} strokeWidth={1.75} />
 											Gear
 										</NavLink>
+										{isMember(g) && (
+											<NavLink
+												to="/g/$region/$slug/dungeons"
+												params={{ region: g.region, slug: g.slug }}
+												className="pl-3"
+											>
+												<HugeiconsIcon icon={Castle01Icon} size={15} strokeWidth={1.75} />
+												Dungeons
+											</NavLink>
+										)}
 										{requestsIn(g) && (
 											<NavLink
 												to="/g/$region/$slug/requests"
@@ -124,6 +140,19 @@ function SidebarNav() {
 								</div>
 							))}
 						</div>
+					</NavSection>
+				)}
+
+				{viewer && (
+					<NavSection title="Personal">
+						<NavLink to="/inventory">
+							<HugeiconsIcon icon={Backpack01Icon} size={15} strokeWidth={1.75} />
+							Inventory
+						</NavLink>
+						<NavLink to="/quests">
+							<HugeiconsIcon icon={ScrollTextIcon} size={15} strokeWidth={1.75} />
+							Quests
+						</NavLink>
 					</NavSection>
 				)}
 

@@ -215,6 +215,23 @@ html[data-desktop="true"] {
 	--class: #ff8000;
 }
 
+/* A quest's level as the game's quest log colors it (shared/quests.ts questDifficulty). */
+.qd-impossible {
+	color: #ff1a1a;
+}
+.qd-hard {
+	color: #ff8040;
+}
+.qd-normal {
+	color: #ffff00;
+}
+.qd-easy {
+	color: #40bf40;
+}
+.qd-trivial {
+	color: #808080;
+}
+
 /* Components, so Tailwind utilities on the same elements win. */
 @layer components {
 	/* ---- App shell: sidebar + one pane that scrolls by itself ---- */

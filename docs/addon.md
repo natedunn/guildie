@@ -58,6 +58,8 @@ game ── addon saves GuildieDB ──▶ SavedVariables/Guildie.lua (on /relo
 | Tokens, ingest                                                                       | `apps/web/convex/helper.ts`                                                                                                |
 | Payload checks, recipe matching                                                      | `apps/web/convex/addonPayload.ts`                                                                                          |
 | Guild requests (rules, handlers; the private inventory behind the mats check)        | `apps/web/convex/shared/requests.ts`, `apps/web/convex/requests.ts`; "Guild requests" below                                |
+| Personal → Inventory (your bags and banks, owner only)                               | `apps/web/convex/inventory.ts`, `apps/web/src/routes/inventory.tsx`                                                        |
+| Quests: catalog, Personal → Quests, a guild's Dungeons page                          | `apps/web/convex/quests.ts`, `apps/web/convex/shared/quests.ts`; "Quests" below                                            |
 | Newest-wins merge with Blizzard's data                                               | `apps/web/convex/profile.ts` (`pickProfile` in helper.ts)                                                                  |
 | What Guildie shows for your own characters, for the addon's "On Guildie" check       | `apps/web/convex/addonView.ts` (in `guildData`), `apps/addon/Guildie/Status.lua`                                           |
 | Addon tests (stubbed WoW API, luajit)                                                | `apps/addon/tests`                                                                                                         |
@@ -89,8 +91,8 @@ used); the account page lists them with Disconnect.
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
-  `{ "version": 3, "characters": [ ... ] }` (versions 1, talents and level
-  only, and 2, without `inventory`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
+  `{ "version": 4, "characters": [ ... ] }` (versions 1, talents and level
+  only, 2, without `inventory`, and 3, without `quests`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
   One upload per 5 s per token, at most 50 characters. A character, version 2:
 
   ```jsonc
@@ -116,6 +118,12 @@ used); the account page lists them with Disconnect.
     "inventory": {                            // version 3 (addon 0.8.0)
       "bags": { "capturedAt": 1794336950, "items": [ { "id": 2589, "count": 25 } ] },
       "bank": { "capturedAt": 1794250000, "items": [ { "id": 2589, "count": 40 } ] }
+    },
+    "quests": {                               // version 4 (addon 0.10.0)
+      "capturedAt": 1794336950,
+      "list": [ { "id": 166, "title": "The Defias Brotherhood", "level": 22, "tag": "Dungeon",
+                  "zone": "The Deadmines", "objectives": [ { "text": "Edwin VanCleef's head: 0/1", "done": false } ] },
+                { "id": 214, "title": "Red Silk Bandanas", "level": 17, "complete": true } ]
     }
   }
   ```
@@ -128,7 +136,11 @@ used); the account page lists them with Disconnect.
   site checks them against its rules (docs/game-data.md). `inventory`
   (addon 0.8.0+): bags (backpack and bag slots) and the bank as of the last
   time it was open in game, item id → count (at most 600 items each); see
-  "Guild requests". Tooltip lines
+  "Guild requests". `quests` (addon 0.10.0+): the quest log, at most 60
+  quests and 12 objectives each: the game's title, level (none for scaling
+  quests), tag (`Dungeon`, `Elite`, `Raid`...), the header it's under
+  (`zone`), `complete`/`failed`, and each objective's text; see "Quests".
+  Tooltip lines
   exclude the name; `color` is omitted for white. Talent `id` is the TraitDefinition ID.
   Each character is checked on its own (types, counts, lengths, clocks no
   more than 10 minutes ahead: `convex/addonPayload.ts`); one that fails is
@@ -148,6 +160,9 @@ What the site does with it (`helper:ingest`):
   item, then by name; unmatched names are counted (`unmatched`), not kept.
 - New gear gets icons through `items.ensure`, with the game's tooltip as the
   fallback when Blizzard's item API has none.
+- The quest log is stored on the snapshot (newer wins); quests the catalog
+  doesn't have yet are looked up (`quests.ensure`), with the game's title,
+  tag and header as the fallback when Blizzard has none.
 - Bags and bank go to their own table (`inventories`, newer read wins per
   part), never into `addonSnapshots`, and re-check the player's open craft
   requests.
@@ -288,6 +303,8 @@ session, so its time is `lastLoginAt`:
 - Known recipes, per profession: the addon's read while newer, added to
   Blizzard's list (recipes are only lost with the profession). A profession
   no longer known shows none.
+- Quests in progress: the addon's quest log while newer than `lastLoginAt`,
+  else Blizzard's list (ids only).
 - Talents: the addon's while newer than the last time Blizzard's talents
   changed (`talentsChangedAt`, set by the hourly sync); an empty list from the
   addon doesn't replace Blizzard's points.
@@ -336,6 +353,36 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   window's "Your requests: 2 open (1 stale)". Enchants (no item) aren't on
   tooltips.
 
+## Quests
+
+Personal → Quests (`/quests`) lists your characters' quests in progress, by
+character or by zone; each with its area, type (Blizzard's `Dungeon`/`Raid`,
+else the game's tag), level (in the quest log's colors for that character),
+complete or failed and objectives (from the addon), a Wowhead link, and
+"Also on it": guildmates in any of your guilds with the same quest. A
+guild's Dungeons page (`/g/<region>/<guild>/dungeons`) groups the members'
+dungeon and raid quests by dungeon, so people can see who to group with.
+
+- **Data:** each character's `in_progress` list from Blizzard
+  (`/profile/wow/character/{slug}/quests`, with the hourly profile sync;
+  as of the character's last logout) on `characters.quests`; the addon's
+  quest log (payload 4) on the snapshot; newest wins (`profile.ts`). The
+  `quests` table is the catalog: title, type and area from
+  `/data/wow/quest/{id}` (static; most quests have no type, dungeon quests
+  have `Dungeon` and the dungeon as area), the level from the game. Filled
+  by `quests.ensure` when new ids turn up, and daily (`backfill quest
+  titles`). A quest Blizzard 404s gets the game's (or Blizzard's
+  in-progress) title and is retried weekly.
+- **Who sees what:** which quests a character has in progress is public on
+  Blizzard's profiles; Guildie shows it only to the guild's signed-in
+  members ("Also on it", Dungeons). Objectives and progress only to the
+  character's own player. `/quests` and `/inventory` need sign-in.
+- **In game:** `GetQuestLogTitle` (or `C_QuestLog.GetInfo`), with
+  `GetQuestTagInfo`, the leader boards (or `C_QuestLog.GetQuestObjectives`),
+  on `QUEST_LOG_UPDATE`. A collapsed header hides its quests, so they keep
+  their last read. Like bags, changes update the saved read; the payload
+  catches up at the next full read (at the latest, `/reload` or logout).
+
 ## Verified in game
 
 - Talent reading (names and ranks) in WoW: Forever.
@@ -367,6 +414,12 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   `BAG_UPDATE_DELAYED`, `BANKFRAME_OPENED`/`_CLOSED`,
   `PLAYERBANKSLOTS_CHANGED`, `PLAYERBANKBAGSLOTS_CHANGED`. The request line on
   tooltips and the window's "Your requests" row.
+
+- The 0.10.0 quest log read in Forever: which of `GetQuestLogTitle` /
+  `C_QuestLog.GetInfo` the client has and their fields (`questID`,
+  `isComplete` as 1/-1), `GetQuestTagInfo`'s tag names, the objective text,
+  quest log headers (zone or dungeon names), and that the log is loaded by
+  the first `QUEST_LOG_UPDATE` after login.
 
 - The desktop app on Windows (built from macOS and smoke-tested there; see
   apps/desktop/README.md).

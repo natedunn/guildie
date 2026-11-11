@@ -19,8 +19,8 @@ on guildie.club and inside the Windows app, so every page must work in both.
   solid.
 - **Color:** neutral greys only (surfaces, hairline borders at ~8% white).
   Color that means something comes from the game: class colors
-  (`ClassText`), item quality (`.q-*`, `QUALITY_COLORS`) and in-game tooltip
-  colors. No gradients, glows, emoji, textures, decorative badges, or new
+  (`ClassText`), item quality (`.q-*`, `QUALITY_COLORS`), quest level
+  difficulty (`.qd-*`, the quest log's colors) and in-game tooltip colors. No gradients, glows, emoji, textures, decorative badges, or new
   accent colors.
 - **Type:** one sans family (Inter on the web, Segoe in the app), 13-14px UI
   text (`text-sm`, `text-[0.8125rem]`), `.num` for numbers that line up.

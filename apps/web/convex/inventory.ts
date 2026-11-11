@@ -1,57 +1,98 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { query } from "./_generated/server";
 import { itemRow } from "./guilds";
-import { vRegion } from "./schema";
+import { QUALITY_ORDER } from "./shared/wow";
 
-// A character's bags and bank, as the addon last read them in game (bags at
-// the last /reload or logout, the bank as of the last time it was open). Only
-// for the player who claimed the character: anyone else gets null, and
-// nothing about it is in any other query (requests only use it for the
-// owner's own "has the mats" check).
+// Personal → Inventory: the bags and banks of all the viewer's claimed
+// characters, as the addon last read them in game (bags at the last /reload
+// or logout, the bank as of the last time it was open). Only for the player
+// who claimed them: nothing about them is in any other query (requests only
+// use them for the owner's own "has the mats" check).
 
-const QUALITY_ORDER = ["LEGENDARY", "EPIC", "RARE", "UNCOMMON", "COMMON", "POOR"];
+type Part = "bags" | "bank";
 
-export const mine = query({
-	args: { region: vRegion, slug: v.string() },
-	handler: async (ctx, { region, slug }) => {
+export const all = query({
+	args: {},
+	handler: async (ctx) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 		if (!userId) return null;
-		const claim = await ctx.db
+		const owned = await ctx.db
 			.query("ownedCharacters")
-			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
-		if (!claim.some((c) => c.userId === userId)) return null;
-		const row = await ctx.db
-			.query("inventories")
-			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
-			.unique();
-		// An inventory uploaded under someone else's claim stays theirs.
-		if (row && row.userId !== userId) return { bags: null, bank: null };
-		const items = new Map<number, Doc<"items"> | null>();
-		const list = async (part: Doc<"inventories">["bags"]) => {
-			if (!part) return null;
-			const out = [];
-			for (const { id, count } of part.items) {
-				if (!items.has(id)) items.set(id, await itemRow(ctx, id));
-				const item = items.get(id);
-				out.push({
-					itemId: id,
-					count,
-					name: item?.name,
-					quality: item?.quality ?? "COMMON",
-					icon: item?.icon,
-					kind: item?.kind,
-				});
+		const characters = [];
+		const items = new Map<
+			number,
+			{
+				itemId: number;
+				name?: string;
+				quality: string;
+				icon?: string;
+				kind?: string;
+				total: number;
+				where: { key: string; part: Part; count: number }[];
 			}
-			out.sort(
-				(a, b) =>
-					QUALITY_ORDER.indexOf(a.quality) - QUALITY_ORDER.indexOf(b.quality) ||
-					(a.name ?? "~").localeCompare(b.name ?? "~"),
-			);
-			return { capturedAt: part.capturedAt, items: out };
+		>();
+		const seen = new Set<string>();
+		for (const c of owned) {
+			const key = `${c.region}/${c.slug}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			const row = await ctx.db
+				.query("inventories")
+				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
+				.unique();
+			// An inventory uploaded under someone else's claim stays theirs.
+			const inv = row?.userId === userId ? row : null;
+			const roster = await ctx.db
+				.query("characters")
+				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
+				.first();
+			const summary = (part: Doc<"inventories">["bags"]) =>
+				part ? { capturedAt: part.capturedAt, items: part.items.length } : null;
+			characters.push({
+				key,
+				region: c.region,
+				slug: c.slug,
+				name: c.name,
+				surname: roster?.surname,
+				classId: roster?.classId ?? c.classId ?? 0,
+				level: roster?.level ?? c.level ?? 0,
+				avatarUrl: roster?.avatarUrl,
+				bags: summary(inv?.bags),
+				bank: summary(inv?.bank),
+			});
+			for (const part of ["bags", "bank"] as const) {
+				for (const { id, count } of inv?.[part]?.items ?? []) {
+					let item = items.get(id);
+					if (!item) {
+						const known = await itemRow(ctx, id);
+						item = {
+							itemId: id,
+							name: known?.name,
+							quality: known?.quality ?? "COMMON",
+							icon: known?.icon,
+							kind: known?.kind,
+							total: 0,
+							where: [],
+						};
+						items.set(id, item);
+					}
+					item.total += count;
+					item.where.push({ key, part, count });
+				}
+			}
+		}
+		const order = (q: string) => {
+			const i = QUALITY_ORDER.indexOf(q);
+			return i < 0 ? -1 : i;
 		};
-		return { bags: await list(row?.bags), bank: await list(row?.bank) };
+		return {
+			characters: characters.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name)),
+			items: [...items.values()]
+				.map((i) => ({ ...i, where: i.where.sort((a, b) => b.count - a.count) }))
+				.sort((a, b) => order(b.quality) - order(a.quality) || (a.name ?? "~").localeCompare(b.name ?? "~")),
+		};
 	},
 });

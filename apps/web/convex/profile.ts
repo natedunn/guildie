@@ -17,7 +17,10 @@ import type { Doc } from "./_generated/dataModel";
 //   profession), so a recipe the catalog couldn't match isn't lost;
 // - talents: as before, the addon's while newer than the last change seen
 //   from Blizzard (`talentsChangedAt`), except an empty list when Blizzard
-//   has points spent: more likely a read that failed in game than a reset.
+//   has points spent: more likely a read that failed in game than a reset;
+// - quests in progress: the addon's quest log when it's newer (with the
+//   game's titles, levels, objectives and complete state), else Blizzard's
+//   list (ids only; titles come from the quests catalog).
 //
 // Anything the addon never captured stays Blizzard's.
 
@@ -33,14 +36,18 @@ type Character = Pick<
 	| "equipment"
 	| "professions"
 	| "talentTrees"
+	| "quests"
 >;
 type Snapshot = Pick<
 	Doc<"addonSnapshots">,
-	"capturedAt" | "level" | "talentTrees" | "equipment" | "professions" | "recipes"
+	"capturedAt" | "level" | "talentTrees" | "equipment" | "professions" | "recipes" | "quests"
 >;
 type Item = NonNullable<Character["equipment"]>[number];
 
 export type Profession = NonNullable<Character["professions"]>[number] & { recipesSource?: Source };
+
+/** A quest in progress: just the id from Blizzard; from the game, what its quest log showed. */
+export type QuestProgress = NonNullable<Doc<"addonSnapshots">["quests"]>["list"][number];
 
 /**
  * Blizzard's way (as far as Classic profiles show): the 17 gear slots, shirt
@@ -113,6 +120,13 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 		talentSource = addon(snap.capturedAt);
 	}
 
+	let quests: QuestProgress[] | undefined = c.quests?.ids.map((id) => ({ id }));
+	let questsSource: Source | undefined = c.quests ? blizzard : undefined;
+	if (snap?.quests && snap.quests.capturedAt > blizzardAt) {
+		quests = snap.quests.list;
+		questsSource = addon(snap.quests.capturedAt);
+	}
+
 	// When this character's data was last current, and from where: in game
 	// (the player's Guildie app uploaded it) when any of it is the addon's,
 	// else Blizzard's as of their last logout (checked at profileSyncedAt).
@@ -128,7 +142,14 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 		equipment,
 		professions,
 		talentTrees,
-		sources: { level: levelSource, gear: gearSource, professions: professionsSource, talents: talentSource },
+		quests,
+		sources: {
+			level: levelSource,
+			gear: gearSource,
+			professions: professionsSource,
+			talents: talentSource,
+			quests: questsSource,
+		},
 		synced,
 	};
 }

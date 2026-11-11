@@ -109,6 +109,7 @@ if (guild) {
 		{ path: `${guild}/crafting` },
 		{ path: `${guild}/gear` },
 		{ path: `${guild}/requests`, auth: true },
+		{ path: `${guild}/dungeons`, auth: true },
 		{
 			path: `${guild}/requests`,
 			name: "requests search",
@@ -155,6 +156,19 @@ if (character) {
 pages.push(
 	{ path: `${character ?? "/"}?item=${args.item ?? "2589"}`, name: "item panel" },
 	{ path: "/me", auth: true },
+	{ path: "/inventory", auth: true },
+	{
+		path: "/inventory",
+		name: "inventory search",
+		auth: true,
+		needs: "#inventory-search",
+		act: async (p) => {
+			await p.fill("#inventory-search", "a");
+			await p.waitForTimeout(300);
+		},
+	},
+	{ path: "/quests", auth: true },
+	{ path: "/quests?view=zone", auth: true },
 	{ path: "/settings", auth: true },
 	{ path: "/settings/guilds", auth: true },
 	{ path: "/settings/addon", auth: true },

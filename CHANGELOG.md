@@ -15,6 +15,12 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** A Personal section in the sidebar. Inventory: all your characters' bags and banks on one page, with a search ("where's my Silk Cloth?" Lich bags 37 · Isai bank 20), a character filter and when each was last read; it replaces the Inventory tab on character pages. Quests: your characters' quests in progress, by character or by zone, each with a Wowhead link and who in your guild is on it too.
+- **Guildie:** Dungeons, under each of your guilds: the dungeon and raid quests members have in progress, by dungeon, so you can see who to group with. Only the guild's members see it.
+- **Addon:** Saves your quest log (each quest's progress, and whether it's complete), so Guildie shows your quests after a /reload instead of after you log out. Addon 0.10.0.
+
 ## 0.3.10
 
 ### Fixes

@@ -16,4 +16,6 @@ crons.daily("expire stale requests", { hourUTC: 8, minuteUTC: 30 }, internal.req
 
 crons.daily("backfill item names and icons", { hourUTC: 10, minuteUTC: 30 }, internal.items.backfill, {});
 
+crons.daily("backfill quest titles", { hourUTC: 11, minuteUTC: 0 }, internal.quests.backfill, {});
+
 export default crons;

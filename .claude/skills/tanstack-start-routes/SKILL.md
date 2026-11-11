@@ -12,15 +12,16 @@ Vite plugin while `pnpm dev` runs (commit it). Path params are `$name`
 
 ## Main routes
 
-| Route                                                                                      | Page                                                                                                       |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `__root.tsx`                                                                               | HTML shell, app shell (sidebar, title bar, content pane), auth provider, `?item=` panel, desktop detection |
-| `index.tsx`                                                                                | Home: find or add a guild                                                                                  |
-| `g/$region/$slug.tsx` + `g/.../index.tsx`, `crafting.tsx`                                  | A guild: layout with header, roster, crafting                                                              |
-| `c/$region/$slug.tsx` + `index.tsx`, `talents.tsx`, `professions.tsx`                      | A character: layout with tabs                                                                              |
-| `settings.tsx` + `settings/{index,guilds,addon,app}.tsx`                                   | Settings tabs (Addon and App are for the desktop app)                                                      |
-| `sign-in.tsx`, `claim/callback.tsx`, `desktop/session.tsx`, `helper/connect.tsx`, `auth/*` | Sign-in flows (auth-and-sign-in skill; ask first)                                                          |
-| `api/helper/*`                                                                             | HTTP endpoints for the desktop app (server routes)                                                         |
+| Route                                                                                                 | Page                                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `__root.tsx`                                                                                          | HTML shell, app shell (sidebar, title bar, content pane), auth provider, `?item=` panel, desktop detection |
+| `index.tsx`                                                                                           | Home: find or add a guild                                                                                  |
+| `g/$region/$slug.tsx` + `g/.../index.tsx`, `crafting.tsx`, `gear.tsx`, `dungeons.tsx`, `requests.tsx` | A guild: layout with header; its pages are in the sidebar (Dungeons and Requests for members)              |
+| `c/$region/$slug.tsx` + `index.tsx`, `talents.tsx`, `professions.tsx`                                 | A character: layout with tabs (`inventory.tsx` only redirects to `/inventory`)                             |
+| `inventory.tsx`, `quests.tsx`                                                                         | Personal (sidebar, signed in): your characters' bags and banks; their quests and who shares them           |
+| `settings.tsx` + `settings/{index,guilds,addon,app}.tsx`                                              | Settings tabs (Addon and App are for the desktop app)                                                      |
+| `sign-in.tsx`, `claim/callback.tsx`, `desktop/session.tsx`, `helper/connect.tsx`, `auth/*`            | Sign-in flows (auth-and-sign-in skill; ask first)                                                          |
+| `api/helper/*`                                                                                        | HTTP endpoints for the desktop app (server routes)                                                         |
 
 ## Reading data: loader + suspense
 

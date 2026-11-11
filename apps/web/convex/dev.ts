@@ -201,6 +201,30 @@ export const probe = internalAction({
 });
 
 /**
+ * `npx convex run dev:get '{"path": "/data/wow/quest/176", "namespace": "static"}'`
+ * One raw Blizzard API response, for checking what a path returns. Read-only.
+ */
+export const get = internalAction({
+	args: {
+		path: v.string(),
+		namespace: v.optional(v.union(v.literal("profile"), v.literal("static"), v.literal("dynamic"))),
+		region: v.optional(vRegion),
+	},
+	handler: async (ctx, { path, namespace, region }): Promise<unknown> => {
+		if (!path.startsWith("/")) throw new ConvexError("A path like /data/wow/quest/176");
+		const token: string = await appToken(ctx, region ?? "us");
+		const res = await blizzardGet<unknown>({
+			token,
+			flavor: "forever",
+			region: region ?? "us",
+			namespace: namespace ?? "profile",
+			path,
+		});
+		return res.ok ? res.data : { status: res.status };
+	},
+});
+
+/**
  * `npx convex run --deployment <name> dev:addGuild '{"name": "Your Guild", "region": "us"}'`
  * Adds a guild without a signed-in user (no owner) and syncs it. For seeding
  * cloud dev, which local worktrees import guilds from.

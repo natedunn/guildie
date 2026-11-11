@@ -158,3 +158,28 @@ test("average item level, Blizzard's way", () => {
 	assert.equal(averageItemLevel([...gear, item("MAIN_HAND", 34)]), 30);
 	assert.equal(averageItemLevel([]), undefined);
 });
+
+test("quests: Blizzard's ids until the game's quest log is newer", () => {
+	const withQuests = { ...blizzard, quests: { syncedAt: LOGIN + 2 * HOUR, ids: [166, 214] } };
+	const p = mergeProfile(withQuests, null);
+	assert.deepEqual(p.quests, [{ id: 166 }, { id: 214 }]);
+	assert.equal(p.sources.quests?.kind, "blizzard");
+
+	const log = {
+		capturedAt: LOGIN + 3 * HOUR,
+		list: [{ id: 214, title: "Red Silk Bandanas", level: 17, complete: true }],
+	};
+	const newer = mergeProfile(withQuests, { ...snapshot(LOGIN + 3 * HOUR), quests: log });
+	assert.deepEqual(newer.quests, log.list);
+	assert.deepEqual(newer.sources.quests, { kind: "addon", at: LOGIN + 3 * HOUR });
+
+	// Played elsewhere without the app and logged out since: Blizzard's again.
+	const older = mergeProfile(withQuests, {
+		...snapshot(LOGIN + 3 * HOUR),
+		quests: { ...log, capturedAt: LOGIN - HOUR },
+	});
+	assert.deepEqual(older.quests, [{ id: 166 }, { id: 214 }]);
+
+	// Not synced since quests were added: nothing to show yet.
+	assert.equal(mergeProfile(blizzard, null).quests, undefined);
+});
