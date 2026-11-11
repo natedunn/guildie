@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.12
+
 ### Improvements
 
 - **Addon:** A clearer in-game window with separate sync, guild tooltip, request and preference sections, shorter labels, and scrolling on smaller screens. Sync now explains the UI reload and is unavailable during combat.
