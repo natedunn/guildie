@@ -15,11 +15,13 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.18
+
 ### Improvements
 
 - **Guildie:** Your characters have a Preferences tab for their stats to look for and gear types, with room to see every option: each talent tree's top stats side by side, and your own stats with their weights in one list. The Gear tab still shows them.
 - **Guildie:** Custom stat priorities can list up to 10 stats (pages still show the top three; an item is a trade-off only if it gives up one of your top five).
-- **Guildie, Addon:** Prefer several armor and weapon types, in your order ("Two-Handed Axes, then Two-Handed Maces"), or allow only those. Each type further down counts a little less. In game after the next addon update.
+- **Guildie, Addon:** Prefer several armor and weapon types, in your order ("Two-Handed Axes, then Two-Handed Maces"), or allow only those. Each type further down counts a little less.
 
 ## 0.3.17
 
