@@ -111,7 +111,7 @@ test("the request rows come before the reagent row", function()
     eq(plain(lines[2]), "Brenna | might want (Tailoring)")
 end)
 
-test("reagents: a row per person, professions merged, then +N more", function()
+test("reagents: a row per person, professions merged, up to 8, then +N more", function()
     local data = {}
     for k, v in pairs(DATA) do data[k] = v end
     data.reagents = { [765] = { name = "Silverleaf", users = {
@@ -126,11 +126,18 @@ test("reagents: a row per person, professions merged, then +N more", function()
     } } }
     local ns = load(data)
     local lines = hover(ns, 765)
-    eq(#lines, 4)
+    eq(#lines, 5, "everyone, not your own character")
     eq(plain(lines[1]), "Healing | might want (Alchemy, Herbalism)")
     eq(plain(lines[2]), "Hoofing | might want (Herbalism)")
     eq(plain(lines[3]), "Brenna | might want (Tailoring)")
-    eq(plain(lines[4]), "+2 more")
+    eq(plain(lines[5]), "Dax | might want (Alchemy, Cooking)")
+    for _, name in ipairs({ "Ezra", "Fen", "Gus", "Hob", "Ivy" }) do
+        table.insert(data.reagents[765].users, { name = name, classId = 1, profession = "Mining" })
+    end
+    lines = hover(ns, 765)
+    eq(#lines, 9, "8 people, then the rest")
+    eq(plain(lines[8]), "Gus | might want (Mining)")
+    eq(plain(lines[9]), "+2 more")
 end)
 
 test("hooks item tooltips at PLAYER_LOGIN, after every addon has loaded", function()

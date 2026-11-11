@@ -225,7 +225,7 @@ your last login or reload.
   the class-colored name, and what Guildie knows in muted grey. Requests
   first, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
   so other addons' lines (added at load) come before the block. Reagent
-  rows, skipping your own characters, at most 3 people:
+  rows, skipping your own characters, up to 8 (all the site sends):
   "Brenna | might want (Tailoring, Alchemy)", then "+2 more".
 - Gear upgrades (addon 0.5.0): `upgrades` holds the rules and stat weights
   once (`apps/web/convex/shared/weights.ts`, seeded from WowSims' EP weights)

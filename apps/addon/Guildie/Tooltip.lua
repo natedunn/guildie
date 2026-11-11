@@ -6,7 +6,8 @@
 
 local ADDON, ns = ...
 
-local MAX_NAMES = 3
+-- The site sends at most 8 per reagent (apps/web/convex/helper.ts); show them all.
+local MAX_NAMES = 8
 
 local function isMine(name)
     for _, mine in ipairs(GuildieData and GuildieData.mine or {}) do
