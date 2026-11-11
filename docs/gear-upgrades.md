@@ -1,7 +1,7 @@
 # Gear upgrade suggestions
 
 How Guildie decides that an item is an upgrade for a guildmate: the
-"Brisket | upgrade (Feral)" and "Miller | maybe (at 24)" rows under Guildie
+"Brisket | upgrade (Feral)" and "Miller | maybe (lvl 24)" rows under Guildie
 in the addon's item tooltips, and the "Upgrade for" list in the site's item panel.
 
 It's a best guess from stat weights and what each person wears, not a

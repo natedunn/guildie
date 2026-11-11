@@ -249,7 +249,7 @@ your last login or reload.
   Soulbound), scores it for each of them the same way
   (`Guildie/Upgrades.lua`, a port of `convex/shared/upgrades.ts`; both run
   `apps/addon/tests/upgrade_vectors.json`) and adds a row each for up to 3 people:
-  "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)", "Miller | maybe (at 24)". Upgrade:
+  "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)", "Miller | maybe (lvl 24)". Upgrade:
   15%+ better than what they wear there, usable now, main spec, none of
   their priority stats lower. Trade-off: the same, but some of a priority
   stat is given up. Maybe: 3-15%,

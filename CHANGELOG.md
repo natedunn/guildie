@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Addon:** Gear tooltips say "lvl 24" instead of "at 24" for guildmates who can use an item a few levels from now.
+
 ## 0.3.18
 
 ### Improvements
