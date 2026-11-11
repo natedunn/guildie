@@ -96,11 +96,27 @@ local function upgradeRows(tooltip, itemID, data)
     return ns.upgrades.lines(item, itemID, classColored)
 end
 
+--- Why there's nothing to say, for the "Say why tooltips have nothing"
+--- setting (off by default): no guild data yet, it can't be traded, or
+--- nobody needs it.
+local function emptyReason(binding)
+    if not GuildieData then return "No guild data yet (needs the Guildie app)" end
+    if binding then return binding .. ", can't be traded" end
+    return "No guildmates need this"
+end
+ns.emptyReason = emptyReason
+
+local function explainEmpty()
+    local s = GuildieDB and GuildieDB.settings
+    return s and s.explainEmpty == true
+end
+
 --- Everything Guildie has to say about this item, as rows (no header).
 local function rowsFor(tooltip, itemID, data)
     local rows = requestRows(itemID)
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
-    local bound = ns.upgrades and ns.upgrades.untradeable(ns.upgrades.tooltipLines(tooltip, data))
+    local binding = ns.upgrades and ns.upgrades.binding(ns.upgrades.tooltipLines(tooltip, data))
+    local bound = binding ~= nil
     if not bound then
         for _, row in ipairs(reagentRows(itemID)) do table.insert(rows, row) end
     end
@@ -108,6 +124,7 @@ local function rowsFor(tooltip, itemID, data)
     if ok and upgrades then
         for _, row in ipairs(upgrades) do table.insert(rows, row) end
     end
+    if #rows == 0 and explainEmpty() then table.insert(rows, { left = emptyReason(binding) }) end
     return rows
 end
 

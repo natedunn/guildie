@@ -17,8 +17,10 @@ local function settings()
     if s.minimapAngle == nil then s.minimapAngle = 220 end
     if s.showMinimap == nil then s.showMinimap = true end
     if s.reloadWhenAfk == nil then s.reloadWhenAfk = false end
+    if s.explainEmpty == nil then s.explainEmpty = false end
     return s
 end
+ns.settings = settings
 
 -- ---- Window ------------------------------------------------------------------
 -- The game's own look: PortraitFrameTemplate (the logo in the portrait ring,
@@ -374,6 +376,9 @@ local function buildWindow()
             settings().showMinimap = on
             if ns.updateMinimapButton then ns.updateMinimapButton() end
         end)
+    window.explain = checkbox("Say why tooltips have nothing",
+        function() return settings().explainEmpty end,
+        function(on) settings().explainEmpty = on end)
 
     local afkHint = text("GameFontDisableSmall", TEXT_WIDTH - 26)
     afkHint:SetText("Experimental. Reloads your UI while AFK, out of combat, at most every 20 minutes.")
@@ -401,6 +406,7 @@ local function buildWindow()
         { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
         { el = heading("Preferences"), gap = 14 },
         { el = window.minimap, gap = 6, dx = -4, height = 24 },
+        { el = window.explain, gap = 2, dx = -4, height = 24 },
         { el = window.afk, gap = 2, dx = -4, height = 24 },
         { el = afkHint, gap = 0, dx = 26 },
     }

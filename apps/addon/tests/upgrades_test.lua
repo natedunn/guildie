@@ -241,6 +241,29 @@ test("nothing that can't be traded: Binds when picked up, Quest Item; reagent li
     eq(U.untradeable({ GLOVES.name, "Binds when picked up" }), true)
 end)
 
+test("say why tooltips have nothing: off by default, then the reason", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    local cloak = { id = 8, name = "Plain Cloak", equipLoc = "INVTYPE_CLOAK", classID = 4, subclassID = 1, stats = {} }
+    stubItems({ GLOVES, cloak })
+    _G.GuildieData = guildData({ vectors.members.Brisket })
+    local bound = {}
+    for k, v in pairs(GLOVES) do bound[k] = v end
+    bound.lines = { "Binds when picked up", "Hands", "+6 Agility" }
+    GuildieDB.settings = nil
+    eq(#hover(cloak), 0, "off by default")
+    eq(#hover(bound), 0, "off by default")
+    GuildieDB.settings = { explainEmpty = true }
+    eq(plain(hover(cloak)[1]), "No guildmates need this")
+    eq(plain(hover(bound)[1]), "Binds when picked up, can't be traded")
+    bound.lines = { "Soulbound", "Hands" }
+    eq(plain(hover(bound)[1]), "Soulbound, can't be traded")
+    eq(#hover(GLOVES), 1, "a suggestion: no reason row")
+    eq(plain(hover(GLOVES)[1]), "Brisket | upgrade (Feral)")
+    _G.GuildieData = nil
+    eq(plain(hover(cloak)[1]), "No guild data yet (needs the Guildie app)")
+    GuildieDB.settings = nil
+end)
+
 test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local helm = {

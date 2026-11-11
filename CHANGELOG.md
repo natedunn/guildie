@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Addon:** "Say why tooltips have nothing" in the `/guildie` window (off by default): items Guildie has nothing for say why, like "Soulbound, can't be traded" or "No guildmates need this".
+
 ### Improvements
 
 - **Addon:** Guildie's part of item tooltips is set apart from the item's own lines: it comes last, after a gap and a "Guildie" header with the addon's icon, with one short row per guildmate (their name, then what they're requesting, might want it for, or would get as an upgrade), instead of long wrapping lines that each started with "Guildie".

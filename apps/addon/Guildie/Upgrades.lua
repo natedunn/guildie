@@ -264,15 +264,21 @@ end
 --- when picked up" (it binds to whoever loots or crafts it) or "Quest Item"
 --- (as `untradeable` in itemInfo.ts). `lines`: the tooltip's text lines.
 function U.untradeable(lines)
+    return U.binding(lines) ~= nil
+end
+
+--- The tooltip line that makes the item untradeable ("Soulbound", "Binds
+--- when picked up", "Quest Item"), or nil.
+function U.binding(lines)
     local bound = {
         [ITEM_SOULBOUND or "Soulbound"] = true,
         [ITEM_BIND_ON_PICKUP or "Binds when picked up"] = true,
         [ITEM_BIND_QUEST or "Quest Item"] = true,
     }
     for i, text in ipairs(lines or {}) do
-        if i > 1 and bound[text] then return true end
+        if i > 1 and bound[text] then return text end
     end
-    return false
+    return nil
 end
 
 --- The hovered item as the decision wants it (same shape as ItemInfo in

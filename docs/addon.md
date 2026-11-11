@@ -233,7 +233,12 @@ your last login or reload.
   first, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
   so other addons' lines (added at load) come before the block. Reagent
   rows, skipping your own characters, up to 8 (all the site sends):
-  "Brenna | might want (Tailoring, Alchemy)", then "+2 more".
+  "Brenna | might want (Tailoring, Alchemy)", then "+2 more". With "Say
+  why tooltips have nothing" ticked in the `/guildie` window
+  (`GuildieDB.settings.explainEmpty`, off by default), an item with nothing
+  to show gets one row instead: "Soulbound, can't be traded" (or Binds when
+  picked up, Quest Item), "No guildmates need this", or "No guild data yet
+  (needs the Guildie app)".
 - Gear upgrades (addon 0.5.0): `upgrades` holds the rules and stat weights
   once (`apps/web/convex/shared/weights.ts`, seeded from WowSims' EP weights)
   and each guildmate seen in the last 14 days (not your own characters):
