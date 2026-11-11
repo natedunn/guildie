@@ -1,6 +1,6 @@
 {
 	"name": "@guildie/desktop",
-	"version": "0.3.13",
+	"version": "0.3.14",
 	"private": true,
 	"description": "Guildie for Windows: the site in its own window, plus the addon uploader.",
 	"author": "Guildie",
