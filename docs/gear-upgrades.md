@@ -192,7 +192,6 @@ addon's tooltips (`specsFor` in `shared/upgrades.ts`):
   (tooltips say "upgrade (Str/Int/Agi)"). The site adds it to the rules in
   `GuildieData.lua`. Pages show the first three stats; the rest
   count only in suggestions (the Preferences tab lists them all).
-  The steepness and order can also be changed on Crafting → Upgrades for me.
 
 In game, a change shows in guildmates' tooltips after their Guildie app's
 next guild data refresh (every 15 minutes) and a `/reload`.

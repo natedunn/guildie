@@ -7,7 +7,6 @@ import { pickProfile } from "./helper";
 import { activeIn, membership } from "./requests";
 import { vRegion } from "./schema";
 import { type ItemInfo, itemInfoFromTooltip, untradeable } from "./shared/itemInfo";
-import { type StatPriority, statPriority } from "./shared/statPriority";
 import { explain, judge, kindRank, suggest, upgradeRules, type VerdictKind } from "./shared/upgrades";
 import { CLASS_TOKENS } from "./shared/weights";
 import { memberForUpgrades } from "./upgradeProfiles";
@@ -161,15 +160,11 @@ export const upgradesForMe = query({
 		const cache = new Map<number, ItemInfo | undefined>();
 		const mine: (NonNullable<Awaited<ReturnType<typeof memberForUpgrades>>> & { character: Doc<"characters"> })[] = [];
 		const noGear: { slug: string; name: string; classId: number }[] = [];
-		// Each character's stat priority, for changing it right here.
-		const priorities: { slug: string; name: string; classId: number; priority: StatPriority }[] = [];
 		for (const c of viewer.characters) {
 			const profile = await pickProfile(ctx, c);
 			const f = await memberForUpgrades(ctx, c, profile, rules, cache);
 			if (f) mine.push({ ...f, character: c });
 			else noGear.push({ slug: c.slug, name: c.name, classId: c.classId });
-			const priority = f && statPriority(c.classId, profile.talentTrees, f.choice);
-			if (priority) priorities.push({ slug: c.slug, name: c.name, classId: c.classId, priority });
 		}
 
 		const items = new Map<number, Doc<"items"> | null>();
@@ -218,7 +213,6 @@ export const upgradesForMe = query({
 		);
 		return {
 			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId })),
-			priorities,
 			noGear,
 			/** The viewer's characters whose gear types leave other types out ("Only this type"). */
 			strict: mine

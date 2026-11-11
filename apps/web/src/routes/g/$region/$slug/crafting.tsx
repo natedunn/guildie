@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import type { Region } from "@convex/shared/wow";
+import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -16,7 +16,13 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
-import { PriorityStrip } from "@/components/stat-priority";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
@@ -201,18 +207,12 @@ function CraftingPage() {
 				{/* One row: whose upgrades (upgrade views), the search, the profession. Wraps on phones. */}
 				<div className="flex flex-wrap gap-2">
 					{(showUpgrades || showCraft) && char ? (
-						<select
-							aria-label={showCraft ? "Crafting as" : "Upgrades for"}
+						<CharacterPicker
+							label={showCraft ? "Crafting as" : "For"}
+							characters={characters}
 							value={char.slug}
-							onChange={(e) => setChar(e.target.value)}
-							className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:flex-1"
-						>
-							{characters.map((c) => (
-								<option key={c.slug} value={c.slug}>
-									{showCraft ? `Crafting as ${c.name}` : `For ${c.name}`}
-								</option>
-							))}
-						</select>
+							onChange={setChar}
+						/>
 					) : null}
 					<Input
 						ref={inputRef}
@@ -247,22 +247,6 @@ function CraftingPage() {
 					</select>
 				</div>
 			</div>
-
-			{showUpgrades && upgrades?.priorities.some((p) => p.slug === char?.slug) ? (
-				<div className="space-y-1.5">
-					{upgrades.priorities
-						.filter((p) => p.slug === char?.slug)
-						.map((p) => (
-							<PriorityStrip
-								key={p.slug}
-								region={params.region}
-								slug={p.slug}
-								name={<ClassText classId={p.classId}>{p.name}</ClassText>}
-								priority={p.priority}
-							/>
-						))}
-				</div>
-			) : null}
 
 			{loading ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
@@ -591,5 +575,48 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 				/>
 			) : null}
 		</div>
+	);
+}
+
+/**
+ * Which of the viewer's characters the upgrade views are about: a dropdown
+ * that looks like the page's selects ("For Todd"), names in class colors
+ * (a native select can't color its options).
+ */
+function CharacterPicker({
+	label,
+	characters,
+	value,
+	onChange,
+}: {
+	label: string;
+	characters: { slug: string; name: string; classId: number }[];
+	value: string;
+	onChange: (slug: string) => void;
+}) {
+	const current = characters.find((c) => c.slug === value);
+	// Inline color: the menu's highlight restyles descendants' text color through classes.
+	const named = (c: { name: string; classId: number }) => (
+		<span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>
+	);
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger
+				aria-label={`${label}: ${current?.name ?? ""}`}
+				className="h-10 min-w-0 whitespace-nowrap rounded-md border border-input bg-well bg-(image:--select-chevron) bg-size-[0.75rem] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-3 text-left text-sm @max-md:flex-1"
+			>
+				<span className="text-muted-foreground">{label} </span>
+				{current ? named(current) : null}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent className="w-auto min-w-(--anchor-width)">
+				<DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(String(v))}>
+					{characters.map((c) => (
+						<DropdownMenuRadioItem key={c.slug} value={c.slug}>
+							{named(c)}
+						</DropdownMenuRadioItem>
+					))}
+				</DropdownMenuRadioGroup>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }

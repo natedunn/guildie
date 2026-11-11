@@ -14,7 +14,7 @@ import { className, type Region } from "@convex/shared/wow";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { type DragEvent, type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useState } from "react";
 import { Panel, panelAction } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -597,121 +597,5 @@ function OptionCard({
 			<span className={cn("block text-[0.8125rem]", active && "font-semibold")}>{title}</span>
 			{detail && <span className="block truncate text-xs text-muted-foreground">{detail}</span>}
 		</button>
-	);
-}
-
-/**
- * "Upgrades for me": a character's first three stats, dragged into another
- * order, and the steepness, saved to the character right away (the same
- * choice as the character page; suggestions follow on the next query). A
- * tree's priority becomes the player's own on the first change.
- */
-export function PriorityStrip({
-	region,
-	slug,
-	name,
-	priority,
-}: {
-	region: string;
-	slug: string;
-	name: ReactNode;
-	priority: StatPriority;
-}) {
-	const set = useMutation(api.statPriority.set);
-	const [order, setOrder] = useState<string[]>();
-	const [saving, setSaving] = useState(false);
-	const [error, setError] = useState<string>();
-	const stats = order ?? priority.stats;
-	const own = priority.chosen && !priority.tree;
-	const tiers = own ? priority.shares : presetTiers("balanced", priority.stats.length);
-
-	const save = async (next: string[], nextTiers: number[]) => {
-		setSaving(true);
-		setError(undefined);
-		try {
-			await set({ region: region as Region, slug, choice: ownChoice(next, nextTiers) });
-		} catch (err) {
-			setError(err instanceof ConvexError ? String(err.data) : "Couldn't save.");
-		} finally {
-			setSaving(false);
-			setOrder(undefined);
-		}
-	};
-	// The order while dragging (state for the render, a ref for the drop).
-	const dragged = useRef<string[]>(undefined);
-	const reorder = useReorder(
-		(from, to) => {
-			dragged.current = moved(dragged.current ?? priority.stats, from, to);
-			setOrder(dragged.current);
-		},
-		() => {
-			const o = dragged.current;
-			dragged.current = undefined;
-			if (o?.some((s, i) => s !== priority.stats[i])) void save(o, tiers);
-			else setOrder(undefined);
-		},
-	);
-
-	return (
-		<div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-surface px-3 py-2">
-			<span className="text-[0.8125rem] font-medium">{name}</span>
-			<ol className="flex flex-wrap items-center gap-1" aria-label="Stats to look for, first to third">
-				{stats.slice(0, SHOWN_STATS).map((stat, i) => (
-					<li key={stat} {...reorder.target(i)} className="flex items-center gap-1">
-						{i > 0 ? <span className="text-xs text-muted-foreground/60">›</span> : null}
-						<button
-							type="button"
-							disabled={saving}
-							aria-label={`${i + 1}. ${label(stat)}: drag, or Alt+arrow keys, to move`}
-							title="Drag to reorder"
-							className={cn(
-								"flex h-6 cursor-grab items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-well px-2 text-[0.8125rem] active:cursor-grabbing",
-								reorder.dragging === i && "opacity-50",
-							)}
-							{...reorder.handle(i, SHOWN_STATS, "x")}
-						>
-							<span className="text-muted-foreground/60">
-								<Grip />
-							</span>
-							{label(stat)}
-						</button>
-					</li>
-				))}
-			</ol>
-			{!own ? (
-				<span className="text-xs text-muted-foreground">
-					{priority.chosen ? priority.tree : `From ${priority.tree} talents`}
-				</span>
-			) : null}
-			{error ? <span className="text-xs text-destructive">{error}</span> : null}
-			<span className="ml-auto">
-				<select
-					aria-label="How much more the first stat counts"
-					value={own ? (priority.steepness ?? "balanced") : ""}
-					disabled={saving}
-					onChange={(e) => {
-						const s = e.target.value as Steepness;
-						if (s && s !== "custom") void save(stats, presetTiers(s, stats.length));
-					}}
-					className="h-7 rounded-md border bg-well pl-2 text-xs pointer-coarse:h-9"
-				>
-					{!own && (
-						<option value="" disabled>
-							Steepness
-						</option>
-					)}
-					{STEEPNESS.map((o) => (
-						<option key={o.key} value={o.key}>
-							{o.name}
-						</option>
-					))}
-					{own && priority.steepness === "custom" && (
-						<option value="custom" disabled>
-							{STEEPNESS_NAMES.custom}
-						</option>
-					)}
-				</select>
-			</span>
-		</div>
 	);
 }
