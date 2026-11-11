@@ -4,10 +4,12 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, internalAction, internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
 import { guildOfProfile } from "./claimRegions";
+import { noteClears, noteLevel, noteQuests } from "./feed";
 import { setOwner } from "./guilds";
 import { type ItemPreview, tooltipLines } from "./items";
 import { isSampleGuild } from "./sample";
 import { vEquippedItem, vTalentTree } from "./schema";
+import { dungeonOfKillStatistic } from "./shared/dungeons";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import { FLAVORS, type Region } from "./shared/wow";
 
@@ -144,6 +146,7 @@ export const applyRoster = internalMutation({
 			if (row) {
 				await ctx.db.patch(row._id, { ...member, inRoster: true });
 				id = row._id;
+				await noteLevel(ctx, { ...row, inRoster: true }, member.level);
 			} else {
 				id = await ctx.db.insert("characters", {
 					...member,
@@ -151,6 +154,8 @@ export const applyRoster = internalMutation({
 					flavor: guild.flavor,
 					region: guild.region,
 					inRoster: true,
+					// New to the guild: the feed starts from here.
+					feedLevel: member.level,
 				});
 			}
 			const stale = force || !row?.profileSyncedAt || now - row.profileSyncedAt > PROFILE_TTL_MS;
@@ -208,6 +213,23 @@ type Professions = { primaries?: ProfessionEntry[]; secondaries?: ProfessionEntr
 type Media = { assets?: { key: string; value: string }[] };
 type Quests = { in_progress?: { id: number; name?: string }[] };
 type CompletedQuests = { quests?: { id: number }[] };
+type Statistic = { name?: string; quantity?: number };
+type StatisticCategory = { statistics?: Statistic[]; sub_categories?: StatisticCategory[] };
+type Statistics = { categories?: StatisticCategory[] };
+
+/** Dungeons whose boss-kill statistic is 1 or more ("Edwin VanCleef Kills (Deadmines)"). */
+function clearedFrom(stats: Statistics) {
+	const out = new Set<string>();
+	const walk = (c: StatisticCategory) => {
+		for (const s of c.statistics ?? []) {
+			const key = s.name && (s.quantity ?? 0) >= 1 ? dungeonOfKillStatistic(s.name) : undefined;
+			if (key) out.add(key);
+		}
+		for (const sub of c.sub_categories ?? []) walk(sub);
+	};
+	for (const c of stats.categories ?? []) walk(c);
+	return [...out];
+}
 type Specializations = {
 	specialization_groups?: {
 		is_active?: boolean;
@@ -281,7 +303,7 @@ export const syncCharacter = internalAction({
 			await ctx.runMutation(internal.sync.applyProfile, { characterId, missing: true });
 			return;
 		}
-		const [equipment, professions, specializations, media, quests, completed] = await Promise.all([
+		const [equipment, professions, specializations, media, quests, completed, statistics] = await Promise.all([
 			blizzardGet<Equipment>({ ...common, path: `${base}/equipment` }),
 			blizzardGet<Professions>({ ...common, path: `${base}/professions` }),
 			blizzardGet<Specializations>({ ...common, path: `${base}/specializations` }),
@@ -291,6 +313,8 @@ export const syncCharacter = internalAction({
 			blizzardGet<Quests>({ ...common, path: `${base}/quests` }),
 			// Quests turned in: for the Dungeons page (ready, completed).
 			blizzardGet<CompletedQuests>({ ...common, path: `${base}/quests/completed` }),
+			// Boss kills: first dungeon clears, for the guild's feed.
+			blizzardGet<Statistics>({ ...common, path: `${base}/achievements/statistics` }),
 		]);
 		const inProgress = quests.ok ? (quests.data.in_progress ?? []) : undefined;
 		await ctx.runMutation(internal.sync.applyProfile, {
@@ -315,6 +339,7 @@ export const syncCharacter = internalAction({
 			renderUrl: media.ok ? media.data.assets?.find((a) => a.key === "main-raw")?.value : undefined,
 			questIds: inProgress?.map((q) => q.id),
 			completedQuestIds: completed.ok ? (completed.data.quests ?? []).map((q) => q.id) : undefined,
+			clearedDungeons: statistics.ok ? clearedFrom(statistics.data) : undefined,
 		});
 		// Titles, types and areas for quests the catalog doesn't have yet.
 		if (inProgress?.length && inProgress.map((q) => q.id).join() !== character.quests?.ids.join()) {
@@ -366,8 +391,9 @@ export const applyProfile = internalMutation({
 		renderUrl: v.optional(v.string()),
 		questIds: v.optional(v.array(v.number())),
 		completedQuestIds: v.optional(v.array(v.number())),
+		clearedDungeons: v.optional(v.array(v.string())),
 	},
-	handler: async (ctx, { characterId, missing, questIds, completedQuestIds, ...data }) => {
+	handler: async (ctx, { characterId, missing, questIds, completedQuestIds, clearedDungeons, ...data }) => {
 		const character = await ctx.db.get(characterId);
 		if (!character) return;
 		const now = Date.now();
@@ -391,6 +417,20 @@ export const applyProfile = internalMutation({
 			if (!row) await ctx.db.insert("completedQuests", { characterId, ids, syncedAt: now });
 			else if (row.ids.join() !== ids.join()) await ctx.db.patch(row._id, { ids, syncedAt: now });
 			else await ctx.db.patch(row._id, { syncedAt: now });
+			// Newly turned in (the first read is the baseline): the guild's feed.
+			const character = row ? await ctx.db.get(characterId) : null;
+			if (row && character) {
+				const before = new Set(row.ids);
+				await noteQuests(
+					ctx,
+					character,
+					ids.filter((id) => !before.has(id)),
+				);
+			}
+		}
+		if (clearedDungeons) {
+			const character = await ctx.db.get(characterId);
+			if (character) await noteClears(ctx, character, clearedDungeons);
 		}
 		if (data.talentTrees) await learnTreeInfo(ctx, data.talentTrees);
 	},

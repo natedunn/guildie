@@ -159,6 +159,10 @@ export default defineSchema({
 		profileMissing: v.optional(v.boolean()),
 		/** Still in the guild as of the last roster sync. */
 		inRoster: v.boolean(),
+		/** The highest level the guild's feed has seen (feed.ts); unset until first seen, so history isn't replayed. */
+		feedLevel: v.optional(v.number()),
+		/** Dungeons (shared/dungeons.ts keys) whose final boss they've killed, from Blizzard's statistics; unset until first read. */
+		clearedDungeons: v.optional(v.array(v.string())),
 	})
 		.index("by_guild", ["guildId", "inRoster"])
 		.index("by_slug", ["flavor", "region", "slug"])
@@ -374,6 +378,38 @@ export default defineSchema({
 		partial: v.optional(v.boolean()),
 		syncedAt: v.number(),
 	}).index("by_questId", ["questId"]),
+
+	/**
+	 * A guild's feed (feed.ts): level-ups, first dungeon clears, dungeon
+	 * quests turned in, and requests made, claimed and fulfilled. Written as
+	 * they're noticed (roster and profile syncs, addon uploads, requests).
+	 */
+	feedEvents: defineTable({
+		guildId: v.id("guilds"),
+		at: v.number(),
+		kind: v.union(
+			v.literal("level"),
+			v.literal("dungeon"),
+			v.literal("quests"),
+			v.literal("request"),
+			v.literal("claim"),
+			v.literal("fulfilled"),
+		),
+		/** Who it's about (the requester for requests). */
+		character: vRequestCharacter,
+		/** level: the new level, and the one before. */
+		level: v.optional(v.number()),
+		fromLevel: v.optional(v.number()),
+		/** dungeon, quests: the dungeon's key. */
+		dungeon: v.optional(v.string()),
+		questIds: v.optional(v.array(v.number())),
+		/** Requests. `other`: who claimed or fulfilled it. */
+		requestId: v.optional(v.id("requests")),
+		requestKind: v.optional(v.union(v.literal("item"), v.literal("craft"))),
+		itemId: v.optional(v.number()),
+		quantity: v.optional(v.number()),
+		other: v.optional(vRequestCharacter),
+	}).index("by_guild", ["guildId", "at"]),
 
 	/**
 	 * Each dungeon's quests (shared/dungeons.ts), from Blizzard's quest areas:

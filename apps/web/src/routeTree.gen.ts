@@ -41,6 +41,7 @@ import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
 import { Route as GRegionSlugCraftingRouteImport } from './routes/g/$region/$slug/crafting'
+import { Route as GRegionSlugFeedRouteImport } from './routes/g/$region/$slug/feed'
 import { Route as GRegionSlugGearRouteImport } from './routes/g/$region/$slug/gear'
 import { Route as GRegionSlugRequestsRouteImport } from './routes/g/$region/$slug/requests'
 import { Route as GRegionSlugDungeonsIndexRouteImport } from './routes/g/$region/$slug/dungeons.index'
@@ -206,6 +207,11 @@ const GRegionSlugCraftingRoute = GRegionSlugCraftingRouteImport.update({
   path: '/crafting',
   getParentRoute: () => GRegionSlugRoute,
 } as any)
+const GRegionSlugFeedRoute = GRegionSlugFeedRouteImport.update({
+  id: '/feed',
+  path: '/feed',
+  getParentRoute: () => GRegionSlugRoute,
+} as any)
 const GRegionSlugGearRoute = GRegionSlugGearRouteImport.update({
   id: '/gear',
   path: '/gear',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
@@ -295,6 +302,7 @@ export interface FileRoutesByTo {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug': typeof CRegionSlugIndexRoute
@@ -334,6 +342,7 @@ export interface FileRoutesById {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
+  '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
@@ -374,6 +383,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
@@ -409,6 +419,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug'
@@ -447,6 +458,7 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
+    | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
@@ -705,6 +717,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GRegionSlugCraftingRouteImport
       parentRoute: typeof GRegionSlugRoute
     }
+    '/g/$region/$slug/feed': {
+      id: '/g/$region/$slug/feed'
+      path: '/feed'
+      fullPath: '/g/$region/$slug/feed'
+      preLoaderRoute: typeof GRegionSlugFeedRouteImport
+      parentRoute: typeof GRegionSlugRoute
+    }
     '/g/$region/$slug/gear': {
       id: '/g/$region/$slug/gear'
       path: '/gear'
@@ -786,6 +805,7 @@ const CRegionSlugRouteWithChildren = CRegionSlugRoute._addFileChildren(
 
 interface GRegionSlugRouteChildren {
   GRegionSlugCraftingRoute: typeof GRegionSlugCraftingRoute
+  GRegionSlugFeedRoute: typeof GRegionSlugFeedRoute
   GRegionSlugGearRoute: typeof GRegionSlugGearRoute
   GRegionSlugRequestsRoute: typeof GRegionSlugRequestsRoute
   GRegionSlugIndexRoute: typeof GRegionSlugIndexRoute
@@ -795,6 +815,7 @@ interface GRegionSlugRouteChildren {
 
 const GRegionSlugRouteChildren: GRegionSlugRouteChildren = {
   GRegionSlugCraftingRoute: GRegionSlugCraftingRoute,
+  GRegionSlugFeedRoute: GRegionSlugFeedRoute,
   GRegionSlugGearRoute: GRegionSlugGearRoute,
   GRegionSlugRequestsRoute: GRegionSlugRequestsRoute,
   GRegionSlugIndexRoute: GRegionSlugIndexRoute,
