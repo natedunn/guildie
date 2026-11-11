@@ -102,7 +102,9 @@ local function addTo(tooltip, itemID, data)
         tooltip:AddLine(request, 1, 1, 1, true)
         added = true
     end
-    local line = suggestion(itemID)
+    -- Guildmates' recipes use it, but nobody can hand over a bound one.
+    local bound = ns.upgrades and ns.upgrades.untradeable(ns.upgrades.tooltipLines(tooltip, data))
+    local line = not bound and suggestion(itemID)
     if line then
         tooltip:AddLine(line, 1, 1, 1, true)
         added = true

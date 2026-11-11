@@ -150,6 +150,20 @@ const EQUIP_LINES: [RegExp, string][] = [
 const CLASS_BY_NAME = new Map(Object.entries(CLASSES).map(([id, c]) => [c.name, Number(id)]));
 
 /**
+ * Tooltip lines that mean nobody can trade the item: "Binds when picked up"
+ * (it binds to whoever loots or crafts it), "Soulbound" (already bound) and
+ * "Quest Item". "Binds when equipped" and "Binds when used" items trade
+ * until then. These are the game's English strings, as Blizzard's data and
+ * English clients show them.
+ */
+const UNTRADEABLE = new Set(["Binds when picked up", "Soulbound", "Quest Item"]);
+
+/** The line that says the item can't be traded ("Binds when picked up"), or undefined. */
+export function untradeable(lines: { left: string; right?: string }[] | undefined): string | undefined {
+	return lines?.find((l) => UNTRADEABLE.has(l.left))?.left;
+}
+
+/**
  * An item's slot, type and stats from its tooltip lines (name line excluded),
  * or undefined when no line names a slot (not gear, or not English).
  */

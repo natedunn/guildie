@@ -7,6 +7,7 @@ import { noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { vRegion } from "./schema";
+import { untradeable } from "./shared/itemInfo";
 import {
 	ACTIVE,
 	type Action,
@@ -63,7 +64,7 @@ async function charactersIn(ctx: Ctx, userId: Id<"users">, guildId: Id<"guilds">
 }
 
 /** The signed-in viewer as a member of this guild, or null (signed out, or no character in it). */
-async function membership(ctx: Ctx, guild: Doc<"guilds">) {
+export async function membership(ctx: Ctx, guild: Doc<"guilds">) {
 	const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 	if (!userId) return null;
 	const characters = await charactersIn(ctx, userId, guild._id);
@@ -74,6 +75,13 @@ async function requireMember(ctx: Ctx, guild: Doc<"guilds">) {
 	const member = await membership(ctx, guild);
 	if (!member) throw new ConvexError("Only this guild's members can do that. Claim your character first.");
 	return member;
+}
+
+/** Requests are for things a guildmate can hand over: not "Binds when picked up", "Soulbound" or "Quest Item". */
+async function requireTradeable(ctx: Ctx, itemId: number, why: string) {
+	const item = await itemRow(ctx, itemId);
+	const line = untradeable(item?.tooltip);
+	if (item && line) throw new ConvexError(`${item.name}: ${line}, so ${why}.`);
 }
 
 /** Recipe ids each of these characters knows (with the addon's newer reads). */
@@ -367,12 +375,14 @@ export const create = mutation({
 		let mats: Doc<"requests">["mats"];
 		if (args.kind === "item") {
 			if (itemId === undefined || !Number.isInteger(itemId) || itemId < 1) throw new ConvexError("Which item?");
+			await requireTradeable(ctx, itemId, "nobody can send it to you");
 		} else {
 			if (args.recipeId === undefined) throw new ConvexError("Which recipe?");
 			const recipe = await recipeRow(ctx, args.recipeId);
 			if (!recipe) throw new ConvexError("Guildie doesn't know that recipe.");
 			recipeId = recipe.recipeId;
 			itemId = recipe.craftedItemId;
+			if (itemId !== undefined) await requireTradeable(ctx, itemId, "only whoever crafts it can have it");
 			// Someone else in the guild has to know it, or nobody could claim it.
 			const members = await ctx.db
 				.query("characters")
@@ -640,7 +650,15 @@ export const search = query({
 					crafters: roster.filter((c) => known.get(c._id)?.has(recipe.recipeId)).map(brief),
 				}))
 				.find((r) => r.crafters.length > 0);
-			return { itemId: item.itemId, name: item.name, quality: item.quality, icon: item.icon, kind: item.kind, craft };
+			return {
+				itemId: item.itemId,
+				name: item.name,
+				quality: item.quality,
+				icon: item.icon,
+				kind: item.kind,
+				craft,
+				untradeable: untradeable(item.tooltip),
+			};
 		});
 	},
 });

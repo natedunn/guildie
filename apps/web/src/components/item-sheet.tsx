@@ -106,24 +106,30 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 								))}
 							</ul>
 						)}
-						<div className="flex items-center gap-2">
-							<RequestButton
-								guild={member.guild}
-								characters={member.characters}
-								target={{
-									kind: "item",
-									itemId,
-									name: item?.name ?? `Item ${itemId}`,
-									quality: item?.quality,
-									icon: item?.icon,
-								}}
-							/>
-							<span className="text-xs text-muted-foreground">
-								{requests && requests.requests.length > 0
-									? "Shows on this item's tooltip in game too."
-									: `Ask ${member.guild.slug === data?.guild?.slug ? data?.guild?.name : "the guild"} for it.`}
-							</span>
-						</div>
+						{data?.untradeable ? (
+							<p className="text-xs text-muted-foreground">
+								{data.untradeable}: nobody can trade it, so it can't be requested.
+							</p>
+						) : (
+							<div className="flex items-center gap-2">
+								<RequestButton
+									guild={member.guild}
+									characters={member.characters}
+									target={{
+										kind: "item",
+										itemId,
+										name: item?.name ?? `Item ${itemId}`,
+										quality: item?.quality,
+										icon: item?.icon,
+									}}
+								/>
+								<span className="text-xs text-muted-foreground">
+									{requests && requests.requests.length > 0
+										? "Shows on this item's tooltip in game too."
+										: `Ask ${member.guild.slug === data?.guild?.slug ? data?.guild?.name : "the guild"} for it.`}
+								</span>
+							</div>
+						)}
 					</Section>
 				)}
 
@@ -173,7 +179,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 										)}
 									</p>
 								)}
-								{member && r.crafters.length > 0 && (
+								{member && r.crafters.length > 0 && !data.untradeable && (
 									<RequestButton
 										guild={member.guild}
 										characters={member.characters}
@@ -222,6 +228,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 						</div>
 						<p className="text-xs text-muted-foreground">
 							A best guess from stat weights and what they wear, not a sim.
+							{data.untradeable ? ` ${data.untradeable}: they'd have to get it themselves.` : null}
 						</p>
 					</Section>
 				)}

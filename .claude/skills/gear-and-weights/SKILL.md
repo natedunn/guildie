@@ -94,3 +94,8 @@ The two implementations must match exactly:
 - Numbers are compared with a 1e-9 tolerance in the shared tests; Lua and JS
   floats must follow the same order of operations.
 - Shared code stays free of Convex imports (`node --test` runs it).
+- Trading is the callers' part, not `judge`/`suggest`: `untradeable()` in
+  `itemInfo.ts` (Binds when picked up, Soulbound, Quest Item) and
+  `U.untradeable` in `Upgrades.lua`. Items it flags are never suggested for
+  others in the addon, can't be requested (`requests.create`), and only count
+  for their own crafter under Upgrades for me.

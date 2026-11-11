@@ -260,8 +260,24 @@ local function apiItemStats(link)
     if GetItemStats then return GetItemStats(link) end
 end
 
+--- Whether the tooltip says nobody can trade the item: "Soulbound", "Binds
+--- when picked up" (it binds to whoever loots or crafts it) or "Quest Item"
+--- (as `untradeable` in itemInfo.ts). `lines`: the tooltip's text lines.
+function U.untradeable(lines)
+    local bound = {
+        [ITEM_SOULBOUND or "Soulbound"] = true,
+        [ITEM_BIND_ON_PICKUP or "Binds when picked up"] = true,
+        [ITEM_BIND_QUEST or "Quest Item"] = true,
+    }
+    for i, text in ipairs(lines or {}) do
+        if i > 1 and bound[text] then return true end
+    end
+    return false
+end
+
 --- The hovered item as the decision wants it (same shape as ItemInfo in
---- itemInfo.ts), plus `soulbound`; nil when it isn't gear or not known yet.
+--- itemInfo.ts), plus `soulbound` (it can't be traded: Soulbound, Binds when
+--- picked up, Quest Item); nil when it isn't gear or not known yet.
 --- `lines`: the tooltip's text lines (name first).
 function U.readItem(link, lines)
     if not link then return nil end
@@ -292,7 +308,6 @@ function U.readItem(link, lines)
     local classesPattern = patternOf(ITEM_CLASSES_ALLOWED, "Classes: %s")
     local unique = { [ITEM_UNIQUE or "Unique"] = true, [ITEM_UNIQUE_EQUIPPABLE or "Unique-Equipped"] = true }
     local uniqueMultiple = patternOf(ITEM_UNIQUE_MULTIPLE, "Unique (%d)")
-    local soulbound = ITEM_SOULBOUND or "Soulbound"
     for i, text in ipairs(lines or {}) do
         if i > 1 and type(text) == "string" then
             local classes = text:match(classesPattern)
@@ -304,8 +319,6 @@ function U.readItem(link, lines)
                 end
             elseif unique[text] or text:match(uniqueMultiple) then
                 item.unique = true
-            elseif text == soulbound then
-                item.soulbound = true
             elseif not fromApi then
                 -- No GetItemStats: read the (English) tooltip instead.
                 local value, statName = text:match("^([%+%-]%d+) (.+)$")
@@ -320,6 +333,7 @@ function U.readItem(link, lines)
             end
         end
     end
+    if U.untradeable(lines) then item.soulbound = true end
     return item
 end
 

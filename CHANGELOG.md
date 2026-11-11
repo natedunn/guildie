@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** Upgrades for me, on a guild's Crafting page: everything guildmates can craft that would be an upgrade for your characters, with why ("+4 Agility, +4 Stamina over Archery Training Gloves"), who can make it and a Request button.
+
+### Improvements
+
+- **Guildie, Addon:** Items nobody can trade (Binds when picked up, Soulbound, Quest Item) are no longer suggested as upgrades for guildmates or as "might want this" reagents, and can't be requested. A crafted Binds when picked up item still shows under Upgrades for me when your own character knows the recipe.
+
 ## 0.3.13
 
 ### New
