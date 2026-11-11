@@ -245,6 +245,17 @@ test("a player's own stat priority: a custom spec the site adds to the rules", f
     eq(plain(added[1]), "Brisket | upgrade (Agi/Sta/Str)")
 end)
 
+test("trade-offs: after upgrades, when a priority stat is given up", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    stubItems({ GLOVES })
+    -- Sturdy wears Strength gloves; the Agility gloves give it up.
+    _G.GuildieData = guildData({ vectors.members.Sturdy, vectors.members.Miller })
+    local added = hover(GLOVES)
+    eq(#added, 2)
+    eq(plain(added[1]), "Miller | upgrade (Arms)")
+    eq(plain(added[2]), "Sturdy | trade-off (Str/Agi/Sta)")
+end)
+
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     stubItems({ GLOVES })

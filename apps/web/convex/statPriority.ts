@@ -2,21 +2,27 @@ import { ConvexError, v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { vRegion } from "./schema";
 import { CLASS_RULES } from "./shared/proficiencies";
-import { validStats } from "./shared/statPriority";
+import { steepnessOf, validStats, validTiers } from "./shared/statPriority";
 import { canPrefer } from "./shared/upgrades";
 import { CLASS_TOKENS, SPECS } from "./shared/weights";
 import { requireUserId } from "./users";
 
 /**
  * The player who claimed a character chooses what its stat priority shows:
- * another talent tree's, their own three stats, or (null) back to their
- * talents. Shown on the roster and the character page.
+ * another talent tree's, their own three to five stats with how much each
+ * counts next to the first (`tiers`; left out: Balanced), or (null) back to
+ * their talents. Shown on the roster and the character page; gear
+ * suggestions follow it.
  */
 export const set = mutation({
 	args: {
 		region: vRegion,
 		slug: v.string(),
-		choice: v.union(v.null(), v.object({ tree: v.number() }), v.object({ stats: v.array(v.string()) })),
+		choice: v.union(
+			v.null(),
+			v.object({ tree: v.number() }),
+			v.object({ stats: v.array(v.string()), tiers: v.optional(v.array(v.number())) }),
+		),
 	},
 	handler: async (ctx, { region, slug, choice }) => {
 		const userId = await requireUserId(ctx);
@@ -27,7 +33,15 @@ export const set = mutation({
 				.collect()
 		).find((c) => c.userId === userId);
 		if (!claim) throw new ConvexError("Only the player who claimed this character can change it.");
-		if (choice && "stats" in choice && !validStats(choice.stats)) throw new ConvexError("Pick three different stats.");
+		if (choice && "stats" in choice) {
+			if (!validStats(choice.stats)) throw new ConvexError("Pick three to five different stats.");
+			if (choice.tiers) {
+				const tiers = validTiers(choice.tiers, choice.stats.length);
+				if (tiers !== choice.tiers) throw new ConvexError("Each stat can count at most as much as the one before.");
+				// Balanced is the default: not stored.
+				if (steepnessOf(tiers) === "balanced") choice = { stats: choice.stats };
+			}
+		}
 		if (choice && "tree" in choice) {
 			const character = await ctx.db
 				.query("characters")

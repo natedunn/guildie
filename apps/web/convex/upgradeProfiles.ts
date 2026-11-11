@@ -2,7 +2,7 @@ import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import type { Profile } from "./profile";
 import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
-import { type Rules, type UpgradeMember, upgradeMember, type WornItem } from "./shared/upgrades";
+import { type Rules, type StatChoice, type UpgradeMember, upgradeMember, type WornItem } from "./shared/upgrades";
 
 // Guild members as gear-upgrade suggestions see them (shared/upgrades.ts):
 // what they wear, read from each item's tooltip, and the stat priority and
@@ -55,7 +55,7 @@ export async function memberForUpgrades(
 	profile: Profile,
 	rules: Rules,
 	cache: Map<number, ItemInfo | undefined>,
-): Promise<{ member: UpgradeMember; worn: WornItem[] } | undefined> {
+): Promise<{ member: UpgradeMember; worn: WornItem[]; choice?: StatChoice } | undefined> {
 	if (!profile.equipment) return undefined;
 	const worn = await wornItems(ctx, profile.equipment, cache);
 	// The stat priority the player who claimed it chose, as the roster shows it (guilds.ts).
@@ -79,5 +79,5 @@ export async function memberForUpgrades(
 		},
 		rules,
 	);
-	return member && { member, worn };
+	return member && { member, worn, choice: claim?.statPriority };
 }

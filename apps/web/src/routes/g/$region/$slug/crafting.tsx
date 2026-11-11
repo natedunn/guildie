@@ -15,8 +15,10 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
+import { PriorityStrip } from "@/components/stat-priority";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
 // "Who can make...": every recipe someone in the guild knows, searched on the
 // client (recipe, item, item kind, tooltip text, reagents). The search and the
@@ -206,6 +208,20 @@ function CraftingPage() {
 				</div>
 			</div>
 
+			{showUpgrades && upgrades && upgrades.priorities.length > 0 ? (
+				<div className="space-y-1.5">
+					{upgrades.priorities.map((p) => (
+						<PriorityStrip
+							key={p.slug}
+							region={params.region}
+							slug={p.slug}
+							name={<ClassText classId={p.classId}>{p.name}</ClassText>}
+							priority={p.priority}
+						/>
+					))}
+				</div>
+			) : null}
+
 			{showUpgrades && upgrades && upgrades.noGear.length > 0 ? (
 				<p className="text-xs text-muted-foreground">
 					No gear read yet for {names(upgrades.noGear)}, so they're left out. Gear comes from Blizzard after a logout,
@@ -277,11 +293,23 @@ function CraftingPage() {
 							<span>For</span>
 							<span>Crafters</span>
 						</div>
-						<ul>
-							{results.slice(0, limit).map((r) => (
-								<UpgradeRow key={r.recipeId} recipe={r} region={params.region} member={member} />
-							))}
-						</ul>
+						{KIND_GROUPS.map((g) => {
+							const rows = results.slice(0, limit).filter((r) => r.for?.[0]?.kind === g.kind);
+							if (rows.length === 0) return null;
+							return (
+								<section key={g.kind}>
+									<h3 className="mt-3 flex items-baseline gap-2 border-b border-border pb-1.5 text-[0.8125rem] font-semibold">
+										{g.title}
+										<span className="text-xs font-normal text-muted-foreground">{g.hint}</span>
+									</h3>
+									<ul>
+										{rows.map((r) => (
+											<UpgradeRow key={r.recipeId} recipe={r} region={params.region} member={member} />
+										))}
+									</ul>
+								</section>
+							);
+						})}
 						{results.length > limit ? (
 							<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
 						) : null}
@@ -380,6 +408,17 @@ function Footnote({ region, characters }: { region: string; characters?: { slug:
 	);
 }
 
+/** "Upgrades for me" in groups, by each row's best verdict. */
+const KIND_GROUPS = [
+	{ kind: "upgrade", title: "Upgrades", hint: "More of your stats, nothing lost" },
+	{
+		kind: "tradeoff",
+		title: "Trade-offs",
+		hint: "Give up some of one stat for more of another; worth it at your steepness",
+	},
+	{ kind: "maybe", title: "Maybe", hint: "Small gains, your second spec, or a few levels from now" },
+] as const;
+
 const UPGRADE_GRID = "grid grid-cols-1 gap-x-4 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)]";
 
 /** "Brisket", "Brisket and Miller", "Brisket, Miller and Pip". */
@@ -453,8 +492,11 @@ function UpgradeRow({
 							</Link>
 							{h.mine ? <span className="text-xs text-muted-foreground">you</span> : null}
 							<span className="truncate text-xs text-muted-foreground">{h.spec}</span>
-							<span className={cn("ml-auto shrink-0 text-xs", h.kind !== "upgrade" && "text-muted-foreground")}>
-								{h.kind === "upgrade" ? "Upgrade" : h.at ? `Maybe, at ${h.at}` : "Maybe"}
+							<span
+								title={VERDICT_HINTS[h.kind]}
+								className={cn("ml-auto shrink-0 text-xs", h.kind === "maybe" && "text-muted-foreground")}
+							>
+								{verdictLabel(h.kind, h.at)}
 							</span>
 						</div>
 						<p className="text-xs text-muted-foreground">{h.why}</p>

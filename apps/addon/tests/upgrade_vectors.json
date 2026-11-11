@@ -43,6 +43,29 @@
 					"DPS": 8
 				}
 			},
+			"WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR": {
+				"name": "Str/Agi/Sta",
+				"w": {
+					"STRENGTH": 1,
+					"AGILITY": 0.7,
+					"STAMINA": 0.6,
+					"ARMOR": 0.02,
+					"DPS": 8
+				},
+				"stats": ["STRENGTH", "AGILITY", "STAMINA", "ARMOR"]
+			},
+			"MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA": {
+				"name": "Int/Spell dmg/Sta",
+				"w": {
+					"INTELLECT": 1,
+					"SPIRIT": 0.5,
+					"STAMINA": 0.6,
+					"SPELL_POWER": 1.3,
+					"SPELL_DAMAGE_DONE": 1.3,
+					"ARMOR": 0.02
+				},
+				"stats": ["INTELLECT", "SPELL_DAMAGE_DONE", "STAMINA"]
+			},
 			"WARRIOR:1": {
 				"name": "Fury",
 				"w": {
@@ -272,6 +295,35 @@
 				"INTELLECT": 3
 			},
 			"armor": 40
+		},
+		"strMailGloves": {
+			"invType": "HAND",
+			"cls": 4,
+			"subclass": 3,
+			"stats": {
+				"STRENGTH": 6,
+				"AGILITY": 2
+			},
+			"armor": 90
+		},
+		"thinStrGloves": {
+			"invType": "HAND",
+			"cls": 4,
+			"subclass": 3,
+			"stats": {
+				"STRENGTH": 9,
+				"STAMINA": 3
+			},
+			"armor": 40
+		},
+		"agiRingPlain": {
+			"invType": "FINGER",
+			"cls": 4,
+			"subclass": 0,
+			"stats": {
+				"AGILITY": 7,
+				"STAMINA": 2
+			}
 		}
 	},
 	"members": {
@@ -353,6 +405,46 @@
 			"spec": "DRUID:1",
 			"seen": 0,
 			"slots": {}
+		},
+		"Sturdy": {
+			"name": "Sturdy",
+			"classId": 1,
+			"level": 30,
+			"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+			"seen": 2000000,
+			"slots": {
+				"10": 5,
+				"11": 3,
+				"12": 6
+			},
+			"keys": {
+				"10": {
+					"STRENGTH": 3,
+					"ARMOR": 60
+				},
+				"11": {
+					"STRENGTH": 3
+				},
+				"12": {
+					"STAMINA": 10
+				}
+			}
+		},
+		"Sparky": {
+			"name": "Sparky",
+			"classId": 8,
+			"level": 30,
+			"spec": "MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA",
+			"seen": 2000000,
+			"slots": {
+				"1": 5
+			},
+			"keys": {
+				"1": {
+					"INTELLECT": 2,
+					"SPELL_DAMAGE_DONE": 4
+				}
+			}
 		},
 		"Chainmail": {
 			"name": "Chainmail",
@@ -728,6 +820,84 @@
 				"second": false,
 				"against": [18]
 			}
+		},
+		{
+			"name": "more of every priority stat: an upgrade",
+			"item": "strMailGloves",
+			"member": "Sturdy",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.8400000000000002,
+				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+				"at": null,
+				"second": false,
+				"against": [10]
+			}
+		},
+		{
+			"name": "less armor than worn: a trade-off",
+			"item": "thinStrGloves",
+			"member": "Sturdy",
+			"expect": {
+				"kind": "tradeoff",
+				"gain": 1.3200000000000003,
+				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+				"at": null,
+				"second": false,
+				"against": [10]
+			}
+		},
+		{
+			"name": "gives up Strength for Agility: a trade-off",
+			"item": "leatherAgiGloves",
+			"member": "Sturdy",
+			"expect": {
+				"kind": "tradeoff",
+				"gain": 0.5599999999999999,
+				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+				"at": null,
+				"second": false,
+				"against": [10]
+			}
+		},
+		{
+			"name": "ring vs the weaker ring: its Strength is given up",
+			"item": "agiRingPlain",
+			"member": "Sturdy",
+			"expect": {
+				"kind": "tradeoff",
+				"gain": 1.0333333333333332,
+				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+				"at": null,
+				"second": false,
+				"against": [11]
+			}
+		},
+		{
+			"name": "spell power counts as spell damage: an upgrade",
+			"item": "clothIntHead",
+			"member": "Sparky",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 2.02,
+				"spec": "MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA",
+				"at": null,
+				"second": false,
+				"against": [1]
+			}
+		},
+		{
+			"name": "no priority stats known: an upgrade as before",
+			"item": "clothIntHead",
+			"member": "Frosty",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 2.02,
+				"spec": "MAGE:2",
+				"at": null,
+				"second": false,
+				"against": [1]
+			}
 		}
 	],
 	"scores": [
@@ -843,7 +1013,7 @@
 			"expect": 1
 		}
 	],
-	"suggestMembers": ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale"],
+	"suggestMembers": ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy"],
 	"suggest": [
 		{
 			"name": "agility gloves, everyone",
@@ -883,7 +1053,15 @@
 			"now": 2003600,
 			"skip": [],
 			"max": 3,
-			"expect": ["Rage:upgrade", "Miller:maybe"]
+			"expect": ["Sturdy:upgrade", "Rage:upgrade", "Miller:maybe"]
+		},
+		{
+			"name": "upgrades before trade-offs",
+			"item": "leatherAgiGloves",
+			"now": 2003600,
+			"skip": [],
+			"max": 6,
+			"expect": ["Arrow:upgrade", "Rage:upgrade", "Miller:upgrade", "Brisket:upgrade", "Sturdy:tradeoff"]
 		}
 	]
 }

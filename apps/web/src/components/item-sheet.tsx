@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
 import { RequestButton, RequestRow } from "@/components/requests";
+import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
 // The item panel: click any item and it slides in from the right over the
 // page you're on (`?item=<id>`, so Back closes it). What the item is, who in
@@ -217,9 +218,10 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 											<span className="num">{u.level}</span> {u.spec}
 										</span>
 										<span
-											className={u.kind === "upgrade" ? "ml-auto text-xs" : "ml-auto text-xs text-muted-foreground"}
+											title={VERDICT_HINTS[u.kind]}
+											className={u.kind === "maybe" ? "ml-auto text-xs text-muted-foreground" : "ml-auto text-xs"}
 										>
-											{u.kind === "upgrade" ? "Upgrade" : u.at ? `Maybe, at ${u.at}` : "Maybe"}
+											{verdictLabel(u.kind, u.at)}
 										</span>
 									</div>
 									<p className="text-xs text-muted-foreground">{u.why}</p>

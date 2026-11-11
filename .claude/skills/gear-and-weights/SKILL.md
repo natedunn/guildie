@@ -34,7 +34,9 @@ away, Unique already worn). Spec = tree with most points (under
 Score = Σ weight × stat + armor and DPS terms; items whose stats are mostly
 useless to the spec (`minFit`) don't suit it. Compare with what they wear in
 that slot (weaker ring/trinket, main+off hand for a two-hander). **Upgrade:**
-gain ≥ `upgrade` (15%), usable now, main spec. **Maybe:** gain ≥ `maybe`
+gain ≥ `upgrade` (15%), usable now, main spec, none of the spec's priority
+stats (`stats`) lower than worn (member `keys`). **Trade-off:** the same but
+some priority stat is given up. **Maybe:** gain ≥ `maybe`
 (3%), second spec, or usable within `levelsAhead`.
 
 ## Tuning weights (the common change)
@@ -96,7 +98,8 @@ The two implementations must match exactly:
 - Shared code stays free of Convex imports (`node --test` runs it).
 - A player's stat priority choice (`ownedCharacters.statPriority`) picks the
   spec: `specsFor` (another tree, or a custom spec from `customWeights` added
-  to `rules.specs`). Build members with `memberForUpgrades` (it reads the
+  to `rules.specs`, with up to five `stats` and the steepness `tiers`;
+  pages show three). Build members with `memberForUpgrades` (it reads the
   claim), and when rules leave the call (helper.ts guild data) carry the
   custom specs along, or the addon can't find them.
 - Preferred armor and weapon types (`ownedCharacters.gearPreference`) ride on

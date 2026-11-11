@@ -7,7 +7,8 @@ import { pickProfile } from "./helper";
 import { activeIn, membership } from "./requests";
 import { vRegion } from "./schema";
 import { type ItemInfo, itemInfoFromTooltip, untradeable } from "./shared/itemInfo";
-import { explain, judge, suggest, upgradeRules } from "./shared/upgrades";
+import { type StatPriority, statPriority } from "./shared/statPriority";
+import { explain, judge, kindRank, suggest, upgradeRules, type VerdictKind } from "./shared/upgrades";
 import { CLASS_TOKENS } from "./shared/weights";
 import { memberForUpgrades } from "./upgradeProfiles";
 
@@ -160,10 +161,15 @@ export const upgradesForMe = query({
 		const cache = new Map<number, ItemInfo | undefined>();
 		const mine: (NonNullable<Awaited<ReturnType<typeof memberForUpgrades>>> & { character: Doc<"characters"> })[] = [];
 		const noGear: { slug: string; name: string; classId: number }[] = [];
+		// Each character's stat priority, for changing it right here.
+		const priorities: { slug: string; name: string; classId: number; priority: StatPriority }[] = [];
 		for (const c of viewer.characters) {
-			const f = await memberForUpgrades(ctx, c, await pickProfile(ctx, c), rules, cache);
+			const profile = await pickProfile(ctx, c);
+			const f = await memberForUpgrades(ctx, c, profile, rules, cache);
 			if (f) mine.push({ ...f, character: c });
 			else noGear.push({ slug: c.slug, name: c.name, classId: c.classId });
+			const priority = f && statPriority(c.classId, profile.talentTrees, f.choice);
+			if (priority) priorities.push({ slug: c.slug, name: c.name, classId: c.classId, priority });
 		}
 
 		const items = new Map<number, Doc<"items"> | null>();
@@ -197,7 +203,7 @@ export const upgradesForMe = query({
 				});
 			}
 			if (helps.length === 0) continue;
-			helps.sort((a, b) => rank(a) - rank(b) || b.gain - a.gain);
+			helps.sort((a, b) => kindRank(a.kind) - kindRank(b.kind) || b.gain - a.gain);
 			hits.push({
 				...(await recipeView(ctx, recipe, items)),
 				crafters: bound ? crafters.filter((c) => helps.some((h) => h.slug === c.slug)) : crafters,
@@ -205,10 +211,14 @@ export const upgradesForMe = query({
 			});
 		}
 		hits.sort(
-			(a, b) => rank(a.for[0]) - rank(b.for[0]) || b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name),
+			(a, b) =>
+				kindRank(a.for[0].kind) - kindRank(b.for[0].kind) ||
+				b.for[0].gain - a.for[0].gain ||
+				a.name.localeCompare(b.name),
 		);
 		return {
 			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId })),
+			priorities,
 			noGear,
 			/** The viewer's characters whose gear types leave other types out ("Only this type"). */
 			strict: mine
@@ -314,7 +324,7 @@ export const upgradesICanCraft = query({
 				requested: requested.get(recipeId) ?? [],
 			});
 		}
-		const upgrades = (h: { for: Help[] }) => h.for.filter((x) => x.kind === "upgrade").length;
+		const upgrades = (h: { for: Help[] }) => h.for.filter((x) => x.kind !== "maybe").length;
 		hits.sort(
 			(a, b) =>
 				upgrades(b) - upgrades(a) ||
@@ -332,15 +342,12 @@ type Help = {
 	name: string;
 	classId: number;
 	level: number;
-	kind: "upgrade" | "maybe";
+	kind: VerdictKind;
 	gain: number;
 	spec: string;
 	at?: number;
 	why: string;
 };
-
-/** Upgrades before maybes. */
-const rank = (h: { kind: "upgrade" | "maybe" }) => (h.kind === "upgrade" ? 0 : 1);
 
 /** Most names the item panel's "Upgrade for" lists (the addon's tooltip line shows 3). */
 const PANEL_UPGRADES = 5;

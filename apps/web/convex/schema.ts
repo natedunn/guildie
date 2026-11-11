@@ -181,10 +181,17 @@ export default defineSchema({
 		claimedAt: v.number(),
 		/**
 		 * The stats this character looks for on gear, if the player chose:
-		 * another talent tree's (index in the class), or their own three
-		 * (shared/statPriority.ts). Unset: from their talents.
+		 * another talent tree's (index in the class), or their own three to
+		 * five with how much each counts next to the first (`tiers`, unset:
+		 * Balanced) (shared/statPriority.ts). Unset: from their talents.
 		 */
-		statPriority: v.optional(v.object({ tree: v.optional(v.number()), stats: v.optional(v.array(v.string())) })),
+		statPriority: v.optional(
+			v.object({
+				tree: v.optional(v.number()),
+				stats: v.optional(v.array(v.string())),
+				tiers: v.optional(v.array(v.number())),
+			}),
+		),
 		/**
 		 * The armor and weapon types this character prefers, if the player
 		 * chose (armor and weapon subclass ids): others count less in gear
