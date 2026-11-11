@@ -17,8 +17,10 @@ local function settings()
     if s.minimapAngle == nil then s.minimapAngle = 220 end
     if s.showMinimap == nil then s.showMinimap = true end
     if s.reloadWhenAfk == nil then s.reloadWhenAfk = false end
+    if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
     return s
 end
+ns.settings = settings
 
 -- ---- Window ------------------------------------------------------------------
 -- The game's own look: PortraitFrameTemplate (the logo in the portrait ring,
@@ -64,7 +66,13 @@ local function makeFrame()
             disc:SetVertexColor(0.06, 0.06, 0.06)
             disc:SetAllPoints(portrait)
             portrait:SetTexture(ICON)
-            portrait:SetTexCoord(0, 1, 0, 1)
+            -- The portrait sits about 2px right of and below the ring's
+            -- center (measured in game), so shift the logo up and left
+            -- inside it. The icon's edges are transparent, so the shifted
+            -- texture coordinates show nothing extra.
+            local size = (portrait.GetWidth and portrait:GetWidth()) or 0
+            local shift = size > 0 and (2 / size) or 0
+            portrait:SetTexCoord(shift, 1 + shift, shift, 1 + shift)
         end
         if f.SetTitle then
             f:SetTitle("Guildie")
@@ -374,6 +382,9 @@ local function buildWindow()
             settings().showMinimap = on
             if ns.updateMinimapButton then ns.updateMinimapButton() end
         end)
+    window.explain = checkbox("Say why tooltips have nothing",
+        function() return settings().sayWhyEmpty end,
+        function(on) settings().sayWhyEmpty = on end)
 
     local afkHint = text("GameFontDisableSmall", TEXT_WIDTH - 26)
     afkHint:SetText("Experimental. Reloads your UI while AFK, out of combat, at most every 20 minutes.")
@@ -401,6 +412,7 @@ local function buildWindow()
         { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
         { el = heading("Preferences"), gap = 14 },
         { el = window.minimap, gap = 6, dx = -4, height = 24 },
+        { el = window.explain, gap = 2, dx = -4, height = 24 },
         { el = window.afk, gap = 2, dx = -4, height = 24 },
         { el = afkHint, gap = 0, dx = 26 },
     }
@@ -444,12 +456,15 @@ local function buildButton()
     local background = button:CreateTexture(nil, "BACKGROUND")
     background:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
     background:SetSize(20, 20)
-    background:SetPoint("TOPLEFT", 7, -5)
+    background:SetPoint("TOPLEFT", 7, -6)
 
+    -- Centered in the tracking border's ring, whose center is at (17, -16)
+    -- from the button's top left (measured in game; the usual 7, -6 sat a
+    -- pixel up and left).
     local icon = button:CreateTexture(nil, "ARTWORK")
     icon:SetTexture("Interface\\AddOns\\Guildie\\icon")
     icon:SetSize(18, 18)
-    icon:SetPoint("TOPLEFT", 7, -6)
+    icon:SetPoint("TOPLEFT", 8, -7)
 
     local border = button:CreateTexture(nil, "OVERLAY")
     border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")

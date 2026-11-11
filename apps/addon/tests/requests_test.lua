@@ -43,10 +43,11 @@ local function hover(ns, itemID)
     local tooltip = {
         GetName = function() return "GameTooltip" end,
         AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
         Show = function() end,
     }
     ns.addToTooltip(tooltip, itemID)
-    return added
+    return wow.guildieRows(added, ns)
 end
 
 local DATA = {
@@ -69,41 +70,95 @@ local DATA = {
 test("an item request: who and how many, class-colored", function()
     local ns = load(DATA)
     local lines = hover(ns, 2589)
-    eq(#lines, 1, "one line")
-    eq(plain(lines[1]), "Guildie: Todd is requesting 20")
+    eq(#lines, 1, "one row")
+    eq(plain(lines[1]), "Todd | requesting 20")
     assert(lines[1]:find("|cffc69b6dTodd|r", 1, true), "warrior color for Todd: " .. lines[1])
 end)
 
-test("claimed, and your own request, on one line", function()
+test("claimed, and your own request: a row each", function()
     local ns = load(DATA)
-    eq(plain(ns.requestLine(4306)), "Guildie: Todd is requesting 5, claimed by Miller; you are requesting 1")
+    local lines = hover(ns, 4306)
+    eq(#lines, 2)
+    eq(plain(lines[1]), "Todd | requesting 5, claimed by Miller")
+    eq(plain(lines[2]), "You | requesting 1")
 end)
 
 test("crafts: wants this crafted, with how many", function()
     local ns = load(DATA)
-    eq(plain(ns.requestLine(4245)), "Guildie: Brenna wants this crafted (2)")
-    eq(plain(ns.requestLine(4246)), "Guildie: You want this crafted")
+    eq(plain(hover(ns, 4245)[1]), "Brenna | wants it crafted (2)")
+    eq(plain(hover(ns, 4246)[1]), "You | want it crafted")
 end)
 
-test("nothing requested, no data, or an older file without requests: no line", function()
+test("nothing requested, no data, or an older file without requests: no request rows", function()
     local ns = load(DATA)
-    eq(ns.requestLine(1234), nil, "not requested")
-    eq(#hover(ns, 1234), 0)
+    eq(#ns.requestRows(1234), 0, "not requested")
+    eq(table.concat(hover(ns, 1234)), "No guildmates need this")
     ns = load(nil)
-    eq(ns.requestLine(2589), nil, "no GuildieData")
+    eq(#ns.requestRows(2589), 0, "no GuildieData")
+    eq(table.concat(hover(ns, 2589)), "No guild data yet (needs the Guildie app)")
     ns = load({ generatedAt = 1, reagents = {} })
-    eq(ns.requestLine(2589), nil, "file from before 0.8.0")
+    eq(#ns.requestRows(2589), 0, "file from before 0.8.0")
 end)
 
-test("the request line comes before the reagent line", function()
+test("the request rows come before the reagent row", function()
     local data = {}
     for k, v in pairs(DATA) do data[k] = v end
     data.reagents = { [2589] = { name = "Linen Cloth", users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } } }
     local ns = load(data)
     local lines = hover(ns, 2589)
     eq(#lines, 2)
-    eq(plain(lines[1]), "Guildie: Todd is requesting 20")
-    eq(plain(lines[2]), "Guildie might want this: Brenna (Tailoring)")
+    eq(plain(lines[1]), "Todd | requesting 20")
+    eq(plain(lines[2]), "Brenna | might want (Tailoring)")
+end)
+
+test("reagents: a row per person, professions merged, up to 8, then +N more", function()
+    local data = {}
+    for k, v in pairs(DATA) do data[k] = v end
+    data.reagents = { [765] = { name = "Silverleaf", users = {
+        { name = "Healing", classId = 5, profession = "Alchemy" },
+        { name = "Lich", classId = 5, profession = "Alchemy" },
+        { name = "Hoofing", classId = 11, profession = "Herbalism" },
+        { name = "Healing", classId = 5, profession = "Herbalism" },
+        { name = "Brenna", classId = 8, profession = "Tailoring" },
+        { name = "Corwin", classId = 4, profession = "Alchemy" },
+        { name = "Dax", classId = 1, profession = "Alchemy" },
+        { name = "Dax", classId = 1, profession = "Cooking" },
+    } } }
+    local ns = load(data)
+    local lines = hover(ns, 765)
+    eq(#lines, 5, "everyone, not your own character")
+    eq(plain(lines[1]), "Healing | might want (Alchemy, Herbalism)")
+    eq(plain(lines[2]), "Hoofing | might want (Herbalism)")
+    eq(plain(lines[3]), "Brenna | might want (Tailoring)")
+    eq(plain(lines[5]), "Dax | might want (Alchemy, Cooking)")
+    for _, name in ipairs({ "Ezra", "Fen", "Gus", "Hob", "Ivy" }) do
+        table.insert(data.reagents[765].users, { name = name, classId = 1, profession = "Mining" })
+    end
+    lines = hover(ns, 765)
+    eq(#lines, 9, "8 people, then the rest")
+    eq(plain(lines[8]), "Gus | might want (Mining)")
+    eq(plain(lines[9]), "+2 more")
+end)
+
+test("hooks item tooltips at PLAYER_LOGIN, after every addon has loaded", function()
+    local ns = load(DATA)
+    -- (wow.load clears these; the hook looks for them at login.)
+    local calls = {}
+    _G.Enum = { TooltipDataType = { Item = 0 } }
+    _G.TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) table.insert(calls, { kind = kind, fn = fn }) end }
+    eq(#calls, 0, "not while loading")
+    wow.fire("PLAYER_LOGIN")
+    eq(#calls, 1, "once at login")
+    eq(calls[1].kind, 0)
+    local added = {}
+    calls[1].fn({
+        GetName = function() return "GameTooltip" end,
+        AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
+        Show = function() end,
+    }, { id = 2589 })
+    eq(plain(wow.guildieRows(added, ns)[1]), "Todd | requesting 20")
+    _G.TooltipDataProcessor, _G.Enum = nil, nil
 end)
 
 test("window: your requests, with the stale nudge", function()

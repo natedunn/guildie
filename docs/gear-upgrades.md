@@ -1,8 +1,8 @@
 # Gear upgrade suggestions
 
 How Guildie decides that an item is an upgrade for a guildmate: the
-"**Guildie**: upgrade for Brisket (Feral), maybe Miller (at 24)" line in the
-addon's item tooltips, and the "Upgrade for" list in the site's item panel.
+"Brisket | upgrade (Feral)" and "Miller | maybe (at 24)" rows under Guildie
+in the addon's item tooltips, and the "Upgrade for" list in the site's item panel.
 
 It's a best guess from stat weights and what each person wears, not a
 simulation. If a suggestion looks wrong, or you know a spec's priorities

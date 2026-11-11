@@ -137,12 +137,13 @@ local function hover(item)
         GetName = function() return "GameTooltip" end,
         GetItem = function() return item.name, item.link end,
         AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
         Show = function() end,
     }
     local lines = { { leftText = item.name } }
     for _, l in ipairs(item.lines or {}) do table.insert(lines, { leftText = l }) end
     ns.addToTooltip(tooltip, item.id, { id = item.id, lines = lines })
-    return added
+    return wow.guildieRows(added, ns)
 end
 
 local function plain(text)
@@ -212,14 +213,15 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     alt.name = "Alt"
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, alt })
     local added = hover(GLOVES)
-    eq(#added, 1, "one line")
-    eq(plain(added[1]), "Guildie: upgrade for Miller (Arms), Brisket (Feral)")
-    assert(added[1]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[1])
+    eq(#added, 2, "a row each")
+    eq(plain(added[1]), "Miller | upgrade (Arms)")
+    eq(plain(added[2]), "Brisket | upgrade (Feral)")
+    assert(added[2]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[2])
     -- Soulbound to the viewer: can't be traded, so no suggestions.
     local bound = {}
     for k, v in pairs(GLOVES) do bound[k] = v end
     bound.lines = { "Soulbound", "Hands", "+6 Agility" }
-    eq(#hover(bound), 0, "soulbound")
+    eq(table.concat(hover(bound)), "Soulbound, can't be traded")
 end)
 
 test("a player's own stat priority: a custom spec the site adds to the rules", function()
@@ -240,7 +242,7 @@ test("a player's own stat priority: a custom spec the site adds to the rules", f
     _G.GuildieData = data
     local added = hover(GLOVES)
     eq(#added, 1)
-    eq(plain(added[1]), "Guildie: upgrade for Brisket (Agi/Sta/Str)")
+    eq(plain(added[1]), "Brisket | upgrade (Agi/Sta/Str)")
 end)
 
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
@@ -248,16 +250,38 @@ test("nothing that can't be traded: Binds when picked up, Quest Item; reagent li
     stubItems({ GLOVES })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller })
     GuildieData.reagents[GLOVES.id] = { name = GLOVES.name, users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } }
-    eq(#hover(GLOVES), 2, "tradeable: reagent and upgrade lines")
+    eq(#hover(GLOVES), 3, "tradeable: reagent and upgrade rows")
     for _, binding in ipairs({ "Binds when picked up", "Quest Item", "Soulbound" }) do
         local bound = {}
         for k, v in pairs(GLOVES) do bound[k] = v end
         bound.lines = { binding, "Hands", "60 Armor", "+6 Agility", "+4 Stamina" }
-        eq(#hover(bound), 0, binding)
+        eq(table.concat(hover(bound)), binding .. ", can't be traded")
     end
     -- "Binds when equipped" trades until it's worn.
     eq(U.untradeable({ GLOVES.name, "Binds when equipped" }), false)
     eq(U.untradeable({ GLOVES.name, "Binds when picked up" }), true)
+end)
+
+test("say why tooltips have nothing: on by default, and can be turned off", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    local cloak = { id = 8, name = "Plain Cloak", equipLoc = "INVTYPE_CLOAK", classID = 4, subclassID = 1, stats = {} }
+    stubItems({ GLOVES, cloak })
+    _G.GuildieData = guildData({ vectors.members.Brisket })
+    local bound = {}
+    for k, v in pairs(GLOVES) do bound[k] = v end
+    bound.lines = { "Binds when picked up", "Hands", "+6 Agility" }
+    GuildieDB.settings = { sayWhyEmpty = false }
+    eq(#hover(cloak), 0, "turned off")
+    eq(#hover(bound), 0, "turned off")
+    GuildieDB.settings = nil
+    eq(plain(hover(cloak)[1]), "No guildmates need this")
+    eq(plain(hover(bound)[1]), "Binds when picked up, can't be traded")
+    bound.lines = { "Soulbound", "Hands" }
+    eq(plain(hover(bound)[1]), "Soulbound, can't be traded")
+    eq(#hover(GLOVES), 1, "a suggestion: no reason row")
+    eq(plain(hover(GLOVES)[1]), "Brisket | upgrade (Feral)")
+    _G.GuildieData = nil
+    eq(plain(hover(cloak)[1]), "No guild data yet (needs the Guildie app)")
 end)
 
 test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies", function()
@@ -276,12 +300,17 @@ test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies
     }
     stubItems({ helm, sword, resist })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, vectors.members.Rage })
-    eq(plain(hover(helm)[1]), "Guildie: maybe Frosty (at 33), Brisket (Restoration, at 33)")
-    eq(plain(hover(sword)[1]), "Guildie: upgrade for Rage (Fury), maybe Miller (at 25)")
-    eq(#hover(resist), 0, "nobody")
+    local helm_rows = hover(helm)
+    eq(plain(helm_rows[1]), "Frosty | maybe (at 33)")
+    eq(plain(helm_rows[2]), "Brisket | maybe (Restoration, at 33)")
+    local sword_rows = hover(sword)
+    eq(#sword_rows, 2, "upgrade first, then maybe")
+    eq(plain(sword_rows[1]), "Rage | upgrade (Fury)")
+    eq(plain(sword_rows[2]), "Miller | maybe (at 25)")
+    eq(table.concat(hover(resist)), "No guildmates need this", "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }
-    eq(#hover(sword), 0)
+    eq(table.concat(hover(sword)), "No guildmates need this")
 end)
 
 -- ---- End to end: real guild data, items to hover ------------------------------
@@ -299,7 +328,7 @@ if dataPath and itemsPath then
     for _, item in ipairs(items) do
         local added = hover(item)
         _G.GuildieData = data
-        print(string.format("%-34s %s", item.name, #added > 0 and plain(added[#added]) or "(no line)"))
+        print(string.format("%-34s %s", item.name, #added > 0 and plain(table.concat(added, "; ")) or "(no line)"))
     end
 end
 

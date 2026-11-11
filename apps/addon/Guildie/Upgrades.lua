@@ -1,5 +1,5 @@
 -- Gear-upgrade suggestions on item tooltips: which guildmates the hovered
--- item might help ("Guildie: upgrade for Brisket (Feral), maybe Miller (at 24)").
+-- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Miller | maybe (at 24)").
 -- A best guess from stat weights, not a sim.
 --
 -- The rules, the weights and each guildmate (level, spec, scores of what they
@@ -289,15 +289,21 @@ end
 --- when picked up" (it binds to whoever loots or crafts it) or "Quest Item"
 --- (as `untradeable` in itemInfo.ts). `lines`: the tooltip's text lines.
 function U.untradeable(lines)
+    return U.binding(lines) ~= nil
+end
+
+--- The tooltip line that makes the item untradeable ("Soulbound", "Binds
+--- when picked up", "Quest Item"), or nil.
+function U.binding(lines)
     local bound = {
         [ITEM_SOULBOUND or "Soulbound"] = true,
         [ITEM_BIND_ON_PICKUP or "Binds when picked up"] = true,
         [ITEM_BIND_QUEST or "Quest Item"] = true,
     }
     for i, text in ipairs(lines or {}) do
-        if i > 1 and bound[text] then return true end
+        if i > 1 and bound[text] then return text end
     end
-    return false
+    return nil
 end
 
 --- The hovered item as the decision wants it (same shape as ItemInfo in
@@ -362,9 +368,7 @@ function U.readItem(link, lines)
     return item
 end
 
--- ---- The tooltip line ---------------------------------------------------------------
-
-local GOLD = "|cffd9b45a"
+-- ---- The tooltip rows ---------------------------------------------------------------
 
 local function upgradeData()
     local data = GuildieData and GuildieData.upgrades
@@ -372,9 +376,10 @@ local function upgradeData()
     return data
 end
 
---- "Guildie: upgrade for A (Feral), B (Fury), maybe C (at 24)", or nil.
---- `color(name, classId)` colors a name.
-function U.line(item, itemID, color)
+--- Rows under the tooltip's Guildie header, one per person, upgrades first:
+--- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Miller", right =
+--- "maybe (at 24)" }, or nil. `color(name, classId)` colors a name.
+function U.lines(item, itemID, color)
     local data = upgradeData()
     if not data or not item or item.soulbound then return nil end
     local skip = {}
@@ -392,13 +397,11 @@ function U.line(item, itemID, color)
         local notes = {}
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
         if v.at then table.insert(notes, "at " .. v.at) end
-        local text = color(p.member.name, p.member.classId) .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
-        table.insert(v.kind == "upgrade" and ups or maybes, text)
+        local right = (v.kind == "upgrade" and "upgrade" or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
+        table.insert(v.kind == "upgrade" and ups or maybes, { left = color(p.member.name, p.member.classId), right = right })
     end
-    local parts = {}
-    if #ups > 0 then table.insert(parts, "upgrade for " .. table.concat(ups, ", ")) end
-    if #maybes > 0 then table.insert(parts, "maybe " .. table.concat(maybes, ", ")) end
-    return GOLD .. "Guildie|r: " .. table.concat(parts, ", ")
+    for _, row in ipairs(maybes) do table.insert(ups, row) end
+    return ups
 end
 
 --- The tooltip's text lines: from tooltip data (modern clients), else its font strings.

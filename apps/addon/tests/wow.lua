@@ -389,4 +389,20 @@ function wow.savedVariables(db)
         .. ",\n\t[\"lastReason\"] = " .. q(db.lastReason or "") .. ",\n}\n"
 end
 
+--- The rows of the addon's tooltip block, given every line a test tooltip
+--- recorded. Checks the block's shape (a blank line, the "Guildie" header,
+--- indented rows) and returns the rows without their indent.
+function wow.guildieRows(added, ns)
+    if #added == 0 then return {} end
+    assert(added[1] == " ", "a blank line first, got: " .. tostring(added[1]))
+    assert(added[2] == ns.TOOLTIP_HEADER, "then the header, got: " .. tostring(added[2]))
+    assert(#added > 2, "a header with no rows")
+    local rows = {}
+    for i = 3, #added do
+        assert(added[i]:match("^   %S"), "rows are indented: " .. added[i])
+        table.insert(rows, (added[i]:gsub("^%s+", "")))
+    end
+    return rows
+end
+
 return wow
