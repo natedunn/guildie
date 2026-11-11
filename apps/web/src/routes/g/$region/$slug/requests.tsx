@@ -197,36 +197,40 @@ function NewRequest({
 										</span>
 									</span>
 								</ItemHover>
-								<span className="flex gap-1.5">
-									<RequestButton
-										guild={guild}
-										characters={characters}
-										target={{
-											kind: "item",
-											itemId: item.itemId,
-											name: item.name,
-											quality: item.quality,
-											icon: item.icon,
-										}}
-										label="Request item"
-									/>
-									{item.craft && (
+								{item.untradeable ? (
+									<span className="shrink-0 text-xs text-muted-foreground">{item.untradeable}</span>
+								) : (
+									<span className="flex gap-1.5">
 										<RequestButton
 											guild={guild}
 											characters={characters}
 											target={{
-												kind: "craft",
-												recipeId: item.craft.recipeId,
-												name: item.craft.name,
+												kind: "item",
 												itemId: item.itemId,
+												name: item.name,
 												quality: item.quality,
 												icon: item.icon,
-												crafters: item.craft.crafters,
 											}}
-											label="Request a craft"
+											label="Request item"
 										/>
-									)}
-								</span>
+										{item.craft && (
+											<RequestButton
+												guild={guild}
+												characters={characters}
+												target={{
+													kind: "craft",
+													recipeId: item.craft.recipeId,
+													name: item.craft.name,
+													itemId: item.itemId,
+													quality: item.quality,
+													icon: item.icon,
+													crafters: item.craft.crafters,
+												}}
+												label="Request a craft"
+											/>
+										)}
+									</span>
+								)}
 							</li>
 						))}
 					</ul>

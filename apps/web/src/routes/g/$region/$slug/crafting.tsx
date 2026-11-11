@@ -367,7 +367,10 @@ function UpgradeRow({
 	);
 }
 
-/** Who knows the recipe (highest skill first, a few until "+N more"), and Request for members. */
+/**
+ * Who knows the recipe (highest skill first, a few until "+N more"), and
+ * Request for members, unless the item binds to its crafter.
+ */
 function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: string; member?: Member }) {
 	const [expanded, setExpanded] = useState(false);
 	const shown = expanded ? recipe.crafters : recipe.crafters.slice(0, CRAFTERS);
@@ -395,7 +398,10 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 					+{hidden} more
 				</button>
 			) : null}
-			{member && recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug)) ? (
+			{recipe.item?.untradeable ? (
+				// Binds to whoever crafts it: nothing to request.
+				<span className="ml-auto text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>
+			) : member && recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug)) ? (
 				<RequestButton
 					guild={member.guild}
 					characters={member.characters}

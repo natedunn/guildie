@@ -222,6 +222,23 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     eq(#hover(bound), 0, "soulbound")
 end)
 
+test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    stubItems({ GLOVES })
+    _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller })
+    GuildieData.reagents[GLOVES.id] = { name = GLOVES.name, users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } }
+    eq(#hover(GLOVES), 2, "tradeable: reagent and upgrade lines")
+    for _, binding in ipairs({ "Binds when picked up", "Quest Item", "Soulbound" }) do
+        local bound = {}
+        for k, v in pairs(GLOVES) do bound[k] = v end
+        bound.lines = { binding, "Hands", "60 Armor", "+6 Agility", "+4 Stamina" }
+        eq(#hover(bound), 0, binding)
+    end
+    -- "Binds when equipped" trades until it's worn.
+    eq(U.untradeable({ GLOVES.name, "Binds when equipped" }), false)
+    eq(U.untradeable({ GLOVES.name, "Binds when picked up" }), true)
+end)
+
 test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local helm = {

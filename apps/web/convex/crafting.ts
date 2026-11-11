@@ -6,7 +6,7 @@ import { access, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { membership } from "./requests";
 import { vRegion } from "./schema";
-import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
+import { type ItemInfo, itemInfoFromTooltip, untradeable } from "./shared/itemInfo";
 import { explain, judge, suggest, upgradeRules } from "./shared/upgrades";
 import { CLASS_TOKENS } from "./shared/weights";
 import { memberForUpgrades } from "./upgradeProfiles";
@@ -42,6 +42,8 @@ async function recipeView(ctx: QueryCtx, recipe: Doc<"recipes">, items: Map<numb
 					icon: made.icon,
 					kind: made.kind,
 					tooltip: made.tooltip,
+					/** "Binds when picked up" and the like: only the crafter can have it, so no requests. */
+					untradeable: untradeable(made.tooltip),
 				}
 			: null,
 		reagents: await Promise.all(
@@ -174,8 +176,12 @@ export const upgradesForMe = query({
 			const made = items.get(recipe.craftedItemId);
 			const info = made ? itemInfoFromTooltip(made.tooltip) : undefined;
 			if (!info) continue;
-			const helps = [];
+			// Binds when picked up: it binds to whoever crafts it, so it's only
+			// for those of the viewer's characters who know the recipe themselves.
+			const bound = !!untradeable(made?.tooltip);
+			const helps: Help[] = [];
 			for (const f of mine) {
+				if (bound && !crafters.some((c) => c.slug === f.character.slug)) continue;
 				const verdict = judge(info, f.member, rules, recipe.craftedItemId);
 				if (!verdict) continue;
 				helps.push({
@@ -192,7 +198,11 @@ export const upgradesForMe = query({
 			}
 			if (helps.length === 0) continue;
 			helps.sort((a, b) => rank(a) - rank(b) || b.gain - a.gain);
-			hits.push({ ...(await recipeView(ctx, recipe, items)), crafters, for: helps });
+			hits.push({
+				...(await recipeView(ctx, recipe, items)),
+				crafters: bound ? crafters.filter((c) => helps.some((h) => h.slug === c.slug)) : crafters,
+				for: helps,
+			});
 		}
 		hits.sort(
 			(a, b) => rank(a.for[0]) - rank(b.for[0]) || b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name),
@@ -204,6 +214,19 @@ export const upgradesForMe = query({
 		};
 	},
 });
+
+/** One of the viewer's characters an item would help, and why. */
+type Help = {
+	slug: string;
+	name: string;
+	classId: number;
+	level: number;
+	kind: "upgrade" | "maybe";
+	gain: number;
+	spec: string;
+	at?: number;
+	why: string;
+};
 
 /** Upgrades before maybes. */
 const rank = (h: { kind: "upgrade" | "maybe" }) => (h.kind === "upgrade" ? 0 : 1);
@@ -341,6 +364,8 @@ export const itemDetail = query({
 			item: item
 				? { name: item.name, quality: item.quality, icon: item.icon, kind: item.kind, tooltip: item.tooltip }
 				: null,
+			/** "Binds when picked up" and the like: nobody can trade it, so no requests. */
+			untradeable: untradeable(item?.tooltip),
 			guild: guild ? { name: guild.name, region: guild.region, slug: guild.slug } : null,
 			craftedBy,
 			usedIn,

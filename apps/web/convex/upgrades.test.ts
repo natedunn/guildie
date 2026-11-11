@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { itemInfoFromTooltip } from "./shared/itemInfo.ts";
+import { itemInfoFromTooltip, untradeable } from "./shared/itemInfo.ts";
 import { CLASS_RULES } from "./shared/proficiencies.ts";
 import {
 	explain,
@@ -272,4 +272,16 @@ test("worn gear: two-hander flag, unique ids, estimates for unknown items", () =
 		undefined,
 		"nothing known",
 	);
+});
+
+test("untradeable: Binds when picked up, Soulbound, Quest Item; not Binds when equipped or used", () => {
+	assert.equal(
+		untradeable([{ left: "Binds when picked up" }, { left: "Head", right: "Cloth" }]),
+		"Binds when picked up",
+	);
+	assert.equal(untradeable([{ left: "Soulbound" }]), "Soulbound");
+	assert.equal(untradeable([{ left: "Quest Item" }]), "Quest Item");
+	assert.equal(untradeable([{ left: "Binds when equipped" }, { left: "Hands" }]), undefined);
+	assert.equal(untradeable([{ left: "Binds when used" }]), undefined);
+	assert.equal(untradeable(undefined), undefined);
 });
