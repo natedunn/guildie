@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
-- **Addon:** "Say why tooltips have nothing" in the `/guildie` window (off by default): items Guildie has nothing for say why, like "Soulbound, can't be traded" or "No guildmates need this".
+- **Addon:** "Say why tooltips have nothing" in the `/guildie` window (on by default): items Guildie has nothing for say why, like "Soulbound, can't be traded" or "No guildmates need this".
 
 ### Improvements
 

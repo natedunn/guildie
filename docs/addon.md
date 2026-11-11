@@ -235,7 +235,7 @@ your last login or reload.
   rows, skipping your own characters, up to 8 (all the site sends):
   "Brenna | might want (Tailoring, Alchemy)", then "+2 more". With "Say
   why tooltips have nothing" ticked in the `/guildie` window
-  (`GuildieDB.settings.explainEmpty`, off by default), an item with nothing
+  (`GuildieDB.settings.sayWhyEmpty`, on by default), an item with nothing
   to show gets one row instead: "Soulbound, can't be traded" (or Binds when
   picked up, Quest Item), "No guildmates need this", or "No guild data yet
   (needs the Guildie app)".

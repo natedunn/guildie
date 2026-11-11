@@ -97,7 +97,7 @@ local function upgradeRows(tooltip, itemID, data)
 end
 
 --- Why there's nothing to say, for the "Say why tooltips have nothing"
---- setting (off by default): no guild data yet, it can't be traded, or
+--- setting (on by default): no guild data yet, it can't be traded, or
 --- nobody needs it.
 local function emptyReason(binding)
     if not GuildieData then return "No guild data yet (needs the Guildie app)" end
@@ -108,7 +108,7 @@ ns.emptyReason = emptyReason
 
 local function explainEmpty()
     local s = GuildieDB and GuildieDB.settings
-    return s and s.explainEmpty == true
+    return not s or s.sayWhyEmpty ~= false
 end
 
 --- Everything Guildie has to say about this item, as rows (no header).

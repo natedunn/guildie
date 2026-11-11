@@ -17,7 +17,7 @@ local function settings()
     if s.minimapAngle == nil then s.minimapAngle = 220 end
     if s.showMinimap == nil then s.showMinimap = true end
     if s.reloadWhenAfk == nil then s.reloadWhenAfk = false end
-    if s.explainEmpty == nil then s.explainEmpty = false end
+    if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
     return s
 end
 ns.settings = settings
@@ -377,8 +377,8 @@ local function buildWindow()
             if ns.updateMinimapButton then ns.updateMinimapButton() end
         end)
     window.explain = checkbox("Say why tooltips have nothing",
-        function() return settings().explainEmpty end,
-        function(on) settings().explainEmpty = on end)
+        function() return settings().sayWhyEmpty end,
+        function(on) settings().sayWhyEmpty = on end)
 
     local afkHint = text("GameFontDisableSmall", TEXT_WIDTH - 26)
     afkHint:SetText("Experimental. Reloads your UI while AFK, out of combat, at most every 20 minutes.")

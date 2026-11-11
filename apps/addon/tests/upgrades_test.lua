@@ -221,7 +221,7 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     local bound = {}
     for k, v in pairs(GLOVES) do bound[k] = v end
     bound.lines = { "Soulbound", "Hands", "+6 Agility" }
-    eq(#hover(bound), 0, "soulbound")
+    eq(table.concat(hover(bound)), "Soulbound, can't be traded")
 end)
 
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
@@ -234,14 +234,14 @@ test("nothing that can't be traded: Binds when picked up, Quest Item; reagent li
         local bound = {}
         for k, v in pairs(GLOVES) do bound[k] = v end
         bound.lines = { binding, "Hands", "60 Armor", "+6 Agility", "+4 Stamina" }
-        eq(#hover(bound), 0, binding)
+        eq(table.concat(hover(bound)), binding .. ", can't be traded")
     end
     -- "Binds when equipped" trades until it's worn.
     eq(U.untradeable({ GLOVES.name, "Binds when equipped" }), false)
     eq(U.untradeable({ GLOVES.name, "Binds when picked up" }), true)
 end)
 
-test("say why tooltips have nothing: off by default, then the reason", function()
+test("say why tooltips have nothing: on by default, and can be turned off", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local cloak = { id = 8, name = "Plain Cloak", equipLoc = "INVTYPE_CLOAK", classID = 4, subclassID = 1, stats = {} }
     stubItems({ GLOVES, cloak })
@@ -249,10 +249,10 @@ test("say why tooltips have nothing: off by default, then the reason", function(
     local bound = {}
     for k, v in pairs(GLOVES) do bound[k] = v end
     bound.lines = { "Binds when picked up", "Hands", "+6 Agility" }
+    GuildieDB.settings = { sayWhyEmpty = false }
+    eq(#hover(cloak), 0, "turned off")
+    eq(#hover(bound), 0, "turned off")
     GuildieDB.settings = nil
-    eq(#hover(cloak), 0, "off by default")
-    eq(#hover(bound), 0, "off by default")
-    GuildieDB.settings = { explainEmpty = true }
     eq(plain(hover(cloak)[1]), "No guildmates need this")
     eq(plain(hover(bound)[1]), "Binds when picked up, can't be traded")
     bound.lines = { "Soulbound", "Hands" }
@@ -261,7 +261,6 @@ test("say why tooltips have nothing: off by default, then the reason", function(
     eq(plain(hover(GLOVES)[1]), "Brisket | upgrade (Feral)")
     _G.GuildieData = nil
     eq(plain(hover(cloak)[1]), "No guild data yet (needs the Guildie app)")
-    GuildieDB.settings = nil
 end)
 
 test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies", function()
@@ -287,10 +286,10 @@ test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies
     eq(#sword_rows, 2, "upgrade first, then maybe")
     eq(plain(sword_rows[1]), "Rage | upgrade (Fury)")
     eq(plain(sword_rows[2]), "Miller | maybe (at 25)")
-    eq(#hover(resist), 0, "nobody")
+    eq(table.concat(hover(resist)), "No guildmates need this", "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }
-    eq(#hover(sword), 0)
+    eq(table.concat(hover(sword)), "No guildmates need this")
 end)
 
 -- ---- End to end: real guild data, items to hover ------------------------------
