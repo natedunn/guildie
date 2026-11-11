@@ -7,7 +7,7 @@ import type { VerdictKind } from "@convex/shared/upgrades";
 export function verdictLabel(kind: VerdictKind, at?: number) {
 	if (kind === "upgrade") return "Upgrade";
 	if (kind === "tradeoff") return "Trade-off";
-	return at ? `Maybe, at ${at}` : "Maybe";
+	return at ? `Maybe, at lvl ${at}` : "Maybe";
 }
 
 /** What each verdict means, for a tooltip. */

@@ -48,7 +48,7 @@ An item is out if:
 - it needs a level more than **3** above theirs.
 
 If they can use it within 3 levels, it can only be a **Maybe**, shown as
-"Maybe, at 24".
+"Maybe, at lvl 24".
 
 ### 3. Their spec
 

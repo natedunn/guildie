@@ -923,7 +923,7 @@ export function explain(item: ItemInfo, verdict: Verdict, worn: WornItem[], rule
 		: " (nothing worn there)";
 	const notes = [
 		verdict.second ? rules.specs[verdict.spec]?.name : undefined,
-		verdict.at ? `at ${verdict.at}` : undefined,
+		verdict.at ? `at lvl ${verdict.at}` : undefined,
 	].filter(Boolean);
 	return `${what}${over}${notes.length ? `; ${notes.join(", ")}` : ""}`;
 }
