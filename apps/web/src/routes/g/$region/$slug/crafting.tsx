@@ -559,8 +559,7 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 				<RequestButton
 					guild={member.guild}
 					characters={member.characters}
-					size="xs"
-					variant="ghost"
+					size="sm"
 					label="Request"
 					className="ml-auto"
 					target={{
