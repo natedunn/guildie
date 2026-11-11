@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Addon:** Guildie's part of item tooltips is set apart from the item's own lines: a gap, a "Guildie" header with the addon's icon, and one indented row per request, reagent or upgrade suggestion, instead of long lines that each started with "Guildie".
+- **Addon:** Guildie's part of item tooltips is set apart from the item's own lines: it comes last, after a gap and a "Guildie" header with the addon's icon, with one short row per guildmate (their name, then what they're requesting, might want it for, or would get as an upgrade), instead of long wrapping lines that each started with "Guildie".
 
 ## 0.3.14
 

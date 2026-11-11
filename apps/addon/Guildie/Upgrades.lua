@@ -345,8 +345,9 @@ local function upgradeData()
     return data
 end
 
---- The rows under the tooltip's Guildie header: "Upgrade for A (Feral), B
---- (Fury)" and "Maybe C (at 24)", or nil. `color(name, classId)` colors a name.
+--- Rows under the tooltip's Guildie header, one per person, upgrades first:
+--- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Miller", right =
+--- "maybe (at 24)" }, or nil. `color(name, classId)` colors a name.
 function U.lines(item, itemID, color)
     local data = upgradeData()
     if not data or not item or item.soulbound then return nil end
@@ -365,13 +366,11 @@ function U.lines(item, itemID, color)
         local notes = {}
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
         if v.at then table.insert(notes, "at " .. v.at) end
-        local text = color(p.member.name, p.member.classId) .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
-        table.insert(v.kind == "upgrade" and ups or maybes, text)
+        local right = (v.kind == "upgrade" and "upgrade" or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
+        table.insert(v.kind == "upgrade" and ups or maybes, { left = color(p.member.name, p.member.classId), right = right })
     end
-    local rows = {}
-    if #ups > 0 then table.insert(rows, "Upgrade for " .. table.concat(ups, ", ")) end
-    if #maybes > 0 then table.insert(rows, "Maybe " .. table.concat(maybes, ", ")) end
-    return rows
+    for _, row in ipairs(maybes) do table.insert(ups, row) end
+    return ups
 end
 
 --- The tooltip's text lines: from tooltip data (modern clients), else its font strings.

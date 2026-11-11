@@ -30,26 +30,36 @@ local function classColored(name, classId)
     return color and ("|c" .. color .. name .. "|r") or name
 end
 
---- "Might want this: Brenna (Tailoring), Corwin (Alchemy) +2", or nil.
-local function reagentRow(itemID)
+--- One row per guildmate whose known recipes use it, with their professions
+--- merged: { left = "Brenna", right = "might want (Tailoring)" }, then
+--- "+2 more" past MAX_NAMES people.
+local function reagentRows(itemID)
     local entry = GuildieData and GuildieData.reagents and GuildieData.reagents[itemID]
-    if not entry then return nil end
-    local names, extra = {}, 0
+    if not entry then return {} end
+    local rows, byName, extra = {}, {}, 0
     for _, user in ipairs(entry.users or {}) do
         if not isMine(user.name) then
-            if #names < MAX_NAMES then
-                table.insert(names, string.format("%s (%s)", classColored(user.name, user.classId), user.profession))
-            else
+            local row = byName[user.name]
+            if row then
+                table.insert(row.professions, user.profession)
+            elseif #rows < MAX_NAMES then
+                row = { left = classColored(user.name, user.classId), professions = { user.profession } }
+                byName[user.name] = row
+                table.insert(rows, row)
+            elseif not byName[user.name .. "+"] then
+                byName[user.name .. "+"] = true
                 extra = extra + 1
             end
         end
     end
-    if #names == 0 then return nil end
-    local text = table.concat(names, ", ")
-    if extra > 0 then text = text .. string.format(" +%d", extra) end
-    return "Might want this: " .. text
+    for _, row in ipairs(rows) do
+        row.right = "might want (" .. table.concat(row.professions, ", ") .. ")"
+        row.professions = nil
+    end
+    if extra > 0 then table.insert(rows, { left = string.format("+%d more", extra) }) end
+    return rows
 end
-ns.reagentRow = reagentRow
+ns.reagentRows = reagentRows
 
 --- One two-column row per open request for this item (GuildieData.requests,
 --- addon 0.8.0): { left = "Todd", right = "requesting 20, claimed by Miller" }.
@@ -90,18 +100,20 @@ local function rowsFor(tooltip, itemID, data)
     local rows = requestRows(itemID)
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
     local bound = ns.upgrades and ns.upgrades.untradeable(ns.upgrades.tooltipLines(tooltip, data))
-    local reagent = not bound and reagentRow(itemID)
-    if reagent then table.insert(rows, { left = reagent }) end
+    if not bound then
+        for _, row in ipairs(reagentRows(itemID)) do table.insert(rows, row) end
+    end
     local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)
     if ok and upgrades then
-        for _, text in ipairs(upgrades) do table.insert(rows, { left = text }) end
+        for _, row in ipairs(upgrades) do table.insert(rows, row) end
     end
     return rows
 end
 
 -- Our block, set apart from the item's own lines: a blank line, a gold
--- "Guildie" header with the addon's icon, then one indented row per thing.
--- Rows are muted grey so the class-colored names carry the color.
+-- "Guildie" header with the addon's icon, then one indented row per person:
+-- their class-colored name on the left, what Guildie knows in muted grey on
+-- the right. One short row each, so nothing wraps.
 local HEADER = "|TInterface\\AddOns\\Guildie\\icon:0|t Guildie"
 local HEADER_COLOR = { 0.85, 0.71, 0.35 }
 local MUTED = { 0.66, 0.66, 0.66 }
@@ -130,18 +142,34 @@ local function addTo(tooltip, itemID, data)
 end
 ns.addToTooltip = addTo
 
-if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
-    -- Modern client (WoW: Forever runs on it).
-    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
-        if data and data.id then addTo(tooltip, data.id, data) end
-    end)
-else
-    -- Older clients.
-    local function onSetItem(tooltip)
-        local _, link = tooltip:GetItem()
-        local id = link and tonumber(link:match("item:(%d+)"))
-        addTo(tooltip, id)
+-- Hooked at PLAYER_LOGIN, once every addon has loaded: tooltip hooks run
+-- in the order they were added, so ours comes after other addons' lines
+-- (an "Item Level" line, say) and the Guildie block ends the tooltip.
+local function hookTooltips()
+    if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+        -- Modern client (WoW: Forever runs on it).
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+            if data and data.id then addTo(tooltip, data.id, data) end
+        end)
+    else
+        -- Older clients.
+        local function onSetItem(tooltip)
+            local _, link = tooltip:GetItem()
+            local id = link and tonumber(link:match("item:(%d+)"))
+            addTo(tooltip, id)
+        end
+        GameTooltip:HookScript("OnTooltipSetItem", onSetItem)
+        ItemRefTooltip:HookScript("OnTooltipSetItem", onSetItem)
     end
-    GameTooltip:HookScript("OnTooltipSetItem", onSetItem)
-    ItemRefTooltip:HookScript("OnTooltipSetItem", onSetItem)
+end
+
+if IsLoggedIn and IsLoggedIn() then
+    hookTooltips()
+else
+    local login = CreateFrame("Frame")
+    login:RegisterEvent("PLAYER_LOGIN")
+    login:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_LOGIN")
+        hookTooltips()
+    end)
 end

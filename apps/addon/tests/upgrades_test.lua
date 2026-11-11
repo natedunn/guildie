@@ -213,9 +213,10 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     alt.name = "Alt"
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, alt })
     local added = hover(GLOVES)
-    eq(#added, 1, "one row")
-    eq(plain(added[1]), "Upgrade for Miller (Arms), Brisket (Feral)")
-    assert(added[1]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[1])
+    eq(#added, 2, "a row each")
+    eq(plain(added[1]), "Miller | upgrade (Arms)")
+    eq(plain(added[2]), "Brisket | upgrade (Feral)")
+    assert(added[2]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[2])
     -- Soulbound to the viewer: can't be traded, so no suggestions.
     local bound = {}
     for k, v in pairs(GLOVES) do bound[k] = v end
@@ -228,7 +229,7 @@ test("nothing that can't be traded: Binds when picked up, Quest Item; reagent li
     stubItems({ GLOVES })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller })
     GuildieData.reagents[GLOVES.id] = { name = GLOVES.name, users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } }
-    eq(#hover(GLOVES), 2, "tradeable: reagent and upgrade rows")
+    eq(#hover(GLOVES), 3, "tradeable: reagent and upgrade rows")
     for _, binding in ipairs({ "Binds when picked up", "Quest Item", "Soulbound" }) do
         local bound = {}
         for k, v in pairs(GLOVES) do bound[k] = v end
@@ -256,11 +257,13 @@ test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies
     }
     stubItems({ helm, sword, resist })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, vectors.members.Rage })
-    eq(plain(hover(helm)[1]), "Maybe Frosty (at 33), Brisket (Restoration, at 33)")
+    local helm_rows = hover(helm)
+    eq(plain(helm_rows[1]), "Frosty | maybe (at 33)")
+    eq(plain(helm_rows[2]), "Brisket | maybe (Restoration, at 33)")
     local sword_rows = hover(sword)
-    eq(#sword_rows, 2, "upgrade and maybe rows")
-    eq(plain(sword_rows[1]), "Upgrade for Rage (Fury)")
-    eq(plain(sword_rows[2]), "Maybe Miller (at 25)")
+    eq(#sword_rows, 2, "upgrade first, then maybe")
+    eq(plain(sword_rows[1]), "Rage | upgrade (Fury)")
+    eq(plain(sword_rows[2]), "Miller | maybe (at 25)")
     eq(#hover(resist), 0, "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }
@@ -282,7 +285,7 @@ if dataPath and itemsPath then
     for _, item in ipairs(items) do
         local added = hover(item)
         _G.GuildieData = data
-        print(string.format("%-34s %s", item.name, #added > 0 and plain(added[#added]) or "(no line)"))
+        print(string.format("%-34s %s", item.name, #added > 0 and plain(table.concat(added, "; ")) or "(no line)"))
     end
 end
 

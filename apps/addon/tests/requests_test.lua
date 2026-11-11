@@ -108,7 +108,50 @@ test("the request rows come before the reagent row", function()
     local lines = hover(ns, 2589)
     eq(#lines, 2)
     eq(plain(lines[1]), "Todd | requesting 20")
-    eq(plain(lines[2]), "Might want this: Brenna (Tailoring)")
+    eq(plain(lines[2]), "Brenna | might want (Tailoring)")
+end)
+
+test("reagents: a row per person, professions merged, then +N more", function()
+    local data = {}
+    for k, v in pairs(DATA) do data[k] = v end
+    data.reagents = { [765] = { name = "Silverleaf", users = {
+        { name = "Healing", classId = 5, profession = "Alchemy" },
+        { name = "Lich", classId = 5, profession = "Alchemy" },
+        { name = "Hoofing", classId = 11, profession = "Herbalism" },
+        { name = "Healing", classId = 5, profession = "Herbalism" },
+        { name = "Brenna", classId = 8, profession = "Tailoring" },
+        { name = "Corwin", classId = 4, profession = "Alchemy" },
+        { name = "Dax", classId = 1, profession = "Alchemy" },
+        { name = "Dax", classId = 1, profession = "Cooking" },
+    } } }
+    local ns = load(data)
+    local lines = hover(ns, 765)
+    eq(#lines, 4)
+    eq(plain(lines[1]), "Healing | might want (Alchemy, Herbalism)")
+    eq(plain(lines[2]), "Hoofing | might want (Herbalism)")
+    eq(plain(lines[3]), "Brenna | might want (Tailoring)")
+    eq(plain(lines[4]), "+2 more")
+end)
+
+test("hooks item tooltips at PLAYER_LOGIN, after every addon has loaded", function()
+    local ns = load(DATA)
+    -- (wow.load clears these; the hook looks for them at login.)
+    local calls = {}
+    _G.Enum = { TooltipDataType = { Item = 0 } }
+    _G.TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) table.insert(calls, { kind = kind, fn = fn }) end }
+    eq(#calls, 0, "not while loading")
+    wow.fire("PLAYER_LOGIN")
+    eq(#calls, 1, "once at login")
+    eq(calls[1].kind, 0)
+    local added = {}
+    calls[1].fn({
+        GetName = function() return "GameTooltip" end,
+        AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
+        Show = function() end,
+    }, { id = 2589 })
+    eq(plain(wow.guildieRows(added, ns)[1]), "Todd | requesting 20")
+    _G.TooltipDataProcessor, _G.Enum = nil, nil
 end)
 
 test("window: your requests, with the stale nudge", function()

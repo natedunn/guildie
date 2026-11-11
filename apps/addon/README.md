@@ -37,8 +37,9 @@ reload the UI, and the Guildie app, running on the same computer, uploads it the
   every 20 minutes. If the game doesn't allow addons to reload on their own, it
   turns itself off and tells you.
 - **Tooltips:** hover a reagent to see guildmates whose known recipes use it
-  ("Might want this: …"), and a piece of gear to see who it might be an
-  upgrade for ("Upgrade for Brisket (Feral)", "Maybe Miller (at 24)";
+  ("Brenna: might want (Tailoring)"), and a piece of gear to see who it
+  might be an upgrade for ("Brisket: upgrade (Feral)", "Miller: maybe (at
+  24)";
   `Upgrades.lua`, docs/addon.md), all under a "Guildie" header at the end
   of the tooltip. The Guildie app downloads your
   guild's data into `GuildieData.lua`; it loads at login and `/reload`.

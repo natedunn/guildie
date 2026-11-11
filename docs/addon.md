@@ -220,12 +220,13 @@ your last login or reload.
 - For each reagent: guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
   weekly) and each member's known recipes (with their profile, hourly).
-- Tooltips get a Guildie block after the item's own lines: a blank line, a
-  gold "Guildie" header with the addon's icon, then one indented, muted row
-  per thing (names keep their class colors). Requests first (two columns:
-  who, and what they want), then reagents, then upgrades. The reagent row,
-  skipping your own characters: "Might want this: Brenna (Tailoring),
-  Corwin (Alchemy) +2".
+- Tooltips end with a Guildie block: a blank line, a gold "Guildie" header
+  with the addon's icon, then one indented row per person, in two columns:
+  the class-colored name, and what Guildie knows in muted grey. Requests
+  first, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
+  so other addons' lines (added at load) come before the block. Reagent
+  rows, skipping your own characters, at most 3 people:
+  "Brenna | might want (Tailoring, Alchemy)", then "+2 more".
 - Gear upgrades (addon 0.5.0): `upgrades` holds the rules and stat weights
   once (`apps/web/convex/shared/weights.ts`, seeded from WowSims' EP weights)
   and each guildmate seen in the last 14 days (not your own characters):
@@ -235,8 +236,8 @@ your last login or reload.
   `GetItemInfo`, `GetItemStats`, its tooltip lines for "Classes:", Unique and
   Soulbound), scores it for each of them the same way
   (`Guildie/Upgrades.lua`, a port of `convex/shared/upgrades.ts`; both run
-  `apps/addon/tests/upgrade_vectors.json`) and adds up to two rows:
-  "Upgrade for Brisket (Feral)" and "Maybe Miller (at 24)". Upgrade:
+  `apps/addon/tests/upgrade_vectors.json`) and adds a row each for up to 3 people:
+  "Brisket | upgrade (Feral)", "Miller | maybe (at 24)". Upgrade:
   15%+ better than what they wear there, usable now, main spec. Maybe: 3-15%,
   their second spec, or usable within 3 levels. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
