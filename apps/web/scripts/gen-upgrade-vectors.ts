@@ -103,6 +103,47 @@ const members: Record<string, any> = {
 	Frosty: { name: "Frosty", classId: 8, level: 30, spec: "MAGE:2", seen: SEEN, slots: { 1: 5, 10: 4 } },
 	Arrow: { name: "Arrow", classId: 3, level: 39, spec: "HUNTER:0", seen: SEEN, slots: { 5: 8, 18: 40, 16: 10 } },
 	Stale: { name: "Stale", classId: 11, level: 30, spec: "DRUID:1", seen: 0, slots: {} },
+	// Players' armor and weapon type preferences (soft: others count less; strict: left out).
+	Chainmail: {
+		name: "Chainmail",
+		classId: 1,
+		level: 45,
+		spec: "WARRIOR:1",
+		seen: SEEN,
+		slots: { 5: 10, 16: 60, 17: 10 },
+		armorPref: 3,
+	},
+	MailOnly: {
+		name: "MailOnly",
+		classId: 1,
+		level: 45,
+		spec: "WARRIOR:1",
+		seen: SEEN,
+		slots: { 5: 10, 16: 60, 17: 10 },
+		armorPref: 3,
+		armorStrict: true,
+		weaponPref: 15,
+		weaponStrict: true,
+	},
+	Stabby: {
+		name: "Stabby",
+		classId: 1,
+		level: 45,
+		spec: "WARRIOR:1",
+		seen: SEEN,
+		slots: { 5: 10, 16: 60, 17: 10 },
+		weaponPref: 15,
+	},
+	Bowman: {
+		name: "Bowman",
+		classId: 3,
+		level: 39,
+		spec: "HUNTER:0",
+		seen: SEEN,
+		slots: { 5: 8, 18: 40, 16: 10 },
+		weaponPref: 2,
+		weaponStrict: true,
+	},
 };
 const verdictOut = (v: any) =>
 	v
@@ -129,6 +170,14 @@ const judgeCases: [string, string, string, number?][] = [
 	["plain cloak over an empty slot", "plainCloak", "Frosty"],
 	["spirit robe only fits the second spec", "spiritRobe", "Brisket"],
 	["attack power and bonus armor count as fewer stat points", "apMace", "Brisket"],
+	["prefers mail: mail on a level 45 warrior counts in full", "mailChest", "Chainmail"],
+	["prefers mail: leather still counts less", "leatherChest", "Chainmail"],
+	["mail only: leather left out", "leatherChest", "MailOnly"],
+	["daggers only: a greatsword left out", "greatsword", "MailOnly"],
+	["daggers only: a dagger is fine", "dagger", "MailOnly"],
+	["prefers daggers: a greatsword counts less", "greatsword", "Stabby"],
+	["bows only: melee weapons aren't covered", "dagger", "Bowman"],
+	["bows only: a bow", "bow", "Bowman"],
 ];
 const cases = judgeCases.map(([name, item, member, itemId]) => ({
 	name,
@@ -164,6 +213,8 @@ const usable = [
 	["bow", "Miller"],
 	["dagger", "Brisket"],
 ].map(([item, member]) => ({ item, member, expect: usableAt(items[item], members[member], rules) ?? null }));
+// Who the suggest cases rank (the members with preferences have judge cases of their own).
+const suggestMembers = ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale"];
 const suggestCases = [
 	{ name: "agility gloves, everyone", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "own characters skipped", item: "leatherAgiGloves", now: SEEN + 3600, skip: ["Arrow"], max: 3 },
@@ -172,9 +223,12 @@ const suggestCases = [
 	{ name: "two-hander: upgrades before maybes", item: "greatsword", now: SEEN + 3600, skip: [], max: 3 },
 ].map((c) => ({
 	...c,
-	expect: suggest(items[c.item], Object.values(members), rules, { now: c.now, skip: c.skip, max: c.max }).map(
-		(p) => `${p.member.name}:${p.verdict.kind}`,
-	),
+	expect: suggest(
+		items[c.item],
+		suggestMembers.map((n) => members[n]),
+		rules,
+		{ now: c.now, skip: c.skip, max: c.max },
+	).map((p) => `${p.member.name}:${p.verdict.kind}`),
 }));
 const out = {
 	_comment:
@@ -185,6 +239,7 @@ const out = {
 	judge: cases,
 	scores,
 	usable,
+	suggestMembers,
 	suggest: suggestCases,
 };
 writeFileSync(

@@ -194,6 +194,8 @@ export const character = query({
 			talentSource: profile.sources.talents,
 			synced: profile.synced,
 			statPriority: statPriority(character.classId, profile.talentTrees, (mine ?? claims[0])?.statPriority),
+			/** Preferred armor and weapon types for gear suggestions (shared/upgrades.ts gearPrefs), if chosen. */
+			gearPreference: (mine ?? claims[0])?.gearPreference,
 			/** The viewer claimed this character: they can choose its stat priority. */
 			canEdit: mine !== undefined,
 			talentLayouts: layouts

@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { type CharacterData, sourceNote, useCharacter } from "@/components/character-data";
+import { GearPreferenceSection } from "@/components/gear-preference";
 import { PANEL, Panel, panelAction } from "@/components/panel";
 import { PaperDoll } from "@/components/paper-doll";
 import { CanUse } from "@/components/proficiencies";
@@ -48,6 +49,14 @@ function GearPage() {
 						classId={c.classId}
 						priority={data.statPriority}
 						talentTrees={c.talentTrees}
+						canEdit={data.canEdit}
+					/>
+					<GearPreferenceSection
+						region={params.region}
+						slug={params.slug}
+						classId={c.classId}
+						level={c.level}
+						preference={data.gearPreference}
 						canEdit={data.canEdit}
 					/>
 					<Talents data={data} />

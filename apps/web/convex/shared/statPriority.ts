@@ -1,10 +1,11 @@
-import { specsOf } from "./upgrades.ts";
+import { type StatChoice, specsOf, validStats } from "./upgrades.ts";
 import { CLASS_TOKENS, SPECS } from "./weights.ts";
 
 // Stat priority: the three stats a character should look for on gear, first
 // to third. From their main talent tree (the same one gear suggestions use,
 // shared/upgrades.ts specsOf), unless the player who claimed the character
-// chose another tree or their own three. A general guide, not a sim.
+// chose another tree or their own three. A general guide, not a sim. The
+// choice also steers gear suggestions on the site and in game (specsFor).
 //
 // Kept free of Convex imports so `node --test` can run it.
 
@@ -25,8 +26,9 @@ export const PRIORITY_STATS: Record<string, string> = {
 	ARMOR: "Armor",
 };
 
-/** A player's choice, stored on their claim (ownedCharacters.statPriority). */
-export type StatChoice = { tree?: number; stats?: string[] };
+/** A player's choice, stored on their claim (ownedCharacters.statPriority). Gear suggestions use it too (upgrades.ts specsFor). */
+export type { StatChoice };
+export { validStats };
 
 export type StatPriority = {
 	/** The tree it's from; absent for the player's own three. */
@@ -38,13 +40,6 @@ export type StatPriority = {
 };
 
 type Tree = { name: string; points: number; talents: { id?: number }[] };
-
-/** Three distinct known stats, or undefined. */
-export function validStats(stats: unknown): string[] | undefined {
-	if (!Array.isArray(stats) || stats.length !== 3) return undefined;
-	if (!stats.every((s) => typeof s === "string" && s in PRIORITY_STATS)) return undefined;
-	return new Set(stats).size === 3 ? (stats as string[]) : undefined;
-}
 
 export function statPriority(
 	classId: number,

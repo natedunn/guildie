@@ -94,6 +94,15 @@ The two implementations must match exactly:
 - Numbers are compared with a 1e-9 tolerance in the shared tests; Lua and JS
   floats must follow the same order of operations.
 - Shared code stays free of Convex imports (`node --test` runs it).
+- A player's stat priority choice (`ownedCharacters.statPriority`) picks the
+  spec: `specsFor` (another tree, or a custom spec from `customWeights` added
+  to `rules.specs`). Build members with `memberForUpgrades` (it reads the
+  claim), and when rules leave the call (helper.ts guild data) carry the
+  custom specs along, or the addon can't find them.
+- Preferred armor and weapon types (`ownedCharacters.gearPreference`) ride on
+  the member (`armorPref`, `weaponPref`, `...Strict`; `gearPrefs`) and are
+  read by `scoreItem` and `judge` in both TS and Lua (`preferred`): a rule
+  change, so it goes through the vectors and needs an addon release.
 - Trading is the callers' part, not `judge`/`suggest`: `untradeable()` in
   `itemInfo.ts` (Binds when picked up, Soulbound, Quest Item) and
   `U.untradeable` in `Upgrades.lua`. Items it flags are never suggested for
