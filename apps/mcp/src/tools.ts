@@ -44,11 +44,12 @@ const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: 
 
 export const INSTRUCTIONS = `Guildie (guildie.club) tracks guilds in World of Warcraft: Forever (a Classic-era game; level cap 60).
 Data comes from Blizzard (as of each character's last logout) and from the Guildie addon (fresher, in-game).
-Characters are "Name Surname"; one name is enough when it's unique. Everything is read-only and limited to the player's own guilds.
+Characters are "Name Surname"; one name is enough when it's unique. Reading is limited to the player's own guilds.
+If the player allowed it, set_stat_priority and set_gear_preference change their own characters' settings (gear suggestions follow them); confirm with the player before changing anything.
 Start with \`me\` to learn who the player is and which guilds they're in.`;
 
 /** A fresh server per request (stateless): the tools, bound to this player's connection. */
-export function buildServer(convex: ConvexTarget, props: Props) {
+export function buildServer(convex: ConvexTarget, props: Props, canWrite = false) {
 	const server = new McpServer({ name: "guildie", version: "1.0.0" }, { instructions: INSTRUCTIONS });
 	const call = (tool: string) => (args: Record<string, unknown>) => callTool(convex, props, tool, args);
 
@@ -127,6 +128,46 @@ export function buildServer(convex: ConvexTarget, props: Props) {
 			annotations: READ_ONLY,
 		},
 		call("my_inventory"),
+	);
+	if (!canWrite) return server;
+
+	const WRITES = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
+	const character = z.string().min(1).max(64).describe("One of the player's own claimed characters.");
+	server.registerTool(
+		"set_stat_priority",
+		{
+			title: "Set stat priority",
+			description:
+				"Set what one of the player's own characters looks for on gear: 3-5 stats (most important first) with an optional steepness (even, balanced, steep), a talent tree's priority, or reset to follow their talents. The character tool lists the choices.",
+			inputSchema: {
+				character,
+				stats: z.array(z.string().max(32)).min(3).max(5).optional().describe('e.g. ["Agility", "Strength", "Stamina"]'),
+				steepness: z
+					.enum(["even", "balanced", "steep"])
+					.optional()
+					.describe("How much more the first stat counts. Default balanced."),
+				tree: z.string().max(32).optional().describe('A talent tree, e.g. "Feral Combat", instead of stats.'),
+				reset: z.boolean().optional().describe("Back to following their talents."),
+			},
+			annotations: WRITES,
+		},
+		call("set_stat_priority"),
+	);
+	server.registerTool(
+		"set_gear_preference",
+		{
+			title: "Set gear preference",
+			description:
+				'Set the armor and/or weapon type one of the player\'s own characters prefers in gear suggestions ("none" clears it). strict: suggest only that type.',
+			inputSchema: {
+				character,
+				armor: z.string().max(32).optional().describe('e.g. "Leather", or "none".'),
+				weapon: z.string().max(32).optional().describe('e.g. "Two-Handed Swords", or "none".'),
+				strict: z.boolean().optional().describe("Only suggest this type, rather than just preferring it."),
+			},
+			annotations: WRITES,
+		},
+		call("set_gear_preference"),
 	);
 	return server;
 }

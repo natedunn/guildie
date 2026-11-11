@@ -572,6 +572,12 @@ export default defineSchema({
 		redirectHost: v.string(),
 		createdAt: v.number(),
 		lastUsedAt: v.optional(v.number()),
+		/**
+		 * The player let it change their characters' stat priority and gear
+		 * preferences (OAuth scope guildie:write). Unset: read only, like every
+		 * connection made before writing existed.
+		 */
+		canWrite: v.optional(v.boolean()),
 	}).index("by_user", ["userId"]),
 
 	/**

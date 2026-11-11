@@ -23,7 +23,8 @@ export function AiConnections() {
 			</SectionTitle>
 			<p className="mt-1 text-muted-foreground">
 				Ask Claude, ChatGPT or another AI app about your guild: who can craft something, what someone's wearing, what's
-				open in requests, what's in your bank. It reads what you see on Guildie and can't change anything.
+				open in requests, what's in your bank. It reads what you see on Guildie. If you allow it when connecting, it can
+				also set your characters' stat priority and gear preferences, and nothing else.
 			</p>
 			<div className="mt-3 flex items-center gap-2">
 				<code className="num flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-border px-3 text-[0.8125rem] select-all">
@@ -58,6 +59,7 @@ export function AiConnections() {
 							<span className="truncate">
 								{c.client}
 								{c.redirectHost && <span className="text-muted-foreground"> · {c.redirectHost}</span>}
+								<span className="text-muted-foreground"> · {c.canWrite ? "reads, sets characters" : "reads only"}</span>
 							</span>
 							<span className="num flex shrink-0 items-center gap-4 text-muted-foreground">
 								{c.lastUsedAt ? `used ${ago(c.lastUsedAt)}` : `connected ${ago(c.createdAt)}`}

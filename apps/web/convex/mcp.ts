@@ -7,9 +7,13 @@ import { guildsOf, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { activeIn } from "./requests";
 import { DUNGEON_BY_KEY } from "./shared/dungeons";
-import { ago, capped, matches, quality, slotName } from "./shared/mcpText";
-import { PRIORITY_STATS, statPriority } from "./shared/statPriority";
+import { ago, capped, gearType, matches, quality, slotName, statKey } from "./shared/mcpText";
+import { CLASS_RULES, PROFICIENCY_TYPES } from "./shared/proficiencies";
+import { PRIORITY_STATS, statPriority, TIER_PRESETS } from "./shared/statPriority";
+import { canPrefer, type GearChoice } from "./shared/upgrades";
+import { CLASS_TOKENS, SPECS } from "./shared/weights";
 import { className, raceName } from "./shared/wow";
+import { type Choice, setGearPreference, setStatPriority, type TypeChoice } from "./statPriority";
 import { requireUserId } from "./users";
 
 // AI apps (Claude, ChatGPT...) reading a player's guild data through the MCP
@@ -80,8 +84,11 @@ export const startConnect = mutation({
 
 /** The Worker swaps the code, with the state it came back with, for a connection. Null if it's no good. */
 export const exchange = internalMutation({
-	args: { code: v.string(), state: v.string() },
-	handler: async (ctx, { code, state }): Promise<{ userId: Id<"users">; connectionId: Id<"aiConnections"> } | null> => {
+	args: { code: v.string(), state: v.string(), write: v.optional(v.boolean()) },
+	handler: async (
+		ctx,
+		{ code, state, write },
+	): Promise<{ userId: Id<"users">; connectionId: Id<"aiConnections"> } | null> => {
 		const codeHash = await sha256(code);
 		const row = await ctx.db
 			.query("aiConnectCodes")
@@ -103,6 +110,7 @@ export const exchange = internalMutation({
 			client: row.client,
 			redirectHost: row.redirectHost,
 			createdAt: Date.now(),
+			...(write ? { canWrite: true } : {}),
 		});
 		return { userId: row.userId, connectionId };
 	},
@@ -119,12 +127,13 @@ export const connections = query({
 			.collect();
 		return rows
 			.sort((a, b) => b.createdAt - a.createdAt)
-			.map(({ _id, client, redirectHost, createdAt, lastUsedAt }) => ({
+			.map(({ _id, client, redirectHost, createdAt, lastUsedAt, canWrite }) => ({
 				_id,
 				client,
 				redirectHost,
 				createdAt,
 				lastUsedAt,
+				canWrite: canWrite === true,
 			}));
 	},
 });
@@ -151,10 +160,25 @@ export const touch = internalMutation({
 // ---- Who's asking, and which guild ------------------------------------------------
 
 /** The player behind a connection, or a ConvexError the app shows (disconnected in Settings). */
-async function viewerOf(ctx: QueryCtx, connectionId: string) {
+async function connectionOf(ctx: QueryCtx, connectionId: string) {
 	const id = ctx.db.normalizeId("aiConnections", connectionId);
 	const row = id && (await ctx.db.get(id));
 	if (!row) throw new ConvexError("This app was disconnected from Guildie. Connect it again to keep using it.");
+	return row;
+}
+
+async function viewerOf(ctx: QueryCtx, connectionId: string) {
+	return (await connectionOf(ctx, connectionId)).userId;
+}
+
+/** The player behind a connection that may change their characters' settings. */
+async function writerOf(ctx: QueryCtx, connectionId: string) {
+	const row = await connectionOf(ctx, connectionId);
+	if (!row.canWrite) {
+		throw new ConvexError(
+			"This app can only read. To let it change your characters' settings, disconnect it in Guildie's Settings and connect it again, allowing changes.",
+		);
+	}
 	return row.userId;
 }
 
@@ -313,6 +337,9 @@ export const character = internalQuery({
 				} (×: worth per point next to the first)`,
 			);
 		}
+		const prefs = gearPrefText((mine ?? claims[0])?.gearPreference);
+		if (prefs) lines.push(`Gear preference: ${prefs}`);
+		if (mine) lines.push(...choicesFor(c.classId));
 		if (p.professions.length) {
 			lines.push(
 				`Professions: ${p.professions
@@ -501,5 +528,193 @@ export const inventory = internalQuery({
 			search ? `${items.length} items match "${search}":` : `${items.length} different items:`,
 			...capped(lines, 120, "Add a search to narrow it."),
 		].join("\n");
+	},
+});
+
+// ---- Changing a character's settings (connections allowed to: canWrite) ------------
+// Only stat priority and gear preferences, only on characters the player
+// claimed, through the same checks as the site (statPriority.ts).
+
+/** One kind's types a class can name in a preference, as PROFICIENCY_TYPES has them. */
+const preferable = (classId: number | undefined, kind: "armor" | "weapon") =>
+	PROFICIENCY_TYPES.filter(
+		(t): t is typeof t & { subclass: number } =>
+			t.kind === kind && t.subclass !== undefined && canPrefer(CLASS_RULES[classId ?? 0], kind, t.subclass),
+	);
+
+const typeName = (kind: "armor" | "weapon", type: number) =>
+	PROFICIENCY_TYPES.find((t) => t.kind === kind && t.subclass === type)?.name ?? `type ${type}`;
+
+/** "Plate (only), Two-Handed Swords (preferred)", or "" for none. */
+function gearPrefText(pref: GearChoice | undefined) {
+	return (["armor", "weapon"] as const)
+		.flatMap((kind) => {
+			const p = pref?.[kind];
+			return p ? [`${typeName(kind, p.type)} (${p.strict ? "only" : "preferred"})`] : [];
+		})
+		.join(", ");
+}
+
+/** For the player's own characters: what the settings tools accept. */
+function choicesFor(classId: number) {
+	const trees = SPECS[CLASS_TOKENS[classId] ?? ""]?.map((t) => t.name) ?? [];
+	return [
+		`You can set: stat priority (3-5 of ${Object.values(PRIORITY_STATS).join(", ")}; steepness even, balanced or steep; or a talent tree: ${trees.join(", ")}),`,
+		`  armor preference (${preferable(classId, "armor")
+			.map((t) => t.name)
+			.join(", ")}), weapon preference (${preferable(classId, "weapon")
+			.map((t) => t.name)
+			.join(", ")}).`,
+	];
+}
+
+/** One of the player's claimed characters, by name. */
+async function ownCharacter(ctx: QueryCtx, userId: Id<"users">, name: string) {
+	const owned = await ctx.db
+		.query("ownedCharacters")
+		.withIndex("by_user", (q) => q.eq("userId", userId))
+		.collect();
+	const rows = await Promise.all(
+		owned.map(async (claim) => ({
+			claim,
+			row: await ctx.db
+				.query("characters")
+				.withIndex("by_slug", (q) => q.eq("flavor", claim.flavor).eq("region", claim.region).eq("slug", claim.slug))
+				.first(),
+		})),
+	);
+	const slug = name.trim().toLowerCase();
+	const hits = rows.filter(
+		({ claim, row }) => claim.slug === slug || matches(name, row?.name ?? claim.name, row?.surname),
+	);
+	const exact = hits.find(({ claim }) => claim.slug === slug);
+	const firstName = hits.filter(({ claim, row }) => matches(name, row?.name ?? claim.name));
+	const pick = exact ?? (firstName.length === 1 ? firstName[0] : hits.length === 1 ? hits[0] : undefined);
+	const label = ({ claim, row }: (typeof rows)[number]) => (row ? fullName(row) : claim.name);
+	if (!pick) {
+		throw new ConvexError(
+			hits.length
+				? `Several of your characters match "${name}": ${hits.map(label).join(", ")}. Use the full name.`
+				: `You haven't claimed a character called "${name}". Yours: ${rows.map(label).join(", ") || "none"}. Only your own characters can be changed.`,
+		);
+	}
+	return { ...pick, classId: pick.row?.classId ?? pick.claim.classId, label: label(pick) };
+}
+
+/** The character's stat priority now, as the character tool shows it. */
+async function priorityText(
+	ctx: QueryCtx,
+	userId: Id<"users">,
+	slug: string,
+	region: Doc<"ownedCharacters">["region"],
+) {
+	const claim = (
+		await ctx.db
+			.query("ownedCharacters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.collect()
+	).find((c) => c.userId === userId);
+	const row = await ctx.db
+		.query("characters")
+		.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+		.first();
+	if (!claim) return "";
+	const p = row ? await pickProfile(ctx, row) : undefined;
+	const priority = statPriority(row?.classId ?? claim.classId ?? 0, p?.talentTrees, claim.statPriority);
+	if (!priority) return "";
+	return `${priority.stats
+		.map((s, i) => `${PRIORITY_STATS[s] ?? s}${i > 0 ? ` ×${Math.round((priority.shares[i] ?? 0) * 100) / 100}` : ""}`)
+		.join(" > ")}${priority.tree ? ` (${priority.tree})` : ""}${priority.chosen ? "" : ", from talents"}`;
+}
+
+export const setStatPriorityTool = internalMutation({
+	args: {
+		connectionId: v.string(),
+		character: v.string(),
+		stats: v.optional(v.array(v.string())),
+		steepness: v.optional(v.string()),
+		tree: v.optional(v.string()),
+		reset: v.optional(v.boolean()),
+	},
+	handler: async (ctx, { connectionId, character, stats, steepness, tree, reset }): Promise<string> => {
+		const userId = await writerOf(ctx, connectionId);
+		const own = await ownCharacter(ctx, userId, character);
+		const picked = [reset ? "reset" : "", tree ? "tree" : "", stats?.length ? "stats" : ""].filter(Boolean);
+		if (picked.length > 1)
+			throw new ConvexError("Give one of: stats (with an optional steepness), a talent tree, or reset.");
+		const preset = steepness?.trim().toLowerCase();
+		if (preset && !(preset in TIER_PRESETS)) throw new ConvexError("Steepness is even, balanced or steep.");
+
+		let choice: Choice;
+		if (reset) {
+			choice = null;
+		} else if (tree) {
+			const trees = SPECS[CLASS_TOKENS[own.classId ?? 0] ?? ""] ?? [];
+			const index = trees.findIndex((t) => matches(tree, t.name));
+			if (index < 0)
+				throw new ConvexError(
+					`No talent tree "${tree}" for this class. Trees: ${trees.map((t) => t.name).join(", ")}.`,
+				);
+			choice = { tree: index };
+		} else {
+			// New stats, or the ones they chose before with a new steepness.
+			const names = stats?.length ? stats : undefined;
+			const current = own.claim.statPriority?.stats;
+			if (!names && !(preset && current)) {
+				throw new ConvexError(
+					"Give the stats (3 to 5, most important first, optionally with a steepness), a talent tree, or reset.",
+				);
+			}
+			const unknown = (names ?? []).filter((n) => !statKey(n, PRIORITY_STATS));
+			if (unknown.length) {
+				throw new ConvexError(
+					`Unknown stat ${unknown.map((n) => `"${n}"`).join(", ")}. Choose from: ${Object.values(PRIORITY_STATS).join(", ")}.`,
+				);
+			}
+			const keys = names ? names.map((n) => statKey(n, PRIORITY_STATS) as string) : (current as string[]);
+			// No steepness: Balanced for new stats (the default), what they had otherwise.
+			const tiers = preset
+				? TIER_PRESETS[preset as keyof typeof TIER_PRESETS].slice(0, keys.length)
+				: names
+					? undefined
+					: own.claim.statPriority?.tiers;
+			choice = tiers ? { stats: keys, tiers } : { stats: keys };
+		}
+		await setStatPriority(ctx, userId, own.claim.region, own.claim.slug, choice);
+		return `${own.label}'s stat priority is now: ${await priorityText(ctx, userId, own.claim.slug, own.claim.region)}. Gear suggestions on Guildie and in the addon follow it.`;
+	},
+});
+
+export const setGearPreferenceTool = internalMutation({
+	args: {
+		connectionId: v.string(),
+		character: v.string(),
+		armor: v.optional(v.string()),
+		weapon: v.optional(v.string()),
+		strict: v.optional(v.boolean()),
+	},
+	handler: async (ctx, { connectionId, character, armor, weapon, strict }): Promise<string> => {
+		const userId = await writerOf(ctx, connectionId);
+		const own = await ownCharacter(ctx, userId, character);
+		if (armor === undefined && weapon === undefined)
+			throw new ConvexError("Give an armor type, a weapon type, or both.");
+		const current = own.claim.gearPreference;
+		const pick = (kind: "armor" | "weapon", name: string | undefined): TypeChoice => {
+			if (name === undefined) return current?.[kind] ?? null;
+			if (/^(none|any|no preference|clear|reset)$/i.test(name.trim())) return null;
+			const options = preferable(own.classId, kind);
+			const hit = gearType(name, options);
+			if (!hit) {
+				throw new ConvexError(
+					`${own.label} can't prefer "${name}". ${kind === "armor" ? "Armor" : "Weapon"} types: ${options.map((t) => t.name).join(", ")}, or none.`,
+				);
+			}
+			return { type: hit.subclass, strict: strict ?? current?.[kind]?.strict ?? false };
+		};
+		const a = pick("armor", armor);
+		const w = pick("weapon", weapon);
+		await setGearPreference(ctx, userId, own.claim.region, own.claim.slug, a, w);
+		const text = gearPrefText({ ...(a ? { armor: a } : {}), ...(w ? { weapon: w } : {}) });
+		return `${own.label}'s gear preference is now: ${text || "none"}. "Preferred" types count more in gear suggestions; "only" hides the others.`;
 	},
 });

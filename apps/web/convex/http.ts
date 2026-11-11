@@ -44,6 +44,12 @@ const MCP_TOOLS = {
 	my_inventory: internal.mcp.inventory,
 } as const;
 
+/** Tools that change things: only for connections the player let do that (convex/mcp.ts writerOf). */
+const MCP_WRITE_TOOLS = {
+	set_stat_priority: internal.mcp.setStatPriorityTool,
+	set_gear_preference: internal.mcp.setGearPreferenceTool,
+} as const;
+
 /** The Worker's secret, compared in constant time; false when this deployment has none set. */
 async function fromMcpWorker(request: Request) {
 	const secret = process.env.MCP_SECRET;
@@ -70,9 +76,17 @@ http.route({
 	method: "POST",
 	handler: httpAction(async (ctx, request) => {
 		if (!(await fromMcpWorker(request))) return json({ error: "unauthorized" }, 401);
-		const body = (await request.json().catch(() => null)) as { code?: unknown; state?: unknown } | null;
+		const body = (await request.json().catch(() => null)) as {
+			code?: unknown;
+			state?: unknown;
+			write?: unknown;
+		} | null;
 		if (typeof body?.code !== "string" || typeof body.state !== "string") return json({ error: "bad request" }, 400);
-		const result = await ctx.runMutation(internal.mcp.exchange, { code: body.code, state: body.state });
+		const result = await ctx.runMutation(internal.mcp.exchange, {
+			code: body.code,
+			state: body.state,
+			write: body.write === true,
+		});
 		return result ? json(result) : json({ error: "This sign-in expired or was already used. Start again." }, 400);
 	}),
 });
@@ -88,12 +102,20 @@ http.route({
 			tool?: unknown;
 			args?: unknown;
 		} | null;
-		const tool = typeof body?.tool === "string" ? MCP_TOOLS[body.tool as keyof typeof MCP_TOOLS] : undefined;
-		if (!tool || typeof body?.connectionId !== "string") return json({ error: "Unknown tool." }, 400);
-		const args = typeof body.args === "object" && body.args !== null ? body.args : {};
+		const name = typeof body?.tool === "string" ? body.tool : "";
+		const read = Object.hasOwn(MCP_TOOLS, name) ? MCP_TOOLS[name as keyof typeof MCP_TOOLS] : undefined;
+		const write = Object.hasOwn(MCP_WRITE_TOOLS, name)
+			? MCP_WRITE_TOOLS[name as keyof typeof MCP_WRITE_TOOLS]
+			: undefined;
+		if ((!read && !write) || typeof body?.connectionId !== "string") return json({ error: "Unknown tool." }, 400);
+		const args = {
+			...(typeof body.args === "object" && body.args !== null ? body.args : {}),
+			connectionId: body.connectionId,
+		};
 		try {
-			// biome-ignore lint/suspicious/noExplicitAny: each tool's own validators check the args
-			const text: string = await ctx.runQuery(tool as any, { ...args, connectionId: body.connectionId });
+			// biome-ignore-start lint/suspicious/noExplicitAny: each tool's own validators check the args
+			const text: string = read ? await ctx.runQuery(read as any, args) : await ctx.runMutation(write as any, args);
+			// biome-ignore-end lint/suspicious/noExplicitAny: each tool's own validators check the args
 			const connectionId = body.connectionId;
 			await ctx.runMutation(internal.mcp.touch, { connectionId: connectionId as Id<"aiConnections"> });
 			return json({ text });
