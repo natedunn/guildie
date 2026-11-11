@@ -18,6 +18,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Addon:** A clearer in-game window with separate sync, guild tooltip, request and preference sections, shorter labels, and scrolling on smaller screens. Sync now explains the UI reload and is unavailable during combat.
+- **Addon:** The window's scroll bar only shows when there's something to scroll.
+- **Addon:** Item tooltips no longer suggest guildmates for Cooking, Fishing or First Aid reagents, since nearly everyone has those.
+- **App:** Installing or reinstalling the addon checks that World of Warcraft: Forever was found first, and says what to do if it wasn't.
+- **Guildie:** In the Windows app, a notice at the bottom of the sidebar when the addon isn't installed. Dismiss it if you don't want the addon.
 
 ## 0.3.11
 

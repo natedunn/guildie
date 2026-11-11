@@ -120,6 +120,7 @@ function wow.reset(state)
         end
         local f = kind == "GameTooltip" and scanTooltip(name) or frame(name)
         f.template = template
+        if template == "UIPanelScrollFrameTemplate" then f.ScrollBar = frame() end
         if template == "PortraitFrameTemplate" and state.portrait then
             f.NineSlice = frame()
             f.PortraitContainer = frame()

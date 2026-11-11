@@ -70,6 +70,8 @@ export type DesktopStatus = {
 	/** Character slugs ("todd-bonzalez"), as uploaded. */
 	lastUpload?: { at: number; characters: string[] };
 	addonVersion?: string;
+	/** False after the player uninstalled the addon (apps 0.3.12+). */
+	addonManaged?: boolean;
 	updateReady?: string;
 	update?: UpdateState;
 };

@@ -255,6 +255,7 @@ test("window: short screens scroll, and shrinking content clamps the offset", fu
     local _, window = open({ screenHeight = 480 }, data(nil))
     eq(window:GetHeight(), 400, "screen padding")
     eq(window.body:GetHeight() > window.scroll:GetHeight(), true, "body overflows")
+    eq(window.scroll.ScrollBar:IsShown(), true, "scroll bar when it scrolls")
     window.scroll.scripts.OnMouseWheel(window.scroll, -100)
     eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "bottom clamp")
     _G.GuildieData = data(entry({ level = 24, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 155 } } }))
@@ -262,6 +263,12 @@ test("window: short screens scroll, and shrinking content clamps the offset", fu
     eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "content shrink clamps")
     window.scroll.scripts.OnMouseWheel(window.scroll, 100)
     eq(window.scroll:GetVerticalScroll(), 0, "top clamp")
+end)
+
+test("window: no scroll bar when everything fits", function()
+    local _, window = open({}, data(nil))
+    eq(window.body:GetHeight() <= window.scroll:GetHeight(), true, "fits")
+    eq(window.scroll.ScrollBar:IsShown(), false)
 end)
 
 test("window: reload is blocked during combat and available afterward", function()

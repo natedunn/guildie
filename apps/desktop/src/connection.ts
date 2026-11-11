@@ -20,6 +20,8 @@ export type Status = {
 	pairingCode?: string;
 	/** The Guildie addon's version in the WoW folder (undefined: not installed). Set by main (addon.ts). */
 	addonVersion?: string;
+	/** False after the player uninstalled the addon: the app leaves it out until they install it again. */
+	addonManaged?: boolean;
 	/** An app update downloaded and waiting for a restart (updater.ts). */
 	updateReady?: string;
 	/** Where updating stands (updater.ts UpdateState). */
@@ -38,6 +40,7 @@ export class Connection {
 	private account: string | undefined;
 	private pairingCode: string | undefined;
 	private addonVersion: string | undefined;
+	private addonManaged: boolean | undefined;
 	private updateReady: string | undefined;
 	private update: UpdateState | undefined;
 	private timer: NodeJS.Timeout | undefined;
@@ -77,15 +80,17 @@ export class Connection {
 			wowFolder: this.sync.wowFolder,
 			pairingCode: this.pairingCode,
 			addonVersion: this.addonVersion,
+			addonManaged: this.addonManaged,
 			updateReady: this.updateReady,
 			update: this.update,
 		};
 	}
 
 	/** What main knows about the addon and app updates, shown with the sync status. */
-	setExtras(extras: { addonVersion?: string; updateReady?: string; update?: UpdateState }) {
+	setExtras(extras: { addonVersion?: string; addonManaged?: boolean; updateReady?: string; update?: UpdateState }) {
 		if ("update" in extras) this.update = extras.update;
 		if ("addonVersion" in extras) this.addonVersion = extras.addonVersion;
+		if ("addonManaged" in extras) this.addonManaged = extras.addonManaged;
 		if ("updateReady" in extras) this.updateReady = extras.updateReady;
 		this.emit();
 	}

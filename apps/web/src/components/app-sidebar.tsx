@@ -18,6 +18,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, type LinkProps, useRouterState } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
+import { AddonNotice } from "@/components/addon-notice";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { UpdateReady } from "@/components/update-ready";
@@ -195,6 +196,7 @@ function SidebarNav() {
 					</Link>
 				))}
 				<UpdateReady />
+				<AddonNotice />
 				<UpdatedNotice />
 				{viewer ? (
 					<NavLink to="/settings">
