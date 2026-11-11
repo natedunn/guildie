@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** A clearer dungeon page: big Ready, Partly ready and Completed tiles that switch who's listed, guildmates with avatars and a square per quest (done, in their log, not picked up), and a quest table with the guild's progress and labeled rewards.
+
 ### New
 
 - **Guildie:** A new Dungeons page: a card per dungeon with its art and how many guildmates are ready (level and every dungeon quest for their class picked up or done), partly ready (level only) and completed. Each dungeon has its own page with everyone's status and what they're missing, its quests (class-only ones marked, with rewards) and its bosses.

@@ -239,6 +239,7 @@ export const detail = query({
 					name: m.character.name,
 					surname: m.character.surname,
 					classId: m.character.classId,
+					avatarUrl: m.character.avatarUrl,
 					level: m.quests.level,
 					mine: m.mine,
 					known: m.quests.completed !== undefined,
