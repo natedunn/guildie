@@ -207,6 +207,7 @@ type ProfessionEntry = {
 type Professions = { primaries?: ProfessionEntry[]; secondaries?: ProfessionEntry[] };
 type Media = { assets?: { key: string; value: string }[] };
 type Quests = { in_progress?: { id: number; name?: string }[] };
+type CompletedQuests = { quests?: { id: number }[] };
 type Specializations = {
 	specialization_groups?: {
 		is_active?: boolean;
@@ -280,14 +281,16 @@ export const syncCharacter = internalAction({
 			await ctx.runMutation(internal.sync.applyProfile, { characterId, missing: true });
 			return;
 		}
-		const [equipment, professions, specializations, media, quests] = await Promise.all([
+		const [equipment, professions, specializations, media, quests, completed] = await Promise.all([
 			blizzardGet<Equipment>({ ...common, path: `${base}/equipment` }),
 			blizzardGet<Professions>({ ...common, path: `${base}/professions` }),
 			blizzardGet<Specializations>({ ...common, path: `${base}/specializations` }),
 			// Media can 404 for a day after a character first appears.
 			blizzardGet<Media>({ ...common, path: `${base}/character-media` }),
-			// Quests in progress (ids and names); `completed` is a separate list we don't need.
+			// Quests in progress (ids and names).
 			blizzardGet<Quests>({ ...common, path: `${base}/quests` }),
+			// Quests turned in: for the Dungeons page (ready, completed).
+			blizzardGet<CompletedQuests>({ ...common, path: `${base}/quests/completed` }),
 		]);
 		const inProgress = quests.ok ? (quests.data.in_progress ?? []) : undefined;
 		await ctx.runMutation(internal.sync.applyProfile, {
@@ -311,6 +314,7 @@ export const syncCharacter = internalAction({
 			avatarUrl: media.ok ? media.data.assets?.find((a) => a.key === "avatar")?.value : undefined,
 			renderUrl: media.ok ? media.data.assets?.find((a) => a.key === "main-raw")?.value : undefined,
 			questIds: inProgress?.map((q) => q.id),
+			completedQuestIds: completed.ok ? (completed.data.quests ?? []).map((q) => q.id) : undefined,
 		});
 		// Titles, types and areas for quests the catalog doesn't have yet.
 		if (inProgress?.length && inProgress.map((q) => q.id).join() !== character.quests?.ids.join()) {
@@ -361,8 +365,9 @@ export const applyProfile = internalMutation({
 		avatarUrl: v.optional(v.string()),
 		renderUrl: v.optional(v.string()),
 		questIds: v.optional(v.array(v.number())),
+		completedQuestIds: v.optional(v.array(v.number())),
 	},
-	handler: async (ctx, { characterId, missing, questIds, ...data }) => {
+	handler: async (ctx, { characterId, missing, questIds, completedQuestIds, ...data }) => {
 		const character = await ctx.db.get(characterId);
 		if (!character) return;
 		const now = Date.now();
@@ -377,6 +382,16 @@ export const applyProfile = internalMutation({
 		}
 		if (questIds) patch.quests = { syncedAt: now, ids: questIds };
 		await ctx.db.patch(characterId, patch);
+		if (completedQuestIds) {
+			const ids = [...new Set(completedQuestIds)].sort((a, b) => a - b);
+			const row = await ctx.db
+				.query("completedQuests")
+				.withIndex("by_character", (q) => q.eq("characterId", characterId))
+				.unique();
+			if (!row) await ctx.db.insert("completedQuests", { characterId, ids, syncedAt: now });
+			else if (row.ids.join() !== ids.join()) await ctx.db.patch(row._id, { ids, syncedAt: now });
+			else await ctx.db.patch(row._id, { syncedAt: now });
+		}
 		if (data.talentTrees) await learnTreeInfo(ctx, data.talentTrees);
 	},
 });

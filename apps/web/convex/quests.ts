@@ -8,6 +8,7 @@ import { access, guildsOf } from "./guilds";
 import { pickProfile } from "./helper";
 import type { QuestProgress } from "./profile";
 import { vRegion } from "./schema";
+import { type BlizzardQuestRewards, questDetails } from "./shared/dungeons";
 import { dungeonGroups, type KnownQuest } from "./shared/quests";
 
 // Quests in progress: the catalog (title, type, area from Blizzard's static
@@ -90,7 +91,12 @@ type Quest = {
 	title?: string;
 	type?: { name?: string };
 	area?: { name?: string };
-	requirements?: { level?: number | { min?: number }; min_character_level?: number };
+	requirements?: {
+		level?: number | { min?: number };
+		min_character_level?: number;
+		classes?: { id: number }[];
+	};
+	rewards?: BlizzardQuestRewards;
 };
 
 const vQuestRow = v.object({
@@ -100,6 +106,9 @@ const vQuestRow = v.object({
 	area: v.optional(v.string()),
 	level: v.optional(v.number()),
 	minLevel: v.optional(v.number()),
+	classes: v.optional(v.array(v.number())),
+	faction: v.optional(v.union(v.literal("alliance"), v.literal("horde"))),
+	rewardItems: v.optional(v.array(v.number())),
 	partial: v.optional(v.boolean()),
 });
 
@@ -129,6 +138,7 @@ export const syncBatch = internalAction({
 							area: res.data.area?.name,
 							level: hint?.level,
 							minLevel: minLevel || undefined,
+							...questDetails(res.data),
 						};
 					}
 				} catch (e) {
@@ -195,7 +205,7 @@ export const backfill = internalAction({
 
 // ---- What pages read ---------------------------------------------------------
 
-async function catalogOf(ctx: QueryCtx, ids: Iterable<number>) {
+export async function catalogOf(ctx: QueryCtx, ids: Iterable<number>) {
 	const rows = new Map<number, Doc<"quests">>();
 	for (const id of new Set(ids)) {
 		const row = await ctx.db
