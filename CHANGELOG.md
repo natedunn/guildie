@@ -17,6 +17,9 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Guildie:** Stat priority: the three stats each character should look for on gear, from their main talent tree. See it on the roster's new Stat priority view and on a character's Gear tab, with a link to Wowhead's class guides. Doing something unusual? Change it for a character you've claimed: pick another tree's, or your own three.
+- **Guildie:** The roster is split into views (Overview, Stat priority, Professions) so it fits on the screen.
+- **Guildie:** A tighter character page: the gear, with their stats to look for, talents and what they can use in panels beside it.
 - **Guildie:** A guild Feed: who leveled up, who cleared a dungeon for the first time, who turned in dungeon quests, and who requested, claimed and fulfilled requests. Filter by kind, and show level-ups only every 5 levels.
 
 ### Improvements

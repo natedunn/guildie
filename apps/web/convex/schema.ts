@@ -179,6 +179,12 @@ export default defineSchema({
 		level: v.optional(v.number()),
 		classId: v.optional(v.number()),
 		claimedAt: v.number(),
+		/**
+		 * The stats this character looks for on gear, if the player chose:
+		 * another talent tree's (index in the class), or their own three
+		 * (shared/statPriority.ts). Unset: from their talents.
+		 */
+		statPriority: v.optional(v.object({ tree: v.optional(v.number()), stats: v.optional(v.array(v.string())) })),
 	})
 		.index("by_user", ["userId"])
 		.index("by_slug", ["flavor", "region", "slug"]),

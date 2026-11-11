@@ -153,6 +153,12 @@ leveling:
 - Spirit counts more for healers and Priests (drinking less).
 - Set bonuses and Season of Discovery rune effects are left out.
 
+Each spec also has a hand-written stat priority, first to third (`stats` in
+`SPECS`). The roster and character pages show it as "stats to look for".
+It isn't used for suggestions, but each stat in it must have a weight in that
+spec (`statPriority.test.ts`). A player who claimed a character can show
+another tree's priority or their own three instead (`convex/statPriority.ts`).
+
 Weapon DPS weights are per point of DPS, so they look large: a Combat Rogue
 values 1 main-hand DPS like about 5 Agility. Blank: the spec ignores that
 stat.
