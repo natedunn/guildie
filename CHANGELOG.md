@@ -15,20 +15,19 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.13
+
 ### New
 
-- **Guildie:** Stat priority: the three stats each character should look for on gear, from their main talent tree. See it on the roster's new Stat priority view and on a character's Gear tab, with a link to Wowhead's class guides. Doing something unusual? Change it for a character you've claimed: pick another tree's, or your own three.
-- **Guildie:** The roster is split into views (Overview, Stat priority, Professions) so it fits on the screen.
-- **Guildie:** A tighter character page: the gear, with their stats to look for, talents and what they can use in panels beside it.
+- **Guildie:** A new Dungeons page: a card per dungeon with its art and how many guildmates are ready (level and every dungeon quest for their class picked up or done), partly ready (level only) and completed. Each dungeon has its own page with everyone's status and what they're missing, its quests (class-only ones marked) and its bosses.
 - **Guildie:** A guild Feed: who leveled up, who cleared a dungeon for the first time, who turned in dungeon quests, and who requested, claimed and fulfilled requests. Filter by kind, and show level-ups only every 5 levels.
+- **Guildie:** Stat priority: the three stats each character should look for on gear, from their main talent tree. See it on the roster's new Stat priority view and on a character's Gear tab, with a link to Wowhead's class guides. Doing something unusual? Change it for a character you've claimed: pick another tree's, or your own three.
 
 ### Improvements
 
-- **Guildie:** A clearer dungeon page: big Ready, Partly ready and Completed tiles that switch who's listed, guildmates with avatars and a square per quest (done, in their log, not picked up),, and a quest table with the guild's progress. Quest rewards are gone: Blizzard's data leaves out many of them.
-
-### New
-
-- **Guildie:** A new Dungeons page: a card per dungeon with its art and how many guildmates are ready (level and every dungeon quest for their class picked up or done), partly ready (level only) and completed. Each dungeon has its own page with everyone's status and what they're missing, its quests (class-only ones marked, with rewards) and its bosses.
+- **Guildie:** A clearer dungeon page: big Ready, Partly ready and Completed tiles that switch who's listed, guildmates with avatars and a square per quest (done, in their log, not picked up), and a quest table with the guild's progress. Quest rewards are gone: Blizzard's data leaves out many of them.
+- **Guildie:** The roster is split into views (Overview, Stat priority, Professions) so it fits on the screen.
+- **Guildie:** A tighter character page: the gear, with their stats to look for, talents and what they can use in panels beside it.
 
 ## 0.3.12
 
