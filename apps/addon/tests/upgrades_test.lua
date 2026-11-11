@@ -295,7 +295,7 @@ test("say why tooltips have nothing: on by default, and can be turned off", func
     eq(plain(hover(cloak)[1]), "No guild data yet (needs the Guildie app)")
 end)
 
-test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies", function()
+test("tooltip line: maybe (lvl 24) and second spec; nothing when nobody qualifies", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local helm = {
         id = 5, name = "Spellweaver Cowl", equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 1, reqLevel = 33,
@@ -312,12 +312,12 @@ test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies
     stubItems({ helm, sword, resist })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, vectors.members.Rage })
     local helm_rows = hover(helm)
-    eq(plain(helm_rows[1]), "Frosty | maybe (at 33)")
-    eq(plain(helm_rows[2]), "Brisket | maybe (Restoration, at 33)")
+    eq(plain(helm_rows[1]), "Frosty | maybe (lvl 33)")
+    eq(plain(helm_rows[2]), "Brisket | maybe (Restoration, lvl 33)")
     local sword_rows = hover(sword)
     eq(#sword_rows, 2, "upgrade first, then maybe")
     eq(plain(sword_rows[1]), "Rage | upgrade (Fury)")
-    eq(plain(sword_rows[2]), "Miller | maybe (at 25)")
+    eq(plain(sword_rows[2]), "Miller | maybe (lvl 25)")
     eq(table.concat(hover(resist)), "No guildmates need this", "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }

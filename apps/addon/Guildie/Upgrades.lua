@@ -1,6 +1,6 @@
 -- Gear-upgrade suggestions on item tooltips: which guildmates the hovered
 -- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)",
--- "Miller | maybe (at 24)").
+-- "Miller | maybe (lvl 24)").
 -- A best guess from stat weights, not a sim.
 --
 -- The rules, the weights and each guildmate (level, spec, scores of what they
@@ -439,7 +439,7 @@ end
 
 --- Rows under the tooltip's Guildie header, one per person, upgrades first:
 --- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Pip", right =
---- "trade-off (Str/Int/Agi)" }, { left = "Miller", right = "maybe (at 24)" },
+--- "trade-off (Str/Int/Agi)" }, { left = "Miller", right = "maybe (lvl 24)" },
 --- or nil. `color(name, classId)` colors a name.
 function U.lines(item, itemID, color)
     local data = upgradeData()
@@ -456,10 +456,10 @@ function U.lines(item, itemID, color)
     for _, p in ipairs(picks) do
         local v = p.verdict
         local spec = data.rules.specs[v.spec]
-        -- "(Feral)", "(at 24)", or "(Restoration, at 24)" when it's for their second spec.
+        -- "(Feral)", "(lvl 24)", or "(Restoration, lvl 24)" when it's for their second spec.
         local notes = {}
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
-        if v.at then table.insert(notes, "at " .. v.at) end
+        if v.at then table.insert(notes, "lvl " .. v.at) end
         local right = (LABELS[v.kind] or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
         -- Already in order (suggest): upgrades, trade-offs, maybes.
         table.insert(rows, { left = color(p.member.name, p.member.classId), right = right })
