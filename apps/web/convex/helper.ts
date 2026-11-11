@@ -7,6 +7,7 @@ import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
 import { mergeProfile } from "./profile";
+import { type ReagentRecipe, type ReagentUser, reagentSuggestions } from "./reagentSuggestions";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
@@ -542,10 +543,7 @@ export type GuildData = {
 	mine: string[];
 	recipesKnown: number;
 	recipesInCatalog: number;
-	reagents: Record<
-		string,
-		{ name: string; users: { name: string; classId: number; profession: string; recipes: number }[] }
-	>;
+	reagents: Record<string, { name: string; users: ReagentUser[] }>;
 	/**
 	 * Gear-upgrade suggestions (addon 0.5.0+; older addons ignore it): the
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
@@ -644,12 +642,6 @@ export const guildDataBase = internalQuery({
  * might be an upgrade for (`upgrades`, judged in game). Suggestions, not
  * certainties: knowing a recipe doesn't mean someone is still making it.
  */
-/**
- * Secondary professions nearly everyone levels: "Brisket (Cooking) might want
- * this" would be on every fish and meat, so they're left out of reagents.
- */
-const EVERYONE_HAS = new Set(["Cooking", "Fishing", "First Aid"]);
-
 export const guildData = action({
 	args: { token: v.string() },
 	handler: async (ctx, { token }): Promise<GuildData | null> => {
@@ -658,50 +650,20 @@ export const guildData = action({
 		const ids = [
 			...new Set(base.guilds.flatMap((g) => g.members.flatMap((m) => m.professions.flatMap((p) => p.knownRecipes)))),
 		];
-		const reagentsByRecipe = new Map<number, { itemId: number; name: string }[]>();
+		const recipes = new Map<number, ReagentRecipe>();
 		for (let i = 0; i < ids.length; i += 400) {
 			for (const r of await ctx.runQuery(internal.recipes.byIds, { ids: ids.slice(i, i + 400) })) {
-				reagentsByRecipe.set(r.recipeId, r.reagents);
+				recipes.set(r.recipeId, r);
 			}
 		}
-		// itemId -> member -> { profession, recipes using it }
-		const uses = new Map<
-			number,
-			{ name: string; users: Map<string, { name: string; classId: number; profession: string; recipes: number }> }
-		>();
-		for (const g of base.guilds) {
-			for (const m of g.members) {
-				for (const p of m.professions) {
-					if (EVERYONE_HAS.has(p.name)) continue;
-					for (const recipeId of p.knownRecipes) {
-						for (const reagent of reagentsByRecipe.get(recipeId) ?? []) {
-							let entry = uses.get(reagent.itemId);
-							if (!entry) uses.set(reagent.itemId, (entry = { name: reagent.name, users: new Map() }));
-							const key = `${g.region}:${m.slug}:${p.name}`;
-							const user = entry.users.get(key) ?? { name: m.name, classId: m.classId, profession: p.name, recipes: 0 };
-							user.recipes += 1;
-							entry.users.set(key, user);
-						}
-					}
-				}
-			}
-		}
-		const reagents: GuildData["reagents"] = {};
-		for (const [itemId, entry] of uses) {
-			reagents[itemId] = {
-				name: entry.name,
-				users: [...entry.users.values()]
-					.sort((a, b) => b.recipes - a.recipes || a.name.localeCompare(b.name))
-					.slice(0, 8),
-			};
-		}
+		const reagents = reagentSuggestions(base.guilds, recipes);
 		return {
 			version: 1,
 			generatedAt: Date.now(),
 			guilds: base.guilds.map((g) => g.name),
 			mine: base.mine,
 			recipesKnown: ids.length,
-			recipesInCatalog: reagentsByRecipe.size,
+			recipesInCatalog: recipes.size,
 			reagents,
 			upgrades: { version: 1, rules: upgradeRules(), members: base.upgradeMembers },
 			characters: base.characters,

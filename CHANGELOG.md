@@ -18,6 +18,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Addon:** Guildie's part of item tooltips is set apart from the item's own lines: it comes last, after a gap and a "Guildie" header with the addon's icon, with one short row per guildmate (their name, then what they're requesting, might want it for, or would get as an upgrade), instead of long wrapping lines that each started with "Guildie".
+- **Addon:** "Might want" suggestions on reagent tooltips skip what nobody needs a guildmate for: reagents vendors sell (thread, vials, flux, dyes, Simple Wood), and herbs, leather and stone that herbalists, skinners and miners only use for camping items (Incense Candle, Camp Chair, Lodestone). Up to 8 guildmates are listed instead of 3.
 
 ## 0.3.14
 

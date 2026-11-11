@@ -147,6 +147,6 @@ export const byIds = internalQuery({
 		);
 		return rows
 			.filter((r) => r !== null)
-			.map(({ recipeId, profession, reagents }) => ({ recipeId, profession, reagents }));
+			.map(({ recipeId, profession, name, reagents }) => ({ recipeId, profession, name, reagents }));
 	},
 });

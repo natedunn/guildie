@@ -219,7 +219,12 @@ your last login or reload.
   work, and nobody else's guild is downloaded).
 - For each reagent: guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
-  weekly) and each member's known recipes (with their profile, hourly).
+  weekly) and each member's known recipes (with their profile, hourly), in
+  `convex/reagentSuggestions.ts`. Left out: Cooking, Fishing and First Aid
+  (nearly everyone has them), the gathering professions' camping recipes
+  (Incense Candle, Camp Chair, Lodestone and upgrades; Mining's smelting
+  counts), and reagents vendors sell (`VENDOR_REAGENTS` in `shared/wow.ts`:
+  thread, vials, flux, dyes, Simple Wood...).
 - Tooltips end with a Guildie block: a blank line, a gold "Guildie" header
   with the addon's icon, then one indented row per person, in two columns:
   the class-colored name, and what Guildie knows in muted grey. Requests

@@ -90,3 +90,49 @@ export const SLOT_ORDER = [
 export const AUTO_SYNC_INTERVAL_MS = 60 * 60_000;
 /** "Sync now" is allowed this long after the last sync, so it can't be spammed. */
 export const MANUAL_SYNC_COOLDOWN_MS = 10 * 60_000;
+
+/**
+ * Reagents trade supplies and food vendors sell, by item id. Nobody needs a
+ * guildmate for these, so the addon's tooltips don't suggest who "might
+ * want" them (reagentSuggestions.ts). Only classic items whose vendors are
+ * known; Forever's own items (Cerulean Dye...) aren't listed.
+ */
+export const VENDOR_REAGENTS: Record<number, string> = {
+	159: "Refreshing Spring Water",
+	814: "Flask of Oil",
+	1179: "Ice Cold Milk",
+	1205: "Melon Juice",
+	1645: "Moonberry Juice",
+	1708: "Sweet Nectar",
+	2320: "Coarse Thread",
+	2321: "Fine Thread",
+	2324: "Bleach",
+	2325: "Black Dye",
+	2604: "Red Dye",
+	2605: "Green Dye",
+	2678: "Mild Spices",
+	2692: "Hot Spices",
+	2880: "Weak Flux",
+	3371: "Empty Vial",
+	3372: "Leaded Vial",
+	3466: "Strong Flux",
+	3713: "Soothing Spices",
+	4289: "Salt",
+	4291: "Silken Thread",
+	4340: "Gray Dye",
+	4341: "Yellow Dye",
+	4342: "Purple Dye",
+	4399: "Wooden Stock",
+	4400: "Heavy Stock",
+	4470: "Simple Wood",
+	6217: "Copper Rod",
+	6260: "Blue Dye",
+	6261: "Orange Dye",
+	8343: "Heavy Silken Thread",
+	8766: "Morning Glory Dew",
+	8925: "Crystal Vial",
+	10290: "Pink Dye",
+	14341: "Rune Thread",
+	18256: "Imbued Vial",
+	18567: "Elemental Flux",
+};
