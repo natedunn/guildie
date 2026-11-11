@@ -6,6 +6,7 @@ import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } fr
 import { pickProfile } from "./helper";
 import { vRegion, vVisibility } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
+import { statPriority } from "./shared/statPriority";
 import { guildSlug, MANUAL_SYNC_COOLDOWN_MS } from "./shared/wow";
 import { requireUserId } from "./users";
 
@@ -144,6 +145,7 @@ export const get = query({
 				profileMissing: c.profileMissing,
 				claimed: claimed[i] !== null,
 				battletag: claimed[i] ? tags.get(claimed[i].userId) : undefined,
+				statPriority: statPriority(c.classId, profiles[i].talentTrees, claimed[i]?.statPriority),
 			})),
 		};
 	},
@@ -160,6 +162,13 @@ export const character = query({
 		const guild = await ctx.db.get(character.guildId);
 		if (!guild || !(await access(ctx, guild)).canView) return null;
 		const profile = await pickProfile(ctx, character);
+		// The player who claimed it may have chosen its stat priority; only they can change it.
+		const claims = await ctx.db
+			.query("ownedCharacters")
+			.withIndex("by_slug", (q) => q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", slug))
+			.collect();
+		const userId = await getAuthUserId(ctx);
+		const mine = userId ? claims.find((c) => c.userId === userId) : undefined;
 		const equipment = await Promise.all(
 			(profile.equipment ?? []).map(async (item) => {
 				const known = await itemRow(ctx, item.itemId);
@@ -184,6 +193,9 @@ export const character = query({
 			sources: profile.sources,
 			talentSource: profile.sources.talents,
 			synced: profile.synced,
+			statPriority: statPriority(character.classId, profile.talentTrees, (mine ?? claims[0])?.statPriority),
+			/** The viewer claimed this character: they can choose its stat priority. */
+			canEdit: mine !== undefined,
 			talentLayouts: layouts
 				.map(({ specId, name, nodes }) => ({
 					specId,

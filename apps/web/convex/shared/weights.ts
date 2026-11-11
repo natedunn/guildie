@@ -27,7 +27,14 @@
 //   bow, gun, crossbow, thrown weapon or wand.
 
 export type Weights = Record<string, number>;
-export type Spec = { name: string; w: Weights };
+/**
+ * `stats`: what to look for on gear, first to third (shared/statPriority.ts),
+ * for the roster and character pages. Written by hand rather than read off
+ * `w`: per-point weights rank Attack Power and spell power oddly next to the
+ * main stats, and players think in "Stamina, then Strength". Every stat here
+ * must have a weight in `w` (statPriority.test.ts checks).
+ */
+export type Spec = { name: string; stats: [string, string, string]; w: Weights };
 
 /** Class ids (Blizzard's) to the game's class tokens (UnitClass). */
 export const CLASS_TOKENS: Record<number, string> = {
@@ -91,6 +98,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	WARRIOR: [
 		{
 			name: "Arms",
+			stats: ["STRENGTH", "CRIT_RATING", "HIT_RATING"],
 			w: {
 				STRENGTH: 1,
 				AGILITY: 0.7,
@@ -106,6 +114,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Fury",
+			stats: ["STRENGTH", "HIT_RATING", "CRIT_RATING"],
 			w: {
 				STRENGTH: 1,
 				AGILITY: 0.8,
@@ -122,6 +131,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Protection",
+			stats: ["STAMINA", "DEFENSE_SKILL_RATING", "STRENGTH"],
 			w: {
 				STAMINA: 1,
 				STRENGTH: 0.6,
@@ -143,9 +153,14 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	// protection_paladin; wowsims/forever paladin/retribution "Unsealed Wrath"
 	// (Str 2.4, Agi 2.23, Int 2.06, spell damage 2.36, AP 1, MH DPS 13.85).
 	PALADIN: [
-		{ name: "Holy", w: healer({ STRENGTH: 0.3, DPS: 1 }) },
+		{
+			name: "Holy",
+			stats: ["SPELL_HEALING_DONE", "INTELLECT", "MANA_REGENERATION"],
+			w: healer({ STRENGTH: 0.3, DPS: 1 }),
+		},
 		{
 			name: "Protection",
+			stats: ["STAMINA", "STRENGTH", "INTELLECT"],
 			w: {
 				STAMINA: 1,
 				STRENGTH: 0.6,
@@ -165,6 +180,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Retribution",
+			stats: ["STRENGTH", "CRIT_RATING", "HIT_RATING"],
 			w: {
 				STRENGTH: 1,
 				AGILITY: 0.7,
@@ -187,6 +203,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	HUNTER: [
 		{
 			name: "Beast Mastery",
+			stats: ["AGILITY", "CRIT_RATING", "STAMINA"],
 			w: {
 				AGILITY: 1,
 				STAMINA: 0.5,
@@ -205,6 +222,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Marksmanship",
+			stats: ["AGILITY", "HIT_RATING", "CRIT_RATING"],
 			w: {
 				AGILITY: 1,
 				STAMINA: 0.5,
@@ -223,6 +241,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Survival",
+			stats: ["AGILITY", "CRIT_RATING", "STAMINA"],
 			w: {
 				AGILITY: 1,
 				STAMINA: 0.6,
@@ -245,6 +264,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	ROGUE: [
 		{
 			name: "Assassination",
+			stats: ["AGILITY", "CRIT_RATING", "HIT_RATING"],
 			w: {
 				AGILITY: 1,
 				STRENGTH: 0.55,
@@ -260,6 +280,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Combat",
+			stats: ["AGILITY", "HIT_RATING", "CRIT_RATING"],
 			w: {
 				AGILITY: 1,
 				STRENGTH: 0.55,
@@ -275,6 +296,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 		},
 		{
 			name: "Subtlety",
+			stats: ["AGILITY", "CRIT_RATING", "STRENGTH"],
 			w: {
 				AGILITY: 1,
 				STRENGTH: 0.55,
@@ -295,6 +317,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	PRIEST: [
 		{
 			name: "Discipline",
+			stats: ["INTELLECT", "SPELL_HEALING_DONE", "SPIRIT"],
 			w: healer({
 				SPIRIT: 0.8,
 				SPELL_DAMAGE_DONE: 0.7,
@@ -302,8 +325,16 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 				BONUS_STAT_HOLY_DAMAGE_DONE: 0.3,
 			}),
 		},
-		{ name: "Holy", w: healer({ SPIRIT: 0.9, BONUS_STAT_HOLY_DAMAGE_DONE: 0.3 }) },
-		{ name: "Shadow", w: caster({ SPIRIT: 0.8, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.2 }) },
+		{
+			name: "Holy",
+			stats: ["SPELL_HEALING_DONE", "SPIRIT", "INTELLECT"],
+			w: healer({ SPIRIT: 0.9, BONUS_STAT_HOLY_DAMAGE_DONE: 0.3 }),
+		},
+		{
+			name: "Shadow",
+			stats: ["SPELL_DAMAGE_DONE", "INTELLECT", "SPIRIT"],
+			w: caster({ SPIRIT: 0.8, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.2 }),
+		},
 	],
 	// wowsims/forever shaman/elemental (Int .19, spell damage 1, nature .69,
 	// fire .31) and shaman/enhancement "Pre-BiS" (Str 2.2, Agi 1.32, Int 1.99,
@@ -311,10 +342,12 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	SHAMAN: [
 		{
 			name: "Elemental",
+			stats: ["SPELL_DAMAGE_DONE", "INTELLECT", "CRIT_RATING"],
 			w: caster({ SPIRIT: 0.4, BONUS_STAT_NATURE_DAMAGE_DONE: 0.9, BONUS_STAT_FIRE_DAMAGE_DONE: 0.4 }),
 		},
 		{
 			name: "Enhancement",
+			stats: ["STRENGTH", "CRIT_RATING", "AGILITY"],
 			w: {
 				STRENGTH: 1,
 				AGILITY: 0.6,
@@ -330,21 +363,46 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 				DPS: 6.4,
 			},
 		},
-		{ name: "Restoration", w: healer({ SPIRIT: 0.5, STRENGTH: 0.2, DPS: 0.8 }) },
+		{
+			name: "Restoration",
+			stats: ["SPELL_HEALING_DONE", "INTELLECT", "MANA_REGENERATION"],
+			w: healer({ SPIRIT: 0.5, STRENGTH: 0.2, DPS: 0.8 }),
+		},
 	],
 	// wowsims/classic mage (Int .49, spell power 1, school power 1).
 	MAGE: [
-		{ name: "Arcane", w: caster({ BONUS_STAT_ARCANE_DAMAGE_DONE: 1.1 }) },
-		{ name: "Fire", w: caster({ BONUS_STAT_FIRE_DAMAGE_DONE: 1.1 }) },
-		{ name: "Frost", w: caster({ BONUS_STAT_FROST_DAMAGE_DONE: 1.1 }) },
+		{
+			name: "Arcane",
+			stats: ["SPELL_DAMAGE_DONE", "INTELLECT", "SPIRIT"],
+			w: caster({ BONUS_STAT_ARCANE_DAMAGE_DONE: 1.1 }),
+		},
+		{
+			name: "Fire",
+			stats: ["SPELL_DAMAGE_DONE", "CRIT_RATING", "INTELLECT"],
+			w: caster({ BONUS_STAT_FIRE_DAMAGE_DONE: 1.1 }),
+		},
+		{
+			name: "Frost",
+			stats: ["SPELL_DAMAGE_DONE", "INTELLECT", "HIT_RATING"],
+			w: caster({ BONUS_STAT_FROST_DAMAGE_DONE: 1.1 }),
+		},
 	],
 	// wowsims/classic warlock (Int .23, SP 1, shadow .9, fire .1). Stamina is
 	// worth a lot more while leveling (Life Tap, drain tanking).
 	WARLOCK: [
-		{ name: "Affliction", w: caster({ STAMINA: 0.9, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.1 }) },
-		{ name: "Demonology", w: caster({ STAMINA: 1, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.1 }) },
+		{
+			name: "Affliction",
+			stats: ["SPELL_DAMAGE_DONE", "STAMINA", "INTELLECT"],
+			w: caster({ STAMINA: 0.9, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.1 }),
+		},
+		{
+			name: "Demonology",
+			stats: ["STAMINA", "SPELL_DAMAGE_DONE", "INTELLECT"],
+			w: caster({ STAMINA: 1, BONUS_STAT_SHADOW_DAMAGE_DONE: 1.1 }),
+		},
 		{
 			name: "Destruction",
+			stats: ["SPELL_DAMAGE_DONE", "CRIT_RATING", "STAMINA"],
 			w: caster({ STAMINA: 0.8, BONUS_STAT_FIRE_DAMAGE_DONE: 1.1, BONUS_STAT_SHADOW_DAMAGE_DONE: 0.8 }),
 		},
 	],
@@ -355,10 +413,12 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 	DRUID: [
 		{
 			name: "Balance",
+			stats: ["SPELL_DAMAGE_DONE", "INTELLECT", "CRIT_RATING"],
 			w: caster({ BONUS_STAT_ARCANE_DAMAGE_DONE: 0.9, BONUS_STAT_NATURE_DAMAGE_DONE: 0.7, SPELL_HEALING_DONE: 0.3 }),
 		},
 		{
 			name: "Feral",
+			stats: ["AGILITY", "STRENGTH", "STAMINA"],
 			w: {
 				AGILITY: 1,
 				STRENGTH: 0.95,
@@ -374,7 +434,7 @@ export const SPECS: Record<string, [Spec, Spec, Spec]> = {
 				MANA_REGENERATION: 0.2,
 			},
 		},
-		{ name: "Restoration", w: healer({ SPIRIT: 0.9 }) },
+		{ name: "Restoration", stats: ["SPELL_HEALING_DONE", "INTELLECT", "SPIRIT"], w: healer({ SPIRIT: 0.9 }) },
 	],
 };
 
