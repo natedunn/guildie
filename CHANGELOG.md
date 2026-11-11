@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Addon:** Gear tooltips say "lvl 24" instead of "at 24" for guildmates who can use an item a few levels from now.
+- **Guildie, Addon:** Gear suggestions for guildmates who can use an item a few levels from now say "Maybe, at lvl 24" on the site and "maybe (lvl 24)" in tooltips, instead of "at 24".
 
 ## 0.3.18
 
