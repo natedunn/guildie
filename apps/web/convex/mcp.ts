@@ -10,7 +10,7 @@ import { DUNGEON_BY_KEY } from "./shared/dungeons";
 import { ago, capped, gearType, matches, quality, slotName, statKey } from "./shared/mcpText";
 import { CLASS_RULES, PROFICIENCY_TYPES } from "./shared/proficiencies";
 import { PRIORITY_STATS, statPriority, TIER_PRESETS } from "./shared/statPriority";
-import { canPrefer, type GearChoice } from "./shared/upgrades";
+import { canPrefer, type GearChoice, typesOf } from "./shared/upgrades";
 import { CLASS_TOKENS, SPECS } from "./shared/weights";
 import { className, raceName } from "./shared/wow";
 import { type Choice, setGearPreference, setStatPriority, type TypeChoice } from "./statPriority";
@@ -545,21 +545,23 @@ const preferable = (classId: number | undefined, kind: "armor" | "weapon") =>
 const typeName = (kind: "armor" | "weapon", type: number) =>
 	PROFICIENCY_TYPES.find((t) => t.kind === kind && t.subclass === type)?.name ?? `type ${type}`;
 
-/** "Plate (only), Two-Handed Swords (preferred)", or "" for none. */
+/** "Leather > Mail (only these); Two-Handed Axes (preferred)", or "" for none. */
 function gearPrefText(pref: GearChoice | undefined) {
 	return (["armor", "weapon"] as const)
 		.flatMap((kind) => {
-			const p = pref?.[kind];
-			return p ? [`${typeName(kind, p.type)} (${p.strict ? "only" : "preferred"})`] : [];
+			const types = typesOf(pref?.[kind]);
+			if (!types.length) return [];
+			const only = pref?.[kind]?.strict ? (types.length > 1 ? "only these" : "only") : "preferred";
+			return [`${types.map((t) => typeName(kind, t)).join(" > ")} (${only})`];
 		})
-		.join(", ");
+		.join("; ");
 }
 
 /** For the player's own characters: what the settings tools accept. */
 function choicesFor(classId: number) {
 	const trees = SPECS[CLASS_TOKENS[classId] ?? ""]?.map((t) => t.name) ?? [];
 	return [
-		`You can set: stat priority (3-5 of ${Object.values(PRIORITY_STATS).join(", ")}; steepness even, balanced or steep; or a talent tree: ${trees.join(", ")}),`,
+		`You can set: stat priority (3-10 of ${Object.values(PRIORITY_STATS).join(", ")}; steepness even, balanced or steep; or a talent tree: ${trees.join(", ")}),`,
 		`  armor preference (${preferable(classId, "armor")
 			.map((t) => t.name)
 			.join(", ")}), weapon preference (${preferable(classId, "weapon")
@@ -662,7 +664,7 @@ export const setStatPriorityTool = internalMutation({
 			const current = own.claim.statPriority?.stats;
 			if (!names && !(preset && current)) {
 				throw new ConvexError(
-					"Give the stats (3 to 5, most important first, optionally with a steepness), a talent tree, or reset.",
+					"Give the stats (3 to 10, most important first, optionally with a steepness), a talent tree, or reset.",
 				);
 			}
 			const unknown = (names ?? []).filter((n) => !statKey(n, PRIORITY_STATS));
@@ -689,8 +691,8 @@ export const setGearPreferenceTool = internalMutation({
 	args: {
 		connectionId: v.string(),
 		character: v.string(),
-		armor: v.optional(v.string()),
-		weapon: v.optional(v.string()),
+		armor: v.optional(v.union(v.string(), v.array(v.string()))),
+		weapon: v.optional(v.union(v.string(), v.array(v.string()))),
 		strict: v.optional(v.boolean()),
 	},
 	handler: async (ctx, { connectionId, character, armor, weapon, strict }): Promise<string> => {
@@ -699,22 +701,31 @@ export const setGearPreferenceTool = internalMutation({
 		if (armor === undefined && weapon === undefined)
 			throw new ConvexError("Give an armor type, a weapon type, or both.");
 		const current = own.claim.gearPreference;
-		const pick = (kind: "armor" | "weapon", name: string | undefined): TypeChoice => {
-			if (name === undefined) return current?.[kind] ?? null;
-			if (/^(none|any|no preference|clear|reset)$/i.test(name.trim())) return null;
-			const options = preferable(own.classId, kind);
-			const hit = gearType(name, options);
-			if (!hit) {
-				throw new ConvexError(
-					`${own.label} can't prefer "${name}". ${kind === "armor" ? "Armor" : "Weapon"} types: ${options.map((t) => t.name).join(", ")}, or none.`,
-				);
+		const pick = (kind: "armor" | "weapon", given: string | string[] | undefined): TypeChoice => {
+			const now = current?.[kind];
+			if (given === undefined) {
+				// Unchanged types; `strict` alone still applies to them.
+				const types = typesOf(now);
+				return types.length ? { types, strict: strict ?? now?.strict ?? false } : null;
 			}
-			return { type: hit.subclass, strict: strict ?? current?.[kind]?.strict ?? false };
+			const names = (Array.isArray(given) ? given : [given]).map((n) => n.trim()).filter(Boolean);
+			if (!names.length || names.some((n) => /^(none|any|no preference|clear|reset)$/i.test(n))) return null;
+			const options = preferable(own.classId, kind);
+			const types = names.map((name) => {
+				const hit = gearType(name, options);
+				if (!hit) {
+					throw new ConvexError(
+						`${own.label} can't prefer "${name}". ${kind === "armor" ? "Armor" : "Weapon"} types: ${options.map((t) => t.name).join(", ")}, or none.`,
+					);
+				}
+				return hit.subclass;
+			});
+			return { types: [...new Set(types)], strict: strict ?? now?.strict ?? false };
 		};
 		const a = pick("armor", armor);
 		const w = pick("weapon", weapon);
 		await setGearPreference(ctx, userId, own.claim.region, own.claim.slug, a, w);
 		const text = gearPrefText({ ...(a ? { armor: a } : {}), ...(w ? { weapon: w } : {}) });
-		return `${own.label}'s gear preference is now: ${text || "none"}. "Preferred" types count more in gear suggestions; "only" hides the others.`;
+		return `${own.label}'s gear preference is now: ${text || "none"}. Listed types count more (each one down the list a little less than the one before); "only" hides the others.`;
 	},
 });

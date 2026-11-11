@@ -58,7 +58,7 @@ const STEEPNESS_NAMES: Record<Steepness, string> = {
 	even: "Even",
 	balanced: "Balanced",
 	steep: "Steep",
-	custom: "Custom",
+	custom: "Manual",
 };
 
 /** Shares for `n` stats from a preset. */
@@ -117,7 +117,7 @@ const wowheadGuides = (classId: number) =>
 function sourceText(p: StatPriority) {
 	if (!p.chosen) return `From ${p.tree} talents`;
 	if (p.tree) return `${p.tree}, set by the player`;
-	return `Set by the player${p.steepness ? ` · ${STEEPNESS_NAMES[p.steepness]}` : ""}`;
+	return `Custom${p.steepness ? ` · ${STEEPNESS_NAMES[p.steepness]}` : ""}`;
 }
 
 type Choice = { tree: number } | { stats: string[]; tiers?: number[] } | null;
@@ -233,7 +233,7 @@ export function SteepnessControl({
 }) {
 	const options: { key: Steepness; name: string }[] = [
 		...STEEPNESS,
-		...(custom || value === "custom" ? [{ key: "custom" as const, name: "Custom" }] : []),
+		...(custom || value === "custom" ? [{ key: "custom" as const, name: STEEPNESS_NAMES.custom }] : []),
 	];
 	return (
 		<div
@@ -442,8 +442,8 @@ export function StatPriorityEditor({
 				<OptionCard
 					active={mode === "own"}
 					onClick={() => pick("own")}
-					title="My own"
-					detail="Pick 3 to 5 stats and how much each counts"
+					title="Custom"
+					detail={`Pick ${MIN_STATS} to ${MAX_STATS} stats and how much each counts`}
 				/>
 			</div>
 

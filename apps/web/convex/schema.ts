@@ -80,6 +80,17 @@ export const vQuestLogEntry = v.object({
 	objectives: v.optional(v.array(v.object({ text: v.string(), done: v.boolean() }))),
 });
 
+/**
+ * Preferred armor or weapon types, first to last (`types`), and whether other
+ * types are left out (`strict`). `type` is the one-type shape from before
+ * lists, still on older rows; shared/upgrades.ts typesOf reads either.
+ */
+export const vTypeChoice = v.object({
+	types: v.optional(v.array(v.number())),
+	type: v.optional(v.number()),
+	strict: v.boolean(),
+});
+
 /** A character as a request shows it. */
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
 
@@ -199,8 +210,8 @@ export default defineSchema({
 		 */
 		gearPreference: v.optional(
 			v.object({
-				armor: v.optional(v.object({ type: v.number(), strict: v.boolean() })),
-				weapon: v.optional(v.object({ type: v.number(), strict: v.boolean() })),
+				armor: v.optional(vTypeChoice),
+				weapon: v.optional(vTypeChoice),
 			}),
 		),
 	})

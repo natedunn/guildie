@@ -138,10 +138,15 @@ export function buildServer(convex: ConvexTarget, props: Props, canWrite = false
 		{
 			title: "Set stat priority",
 			description:
-				"Set what one of the player's own characters looks for on gear: 3-5 stats (most important first) with an optional steepness (even, balanced, steep), a talent tree's priority, or reset to follow their talents. The character tool lists the choices.",
+				"Set what one of the player's own characters looks for on gear: 3-10 stats (most important first) with an optional steepness (even, balanced, steep), a talent tree's priority, or reset to follow their talents. The character tool lists the choices.",
 			inputSchema: {
 				character,
-				stats: z.array(z.string().max(32)).min(3).max(5).optional().describe('e.g. ["Agility", "Strength", "Stamina"]'),
+				stats: z
+					.array(z.string().max(32))
+					.min(3)
+					.max(10)
+					.optional()
+					.describe('e.g. ["Agility", "Strength", "Stamina"]'),
 				steepness: z
 					.enum(["even", "balanced", "steep"])
 					.optional()
@@ -158,12 +163,18 @@ export function buildServer(convex: ConvexTarget, props: Props, canWrite = false
 		{
 			title: "Set gear preference",
 			description:
-				'Set the armor and/or weapon type one of the player\'s own characters prefers in gear suggestions ("none" clears it). strict: suggest only that type.',
+				'Set the armor and/or weapon types one of the player\'s own characters prefers in gear suggestions, most preferred first ("none" clears). strict: suggest only these types.',
 			inputSchema: {
 				character,
-				armor: z.string().max(32).optional().describe('e.g. "Leather", or "none".'),
-				weapon: z.string().max(32).optional().describe('e.g. "Two-Handed Swords", or "none".'),
-				strict: z.boolean().optional().describe("Only suggest this type, rather than just preferring it."),
+				armor: z
+					.union([z.string().max(32), z.array(z.string().max(32)).max(8)])
+					.optional()
+					.describe('e.g. ["Leather", "Mail"], or "none".'),
+				weapon: z
+					.union([z.string().max(32), z.array(z.string().max(32)).max(8)])
+					.optional()
+					.describe('e.g. ["Two-Handed Axes", "Two-Handed Maces"], or "none".'),
+				strict: z.boolean().optional().describe("Only suggest these types, rather than just preferring them."),
 			},
 			annotations: WRITES,
 		},

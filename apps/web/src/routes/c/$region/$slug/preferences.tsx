@@ -55,8 +55,8 @@ function PreferencesPage() {
 				title="Gear types"
 				description={
 					<>
-						The armor and weapon type {c.name} prefers. Other types count less in suggestions, or with "Only this type",
-						don't show at all.
+						The armor and weapon types {c.name} prefers, most preferred first. Others count less in suggestions, or with
+						"Only these", don't show at all.
 					</>
 				}
 			>

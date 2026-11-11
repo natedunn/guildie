@@ -15,7 +15,7 @@ import { CLASS_TOKENS, SPECS, STAT_POINTS, type Weights } from "./weights.ts";
 // Stat priority: the stats a character should look for on gear, first to
 // last. From their main talent tree (the same one gear suggestions use,
 // shared/upgrades.ts specsOf), unless the player who claimed the character
-// chose another tree or their own three to five, with how much each counts
+// chose another tree or their own three to ten, with how much each counts
 // next to the first (Even, Balanced, Steep or their own shares). Pages show
 // the first three; all of them count in gear suggestions on the site and in
 // game (specsFor). A general guide, not a sim.
@@ -46,7 +46,7 @@ export { MAX_STATS, MIN_STATS, steepnessOf, TIER_PRESETS, validStats, validTiers
 export type StatPriority = {
 	/** The tree it's from; absent for the player's own three. */
 	tree?: string;
-	/** Stat keys (PRIORITY_STATS), first to last: three from a tree, three to five of the player's own. Pages show three. */
+	/** Stat keys (PRIORITY_STATS), first to last: three from a tree, three to ten of the player's own. Pages show three. */
 	stats: string[];
 	/** How much each counts next to the first, per stat point (1 first): the player's shares, or a tree's weights. */
 	shares: number[];
