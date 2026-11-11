@@ -164,6 +164,12 @@ local function layout()
     local viewport = frameHeight - BODY_TOP - FOOTER_HEIGHT
     window.scroll:SetHeight(viewport)
     window.scroll:SetVerticalScroll(math.min(window.scroll:GetVerticalScroll() or 0, math.max(0, height - viewport)))
+    -- The template's scroll bar only when there's something to scroll.
+    local bar = rawget(window.scroll, "ScrollBar")
+    if type(bar) == "table" then
+        local scrolls = height > viewport
+        if bar.SetShown then bar:SetShown(scrolls) elseif scrolls then bar:Show() else bar:Hide() end
+    end
 end
 
 local function classColor(token)
@@ -325,6 +331,8 @@ local function buildWindow()
     headerRule:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP + 12)
     local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
     window.scroll = ok and scroll or CreateFrame("ScrollFrame", nil, window)
+    -- Lets the template hide its bar too when the scroll range is 0.
+    window.scroll.scrollBarHideable = true
     window.scroll:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP)
     window.scroll:SetWidth(TEXT_WIDTH)
     window.body = CreateFrame("Frame", nil, window.scroll)

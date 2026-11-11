@@ -18,6 +18,14 @@ local VERSION = 4
 
 GuildieDB = GuildieDB or {}
 
+--- This addon's version (Guildie.toc). Saved with the data so the Guildie app
+--- can tell which version the game last ran (it asks for a /reload after an
+--- update until the game saves with the new one).
+local function addonVersion()
+    local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    return get and get(ADDON, "Version") or nil
+end
+
 local function activeConfigID()
     if C_ClassTalents and C_ClassTalents.GetActiveConfigID then
         return C_ClassTalents.GetActiveConfigID()
@@ -270,6 +278,7 @@ local function capture(reason, recipes)
     local list = {}
     for _, c in pairs(GuildieDB.characters) do table.insert(list, c) end
     GuildieDB.version = VERSION
+    GuildieDB.addonVersion = addonVersion()
     GuildieDB.payload = encode({ version = VERSION, characters = list })
     GuildieDB.lastReason = reason
     -- The game wrote GuildieDB to disk when this session's UI loaded; anything

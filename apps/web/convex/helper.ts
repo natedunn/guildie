@@ -641,6 +641,12 @@ export const guildDataBase = internalQuery({
  * might be an upgrade for (`upgrades`, judged in game). Suggestions, not
  * certainties: knowing a recipe doesn't mean someone is still making it.
  */
+/**
+ * Secondary professions nearly everyone levels: "Brisket (Cooking) might want
+ * this" would be on every fish and meat, so they're left out of reagents.
+ */
+const EVERYONE_HAS = new Set(["Cooking", "Fishing", "First Aid"]);
+
 export const guildData = action({
 	args: { token: v.string() },
 	handler: async (ctx, { token }): Promise<GuildData | null> => {
@@ -663,6 +669,7 @@ export const guildData = action({
 		for (const g of base.guilds) {
 			for (const m of g.members) {
 				for (const p of m.professions) {
+					if (EVERYONE_HAS.has(p.name)) continue;
 					for (const recipeId of p.knownRecipes) {
 						for (const reagent of reagentsByRecipe.get(recipeId) ?? []) {
 							let entry = uses.get(reagent.itemId);

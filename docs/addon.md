@@ -237,7 +237,8 @@ your last login or reload.
   their second spec, or usable within 3 levels. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
   Stamina over Embossed Leather Gloves"). About 20 KB of the file for a guild
-  of 60.
+  of 60. How the scoring works, with every spec's weights:
+  [gear-upgrades.md](gear-upgrades.md).
 - Your own characters (addon 0.6.0): `characters`, by name, each claimed
   character as Guildie shows it now (the merged profile, below): see "Up to
   date with Guildie". About 0.5 KB per character.

@@ -1,7 +1,8 @@
 // Gear-upgrade suggestions: how much each stat is worth to each class and
 // talent tree, and the thresholds the decision uses (shared/upgrades.ts).
 // What each class can wear and wield is in shared/proficiencies.ts (from the
-// game's data). Plain data, meant to be tweaked by hand.
+// game's data). Plain data, meant to be tweaked by hand. Explained, with
+// tables of these numbers, in docs/gear-upgrades.md: update those too.
 // The addon gets all of this in GuildieData.lua (helper.ts), so changing a
 // number here changes the game's tooltips with the next download, no addon
 // release needed.

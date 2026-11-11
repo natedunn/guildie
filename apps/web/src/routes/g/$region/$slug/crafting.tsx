@@ -167,16 +167,21 @@ function CraftingPage() {
 				</div>
 			) : (
 				<div>
-					<div className="hidden grid-cols-[minmax(0,1.3fr)_7.5rem_minmax(0,1fr)] gap-4 border-b border-border pb-1.5 text-xs text-muted-foreground @2xl:grid">
-						<span>Item</span>
-						<span>Profession</span>
-						<span>Crafters</span>
+					{/* Every column at every width: a narrow pane scrolls the list sideways. */}
+					<div className="overflow-x-auto">
+						<div className="min-w-[40rem]">
+							<div className="grid grid-cols-[minmax(0,1.3fr)_7.5rem_minmax(0,1fr)] gap-4 border-b border-border pb-1.5 text-xs text-muted-foreground">
+								<span>Item</span>
+								<span>Profession</span>
+								<span>Crafters</span>
+							</div>
+							<ul>
+								{results.slice(0, limit).map((r) => (
+									<ResultRow key={r.recipeId} recipe={r} region={params.region} member={member} />
+								))}
+							</ul>
+						</div>
 					</div>
-					<ul>
-						{results.slice(0, limit).map((r) => (
-							<ResultRow key={r.recipeId} recipe={r} region={params.region} member={member} />
-						))}
-					</ul>
 					{results.length > limit ? (
 						<button
 							type="button"
@@ -231,10 +236,10 @@ function ResultRow({ recipe, region, member }: { recipe: GuildRecipe; region: st
 	const shown = expanded ? recipe.crafters : recipe.crafters.slice(0, CRAFTERS);
 	const hidden = recipe.crafters.length - shown.length;
 	return (
-		<li className="grid gap-x-4 gap-y-1 border-b border-border/60 py-1.5 last:border-b-0 @2xl:grid-cols-[minmax(0,1.3fr)_7.5rem_minmax(0,1fr)] @2xl:items-center">
+		<li className="grid grid-cols-[minmax(0,1.3fr)_7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 border-b border-border/60 py-1.5 last:border-b-0">
 			<RecipeItem recipe={recipe} />
-			<span className="hidden truncate text-sm text-muted-foreground @2xl:block">{recipe.profession}</span>
-			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 pl-[38px] text-sm @2xl:pl-0">
+			<span className="truncate text-sm text-muted-foreground">{recipe.profession}</span>
+			<div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
 				{shown.map((c) => (
 					<Link
 						key={c.slug}

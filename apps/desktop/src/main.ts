@@ -170,26 +170,34 @@ app.whenReady().then(async () => {
 	// ---- The addon: installed and kept up to date in WoW: Forever ----
 	/** Versions already announced this run, so a change is told once. */
 	const announced = new Set<string>();
+	/**
+	 * Why the addon can't be installed in this folder (no WoW folder, or no
+	 * WoW: Forever in it), or undefined when it can.
+	 */
+	const cannotInstall = (wow: string | undefined) => {
+		if (!wow) return "World of Warcraft wasn't found. Choose your World of Warcraft folder first.";
+		if (!foreverFlavors(wow).length)
+			return `No WoW: Forever (_forever_) folder in ${wow}. Choose the World of Warcraft folder that contains _forever_.`;
+		return undefined;
+	};
 	const manageAddon = (wow = connection.status.wowFolder, force = false) => {
 		// Installing by hand (the Addon page, the tray) undoes an uninstall;
-		// otherwise an uninstalled addon stays uninstalled.
+		// otherwise an uninstalled addon stays uninstalled. installAddon checks
+		// for WoW: Forever before it gets here with force.
 		if (force) settings.addonManaged = true;
 		if (!settings.addonManaged) {
-			connection.setExtras({ addonVersion: undefined });
+			connection.setExtras({ addonVersion: undefined, addonManaged: false });
 			return;
 		}
 		let results: AddonResult[] = [];
-		if (wow) {
+		const missing = cannotInstall(wow);
+		if (missing) {
+			log(`Addon: not installed: ${missing}`);
+		} else if (wow) {
 			try {
 				results = ensureAddon(addonSource, wow, log, force);
 			} catch (e) {
 				log(`Addon: ${(e as Error).message}`);
-			}
-			if (!foreverFlavors(wow).length) {
-				log(`Addon: no _forever_ folder in ${wow}; nothing to install`);
-				// Asked for from the tray: say why nothing happened.
-				if (force)
-					notify("Guildie", `No WoW: Forever (_forever_) folder in ${wow}. Choose your World of Warcraft folder.`);
 			}
 		}
 		// Files on disk apply at the game's next /reload (or start, for a new install),
@@ -206,10 +214,18 @@ app.whenReady().then(async () => {
 		}
 		const failed = results.find((r) => r.error);
 		if (failed) notify("Guildie", `Couldn't install the addon in ${failed.folder}: ${failed.error}`);
-		connection.setExtras({ addonVersion: results.find((r) => r.version)?.version });
+		connection.setExtras({ addonVersion: results.find((r) => r.version)?.version, addonManaged: true });
+	};
+	/** Install or reinstall by hand (the Addon page, the tray): only once WoW: Forever is found. Throws why not. */
+	const installAddon = () => {
+		const wow = connection.status.wowFolder;
+		const missing = cannotInstall(wow);
+		if (missing) throw new Error(missing);
+		manageAddon(wow, true);
 	};
 	connection.onWowFolder = (folder) => manageAddon(folder);
 	log(`Addon shipped with the app: ${readAddonVersion(addonSource) ?? `missing at ${addonSource}`}`);
+	connection.setExtras({ addonBundled: readAddonVersion(addonSource) });
 
 	// ---- The bridge (preload.ts): only Guildie's own page, on this site ----
 	const fromSite = (event: IpcMainInvokeEvent) => {
@@ -300,7 +316,7 @@ app.whenReady().then(async () => {
 	ipcMain.handle(
 		"guildie:addon-install",
 		pageOnly(() => {
-			manageAddon(undefined, true);
+			installAddon();
 			return addonInfo();
 		}),
 	);
@@ -315,7 +331,7 @@ app.whenReady().then(async () => {
 			const wow = connection.status.wowFolder;
 			settings.addonManaged = false;
 			if (wow) uninstallAddon(wow, { savedData }, log);
-			connection.setExtras({ addonVersion: undefined });
+			connection.setExtras({ addonVersion: undefined, addonManaged: false });
 			return addonInfo();
 		}),
 	);
@@ -381,7 +397,14 @@ app.whenReady().then(async () => {
 	const { update } = createTray({
 		open: () => showWindow(),
 		manageAddon: () => showWindow(`${origin}/addon`),
-		reinstallAddon: () => manageAddon(undefined, true),
+		reinstallAddon: () => {
+			try {
+				installAddon();
+			} catch (e) {
+				// From the tray there's no page to show it: say why nothing happened.
+				notify("Guildie", (e as Error).message);
+			}
+		},
 		checkForUpdates: async () => {
 			const result = await checkForUpdates();
 			// From the tray there's no page to show it: say how it went.
