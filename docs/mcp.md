@@ -7,8 +7,9 @@ Players can ask Claude, ChatGPT or any other app that speaks MCP about their
 guild: "who can craft a Mooncloth Bag?", "what's Brisket wearing?", "which
 requests are open?". The app connects to Guildie's MCP server at
 `https://mcp.guildie.club/mcp`, the player signs in with their Guildie
-account, and the app reads what that player can see on the site, nothing more,
-and never changes anything.
+account, and the app reads what that player can see on the site, nothing more.
+If the player allows it, it can also set their own characters' stat priority
+and gear preferences, and nothing else.
 
 ## The pieces
 
@@ -48,17 +49,40 @@ as `{ userId, connectionId }`, encrypted in the OAuth grant.
 
 ## The tools
 
-All read-only, limited to the player's own guilds (whatever their
-visibility) and, for bags and banks, their own characters:
+Reading, limited to the player's own guilds (whatever their visibility) and,
+for bags and banks, their own characters:
 
 `me`, `guild_roster`, `character`, `who_can_craft`, `guild_requests`,
 `guild_activity`, `my_inventory`.
 
-To add one: a handler in `convex/mcp.ts` (an `internalQuery` that starts with
-`viewerOf` and returns a string), its name in `MCP_TOOLS` in `convex/http.ts`,
-and its description and arguments in `apps/mcp/src/tools.ts`. Keep answers
-short: names, not ids; one line per thing; cap long lists with `capped`.
-Descriptions go to the model on every turn, so keep them to a sentence.
+Changing, only if the player allowed it when connecting, only on characters
+they claimed, and only these two settings (never anything about the account,
+the guild or requests):
+
+- `set_stat_priority`: 3 to 5 stats with a steepness, a talent tree's, or
+  reset to their talents.
+- `set_gear_preference`: preferred (or only) armor and weapon types.
+
+They go through the same checks as the site (`setStatPriority` and
+`setGearPreference` in `convex/statPriority.ts`), and the `character` tool
+lists the choices for the player's own characters.
+
+**Permission:** the consent page has "Also let it change your characters'
+stat priority and gear preferences", ticked by default. Ticked, the grant gets
+scope `guildie:write` as well as `guildie:read`, and the connection
+`canWrite`. The Worker only offers the two tools to tokens with that scope, and
+Convex checks `canWrite` (`writerOf`) on every change. Connections from before
+this, or with the box unticked, stay read-only; reconnecting is the way to
+allow changes.
+
+To add a read tool: a handler in `convex/mcp.ts` (an `internalQuery` that
+starts with `viewerOf` and returns a string), its name in `MCP_TOOLS` in
+`convex/http.ts`, and its description and arguments in `apps/mcp/src/tools.ts`.
+A tool that changes something is an `internalMutation` starting with
+`writerOf`, in `MCP_WRITE_TOOLS`, registered after `canWrite` in `tools.ts`.
+Keep answers short: names, not ids; one line per thing; cap long lists with
+`capped`. Descriptions go to the model on every turn, so keep them to a
+sentence.
 
 ## Settings
 

@@ -57,3 +57,57 @@ export function slotName(slot: string) {
 	const s = slot.toLowerCase().replace(/_/g, " ");
 	return s.charAt(0).toUpperCase() + s.slice(1);
 }
+
+// ---- Names a model writes → Guildie's keys (the write tools) ----------------------
+
+/** Words people use for the priority stats, folded (PRIORITY_STATS labels and keys match too). */
+const STAT_ALIASES: Record<string, string> = {
+	str: "STRENGTH",
+	agi: "AGILITY",
+	stam: "STAMINA",
+	sta: "STAMINA",
+	int: "INTELLECT",
+	spi: "SPIRIT",
+	ap: "ATTACK_POWER",
+	sp: "SPELL_DAMAGE_DONE",
+	"spell power": "SPELL_DAMAGE_DONE",
+	"spell damage": "SPELL_DAMAGE_DONE",
+	"healing power": "SPELL_HEALING_DONE",
+	"bonus healing": "SPELL_HEALING_DONE",
+	"critical strike": "CRIT_RATING",
+	"crit chance": "CRIT_RATING",
+	"hit chance": "HIT_RATING",
+	"defense skill": "DEFENSE_SKILL_RATING",
+	mp5: "MANA_REGENERATION",
+	"mana regen": "MANA_REGENERATION",
+	"mana regeneration": "MANA_REGENERATION",
+};
+
+/** A stat's key from what someone called it, or undefined. `labels`: PRIORITY_STATS. */
+export function statKey(name: string, labels: Record<string, string>) {
+	const f = fold(name);
+	for (const [key, label] of Object.entries(labels)) {
+		if (f === fold(key) || f === fold(label)) return key;
+	}
+	return STAT_ALIASES[f];
+}
+
+/** "2h swords", "two-hand sword", "staff" → the folded form PROFICIENCY_TYPES names compare in. */
+function gearWords(name: string) {
+	return fold(name)
+		.replace(/\b(2h|2 h|two hand|two handed|2 handed)\b/g, "two handed")
+		.replace(/\bstaff\b/g, "staves")
+		.split(" ")
+		.map((w) => (w.length > 3 && !w.endsWith("s") && w !== "thrown" && w !== "two" && w !== "handed" ? `${w}s` : w))
+		.join(" ")
+		.replace(/\bmails\b/g, "mail")
+		.replace(/\bleathers\b/g, "leather")
+		.replace(/\bplates\b/g, "plate")
+		.replace(/\bcloths\b/g, "cloth");
+}
+
+/** The type someone named, among `types` (one kind's PROFICIENCY_TYPES), or undefined. */
+export function gearType<T extends { name: string }>(name: string, types: T[]) {
+	const want = gearWords(name);
+	return types.find((t) => gearWords(t.name) === want);
+}
