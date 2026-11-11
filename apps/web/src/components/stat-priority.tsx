@@ -86,8 +86,12 @@ function ShareBar({ stat, share }: { stat: string; share: number }) {
 	);
 }
 
-/** Ranked rows: number, stat, what it does, how much it counts. The first three only. */
-function RankedStats({ stats, shares }: { stats: string[]; shares: number[] }) {
+/**
+ * Ranked rows, the first three: number, stat, what it does, and (the
+ * player's own stats only) how much it counts. A tree's priority is a hand-written guide whose order
+ * its weights don't always follow, so it gets no bars.
+ */
+function RankedStats({ stats, shares }: { stats: string[]; shares?: number[] }) {
 	return (
 		<ol className="space-y-1.5">
 			{stats.slice(0, SHOWN_STATS).map((s, i) => (
@@ -97,7 +101,7 @@ function RankedStats({ stats, shares }: { stats: string[]; shares: number[] }) {
 						<span className={cn("block text-[0.8125rem]", i === 0 && "font-semibold")}>{label(s)}</span>
 						{STAT_HINTS[s] && <span className="block truncate text-xs text-muted-foreground">{STAT_HINTS[s]}</span>}
 					</span>
-					<ShareBar stat={s} share={shares[i] ?? 1} />
+					{shares ? <ShareBar stat={s} share={shares[i] ?? 1} /> : null}
 				</li>
 			))}
 		</ol>
@@ -162,7 +166,10 @@ export function StatPrioritySection({
 				/>
 			) : (
 				<>
-					<RankedStats stats={priority.stats} shares={priority.shares} />
+					<RankedStats
+						stats={priority.stats}
+						shares={priority.chosen && !priority.tree ? priority.shares : undefined}
+					/>
 					{canEdit && more.length > 0 && (
 						<p className="mt-2 text-xs text-muted-foreground">Also counted: {more.map(label).join(", ")}</p>
 					)}
@@ -515,7 +522,7 @@ function StatPicker({
 					</div>
 				</>
 			) : preview ? (
-				<RankedStats stats={preview.stats} shares={preview.shares} />
+				<RankedStats stats={preview.stats} />
 			) : null}
 			{duplicate && <p className="text-xs text-muted-foreground">Pick different stats.</p>}
 			<p className="text-xs text-muted-foreground">
