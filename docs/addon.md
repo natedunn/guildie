@@ -220,8 +220,12 @@ your last login or reload.
 - For each reagent: guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
   weekly) and each member's known recipes (with their profile, hourly).
-- The addon adds one line to item tooltips, skipping your own characters:
-  "**Guildie** might want this: Brenna (Tailoring), Corwin (Alchemy) +2".
+- Tooltips get a Guildie block after the item's own lines: a blank line, a
+  gold "Guildie" header with the addon's icon, then one indented, muted row
+  per thing (names keep their class colors). Requests first (two columns:
+  who, and what they want), then reagents, then upgrades. The reagent row,
+  skipping your own characters: "Might want this: Brenna (Tailoring),
+  Corwin (Alchemy) +2".
 - Gear upgrades (addon 0.5.0): `upgrades` holds the rules and stat weights
   once (`apps/web/convex/shared/weights.ts`, seeded from WowSims' EP weights)
   and each guildmate seen in the last 14 days (not your own characters):
@@ -231,8 +235,8 @@ your last login or reload.
   `GetItemInfo`, `GetItemStats`, its tooltip lines for "Classes:", Unique and
   Soulbound), scores it for each of them the same way
   (`Guildie/Upgrades.lua`, a port of `convex/shared/upgrades.ts`; both run
-  `apps/addon/tests/upgrade_vectors.json`) and adds at most one line:
-  "**Guildie**: upgrade for Brisket (Feral), maybe Miller (at 24)". Upgrade:
+  `apps/addon/tests/upgrade_vectors.json`) and adds up to two rows:
+  "Upgrade for Brisket (Feral)" and "Maybe Miller (at 24)". Upgrade:
   15%+ better than what they wear there, usable now, main spec. Maybe: 3-15%,
   their second spec, or usable within 3 levels. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
@@ -349,8 +353,8 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   Claimed requests keep their mats state (the mats may be in the mail).
 - **In game:** `requests` in the guild data, by item id: `{ kind, quantity,
   name, classId, claimedBy? }`, at most 5 per item and 300 items. The
-  tooltip line: "**Guildie**: Todd is requesting 20, claimed by Miller",
-  "Brenna wants this crafted (2)". `myRequests` `{ open, stale }` feeds the
+  tooltip has a row per request: "Todd | requesting 20, claimed by Miller",
+  "Brenna | wants it crafted (2)". `myRequests` `{ open, stale }` feeds the
   window's "Your requests: 2 open (1 stale)". Enchants (no item) aren't on
   tooltips.
 

@@ -337,9 +337,7 @@ function U.readItem(link, lines)
     return item
 end
 
--- ---- The tooltip line ---------------------------------------------------------------
-
-local GOLD = "|cffd9b45a"
+-- ---- The tooltip rows ---------------------------------------------------------------
 
 local function upgradeData()
     local data = GuildieData and GuildieData.upgrades
@@ -347,9 +345,9 @@ local function upgradeData()
     return data
 end
 
---- "Guildie: upgrade for A (Feral), B (Fury), maybe C (at 24)", or nil.
---- `color(name, classId)` colors a name.
-function U.line(item, itemID, color)
+--- The rows under the tooltip's Guildie header: "Upgrade for A (Feral), B
+--- (Fury)" and "Maybe C (at 24)", or nil. `color(name, classId)` colors a name.
+function U.lines(item, itemID, color)
     local data = upgradeData()
     if not data or not item or item.soulbound then return nil end
     local skip = {}
@@ -370,10 +368,10 @@ function U.line(item, itemID, color)
         local text = color(p.member.name, p.member.classId) .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
         table.insert(v.kind == "upgrade" and ups or maybes, text)
     end
-    local parts = {}
-    if #ups > 0 then table.insert(parts, "upgrade for " .. table.concat(ups, ", ")) end
-    if #maybes > 0 then table.insert(parts, "maybe " .. table.concat(maybes, ", ")) end
-    return GOLD .. "Guildie|r: " .. table.concat(parts, ", ")
+    local rows = {}
+    if #ups > 0 then table.insert(rows, "Upgrade for " .. table.concat(ups, ", ")) end
+    if #maybes > 0 then table.insert(rows, "Maybe " .. table.concat(maybes, ", ")) end
+    return rows
 end
 
 --- The tooltip's text lines: from tooltip data (modern clients), else its font strings.

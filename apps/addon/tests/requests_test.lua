@@ -43,10 +43,11 @@ local function hover(ns, itemID)
     local tooltip = {
         GetName = function() return "GameTooltip" end,
         AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
         Show = function() end,
     }
     ns.addToTooltip(tooltip, itemID)
-    return added
+    return wow.guildieRows(added, ns)
 end
 
 local DATA = {
@@ -69,41 +70,45 @@ local DATA = {
 test("an item request: who and how many, class-colored", function()
     local ns = load(DATA)
     local lines = hover(ns, 2589)
-    eq(#lines, 1, "one line")
-    eq(plain(lines[1]), "Guildie: Todd is requesting 20")
+    eq(#lines, 1, "one row")
+    eq(plain(lines[1]), "Todd | requesting 20")
     assert(lines[1]:find("|cffc69b6dTodd|r", 1, true), "warrior color for Todd: " .. lines[1])
 end)
 
-test("claimed, and your own request, on one line", function()
+test("claimed, and your own request: a row each", function()
     local ns = load(DATA)
-    eq(plain(ns.requestLine(4306)), "Guildie: Todd is requesting 5, claimed by Miller; you are requesting 1")
+    local lines = hover(ns, 4306)
+    eq(#lines, 2)
+    eq(plain(lines[1]), "Todd | requesting 5, claimed by Miller")
+    eq(plain(lines[2]), "You | requesting 1")
 end)
 
 test("crafts: wants this crafted, with how many", function()
     local ns = load(DATA)
-    eq(plain(ns.requestLine(4245)), "Guildie: Brenna wants this crafted (2)")
-    eq(plain(ns.requestLine(4246)), "Guildie: You want this crafted")
+    eq(plain(hover(ns, 4245)[1]), "Brenna | wants it crafted (2)")
+    eq(plain(hover(ns, 4246)[1]), "You | want it crafted")
 end)
 
 test("nothing requested, no data, or an older file without requests: no line", function()
     local ns = load(DATA)
-    eq(ns.requestLine(1234), nil, "not requested")
+    eq(#ns.requestRows(1234), 0, "not requested")
     eq(#hover(ns, 1234), 0)
     ns = load(nil)
-    eq(ns.requestLine(2589), nil, "no GuildieData")
+    eq(#ns.requestRows(2589), 0, "no GuildieData")
+    eq(#hover(ns, 2589), 0)
     ns = load({ generatedAt = 1, reagents = {} })
-    eq(ns.requestLine(2589), nil, "file from before 0.8.0")
+    eq(#ns.requestRows(2589), 0, "file from before 0.8.0")
 end)
 
-test("the request line comes before the reagent line", function()
+test("the request rows come before the reagent row", function()
     local data = {}
     for k, v in pairs(DATA) do data[k] = v end
     data.reagents = { [2589] = { name = "Linen Cloth", users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } } }
     local ns = load(data)
     local lines = hover(ns, 2589)
     eq(#lines, 2)
-    eq(plain(lines[1]), "Guildie: Todd is requesting 20")
-    eq(plain(lines[2]), "Guildie might want this: Brenna (Tailoring)")
+    eq(plain(lines[1]), "Todd | requesting 20")
+    eq(plain(lines[2]), "Might want this: Brenna (Tailoring)")
 end)
 
 test("window: your requests, with the stale nudge", function()

@@ -1,4 +1,4 @@
--- Adds lines to item tooltips: guild requests for this item ("Todd is
+-- Adds a Guildie block to item tooltips: guild requests for this item ("Todd
 -- requesting 20"), guildmates whose known recipes use it (reagents), and
 -- guildmates it might be a gear upgrade for (Upgrades.lua).
 -- Suggestions, not certainties: knowing a recipe doesn't mean they're still
@@ -6,7 +6,6 @@
 
 local ADDON, ns = ...
 
-local GOLD = "|cffd9b45a"
 local MAX_NAMES = 3
 
 local function isMine(name)
@@ -31,7 +30,8 @@ local function classColored(name, classId)
     return color and ("|c" .. color .. name .. "|r") or name
 end
 
-local function suggestion(itemID)
+--- "Might want this: Brenna (Tailoring), Corwin (Alchemy) +2", or nil.
+local function reagentRow(itemID)
     local entry = GuildieData and GuildieData.reagents and GuildieData.reagents[itemID]
     if not entry then return nil end
     local names, extra = {}, 0
@@ -47,74 +47,86 @@ local function suggestion(itemID)
     if #names == 0 then return nil end
     local text = table.concat(names, ", ")
     if extra > 0 then text = text .. string.format(" +%d", extra) end
-    return GOLD .. "Guildie|r might want this: " .. text
+    return "Might want this: " .. text
 end
-ns.reagentSuggestion = suggestion
+ns.reagentRow = reagentRow
 
---- "Guildie: Todd is requesting 20, claimed by Miller; you want this
---- crafted", from the guild's open requests (GuildieData.requests, addon
---- 0.8.0), or nil.
-local function requestLine(itemID)
+--- One two-column row per open request for this item (GuildieData.requests,
+--- addon 0.8.0): { left = "Todd", right = "requesting 20, claimed by Miller" }.
+local function requestRows(itemID)
     local list = GuildieData and type(GuildieData.requests) == "table" and GuildieData.requests[itemID]
-    if type(list) ~= "table" or #list == 0 then return nil end
-    local parts = {}
+    if type(list) ~= "table" then return {} end
+    local rows = {}
     for _, r in ipairs(list) do
         if type(r) == "table" and r.name then
             local mine = isMine(r.name)
-            local who = mine and "you" or classColored(r.name, r.classId)
-            local text
+            local right
             if r.kind == "craft" then
-                text = who .. (mine and " want" or " wants") .. " this crafted"
-                if (r.quantity or 1) > 1 then text = text .. string.format(" (%d)", r.quantity) end
+                right = mine and "want it crafted" or "wants it crafted"
+                if (r.quantity or 1) > 1 then right = right .. string.format(" (%d)", r.quantity) end
             else
-                text = who .. (mine and " are" or " is") .. string.format(" requesting %d", r.quantity or 1)
+                right = string.format("requesting %d", r.quantity or 1)
             end
             if type(r.claimedBy) == "table" and r.claimedBy.name then
-                text = text .. ", claimed by " .. classColored(r.claimedBy.name, r.claimedBy.classId)
+                right = right .. ", claimed by " .. classColored(r.claimedBy.name, r.claimedBy.classId)
             end
-            table.insert(parts, text)
+            table.insert(rows, { left = mine and "You" or classColored(r.name, r.classId), right = right })
         end
     end
-    if #parts == 0 then return nil end
-    local text = table.concat(parts, "; ")
-    -- "you are requesting" reads oddly first in the line: capitalize.
-    text = text:gsub("^you", "You")
-    return GOLD .. "Guildie|r: " .. text
+    return rows
 end
-ns.requestLine = requestLine
+ns.requestRows = requestRows
 
---- The gear-upgrade line for the item in this tooltip, if any.
-local function upgradeLine(tooltip, itemID, data)
+--- The gear-upgrade rows for the item in this tooltip, if any.
+local function upgradeRows(tooltip, itemID, data)
     if not ns.upgrades or not tooltip.GetItem then return nil end
     local _, link = tooltip:GetItem()
     local item = ns.upgrades.readItem(link, ns.upgrades.tooltipLines(tooltip, data))
-    return ns.upgrades.line(item, itemID, classColored)
+    return ns.upgrades.lines(item, itemID, classColored)
 end
-ns.upgradeLine = upgradeLine
+
+--- Everything Guildie has to say about this item, as rows (no header).
+local function rowsFor(tooltip, itemID, data)
+    local rows = requestRows(itemID)
+    -- Guildmates' recipes use it, but nobody can hand over a bound one.
+    local bound = ns.upgrades and ns.upgrades.untradeable(ns.upgrades.tooltipLines(tooltip, data))
+    local reagent = not bound and reagentRow(itemID)
+    if reagent then table.insert(rows, { left = reagent }) end
+    local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)
+    if ok and upgrades then
+        for _, text in ipairs(upgrades) do table.insert(rows, { left = text }) end
+    end
+    return rows
+end
+
+-- Our block, set apart from the item's own lines: a blank line, a gold
+-- "Guildie" header with the addon's icon, then one indented row per thing.
+-- Rows are muted grey so the class-colored names carry the color.
+local HEADER = "|TInterface\\AddOns\\Guildie\\icon:0|t Guildie"
+local HEADER_COLOR = { 0.85, 0.71, 0.35 }
+local MUTED = { 0.66, 0.66, 0.66 }
+local INDENT = "   "
+ns.TOOLTIP_HEADER = HEADER
 
 local function addTo(tooltip, itemID, data)
     if not itemID then return end
     -- Not our own hidden tooltip, which reads worn gear (Capture.lua).
     if tooltip.GetName and tooltip:GetName() == "GuildieScanTooltip" then return end
-    local added = false
-    local request = requestLine(itemID)
-    if request then
-        tooltip:AddLine(request, 1, 1, 1, true)
-        added = true
+    local rows = rowsFor(tooltip, itemID, data)
+    if #rows == 0 then return end
+    tooltip:AddLine(" ")
+    tooltip:AddLine(HEADER, HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3])
+    local m = MUTED
+    for _, row in ipairs(rows) do
+        if row.right and tooltip.AddDoubleLine then
+            tooltip:AddDoubleLine(INDENT .. row.left, row.right, 1, 1, 1, m[1], m[2], m[3])
+        elseif row.right then
+            tooltip:AddLine(INDENT .. row.left .. " " .. row.right, m[1], m[2], m[3], true)
+        else
+            tooltip:AddLine(INDENT .. row.left, m[1], m[2], m[3], true)
+        end
     end
-    -- Guildmates' recipes use it, but nobody can hand over a bound one.
-    local bound = ns.upgrades and ns.upgrades.untradeable(ns.upgrades.tooltipLines(tooltip, data))
-    local line = not bound and suggestion(itemID)
-    if line then
-        tooltip:AddLine(line, 1, 1, 1, true)
-        added = true
-    end
-    local ok, upgrade = pcall(upgradeLine, tooltip, itemID, data)
-    if ok and upgrade then
-        tooltip:AddLine(upgrade, 1, 1, 1, true)
-        added = true
-    end
-    if added then tooltip:Show() end
+    tooltip:Show()
 end
 ns.addToTooltip = addTo
 

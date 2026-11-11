@@ -137,12 +137,13 @@ local function hover(item)
         GetName = function() return "GameTooltip" end,
         GetItem = function() return item.name, item.link end,
         AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
         Show = function() end,
     }
     local lines = { { leftText = item.name } }
     for _, l in ipairs(item.lines or {}) do table.insert(lines, { leftText = l }) end
     ns.addToTooltip(tooltip, item.id, { id = item.id, lines = lines })
-    return added
+    return wow.guildieRows(added, ns)
 end
 
 local function plain(text)
@@ -212,8 +213,8 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     alt.name = "Alt"
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, alt })
     local added = hover(GLOVES)
-    eq(#added, 1, "one line")
-    eq(plain(added[1]), "Guildie: upgrade for Miller (Arms), Brisket (Feral)")
+    eq(#added, 1, "one row")
+    eq(plain(added[1]), "Upgrade for Miller (Arms), Brisket (Feral)")
     assert(added[1]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[1])
     -- Soulbound to the viewer: can't be traded, so no suggestions.
     local bound = {}
@@ -227,7 +228,7 @@ test("nothing that can't be traded: Binds when picked up, Quest Item; reagent li
     stubItems({ GLOVES })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller })
     GuildieData.reagents[GLOVES.id] = { name = GLOVES.name, users = { { name = "Brenna", classId = 8, profession = "Tailoring" } } }
-    eq(#hover(GLOVES), 2, "tradeable: reagent and upgrade lines")
+    eq(#hover(GLOVES), 2, "tradeable: reagent and upgrade rows")
     for _, binding in ipairs({ "Binds when picked up", "Quest Item", "Soulbound" }) do
         local bound = {}
         for k, v in pairs(GLOVES) do bound[k] = v end
@@ -255,8 +256,11 @@ test("tooltip line: maybe (at 24) and second spec; nothing when nobody qualifies
     }
     stubItems({ helm, sword, resist })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, vectors.members.Rage })
-    eq(plain(hover(helm)[1]), "Guildie: maybe Frosty (at 33), Brisket (Restoration, at 33)")
-    eq(plain(hover(sword)[1]), "Guildie: upgrade for Rage (Fury), maybe Miller (at 25)")
+    eq(plain(hover(helm)[1]), "Maybe Frosty (at 33), Brisket (Restoration, at 33)")
+    local sword_rows = hover(sword)
+    eq(#sword_rows, 2, "upgrade and maybe rows")
+    eq(plain(sword_rows[1]), "Upgrade for Rage (Fury)")
+    eq(plain(sword_rows[2]), "Maybe Miller (at 25)")
     eq(#hover(resist), 0, "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }
