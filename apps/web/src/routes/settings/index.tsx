@@ -70,10 +70,7 @@ function Account() {
 				<BattletagSetting hidden={!!viewer.hideBattletag} />
 			</section>
 
-			<section className="mt-10">
-				<SectionTitle>AI apps</SectionTitle>
-				<AiConnections />
-			</section>
+			<AiConnections />
 
 			<section className="mt-10 border-t border-border pt-6">
 				<SignOutButton />

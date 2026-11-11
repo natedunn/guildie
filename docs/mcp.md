@@ -1,5 +1,9 @@
 # AI apps (MCP)
 
+Experimental and unannounced: no CHANGELOG line, and nothing on the site
+points at it yet. Settings shows the section only to players who connected
+an app. When it's ready, add the line and a way in (Settings → Account).
+
 Players can ask Claude, ChatGPT or any other app that speaks MCP about their
 guild: "who can craft a Mooncloth Bag?", "what's Brisket wearing?", "which
 requests are open?". The app connects to Guildie's MCP server at
@@ -16,7 +20,7 @@ and never changes anything.
 | `apps/web/convex/mcp.ts`                                 | What each tool answers (short plain text), connecting, the connection list                               |
 | `apps/web/convex/http.ts` (`/mcp/exchange`, `/mcp/tool`) | The Worker's way in, guarded by `MCP_SECRET`                                                             |
 | `apps/web/src/routes/connect/ai.tsx`                     | Where the player confirms which account the app gets                                                     |
-| Settings → Account → AI apps                             | The address to add, and connected apps with Disconnect                                                   |
+| Settings → Account → AI apps                             | Connected apps with Disconnect; shown only once the player has one (unannounced while experimental)      |
 
 The Worker holds no game data and no Battle.net tokens. It knows a player only
 as `{ userId, connectionId }`, encrypted in the OAuth grant.

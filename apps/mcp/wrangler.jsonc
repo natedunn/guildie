@@ -25,7 +25,7 @@
 		"prod": {
 			"name": "guildie-mcp",
 			"routes": [{ "pattern": "mcp.guildie.club", "zone_name": "guildie.club", "custom_domain": true }],
-			"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "TODO-create-guildie-mcp-oauth" }],
+			"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "a64897d1c7ee45e285aaeb06797bd0cc" }],
 			"vars": {
 				"PUBLIC_URL": "https://mcp.guildie.club",
 				"SITE_URL": "https://guildie.club",
