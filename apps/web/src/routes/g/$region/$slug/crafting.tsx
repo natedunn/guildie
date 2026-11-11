@@ -222,13 +222,6 @@ function CraftingPage() {
 				</div>
 			) : null}
 
-			{showUpgrades && upgrades && upgrades.noGear.length > 0 ? (
-				<p className="text-xs text-muted-foreground">
-					No gear read yet for {names(upgrades.noGear)}, so they're left out. Gear comes from Blizzard after a logout,
-					or from the Guildie app.
-				</p>
-			) : null}
-
 			{loading ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
 					{showCraft
@@ -272,8 +265,8 @@ function CraftingPage() {
 						: "Nothing the guild can craft beats what you wear right now."}
 					{upgrades.strict.length > 0 ? (
 						<span className="mt-1 block text-xs">
-							{names(upgrades.strict)} {upgrades.strict.length > 1 ? "have" : "has"} "Only this type" set under Gear
-							types, which leaves other armor or weapon types out.
+							{names(upgrades.strict)} {upgrades.strict.length > 1 ? "have" : "has"} "Only these" set in Preferences,
+							which leaves other armor or weapon types out.
 						</span>
 					) : null}
 				</p>
