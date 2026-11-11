@@ -6,6 +6,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
+import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import {
 	buildIndex,
 	compareProfessions,
@@ -159,19 +160,22 @@ function CraftingPage() {
 		<div className="@container w-full space-y-4 pb-6">
 			<div className="space-y-3">
 				{upgrades ? (
-					<div className="flex flex-wrap gap-1" role="group" aria-label="View">
-						<Chip active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
+					<PageTabs>
+						<PageTabButton active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
 							All recipes
-						</Chip>
-						<Chip active={showUpgrades} onClick={() => setView("upgrades")} count={upgrades.hits.length}>
-							Upgrades for me
-						</Chip>
+						</PageTabButton>
+						<PageTabButton active={showUpgrades} onClick={() => setView("upgrades")} count={upgrades.hits.length}>
+							{/* Short labels where the three don't fit on one line (phones). */}
+							<span className="@max-md:hidden">Upgrades for me</span>
+							<span className="@md:hidden">For me</span>
+						</PageTabButton>
 						{canCraft ? (
-							<Chip active={showCraft} onClick={() => setView("craft")} count={canCraft.hits.length}>
-								Upgrades I can craft
-							</Chip>
+							<PageTabButton active={showCraft} onClick={() => setView("craft")} count={canCraft.hits.length}>
+								<span className="@max-md:hidden">Upgrades I can craft</span>
+								<span className="@md:hidden">I can craft</span>
+							</PageTabButton>
 						) : null}
-					</div>
+					</PageTabs>
 				) : null}
 				<Input
 					ref={inputRef}
