@@ -685,14 +685,32 @@ export function PriorityStrip({
 			) : null}
 			{error ? <span className="text-xs text-destructive">{error}</span> : null}
 			<span className="ml-auto">
-				<SteepnessControl
-					size="sm"
-					value={own ? priority.steepness : undefined}
+				<select
+					aria-label="How much more the first stat counts"
+					value={own ? (priority.steepness ?? "balanced") : ""}
 					disabled={saving}
-					onChange={(s) => {
-						if (s !== "custom") void save(stats, presetTiers(s, stats.length));
+					onChange={(e) => {
+						const s = e.target.value as Steepness;
+						if (s && s !== "custom") void save(stats, presetTiers(s, stats.length));
 					}}
-				/>
+					className="h-7 rounded-md border bg-well pl-2 text-xs pointer-coarse:h-9"
+				>
+					{!own && (
+						<option value="" disabled>
+							Steepness
+						</option>
+					)}
+					{STEEPNESS.map((o) => (
+						<option key={o.key} value={o.key}>
+							{o.name}
+						</option>
+					))}
+					{own && priority.steepness === "custom" && (
+						<option value="custom" disabled>
+							{STEEPNESS_NAMES.custom}
+						</option>
+					)}
+				</select>
 			</span>
 		</div>
 	);
