@@ -21,6 +21,7 @@ import { Route as AuthRefreshRouteImport } from './routes/auth/refresh'
 import { Route as AuthSigninRouteImport } from './routes/auth/signin'
 import { Route as AuthSignoutRouteImport } from './routes/auth/signout'
 import { Route as ClaimCallbackRouteImport } from './routes/claim/callback'
+import { Route as ConnectAiRouteImport } from './routes/connect/ai'
 import { Route as DesktopSessionRouteImport } from './routes/desktop/session'
 import { Route as HelperConnectRouteImport } from './routes/helper/connect'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
@@ -105,6 +106,11 @@ const AuthSignoutRoute = AuthSignoutRouteImport.update({
 const ClaimCallbackRoute = ClaimCallbackRouteImport.update({
   id: '/claim/callback',
   path: '/claim/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConnectAiRoute = ConnectAiRouteImport.update({
+  id: '/connect/ai',
+  path: '/connect/ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesktopSessionRoute = DesktopSessionRouteImport.update({
@@ -248,6 +254,7 @@ export interface FileRoutesByFullPath {
   '/auth/signin': typeof AuthSigninRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/claim/callback': typeof ClaimCallbackRoute
+  '/connect/ai': typeof ConnectAiRoute
   '/desktop/session': typeof DesktopSessionRoute
   '/helper/connect': typeof HelperConnectRoute
   '/settings/addon': typeof SettingsAddonRoute
@@ -286,6 +293,7 @@ export interface FileRoutesByTo {
   '/auth/signin': typeof AuthSigninRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/claim/callback': typeof ClaimCallbackRoute
+  '/connect/ai': typeof ConnectAiRoute
   '/desktop/session': typeof DesktopSessionRoute
   '/helper/connect': typeof HelperConnectRoute
   '/settings/addon': typeof SettingsAddonRoute
@@ -324,6 +332,7 @@ export interface FileRoutesById {
   '/auth/signin': typeof AuthSigninRoute
   '/auth/signout': typeof AuthSignoutRoute
   '/claim/callback': typeof ClaimCallbackRoute
+  '/connect/ai': typeof ConnectAiRoute
   '/desktop/session': typeof DesktopSessionRoute
   '/helper/connect': typeof HelperConnectRoute
   '/settings/addon': typeof SettingsAddonRoute
@@ -365,6 +374,7 @@ export interface FileRouteTypes {
     | '/auth/signin'
     | '/auth/signout'
     | '/claim/callback'
+    | '/connect/ai'
     | '/desktop/session'
     | '/helper/connect'
     | '/settings/addon'
@@ -403,6 +413,7 @@ export interface FileRouteTypes {
     | '/auth/signin'
     | '/auth/signout'
     | '/claim/callback'
+    | '/connect/ai'
     | '/desktop/session'
     | '/helper/connect'
     | '/settings/addon'
@@ -440,6 +451,7 @@ export interface FileRouteTypes {
     | '/auth/signin'
     | '/auth/signout'
     | '/claim/callback'
+    | '/connect/ai'
     | '/desktop/session'
     | '/helper/connect'
     | '/settings/addon'
@@ -480,6 +492,7 @@ export interface RootRouteChildren {
   AuthSigninRoute: typeof AuthSigninRoute
   AuthSignoutRoute: typeof AuthSignoutRoute
   ClaimCallbackRoute: typeof ClaimCallbackRoute
+  ConnectAiRoute: typeof ConnectAiRoute
   DesktopSessionRoute: typeof DesktopSessionRoute
   HelperConnectRoute: typeof HelperConnectRoute
   ApiHelperGuildDataRoute: typeof ApiHelperGuildDataRoute
@@ -575,6 +588,13 @@ declare module '@tanstack/react-router' {
       path: '/claim/callback'
       fullPath: '/claim/callback'
       preLoaderRoute: typeof ClaimCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/connect/ai': {
+      id: '/connect/ai'
+      path: '/connect/ai'
+      fullPath: '/connect/ai'
+      preLoaderRoute: typeof ConnectAiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/desktop/session': {
@@ -840,6 +860,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthSigninRoute: AuthSigninRoute,
   AuthSignoutRoute: AuthSignoutRoute,
   ClaimCallbackRoute: ClaimCallbackRoute,
+  ConnectAiRoute: ConnectAiRoute,
   DesktopSessionRoute: DesktopSessionRoute,
   HelperConnectRoute: HelperConnectRoute,
   ApiHelperGuildDataRoute: ApiHelperGuildDataRoute,

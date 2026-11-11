@@ -1,0 +1,38 @@
+// The MCP server: lets AI apps (Claude, ChatGPT...) read a player's guild
+// data, as that player. OAuth and the MCP protocol live here; the tools run
+// in Convex (apps/web/convex/mcp.ts). See docs/mcp.md.
+// Secret (per env): wrangler secret put MCP_SECRET -c wrangler.jsonc --env prod
+// (the same value as MCP_SECRET on the Convex deployment it talks to).
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "guildie-mcp-local",
+	// The account that owns guildie.club ("Nate").
+	"account_id": "fc87b44f5832b25053fec2efb19fc208",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-10-01",
+	// global_fetch_strictly_public: the OAuth library fetches clients' metadata
+	// documents (CIMD) from URLs they give; never let those reach our own zone.
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"observability": { "enabled": true },
+	// Local `wrangler dev` (pnpm --filter @guildie/mcp dev): KV is simulated,
+	// so any id works. CONVEX_SITE_URL, SITE_URL and MCP_SECRET go in .dev.vars
+	// (docs/mcp.md, "Locally").
+	"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "local" }],
+	"vars": { "PUBLIC_URL": "http://localhost:8788" },
+	"env": {
+		"prod": {
+			"name": "guildie-mcp",
+			"routes": [{ "pattern": "mcp.guildie.club", "zone_name": "guildie.club", "custom_domain": true }],
+			"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "TODO-create-guildie-mcp-oauth" }],
+			"vars": {
+				"PUBLIC_URL": "https://mcp.guildie.club",
+				"SITE_URL": "https://guildie.club",
+				// Prod Convex (scintillating-gnat-539).
+				"CONVEX_SITE_URL": "https://scintillating-gnat-539.convex.site"
+			},
+			"ratelimits": [{ "name": "LIMITER", "namespace_id": "2203", "simple": { "limit": 120, "period": 60 } }]
+		}
+	}
+}

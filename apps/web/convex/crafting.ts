@@ -123,7 +123,7 @@ export const guildCrafting = query({
 });
 
 /** Recipe id -> the roster characters who know it, highest skill first. */
-async function guildCrafters(ctx: QueryCtx, guild: Doc<"guilds">) {
+export async function guildCrafters(ctx: QueryCtx, guild: Doc<"guilds">) {
 	const members = await ctx.db
 		.query("characters")
 		.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))

@@ -559,4 +559,34 @@ export default defineSchema({
 		token: v.string(),
 		expiresAt: v.number(),
 	}).index("by_region", ["region"]),
+
+	/**
+	 * AI apps (Claude, ChatGPT...) connected through the MCP server (apps/mcp,
+	 * docs/mcp.md). The Worker holds the OAuth tokens; every tool call names
+	 * one of these, so deleting it (Settings → Account) cuts the app off at once.
+	 */
+	aiConnections: defineTable({
+		userId: v.id("users"),
+		/** The app's name as it registered itself (not verified), and where its tokens go. */
+		client: v.string(),
+		redirectHost: v.string(),
+		createdAt: v.number(),
+		lastUsedAt: v.optional(v.number()),
+	}).index("by_user", ["userId"]),
+
+	/**
+	 * One-time codes for the hop back from the site to the MCP Worker after the
+	 * player confirms who they are (mcp.ts). Five minutes, single use, bound to
+	 * the Worker's state; only hashes are stored.
+	 */
+	aiConnectCodes: defineTable({
+		codeHash: v.string(),
+		stateHash: v.string(),
+		userId: v.id("users"),
+		client: v.string(),
+		redirectHost: v.string(),
+		expiresAt: v.number(),
+	})
+		.index("by_codeHash", ["codeHash"])
+		.index("by_user", ["userId"]),
 });

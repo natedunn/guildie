@@ -7,6 +7,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useState } from "react";
+import { AiConnections } from "@/components/ai-connections";
 import { ClassText } from "@/components/class-name";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -67,6 +68,11 @@ function Account() {
 			<section className="mt-10">
 				<SectionTitle>Privacy</SectionTitle>
 				<BattletagSetting hidden={!!viewer.hideBattletag} />
+			</section>
+
+			<section className="mt-10">
+				<SectionTitle>AI apps</SectionTitle>
+				<AiConnections />
 			</section>
 
 			<section className="mt-10 border-t border-border pt-6">
