@@ -17,10 +17,13 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Guildie:** Upgrades I can craft, on a guild's Crafting page: your recipes that would be an upgrade for someone in the guild (your other characters included), with why and any open requests for them.
 - **Addon:** "Say why tooltips have nothing" in the `/guildie` window (on by default): items Guildie has nothing for say why, like "Soulbound, can't be traded" or "No guildmates need this".
 
 ### Improvements
 
+- **Guildie, Addon:** Gear suggestions follow each character's stat priority. Pick another talent tree or your own three stats on your character page, and Upgrades for me, Upgrades I can craft, the item panel and guildmates' tooltips in game (after their Guildie app refreshes) use it.
+- **Guildie, Addon:** Gear types: on your character page, pick the armor and weapon type you prefer, and whether to see only that type. Gear suggestions on the site and in game count other types less, or leave them out.
 - **Addon:** Guildie's part of item tooltips is set apart from the item's own lines: it comes last, after a gap and a "Guildie" header with the addon's icon, with one short row per guildmate (their name, then what they're requesting, might want it for, or would get as an upgrade), instead of long wrapping lines that each started with "Guildie".
 - **Addon:** "Might want" suggestions on reagent tooltips skip what nobody needs a guildmate for: reagents vendors sell (thread, vials, flux, dyes, Simple Wood), and the simple mats herbalists, skinners and miners only use for camping items (Incense Candle, Camp Chair, Lodestone); green camping mats like Silver Bar still show, as "Camping+Mining". Up to 8 guildmates are listed instead of 3.
 

@@ -21,6 +21,11 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 //    smaller gain (from `maybe`), only the second spec, or usable within
 //    `levelsAhead` levels ("at 24").
 //
+// The player's choices steer it: their stat priority picks the spec
+// (specsFor), and a preferred armor or weapon type makes other types of
+// that kind count less (`preferBestFactor`) or, strict, not at all
+// (`preferred`).
+//
 // The addon runs the same rules in Lua (apps/addon/Guildie/Upgrades.lua) with
 // what helper.ts puts in GuildieData.lua: `upgradeRules()` once and each
 // member's `UpgradeMember` (scores of what they wear, worked out here). The
@@ -63,7 +68,20 @@ export type UpgradeMember = {
 	th?: boolean;
 	/** Item ids worn in rings, trinkets and weapon slots (Unique items can't be worn twice). */
 	worn?: number[];
+	/**
+	 * The player's preferred body armor type (armor subclass, cloth 1 ... plate 4):
+	 * other types count less, or (strict) aren't suggested. Replaces "the best
+	 * they can wear from `preferBestFrom`".
+	 */
+	armorPref?: number;
+	armorStrict?: true;
+	/** The same for a weapon type (weapon subclass), within its group: melee, or ranged (bows to wands). */
+	weaponPref?: number;
+	weaponStrict?: true;
 };
+
+/** A player's armor and weapon type preference, as members carry it. */
+export type GearPrefs = Pick<UpgradeMember, "armorPref" | "armorStrict" | "weaponPref" | "weaponStrict">;
 
 export type Verdict = {
 	kind: "upgrade" | "maybe";
@@ -129,7 +147,149 @@ export function specsOf(classId: number, trees: Tree[] | undefined) {
 		if (i !== main && points[i] >= THRESHOLDS.minSpecPoints && (second === undefined || points[i] > points[second]))
 			second = i;
 	}
-	return { spec: `${token}:${main}`, spec2: second !== undefined ? `${token}:${second}` : undefined };
+	return {
+		spec: `${token}:${main}`,
+		spec2: second !== undefined ? `${token}:${second}` : undefined,
+		/** The main spec has the points (not just the class's DEFAULT_TREE for want of talents). */
+		talented: most >= THRESHOLDS.minSpecPoints,
+	};
+}
+
+// ---- Stat priority (shared/statPriority.ts) ------------------------------------------
+
+/** A player's stat priority choice (ownedCharacters.statPriority): another tree, or their own three stats. */
+export type StatChoice = { tree?: number; stats?: string[] };
+
+/** A player's preferred armor and weapon types (ownedCharacters.gearPreference): subclass ids, strict or not. */
+export type GearChoice = { armor?: { type: number; strict: boolean }; weapon?: { type: number; strict: boolean } };
+
+/** The armor types a preference can name: body armor, cloth to plate (ARMOR_SUBCLASS). */
+export const PREFERABLE_ARMOR = [1, 2, 3, 4];
+/** Weapon types a preference can't name: miscellaneous, fishing poles. */
+const NOT_PREFERABLE_WEAPONS = new Set([14, 20]);
+
+/** Whether a class can ever use a type a preference names. */
+export function canPrefer(cls: ClassRules | undefined, kind: "armor" | "weapon", type: number) {
+	if (!cls) return false;
+	if (kind === "armor") return PREFERABLE_ARMOR.includes(type) && cls.armor[type] !== undefined;
+	return !NOT_PREFERABLE_WEAPONS.has(type) && cls.weapons[type] !== undefined;
+}
+
+/** A member's preference fields from the player's choice; types the class can't use are left out. */
+export function gearPrefs(classId: number, choice: GearChoice | undefined, rules: Rules): GearPrefs {
+	const cls = rules.classes[classId];
+	const out: GearPrefs = {};
+	if (choice?.armor && canPrefer(cls, "armor", choice.armor.type)) {
+		out.armorPref = choice.armor.type;
+		if (choice.armor.strict) out.armorStrict = true;
+	}
+	if (choice?.weapon && canPrefer(cls, "weapon", choice.weapon.type)) {
+		out.weaponPref = choice.weapon.type;
+		if (choice.weapon.strict) out.weaponStrict = true;
+	}
+	return out;
+}
+
+/** Short names of the stats a priority can name (statPriority.ts PRIORITY_STATS), for a custom spec's name. */
+export const STAT_SHORT: Record<string, string> = {
+	STRENGTH: "Str",
+	AGILITY: "Agi",
+	STAMINA: "Sta",
+	INTELLECT: "Int",
+	SPIRIT: "Spi",
+	ATTACK_POWER: "AP",
+	SPELL_DAMAGE_DONE: "Spell dmg",
+	SPELL_HEALING_DONE: "Healing",
+	CRIT_RATING: "Crit",
+	HIT_RATING: "Hit",
+	DEFENSE_SKILL_RATING: "Def",
+	MANA_REGENERATION: "MP5",
+	ARMOR: "Armor",
+};
+
+/** First, second, third: at least this share of the spec's best stat (per plain stat point). */
+const PRIORITY_TIERS = [1, 0.8, 0.6];
+/** Stats left out of the three: at most this share of the third. */
+const PRIORITY_OTHERS = 0.9;
+/** Armor named in the three: its weight times this, first to third (armor is per point of armor, not a stat). */
+const ARMOR_TIERS = [2, 1.6, 1.3];
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * A spec's weights bent to a player's own three stats ("Strength, Intellect,
+ * Agility" for an Enhancement shaman): the first is worth as much as the
+ * spec's best stat, the second and third a bit less (never more than the one
+ * before), and other stats count less than the third. Per plain stat point
+ * (`points`: Attack Power is half a point), so "Attack Power" means the same
+ * as "Strength". Weapon DPS, armor (unless named) and school damage stay.
+ */
+export function customWeights(base: Weights, stats: string[], points: Record<string, number>): Weights {
+	const per = (k: string) => (base[k] ?? 0) / (points[k] ?? 1);
+	const named = Object.keys(STAT_SHORT).filter((k) => k !== "ARMOR");
+	const top = Math.max(...named.map(per));
+	const w: Weights = { ...base };
+	let prev = Number.POSITIVE_INFINITY;
+	stats.forEach((k, i) => {
+		if (k === "ARMOR") {
+			w.ARMOR = round3((base.ARMOR ?? 0) * ARMOR_TIERS[i]);
+			return;
+		}
+		const value = Math.min(Math.max(per(k), PRIORITY_TIERS[i] * top), prev);
+		prev = value;
+		w[k] = round3(value * (points[k] ?? 1));
+	});
+	for (const k of named) {
+		if (stats.includes(k) || base[k] === undefined) continue;
+		w[k] = round3(Math.min(base[k], PRIORITY_OTHERS * prev * (points[k] ?? 1)));
+	}
+	// Spell power items ("damage and healing") count as whichever of the two matters more.
+	if (stats.includes("SPELL_DAMAGE_DONE") || stats.includes("SPELL_HEALING_DONE")) {
+		w.SPELL_POWER = round3(Math.max(w.SPELL_DAMAGE_DONE ?? 0, w.SPELL_HEALING_DONE ?? 0));
+	}
+	return w;
+}
+
+/** Three distinct stats a priority can name, or undefined. */
+export function validStats(stats: unknown): string[] | undefined {
+	if (!Array.isArray(stats) || stats.length !== 3) return undefined;
+	if (!stats.every((s) => typeof s === "string" && s in STAT_SHORT)) return undefined;
+	return new Set(stats).size === 3 ? (stats as string[]) : undefined;
+}
+
+/**
+ * Main and second spec keys with the player's stat priority choice applied,
+ * the same choice the roster and character page show (statPriority.ts):
+ *
+ * - their own three stats: a custom spec ("SHAMAN:1:STRENGTH,INTELLECT,AGILITY",
+ *   named "Str/Int/Agi"), their talents' tree with customWeights; it's added
+ *   to `rules.specs` (and so reaches the addon with the rules);
+ * - another tree: that tree, with the talents' tree as the second spec when
+ *   it has the points;
+ * - nothing: their talents (specsOf).
+ */
+export function specsFor(classId: number, trees: Tree[] | undefined, choice: StatChoice | undefined, rules: Rules) {
+	const talents = specsOf(classId, trees);
+	if (!talents) return undefined;
+	const own = validStats(choice?.stats);
+	if (own) {
+		const spec = `${talents.spec}:${own.join(",")}`;
+		const base = rules.specs[talents.spec];
+		if (!base) return talents;
+		rules.specs[spec] ??= {
+			name: own.map((s) => STAT_SHORT[s]).join("/"),
+			w: customWeights(base.w, own, rules.points),
+		};
+		return { spec, spec2: talents.spec2 };
+	}
+	const token = CLASS_TOKENS[classId];
+	const tree = choice?.tree;
+	if (tree !== undefined && rules.specs[`${token}:${tree}`]) {
+		const spec = `${token}:${tree}`;
+		const spec2 = talents.talented && talents.spec !== spec ? talents.spec : talents.spec2;
+		return { spec, spec2: spec2 !== spec ? spec2 : undefined };
+	}
+	return talents;
 }
 
 // ---- Scoring --------------------------------------------------------------------
@@ -198,11 +358,35 @@ function bestArmor(rules: ClassRules, level: number) {
 const isBodyArmor = (item: ItemInfo) =>
 	item.cls === 4 && item.invType !== "CLOAK" && BODY_ARMOR.includes(item.subclass ?? 0);
 
+/** Weapon subclasses for the ranged slot (bow, gun, thrown, crossbow, wand): a weapon preference counts within its group. */
+const RANGED_WEAPONS = new Set([2, 3, 16, 18, 19]);
+
+/**
+ * Whether the player's preference covers the item: true for the preferred
+ * type, false for another type of the same kind (body armor; melee or
+ * ranged weapons), undefined when no preference covers it.
+ */
+export function preferred(item: ItemInfo, p: GearPrefs | undefined): boolean | undefined {
+	if (p?.armorPref !== undefined && isBodyArmor(item)) return item.subclass === p.armorPref;
+	if (p?.weaponPref !== undefined && item.cls === 2 && item.subclass !== undefined) {
+		if (RANGED_WEAPONS.has(item.subclass) !== RANGED_WEAPONS.has(p.weaponPref)) return undefined;
+		return item.subclass === p.weaponPref;
+	}
+	return undefined;
+}
+
+/** Another type than the player's strict preference: not suggested at all. */
+function excluded(item: ItemInfo, p: GearPrefs | undefined) {
+	if (preferred(item, p) !== false) return false;
+	return isBodyArmor(item) ? !!p?.armorStrict : !!p?.weaponStrict;
+}
+
 /**
  * An item's worth to a spec. `stat`: the stats' part alone; `total`: the
  * item's raw stat points (what `minFit` compares with; `points` scales Attack
  * Power and the like down to plain stat points). `offHand`: as a
- * weapon in the off hand (OFFHAND_DPS instead of DPS).
+ * weapon in the off hand (OFFHAND_DPS instead of DPS). `prefs`: the player's
+ * preferred armor and weapon types; other types count less.
  */
 export function scoreItem(
 	item: ItemInfo,
@@ -211,6 +395,7 @@ export function scoreItem(
 	classRules: ClassRules,
 	rules: Pick<Rules, "preferBestFrom" | "preferBestFactor" | "points">,
 	offHand = false,
+	prefs?: GearPrefs,
 ) {
 	let stat = 0;
 	let total = 0;
@@ -228,7 +413,13 @@ export function scoreItem(
 				: "DPS";
 		score += (w[dpsKey] ?? 0) * item.dps;
 	}
-	if (isBodyArmor(item) && level >= rules.preferBestFrom && (item.subclass ?? 0) < bestArmor(classRules, level)) {
+	const pref = preferred(item, prefs);
+	const belowBest =
+		pref === undefined &&
+		isBodyArmor(item) &&
+		level >= rules.preferBestFrom &&
+		(item.subclass ?? 0) < bestArmor(classRules, level);
+	if (pref === false || belowBest) {
 		score *= rules.preferBestFactor;
 		stat *= rules.preferBestFactor;
 	}
@@ -305,7 +496,7 @@ function gainFor(item: ItemInfo, m: UpgradeMember, specKey: string, slots: Recor
 	if (item.invType === "WEAPON" && cls.dualWield !== undefined && cls.dualWield <= m.level && !m.th) options.push(true);
 	let best: { gain: number; against: number[] } | undefined;
 	for (const offHand of options) {
-		const s = scoreItem(item, spec.w, m.level, cls, rules, offHand);
+		const s = scoreItem(item, spec.w, m.level, cls, rules, offHand, m);
 		if (!suits(s, rules)) continue;
 		const { base, against } = baseline(item, slots, m.th, offHand);
 		const gain = (s.score - base) / Math.max(base, rules.minBase);
@@ -317,7 +508,7 @@ function gainFor(item: ItemInfo, m: UpgradeMember, specKey: string, slots: Recor
 /** Upgrade, maybe, or nothing, for one guildmate. */
 export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: number): Verdict | undefined {
 	const at = usableAt(item, m, rules, itemId);
-	if (at === undefined) return undefined;
+	if (at === undefined || excluded(item, m)) return undefined;
 	const later = at > m.level ? at : undefined;
 	const main = gainFor(item, m, m.spec, m.slots, rules);
 	if (main && main.gain >= rules.maybe) {
@@ -430,7 +621,14 @@ export function estimateScore(slot: number, itemLevel: number | undefined, quali
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 /** Scores of what a member wears, per inventory slot, for one spec. */
-export function wornScores(items: WornItem[], level: number, classId: number, specKey: string, rules: Rules) {
+export function wornScores(
+	items: WornItem[],
+	level: number,
+	classId: number,
+	specKey: string,
+	rules: Rules,
+	prefs?: GearPrefs,
+) {
 	const spec = rules.specs[specKey];
 	const cls = rules.classes[classId];
 	const slots: Record<number, number> = {};
@@ -439,7 +637,7 @@ export function wornScores(items: WornItem[], level: number, classId: number, sp
 		const slot = SLOT_NUMBERS[item.slot];
 		if (!slot || slot === 4 || slot === 19) continue;
 		const score = item.info
-			? scoreItem(item.info, spec.w, level, cls, rules, slot === 17 && item.info.cls === 2).score
+			? scoreItem(item.info, spec.w, level, cls, rules, slot === 17 && item.info.cls === 2, prefs).score
 			: estimateScore(slot, item.itemLevel, item.quality, spec.w);
 		slots[slot] = round1(score);
 	}
@@ -455,11 +653,16 @@ export function upgradeMember(
 		seenMs: number;
 		talentTrees: Tree[] | undefined;
 		equipment: WornItem[] | undefined;
+		/** The player's stat priority choice, if any (specsFor). */
+		statPriority?: StatChoice;
+		/** The player's preferred armor and weapon types, if any (gearPrefs). */
+		gearPreference?: GearChoice;
 	},
 	rules: Rules,
 ): UpgradeMember | undefined {
 	if (!c.equipment) return undefined;
-	const specs = specsOf(c.classId, c.talentTrees);
+	const specs = specsFor(c.classId, c.talentTrees, c.statPriority, rules);
+	const prefs = gearPrefs(c.classId, c.gearPreference, rules);
 	if (!specs) return undefined;
 	const main = c.equipment.find((i) => i.slot === "MAIN_HAND");
 	const worn = c.equipment
@@ -472,8 +675,9 @@ export function upgradeMember(
 		spec: specs.spec,
 		...(specs.spec2 ? { spec2: specs.spec2 } : {}),
 		seen: Math.floor(c.seenMs / 1000),
-		slots: wornScores(c.equipment, c.level, c.classId, specs.spec, rules),
-		...(specs.spec2 ? { slots2: wornScores(c.equipment, c.level, c.classId, specs.spec2, rules) } : {}),
+		...prefs,
+		slots: wornScores(c.equipment, c.level, c.classId, specs.spec, rules, prefs),
+		...(specs.spec2 ? { slots2: wornScores(c.equipment, c.level, c.classId, specs.spec2, rules, prefs) } : {}),
 		...(main?.info?.invType === "2HWEAPON" ? { th: true } : {}),
 		...(worn.length ? { worn } : {}),
 	};

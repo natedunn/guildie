@@ -1,5 +1,5 @@
 -- Gear-upgrade suggestions on item tooltips: which guildmates the hovered
--- item might help ("Guildie: upgrade for Brisket (Feral), maybe Miller (at 24)").
+-- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Miller | maybe (at 24)").
 -- A best guess from stat weights, not a sim.
 --
 -- The rules, the weights and each guildmate (level, spec, scores of what they
@@ -40,6 +40,28 @@ local function isBodyArmor(item)
     return item.cls == 4 and item.invType ~= "CLOAK" and BODY_ARMOR[item.subclass or 0] == true
 end
 
+-- Weapon subclasses for the ranged slot: a weapon preference counts within its group.
+local RANGED_WEAPONS = { [2] = true, [3] = true, [16] = true, [18] = true, [19] = true }
+
+--- The player's preferred armor or weapon type (member fields armorPref,
+--- weaponPref): true for that type, false for another of the same kind,
+--- nil when no preference covers the item (preferred in upgrades.ts).
+function U.preferred(item, p)
+    if not p then return nil end
+    if p.armorPref and isBodyArmor(item) then return item.subclass == p.armorPref end
+    if p.weaponPref and item.cls == 2 and item.subclass then
+        if (RANGED_WEAPONS[item.subclass] == true) ~= (RANGED_WEAPONS[p.weaponPref] == true) then return nil end
+        return item.subclass == p.weaponPref
+    end
+    return nil
+end
+
+local function excluded(item, p)
+    if U.preferred(item, p) ~= false then return false end
+    if isBodyArmor(item) then return p.armorStrict == true end
+    return p.weaponStrict == true
+end
+
 local function sortedKeys(t)
     local keys = {}
     for k in pairs(t) do table.insert(keys, k) end
@@ -48,7 +70,7 @@ local function sortedKeys(t)
 end
 
 --- score, stat part, raw stat total (see scoreItem in upgrades.ts).
-function U.scoreItem(item, w, level, cls, rules, offHand)
+function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
     local stat, total = 0, 0
     -- Same order as the site's, so the sums match to the last bit.
     for _, key in ipairs(sortedKeys(item.stats or {})) do
@@ -63,7 +85,10 @@ function U.scoreItem(item, w, level, cls, rules, offHand)
         elseif offHand or item.invType == "WEAPONOFFHAND" then key = "OFFHAND_DPS" end
         score = score + (w[key] or 0) * item.dps
     end
-    if isBodyArmor(item) and level >= rules.preferBestFrom and (item.subclass or 0) < bestArmor(cls, level) then
+    local pref = U.preferred(item, prefs)
+    local belowBest = pref == nil and isBodyArmor(item) and level >= rules.preferBestFrom
+        and (item.subclass or 0) < bestArmor(cls, level)
+    if pref == false or belowBest then
         score = score * rules.preferBestFactor
         stat = stat * rules.preferBestFactor
     end
@@ -139,7 +164,7 @@ local function gainFor(item, m, specKey, slots, rules)
     end
     local best
     for _, offHand in ipairs(options) do
-        local score, stat, total = U.scoreItem(item, spec.w, m.level, cls, rules, offHand)
+        local score, stat, total = U.scoreItem(item, spec.w, m.level, cls, rules, offHand, m)
         if U.suits(score, stat, total, rules) then
             local base, against = U.baseline(item, slots, m.th, offHand)
             local gain = (score - base) / math.max(base, rules.minBase)
@@ -152,7 +177,7 @@ end
 --- { kind = "upgrade"|"maybe", gain, spec, at?, second?, against } or nil.
 function U.judge(item, m, rules, itemID)
     local at = U.usableAt(item, m, rules, itemID)
-    if not at then return nil end
+    if not at or excluded(item, m) then return nil end
     local later = at > m.level and at or nil
     local main = gainFor(item, m, m.spec, m.slots or {}, rules)
     if main and main.gain >= rules.maybe then

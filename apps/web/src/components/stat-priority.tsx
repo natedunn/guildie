@@ -110,7 +110,10 @@ export function StatPrioritySection({
 				<>
 					<RankedStats stats={priority.stats} />
 					<div className="mt-3 flex items-baseline justify-between gap-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
-						<span className="min-w-0 truncate" title="A general guide for leveling and dungeons">
+						<span
+							className="min-w-0 truncate"
+							title="A general guide for leveling and dungeons. Gear suggestions use it too."
+						>
 							{sourceText(priority)}
 						</span>
 						<a
@@ -208,6 +211,10 @@ function StatPicker({
 				<RankedStats stats={mode === "talents" ? fromTalents : (trees[mode]?.stats ?? [])} />
 			)}
 			{duplicate && <p className="text-xs text-muted-foreground">Pick three different stats.</p>}
+			<p className="text-xs text-muted-foreground">
+				Gear suggestions follow it: Upgrades for me and the item panel right away, guildmates' tooltips in game after
+				their Guildie app's next refresh.
+			</p>
 			{error && <p className="text-sm text-destructive">{error}</p>}
 			<div className="flex gap-2 border-t border-border pt-3">
 				<Button size="sm" onClick={save} disabled={saving || duplicate}>
