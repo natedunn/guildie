@@ -370,7 +370,12 @@ function QuestRow({ quest: q, members }: { quest: QuestGroup; members: number })
 						))}
 					</div>
 				) : (
-					<span className="text-xs text-muted-foreground">XP only</span>
+					<span
+						className="text-xs text-muted-foreground"
+						title="Blizzard's data doesn't list item rewards for every quest, so this one may still have some. Wowhead has the full list."
+					>
+						Not listed
+					</span>
 				)}
 			</td>
 		</tr>
