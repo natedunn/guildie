@@ -1,19 +1,23 @@
 # Deploying
 
-Cloudflare Workers Builds deploys every push to `natedunn/guildie`. The
-Worker `guildie` has two build triggers, the same model as Kino:
+Cloudflare Workers Builds deploys every push to `natedunn/guildie`, the same
+model as onda: Worker `guildie` → Settings → Builds, with two tabs.
 
-| Trigger                        | Branches        | Deploy command                    | `CONVEX_DEPLOY_KEY` | Result                                                                                                    |
-| ------------------------------ | --------------- | --------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Deploy default branch          | `main`          | `sh scripts/cloudflare-deploy.sh` | prod deploy key     | Convex prod `scintillating-gnat-539`, then `https://guildie.club`                                         |
-| Deploy non-production branches | everything else | `sh scripts/preview-deploy.sh`    | preview deploy key  | a Convex preview named after the branch, then a Worker Preview at `https://<branch>.preview.guildie.club` |
+| Tab           | Branches        | Command                                                                                                                         | `CONVEX_DEPLOY_KEY` | Result                                                                                                    |
+| ------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Production    | `main`          | `sh scripts/cloudflare-deploy.sh`                                                                                               | prod deploy key     | Convex prod `scintillating-gnat-539`, then `https://guildie.club`                                         |
+| Previews Base | everything else | `sh scripts/preview-build.sh && npx wrangler preview --config dist/server/wrangler.json --name "$(sh scripts/preview-name.sh)"` | preview deploy key  | a Convex preview named after the branch, then a Worker Preview at `https://<branch>.preview.guildie.club` |
 
-Both run with root directory `apps/web` and an empty build command; the
-deploy scripts build. Each trigger has
-exactly one build variable, `CONVEX_DEPLOY_KEY` (secret), with a different
-key on each. That split is the whole per-environment setup. Each script
-refuses the other's key, and the production script refuses to run from any
-branch but `main`.
+Both use root directory `apps/web` and an empty build command; the scripts
+build. Cloudflare requires the Previews command to call `npx wrangler preview`
+itself, so the preview script only builds. Each tab has exactly one build
+variable, `CONVEX_DEPLOY_KEY` (secret), with a different key on each. That
+split is the whole per-environment setup. Each script refuses the other's key,
+and the production script refuses to run from any branch but `main`.
+
+"Builds for Preview branches" must be on. Ignore "Preview URLs are disabled":
+that's Cloudflare's `*.workers.dev` preview links, off on purpose
+(`preview_urls: false`); previews live on `preview.guildie.club`.
 
 The branch name becomes one DNS label: lowercased, anything outside
 `[a-z0-9-]` turned into `-`, cut to 40 characters (`feat/Notes` →
@@ -65,8 +69,10 @@ The branch name becomes one DNS label: lowercased, anything outside
 ## Changing settings
 
 - **Convex values:** docs/auth-environments.md.
-- **Build triggers and their `CONVEX_DEPLOY_KEY`:** Workers & Pages → `guildie`
-  → Settings → Build. A Convex deploy key is made in the Convex dashboard
+- **Build commands and their `CONVEX_DEPLOY_KEY`:** Workers & Pages → `guildie`
+  → Settings → Builds (Production and Previews Base tabs). The API can't
+  change the Previews Base settings yet (it accepts and ignores them): use the
+  dashboard. A Convex deploy key is made in the Convex dashboard
   (prod: deployment Settings → Deploy keys; previews: project Settings →
   Preview deploy keys).
 

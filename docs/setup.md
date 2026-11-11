@@ -133,15 +133,15 @@ at its own URL.
    your repo. Project name `guildie` (must match `wrangler.jsonc`), production
    branch `main`. Deploy. This creates the Worker, the GitHub connection and a
    build token.
-2. **Settings → Build** on the `guildie` Worker: set the `main` trigger's
-   build command to empty and its deploy command to
-   `sh apps/web/scripts/cloudflare-deploy.sh`. Add a trigger for all other branches
-   (exclude `main`) with an empty build command and deploy command
-   `sh apps/web/scripts/preview-deploy.sh`.
+2. **Settings → Builds** on the `guildie` Worker, root directory `apps/web` on
+   both tabs. **Production:** empty build command, deploy command
+   `sh scripts/cloudflare-deploy.sh`. **Previews Base:** turn on "Builds for
+   Preview branches", empty build command, command
+   `sh scripts/preview-build.sh && npx wrangler preview --config dist/server/wrangler.json --name "$(sh scripts/preview-name.sh)"`.
 3. Make a prod deploy key (Convex prod deployment → Settings → Deploy keys)
    and a preview deploy key (project Settings → Preview deploy keys). Add each
-   as secret build variable `CONVEX_DEPLOY_KEY`: the prod key on the `main`
-   trigger, the preview key on the other trigger.
+   as secret build variable `CONVEX_DEPLOY_KEY`: the prod key on Production,
+   the preview key on Previews Base.
 4. Retry the `main` build.
 
 **Check:** `https://guildie.club` loads and sign-in works. Push any branch:
