@@ -28,6 +28,26 @@ local function frame(name)
     function f:IsShown() return self.shown end
     function f:SetText(text) self._text = text end
     function f:GetText() return self._text end
+    function f:SetWidth(width) self.width = width end
+    function f:SetHeight(height) self.height = height end
+    function f:SetSize(width, height) self.width, self.height = width, height end
+    function f:GetWidth() return rawget(self, "width") or 0 end
+    function f:GetHeight() return rawget(self, "height") or 0 end
+    function f:SetVerticalScroll(offset) self.scroll = offset end
+    function f:GetVerticalScroll() return rawget(self, "scroll") or 0 end
+    function f:SetScrollChild(child) self.scrollChild = child end
+    function f:SetEnabled(enabled) self.enabled = enabled end
+    function f:SetChecked(checked) self.checked = checked end
+    function f:GetChecked() return self.checked end
+    function f:GetStringWidth() return #(rawget(self, "_text") or "") * 6 end
+    function f:GetStringHeight()
+        local lines = 0
+        local content = (rawget(self, "_text") or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+        for line in (content .. "\n"):gmatch("(.-)\n") do
+            lines = lines + math.max(1, math.ceil(#line * 6 / math.max(1, rawget(self, "width") or 1000)))
+        end
+        return lines * 12
+    end
     function f:SetPoint(point, relativeTo, relativePoint, x, y)
         table.insert(self.points, { point, relativeTo, relativePoint, x or 0, y or 0 })
     end
@@ -85,6 +105,7 @@ function wow.reset(state)
     _G.C_Timer = nil
     _G.WorldFrame = frame()
     _G.UIParent = frame()
+    _G.UIParent:SetHeight(state.screenHeight or 900)
     _G.Minimap = frame()
     function _G.Minimap:GetWidth() return 140 end
     _G.GameTooltip = frame()
@@ -109,6 +130,8 @@ function wow.reset(state)
         return f
     end
     _G.GetTime = function() return 0 end
+    _G.InCombatLockdown = function() return state.combat or false end
+    _G.ReloadUI = function() state.reloads = (state.reloads or 0) + 1 end
     _G.GetServerTime = function() return state.time end
     _G.UnitGUID = function() return state.guid end
     _G.UnitName = function() return state.name end

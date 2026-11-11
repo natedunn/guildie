@@ -180,21 +180,22 @@ end
 
 test("window: behind, with its lines; rows share one left edge", function()
     local ns, window = open({}, data(entry({ level = 22, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 150 } } })))
-    eq(plain(window.status:GetText()), "2 changes not on Guildie yet:")
+    eq(plain(window.status:GetText()), "2 changes not on Guildie yet")
     has(plain(window.changes:GetText()), "Level 24 (Guildie has 22)")
     has(plain(window.changes:GetText()), "Tailoring 155 (Guildie has 150)")
     eq(plain(window.synced:GetText()), "Last synced 5 min ago, from the game")
-    has(window.next:GetText(), "This catches up at your next /reload")
-    eq(window.guildData:GetText(), "Unbound, updated 10 min ago: 1 reagent, 2 guildmates for upgrades")
+    has(window.next:GetText(), "Reload again to refresh this status")
+    eq(window.guildData:GetText(), "Unbound\n1 reagent \194\183 2 guildmates for upgrades")
+    eq(plain(window.guildUpdated:GetText()), "Updated 10 min ago")
     has(plain(window.name:GetText()), "Lich")
     has(plain(window.info:GetText()), "Level 24")
-    has(plain(window.info:GetText()), "<Unbound>")
+    has(plain(window.guild:GetText()), "<Unbound>")
     -- Every text row at the margin; both checkboxes at the same spot left of it.
     for _, row in ipairs(window.rows) do
-        if row.el:IsShown() then eq(left(row.el, window), 16 + (row.dx or 0), "left edge") end
+        if row.el:IsShown() then eq(left(row.el, window.body), row.dx or 0, "left edge") end
     end
-    eq(left(window.afk, window), left(window.minimap, window), "checkboxes line up")
-    eq(left(window.afk, window), 12)
+    eq(left(window.afk, window.body), left(window.minimap, window.body), "checkboxes line up")
+    eq(left(window.afk, window.body), -4)
     eq(window.template, "BasicFrameTemplateWithInset", "bare PortraitFrameTemplate falls back")
     eq(ns.dirty, false)
 end)
@@ -207,21 +208,21 @@ test("window: changes since this /reload say how they upload", function()
     state.level = 25
     wow.fire("PLAYER_LEVEL_UP")
     eq(ns.dirty, true)
-    eq(plain(window.status:GetText()), "1 change not on Guildie yet:")
-    has(window.next:GetText(), "These upload when you log out or /reload, or now")
+    eq(plain(window.status:GetText()), "1 change not on Guildie yet")
+    has(window.next:GetText(), "Reload to save these changes")
 end)
 
 test("window: unknown character, no data, portrait and dialog frames", function()
     local _, window = open({ portrait = true }, data(nil))
-    eq(plain(window.status:GetText()), "Guildie doesn't know this character yet")
+    eq(plain(window.status:GetText()), "Connect this character")
     has(plain(window.changes:GetText()), "Claim it on guildie.club")
     eq(window.synced:IsShown(), false)
     eq(window.template, "PortraitFrameTemplate")
     eq(window.title, "Guildie")
 
     _, window = open({ missingTemplates = { PortraitFrameTemplate = true, BasicFrameTemplateWithInset = true } }, nil)
-    eq(plain(window.status:GetText()), "No data from the Guildie app yet")
-    has(window.guildData:GetText(), "None yet")
+    eq(plain(window.status:GetText()), "Waiting for the Guildie app")
+    has(window.guildData:GetText(), "No guild data yet")
     eq(rawget(window, "template"), nil, "plain frame with a backdrop")
 end)
 
@@ -248,6 +249,51 @@ test("window: many changes are cut short; minimap tooltip shows the headline", f
     _G.GuildieMinimapButton.scripts.OnEnter(_G.GuildieMinimapButton)
     eq(tooltip[2], "7 changes not on Guildie yet")
     eq(tooltip[6], "and 4 more")
+end)
+
+test("window: short screens scroll, and shrinking content clamps the offset", function()
+    local _, window = open({ screenHeight = 480 }, data(nil))
+    eq(window:GetHeight(), 400, "screen padding")
+    eq(window.body:GetHeight() > window.scroll:GetHeight(), true, "body overflows")
+    window.scroll.scripts.OnMouseWheel(window.scroll, -100)
+    eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "bottom clamp")
+    _G.GuildieData = data(entry({ level = 24, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 155 } } }))
+    window.scripts.OnShow(window)
+    eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "content shrink clamps")
+    window.scroll.scripts.OnMouseWheel(window.scroll, 100)
+    eq(window.scroll:GetVerticalScroll(), 0, "top clamp")
+end)
+
+test("window: reload is blocked during combat and available afterward", function()
+    local state = { combat = true }
+    local ns, window = open(state, nil)
+    eq(window.upload.enabled, false)
+    eq(window.uploadHint:GetText(), "Available after combat.")
+    window.upload.scripts.OnClick()
+    eq(state.reloads, nil, "no protected action")
+    state.combat = false
+    wow.fire("PLAYER_REGEN_ENABLED")
+    eq(window.upload.enabled, true)
+    has(window.uploadHint:GetText(), "Reloads your UI")
+    window.upload.scripts.OnClick()
+    eq(state.reloads, 1)
+    eq(GuildieDB.lastReason, "upload-button")
+    state.combat = true
+    wow.fire("PLAYER_REGEN_DISABLED")
+    eq(window.upload.enabled, false)
+end)
+
+test("window: scroll template fallback and preferences remain usable", function()
+    local _, window = open({ missingTemplates = { UIPanelScrollFrameTemplate = true } }, nil)
+    eq(rawget(window.scroll, "template"), nil)
+    window.afk:SetChecked(true)
+    window.afk.scripts.OnClick(window.afk)
+    eq(GuildieDB.settings.reloadWhenAfk, true)
+    window.minimap:SetChecked(false)
+    window.minimap.scripts.OnClick(window.minimap)
+    eq(GuildieDB.settings.showMinimap, false)
+    eq(_G.GuildieMinimapButton:IsShown(), false)
+    eq(window.requestsHeading:IsShown(), false)
 end)
 
 -- ---- End to end ---------------------------------------------------------------------
@@ -306,9 +352,9 @@ if file then
     for _, row in ipairs(w.rows) do
         if row.el:IsShown() then
             local t = rawget(row.el, "_text")
-            if row.el == w.rows[#w.rows - 1].el then t = string.rep("-", 40) end
-            if row.el == w.upload then t = "[ Upload now (reloads UI) ]" end
-            if row.el == w.afk then t = "[ ] Upload while I'm AFK (reloads your UI; experimental)" end
+            if row.height == 1 then t = string.rep("-", 40) end
+            if row.el == w.upload then t = "[ Sync now ]" end
+            if row.el == w.afk then t = "[ ] Sync while I'm AFK" end
             if row.el == w.minimap then t = "[x] Show minimap button" end
             if type(t) == "string" then print(plain(t)) end
         end

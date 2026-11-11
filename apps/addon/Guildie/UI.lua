@@ -24,14 +24,15 @@ end
 -- The game's own look: PortraitFrameTemplate (the logo in the portrait ring,
 -- like the character window) where the client has it, else the inset frame
 -- earlier versions used, else a dialog-box backdrop. Everything in the body
--- shares one left edge (MARGIN); rows stack top to bottom and the window
--- grows to fit them.
+-- shares one left edge; rows stack in a scrollable body. The window grows
+-- to fit them until it reaches the screen height, keeping the footer visible.
 
 local ICON = "Interface\\AddOns\\Guildie\\icon"
-local WIDTH = 340
-local MARGIN = 16
-local TEXT_WIDTH = WIDTH - 2 * MARGIN
-local BODY_TOP = 74 -- below the header (portrait, name, level)
+local WIDTH = 400
+local MARGIN = 20
+local TEXT_WIDTH = WIDTH - 2 * MARGIN - 20 -- room for the scrollbar
+local BODY_TOP = 104 -- below the character header
+local FOOTER_HEIGHT = 36
 local MAX_CHANGES = 6
 
 local window
@@ -100,7 +101,7 @@ local function makeFrame()
 end
 
 local function text(template, width)
-    local fs = window:CreateFontString(nil, "OVERLAY", template)
+    local fs = window.body:CreateFontString(nil, "OVERLAY", template)
     fs:SetJustifyH("LEFT")
     if fs.SetJustifyV then fs:SetJustifyV("TOP") end
     fs:SetWidth(width or TEXT_WIDTH)
@@ -109,10 +110,12 @@ local function text(template, width)
 end
 
 local function checkbox(label, get, set)
-    local cb = CreateFrame("CheckButton", nil, window, "UICheckButtonTemplate")
+    local cb = CreateFrame("CheckButton", nil, window.body, "UICheckButtonTemplate")
     cb:SetSize(24, 24)
     local fs = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+    fs:SetWidth(TEXT_WIDTH - 26)
+    fs:SetJustifyH("LEFT")
     fs:SetText(label)
     -- Clicking the label toggles it too.
     cb:SetHitRectInsets(0, -((fs:GetStringWidth() or 200) + 4), 0, 0)
@@ -135,7 +138,7 @@ end
 --- offsets never carry over from one row to the next.
 local function layout()
     local prev, prevDx = nil, 0
-    local height = BODY_TOP
+    local height = 0
     for _, row in ipairs(window.rows) do
         local shown = row.shown ~= false
         if row.el.SetShown then row.el:SetShown(shown) elseif shown then row.el:Show() else row.el:Hide() end
@@ -146,14 +149,21 @@ local function layout()
                 row.el:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", dx - prevDx, -row.gap)
                 height = height + row.gap
             else
-                row.el:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN + dx, -BODY_TOP)
+                row.el:SetPoint("TOPLEFT", window.body, "TOPLEFT", dx, 0)
             end
             height = height + heightOf(row)
             row.x = MARGIN + dx
             prev, prevDx = row.el, dx
         end
     end
-    window:SetHeight(height + 14)
+    height = height + 12
+    window.body:SetHeight(height)
+    local available = (UIParent:GetHeight() or 800) - 80
+    local frameHeight = math.min(BODY_TOP + height + FOOTER_HEIGHT, math.max(240, available))
+    window:SetHeight(frameHeight)
+    local viewport = frameHeight - BODY_TOP - FOOTER_HEIGHT
+    window.scroll:SetHeight(viewport)
+    window.scroll:SetVerticalScroll(math.min(window.scroll:GetVerticalScroll() or 0, math.max(0, height - viewport)))
 end
 
 local function classColor(token)
@@ -180,12 +190,12 @@ function ns.windowState()
     local className = UnitClass("player")
     s.name = classColor(me and me.classToken or select(2, UnitClass("player"))) .. ((me and me.name) or UnitName("player") or "") .. "|r"
     local guild = me and me.guild and me.guild.name
-    s.info = string.format("Level %d %s%s", (me and me.level) or UnitLevel("player") or 0, className or "",
-        guild and ("  " .. GREY .. "<" .. guild .. ">|r") or "")
+    s.info = string.format("Level %d %s", (me and me.level) or UnitLevel("player") or 0, className or "")
+    s.guild = guild and (GREY .. "<" .. guild .. ">|r") or ""
 
     if result.state == "behind" then
         local n = #result.changes
-        s.status = GOLD .. ns.status.plural(n, "change") .. " not on Guildie yet:|r"
+        s.status = GOLD .. ns.status.plural(n, "change") .. " not on Guildie yet|r"
         local lines = {}
         for i, change in ipairs(result.changes) do
             if i > MAX_CHANGES - 1 and n > MAX_CHANGES then
@@ -198,11 +208,11 @@ function ns.windowState()
     elseif result.state == "current" then
         s.status = GREEN .. "Up to date with Guildie|r"
     elseif result.state == "unknown" then
-        s.status = GOLD .. "Guildie doesn't know this character yet|r"
+        s.status = GOLD .. "Connect this character|r"
         s.changes = GREY .. "Claim it on guildie.club (level 10 or higher) with the Guildie app running; it shows here after your next /reload.|r"
     else
-        s.status = GOLD .. "No data from the Guildie app yet|r"
-        s.changes = GREY .. "Is the app running and signed in? What it downloads loads here at login and /reload.|r"
+        s.status = GOLD .. "Waiting for the Guildie app|r"
+        s.changes = GREY .. "Open the Guildie app and sign in, then reload WoW to load your guild's data.|r"
     end
     s.synced = ns.status.syncedText(result.entry, now)
     if s.synced then s.synced = GREY .. s.synced .. "|r" end
@@ -211,11 +221,11 @@ function ns.windowState()
         -- Nothing new since this UI loaded: the game wrote it to disk then and
         -- the app uploads it, but GuildieData.lua was read before that, so
         -- this view only catches up at the next /reload.
-        s.next = "Saved at your last /reload; the Guildie app uploads it. This catches up at your next /reload."
+        s.next = "Saved at your last /reload for the app to upload. Reload again to refresh this status."
     elseif result.state == "behind" then
-        s.next = "These upload when you log out or /reload, or now:"
+        s.next = "Reload to save these changes for the Guildie app to upload. Logging out saves them too."
     else
-        s.next = "Changes upload when you log out or /reload."
+        s.next = "Changes save for the app to upload when you log out or reload."
     end
 
     if type(GuildieData) == "table" and GuildieData.generatedAt then
@@ -223,19 +233,20 @@ function ns.windowState()
         for _ in pairs(GuildieData.reagents or {}) do reagents = reagents + 1 end
         local upgrades = GuildieData.upgrades and GuildieData.upgrades.members
         local guilds = table.concat(GuildieData.guilds or {}, ", ")
-        s.guildData = string.format("%s, updated %s: %s, %s for upgrades",
-            guilds ~= "" and guilds or "No guild", ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now),
+        s.guildData = string.format("%s\n%s \194\183 %s for upgrades",
+            guilds ~= "" and guilds or "No guild",
             ns.status.plural(reagents, "reagent"),
             ns.status.plural(type(upgrades) == "table" and #upgrades or 0, "guildmate"))
+        s.guildUpdated = GREY .. "Updated " .. ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now) .. "|r"
     else
-        s.guildData = "None yet. The Guildie app downloads your guild's data; it loads at login and /reload."
+        s.guildData = "No guild data yet. Keep the Guildie app running, then reload to load tooltip hints."
     end
 
     -- Guild requests (0.8.0): yours, with a nudge when some went quiet.
     local mine = type(GuildieData) == "table" and type(GuildieData.myRequests) == "table" and GuildieData.myRequests
     if mine and (mine.open or 0) > 0 then
         local stale = mine.stale or 0
-        s.requests = "Your requests: " .. string.format("%d open", mine.open)
+        s.requests = string.format("%d open", mine.open)
             .. (stale > 0 and string.format(" (%d stale)", stale) or "")
         s.requestsHint = GREY .. (stale > 0
             and "Still need them? Keep or close them on guildie.club (Requests)."
@@ -249,21 +260,34 @@ local function refresh()
     local s = ns.windowState()
     window.name:SetText(s.name)
     window.info:SetText(s.info)
+    window.guild:SetText(s.guild)
     setRow(window.status, s.status)
     setRow(window.changes, s.changes)
     setRow(window.synced, s.synced)
     setRow(window.next, s.next)
     setRow(window.guildData, s.guildData)
+    setRow(window.guildUpdated, s.guildUpdated)
+    setRow(window.requestsHeading, s.requests and "Your requests" or nil)
     setRow(window.requests, s.requests)
     setRow(window.requestsHint, s.requestsHint)
+    local inCombat = InCombatLockdown and InCombatLockdown()
+    window.upload:SetEnabled(not inCombat)
+    window.uploadHint:SetText(inCombat and "Available after combat." or "Reloads your UI. Keep the Guildie app running.")
     layout()
 end
 ns.onCapture = refresh
 
 local function heading(label)
-    local fs = text("GameFontNormal")
+    local fs = text("GameFontHighlight")
     fs:SetText(label)
     return fs
+end
+
+local function rule(parent, width)
+    local line = parent:CreateTexture(nil, "ARTWORK")
+    line:SetSize(width, 1)
+    if line.SetColorTexture then line:SetColorTexture(1, 1, 1, 0.10) else line:SetTexture(1, 1, 1, 0.10) end
+    return line
 end
 
 local function buildWindow()
@@ -288,25 +312,52 @@ local function buildWindow()
     window.info = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     window.info:SetPoint("TOPLEFT", window.name, "BOTTOMLEFT", 0, -3)
     window.info:SetJustifyH("LEFT")
+    window.name:SetWidth(WIDTH - headerX - MARGIN)
+    window.name:SetWordWrap(false)
+    window.info:SetWidth(WIDTH - headerX - MARGIN)
+    window.guild = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    window.guild:SetPoint("TOPLEFT", window.info, "BOTTOMLEFT", 0, -5)
+    window.guild:SetWidth(WIDTH - headerX - MARGIN)
+    window.guild:SetWordWrap(false)
+    window.guild:SetJustifyH("LEFT")
+
+    local headerRule = rule(window, WIDTH - 2 * MARGIN)
+    headerRule:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP + 12)
+    local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
+    window.scroll = ok and scroll or CreateFrame("ScrollFrame", nil, window)
+    window.scroll:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP)
+    window.scroll:SetWidth(TEXT_WIDTH)
+    window.body = CreateFrame("Frame", nil, window.scroll)
+    window.body:SetSize(TEXT_WIDTH, 1)
+    window.scroll:SetScrollChild(window.body)
+    window.scroll:EnableMouseWheel(true)
+    window.scroll:SetScript("OnMouseWheel", function(self, delta)
+        local limit = math.max(0, window.body:GetHeight() - self:GetHeight())
+        self:SetVerticalScroll(math.max(0, math.min(limit, self:GetVerticalScroll() - delta * 32)))
+    end)
 
     window.status = text("GameFontHighlight")
     window.changes = text("GameFontHighlightSmall")
     window.synced = text("GameFontHighlightSmall")
     window.next = text("GameFontHighlightSmall")
     window.guildData = text("GameFontHighlightSmall")
+    window.guildUpdated = text("GameFontDisableSmall")
+    window.requestsHeading = heading("Your requests")
     window.requests = text("GameFontHighlightSmall")
     window.requestsHint = text("GameFontHighlightSmall")
 
-    local upload = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
-    upload:SetSize(170, 22)
-    upload:SetText("Upload now (reloads UI)")
+    local upload = CreateFrame("Button", nil, window.body, "UIPanelButtonTemplate")
+    upload:SetSize(144, 26)
+    upload:SetText("Sync now")
     upload:SetScript("OnClick", function()
+        if InCombatLockdown and InCombatLockdown() then return end
         ns.capture("upload-button")
         ReloadUI()
     end)
     window.upload = upload
+    window.uploadHint = text("GameFontDisableSmall")
 
-    window.afk = checkbox("Upload while I'm AFK (reloads your UI; experimental)",
+    window.afk = checkbox("Sync while I'm AFK",
         function() return settings().reloadWhenAfk end,
         function(on) settings().reloadWhenAfk = on end)
     window.minimap = checkbox("Show minimap button",
@@ -316,28 +367,34 @@ local function buildWindow()
             if ns.updateMinimapButton then ns.updateMinimapButton() end
         end)
 
-    local rule = window:CreateTexture(nil, "ARTWORK")
-    rule:SetSize(TEXT_WIDTH, 1)
-    if rule.SetColorTexture then rule:SetColorTexture(1, 1, 1, 0.12) else rule:SetTexture(1, 1, 1, 0.12) end
-    local foot = text("GameFontDisableSmall")
-    foot:SetText("Works with the Guildie app \194\183 guildie.club")
+    local afkHint = text("GameFontDisableSmall", TEXT_WIDTH - 26)
+    afkHint:SetText("Experimental. Reloads your UI while AFK, out of combat, at most every 20 minutes.")
+    local footerRule = rule(window, WIDTH - 2 * MARGIN)
+    footerRule:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, FOOTER_HEIGHT - 4)
+    local foot = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    foot:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, 12)
+    foot:SetText("Guildie app required \194\183 guildie.club")
 
     window.rows = {
-        { el = heading("On Guildie"), gap = 0 },
-        { el = window.status, gap = 6 },
-        { el = window.changes, gap = 4 },
+        { el = heading("Character sync"), gap = 0 },
+        { el = window.status, gap = 10 },
+        { el = window.changes, gap = 8 },
         { el = window.synced, gap = 6 },
         { el = window.next, gap = 8 },
-        { el = upload, gap = 6, height = 22 },
-        { el = heading("Item tooltips"), gap = 16 },
-        { el = window.guildData, gap = 6 },
-        { el = window.requests, gap = 6 },
-        { el = window.requestsHint, gap = 2 },
-        { el = heading("Options"), gap = 16 },
+        { el = upload, gap = 12, height = 26 },
+        { el = window.uploadHint, gap = 6 },
+        { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
+        { el = heading("Guild tooltips"), gap = 14 },
+        { el = window.guildData, gap = 10 },
+        { el = window.guildUpdated, gap = 6 },
+        { el = window.requestsHeading, gap = 18 },
+        { el = window.requests, gap = 10 },
+        { el = window.requestsHint, gap = 4 },
+        { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
+        { el = heading("Preferences"), gap = 14 },
+        { el = window.minimap, gap = 6, dx = -4, height = 24 },
         { el = window.afk, gap = 2, dx = -4, height = 24 },
-        { el = window.minimap, gap = -2, dx = -4, height = 24 },
-        { el = rule, gap = 10, height = 1 },
-        { el = foot, gap = 8 },
+        { el = afkHint, gap = 0, dx = 26 },
     }
     window:SetScript("OnShow", refresh)
 end
@@ -448,14 +505,18 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_REGEN_DISABLED")
+events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:RegisterEvent("ADDON_ACTION_BLOCKED")
 events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 events:SetScript("OnEvent", function(_, event, addon, action)
     if event == "PLAYER_LOGIN" then
         ns.updateMinimapButton()
         if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(60, maybeReloadWhileAfk) end
+    elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
+        refresh()
     elseif addon == ADDON and action and tostring(action):find("ReloadUI") then
         settings().reloadWhenAfk = false
-        print(GOLD .. "Guildie|r: the game doesn't let addons reload the UI on their own, so \"Upload while I'm AFK\" is off. Uploads still happen when you log out.")
+        print(GOLD .. "Guildie|r: the game doesn't let addons reload the UI on their own, so \"Sync while I'm AFK\" is off. Uploads still happen when you log out.")
     end
 end)

@@ -110,14 +110,14 @@ test("window: your requests, with the stale nudge", function()
     local ns = load(DATA)
     wow.fire("PLAYER_ENTERING_WORLD")
     local s = ns.windowState()
-    eq(s.requests, "Your requests: 2 open (1 stale)")
+    eq(s.requests, "2 open (1 stale)")
     eq(plain(s.requestsHint), "Still need them? Keep or close them on guildie.club (Requests).")
     local fresh = {}
     for k, v in pairs(DATA) do fresh[k] = v end
     fresh.myRequests = { open = 3, stale = 0 }
     ns = load(fresh)
     s = ns.windowState()
-    eq(s.requests, "Your requests: 3 open")
+    eq(s.requests, "3 open")
     eq(plain(s.requestsHint), "Manage them on guildie.club (Requests).")
     fresh.myRequests = { open = 0, stale = 0 }
     eq(ns.windowState().requests, nil, "none open: no row")
@@ -130,7 +130,7 @@ test("window: the rows show and hide", function()
     wow.fire("PLAYER_ENTERING_WORLD")
     ns.toggleWindow()
     local window = _G.GuildieWindow
-    eq(plain(window.requests:GetText()), "Your requests: 2 open (1 stale)")
+    eq(plain(window.requests:GetText()), "2 open (1 stale)")
     local shown
     for _, row in ipairs(window.rows) do
         if row.el == window.requests then shown = row.shown end
