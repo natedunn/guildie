@@ -3,9 +3,9 @@
 Cloudflare Workers Builds deploys every push to `natedunn/guildie`, the same
 model as onda: Worker `guildie` → Settings → Builds, with two tabs.
 
-| Tab           | Branches        | Command                                                                                                                       | `CONVEX_DEPLOY_KEY` | Result                                                                                                    |
-| ------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Production    | `main`          | `sh scripts/cloudflare-deploy.sh`                                                                                             | prod deploy key     | Convex prod `scintillating-gnat-539`, then `https://guildie.club`                                         |
+| Tab           | Branches        | Command                                                                                                                         | `CONVEX_DEPLOY_KEY` | Result                                                                                                    |
+| ------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
+| Production    | `main`          | `sh scripts/cloudflare-deploy.sh`                                                                                               | prod deploy key     | Convex prod `scintillating-gnat-539`, then `https://guildie.club`                                         |
 | Previews Base | everything else | `sh scripts/preview-build.sh && npx wrangler preview --config dist/server/wrangler.json --name "$(sh scripts/preview-name.sh)"` | preview deploy key  | a Convex preview named after the branch, then a Worker Preview at `https://<branch>.preview.guildie.club` |
 
 Both use root directory `apps/web` and an empty build command; the scripts
