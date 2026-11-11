@@ -7,7 +7,8 @@ import { PageTab, PageTabs } from "@/components/page-tabs";
 import { ago, rankLabel } from "@/lib/format";
 import { shareMeta } from "@/lib/share";
 
-// A character's pages: gear (index), talents and professions. The header and
+// A character's pages: gear (index), talents, professions and, for the player
+// who claimed them, preferences. The header and
 // tabs live here so they stay put while the tabs switch.
 export const Route = createFileRoute("/c/$region/$slug")({
 	loader: async ({ context, params }) => {
@@ -92,6 +93,11 @@ function CharacterLayout() {
 						<PageTab to="/c/$region/$slug/professions" params={params}>
 							Professions
 						</PageTab>
+						{data.canEdit && (
+							<PageTab to="/c/$region/$slug/preferences" params={params}>
+								Preferences
+							</PageTab>
+						)}
 					</PageTabs>
 
 					<div className="pt-5">

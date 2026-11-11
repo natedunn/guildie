@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** Your characters have a Preferences tab for their stats to look for and gear types, with room to see every option: each talent tree's top stats side by side, your own stats with their weights in one list, and every armor and weapon type your class can use. The Gear tab still shows them.
+
 ## 0.3.17
 
 ### New

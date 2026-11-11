@@ -8,7 +8,7 @@ import { StatPrioritySection } from "@/components/stat-priority";
 import { cn } from "@/lib/utils";
 
 // Gear: the paper doll, with the character's facts beside it in panels: the
-// stats to look for, their talents and what the class can wear and wield at
+// stats to look for and gear types (edited on Preferences), their talents and what the class can wear and wield at
 // their level. On wide panes the panels are a column to the right, so the
 // whole page fits on one screen; narrower, they wrap under the gear. The
 // layout route loads the character.
@@ -48,14 +48,11 @@ function GearPage() {
 						slug={params.slug}
 						classId={c.classId}
 						priority={data.statPriority}
-						talentTrees={c.talentTrees}
 						canEdit={data.canEdit}
 					/>
 					<GearPreferenceSection
 						region={params.region}
 						slug={params.slug}
-						classId={c.classId}
-						level={c.level}
 						preference={data.gearPreference}
 						canEdit={data.canEdit}
 					/>

@@ -38,6 +38,7 @@ import { Route as GRegionSlugRouteImport } from './routes/g/$region/$slug'
 import { Route as ApiHelperPairPollRouteImport } from './routes/api/helper/pair/poll'
 import { Route as CRegionSlugIndexRouteImport } from './routes/c/$region/$slug/index'
 import { Route as CRegionSlugInventoryRouteImport } from './routes/c/$region/$slug/inventory'
+import { Route as CRegionSlugPreferencesRouteImport } from './routes/c/$region/$slug/preferences'
 import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$slug/professions'
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
@@ -193,6 +194,11 @@ const CRegionSlugInventoryRoute = CRegionSlugInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => CRegionSlugRoute,
 } as any)
+const CRegionSlugPreferencesRoute = CRegionSlugPreferencesRouteImport.update({
+  id: '/preferences',
+  path: '/preferences',
+  getParentRoute: () => CRegionSlugRoute,
+} as any)
 const CRegionSlugProfessionsRoute = CRegionSlugProfessionsRouteImport.update({
   id: '/professions',
   path: '/professions',
@@ -270,6 +276,7 @@ export interface FileRoutesByFullPath {
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
+  '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -307,6 +314,7 @@ export interface FileRoutesByTo {
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
+  '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -348,6 +356,7 @@ export interface FileRoutesById {
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
+  '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
@@ -390,6 +399,7 @@ export interface FileRouteTypes {
     | '/g/$region/$slug'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
+    | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -427,6 +437,7 @@ export interface FileRouteTypes {
     | '/api/helper/snapshot'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
+    | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -467,6 +478,7 @@ export interface FileRouteTypes {
     | '/g/$region/$slug'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
+    | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
@@ -709,6 +721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CRegionSlugInventoryRouteImport
       parentRoute: typeof CRegionSlugRoute
     }
+    '/c/$region/$slug/preferences': {
+      id: '/c/$region/$slug/preferences'
+      path: '/preferences'
+      fullPath: '/c/$region/$slug/preferences'
+      preLoaderRoute: typeof CRegionSlugPreferencesRouteImport
+      parentRoute: typeof CRegionSlugRoute
+    }
     '/c/$region/$slug/professions': {
       id: '/c/$region/$slug/professions'
       path: '/professions'
@@ -807,6 +826,7 @@ const ApiHelperPairRouteWithChildren = ApiHelperPairRoute._addFileChildren(
 
 interface CRegionSlugRouteChildren {
   CRegionSlugInventoryRoute: typeof CRegionSlugInventoryRoute
+  CRegionSlugPreferencesRoute: typeof CRegionSlugPreferencesRoute
   CRegionSlugProfessionsRoute: typeof CRegionSlugProfessionsRoute
   CRegionSlugTalentsRoute: typeof CRegionSlugTalentsRoute
   CRegionSlugIndexRoute: typeof CRegionSlugIndexRoute
@@ -814,6 +834,7 @@ interface CRegionSlugRouteChildren {
 
 const CRegionSlugRouteChildren: CRegionSlugRouteChildren = {
   CRegionSlugInventoryRoute: CRegionSlugInventoryRoute,
+  CRegionSlugPreferencesRoute: CRegionSlugPreferencesRoute,
   CRegionSlugProfessionsRoute: CRegionSlugProfessionsRoute,
   CRegionSlugTalentsRoute: CRegionSlugTalentsRoute,
   CRegionSlugIndexRoute: CRegionSlugIndexRoute,
