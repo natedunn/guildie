@@ -129,7 +129,119 @@ export function specsOf(classId: number, trees: Tree[] | undefined) {
 		if (i !== main && points[i] >= THRESHOLDS.minSpecPoints && (second === undefined || points[i] > points[second]))
 			second = i;
 	}
-	return { spec: `${token}:${main}`, spec2: second !== undefined ? `${token}:${second}` : undefined };
+	return {
+		spec: `${token}:${main}`,
+		spec2: second !== undefined ? `${token}:${second}` : undefined,
+		/** The main spec has the points (not just the class's DEFAULT_TREE for want of talents). */
+		talented: most >= THRESHOLDS.minSpecPoints,
+	};
+}
+
+// ---- Stat priority (shared/statPriority.ts) ------------------------------------------
+
+/** A player's stat priority choice (ownedCharacters.statPriority): another tree, or their own three stats. */
+export type StatChoice = { tree?: number; stats?: string[] };
+
+/** Short names of the stats a priority can name (statPriority.ts PRIORITY_STATS), for a custom spec's name. */
+export const STAT_SHORT: Record<string, string> = {
+	STRENGTH: "Str",
+	AGILITY: "Agi",
+	STAMINA: "Sta",
+	INTELLECT: "Int",
+	SPIRIT: "Spi",
+	ATTACK_POWER: "AP",
+	SPELL_DAMAGE_DONE: "Spell dmg",
+	SPELL_HEALING_DONE: "Healing",
+	CRIT_RATING: "Crit",
+	HIT_RATING: "Hit",
+	DEFENSE_SKILL_RATING: "Def",
+	MANA_REGENERATION: "MP5",
+	ARMOR: "Armor",
+};
+
+/** First, second, third: at least this share of the spec's best stat (per plain stat point). */
+const PRIORITY_TIERS = [1, 0.8, 0.6];
+/** Stats left out of the three: at most this share of the third. */
+const PRIORITY_OTHERS = 0.9;
+/** Armor named in the three: its weight times this, first to third (armor is per point of armor, not a stat). */
+const ARMOR_TIERS = [2, 1.6, 1.3];
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000;
+
+/**
+ * A spec's weights bent to a player's own three stats ("Strength, Intellect,
+ * Agility" for an Enhancement shaman): the first is worth as much as the
+ * spec's best stat, the second and third a bit less (never more than the one
+ * before), and other stats count less than the third. Per plain stat point
+ * (`points`: Attack Power is half a point), so "Attack Power" means the same
+ * as "Strength". Weapon DPS, armor (unless named) and school damage stay.
+ */
+export function customWeights(base: Weights, stats: string[], points: Record<string, number>): Weights {
+	const per = (k: string) => (base[k] ?? 0) / (points[k] ?? 1);
+	const named = Object.keys(STAT_SHORT).filter((k) => k !== "ARMOR");
+	const top = Math.max(...named.map(per));
+	const w: Weights = { ...base };
+	let prev = Number.POSITIVE_INFINITY;
+	stats.forEach((k, i) => {
+		if (k === "ARMOR") {
+			w.ARMOR = round3((base.ARMOR ?? 0) * ARMOR_TIERS[i]);
+			return;
+		}
+		const value = Math.min(Math.max(per(k), PRIORITY_TIERS[i] * top), prev);
+		prev = value;
+		w[k] = round3(value * (points[k] ?? 1));
+	});
+	for (const k of named) {
+		if (stats.includes(k) || base[k] === undefined) continue;
+		w[k] = round3(Math.min(base[k], PRIORITY_OTHERS * prev * (points[k] ?? 1)));
+	}
+	// Spell power items ("damage and healing") count as whichever of the two matters more.
+	if (stats.includes("SPELL_DAMAGE_DONE") || stats.includes("SPELL_HEALING_DONE")) {
+		w.SPELL_POWER = round3(Math.max(w.SPELL_DAMAGE_DONE ?? 0, w.SPELL_HEALING_DONE ?? 0));
+	}
+	return w;
+}
+
+/** Three distinct stats a priority can name, or undefined. */
+export function validStats(stats: unknown): string[] | undefined {
+	if (!Array.isArray(stats) || stats.length !== 3) return undefined;
+	if (!stats.every((s) => typeof s === "string" && s in STAT_SHORT)) return undefined;
+	return new Set(stats).size === 3 ? (stats as string[]) : undefined;
+}
+
+/**
+ * Main and second spec keys with the player's stat priority choice applied,
+ * the same choice the roster and character page show (statPriority.ts):
+ *
+ * - their own three stats: a custom spec ("SHAMAN:1:STRENGTH,INTELLECT,AGILITY",
+ *   named "Str/Int/Agi"), their talents' tree with customWeights; it's added
+ *   to `rules.specs` (and so reaches the addon with the rules);
+ * - another tree: that tree, with the talents' tree as the second spec when
+ *   it has the points;
+ * - nothing: their talents (specsOf).
+ */
+export function specsFor(classId: number, trees: Tree[] | undefined, choice: StatChoice | undefined, rules: Rules) {
+	const talents = specsOf(classId, trees);
+	if (!talents) return undefined;
+	const own = validStats(choice?.stats);
+	if (own) {
+		const spec = `${talents.spec}:${own.join(",")}`;
+		const base = rules.specs[talents.spec];
+		if (!base) return talents;
+		rules.specs[spec] ??= {
+			name: own.map((s) => STAT_SHORT[s]).join("/"),
+			w: customWeights(base.w, own, rules.points),
+		};
+		return { spec, spec2: talents.spec2 };
+	}
+	const token = CLASS_TOKENS[classId];
+	const tree = choice?.tree;
+	if (tree !== undefined && rules.specs[`${token}:${tree}`]) {
+		const spec = `${token}:${tree}`;
+		const spec2 = talents.talented && talents.spec !== spec ? talents.spec : talents.spec2;
+		return { spec, spec2: spec2 !== spec ? spec2 : undefined };
+	}
+	return talents;
 }
 
 // ---- Scoring --------------------------------------------------------------------
@@ -455,11 +567,13 @@ export function upgradeMember(
 		seenMs: number;
 		talentTrees: Tree[] | undefined;
 		equipment: WornItem[] | undefined;
+		/** The player's stat priority choice, if any (specsFor). */
+		statPriority?: StatChoice;
 	},
 	rules: Rules,
 ): UpgradeMember | undefined {
 	if (!c.equipment) return undefined;
-	const specs = specsOf(c.classId, c.talentTrees);
+	const specs = specsFor(c.classId, c.talentTrees, c.statPriority, rules);
 	if (!specs) return undefined;
 	const main = c.equipment.find((i) => i.slot === "MAIN_HAND");
 	const worn = c.equipment

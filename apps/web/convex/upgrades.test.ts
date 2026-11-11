@@ -149,23 +149,29 @@ test("specs: most points, a second tree with 10+, the class default below 10", (
 	assert.deepEqual(specsOf(11, [tree("Feral Combat", 15), tree("Restoration", 5)]), {
 		spec: "DRUID:1",
 		spec2: undefined,
+		talented: true,
 	});
-	assert.deepEqual(specsOf(11, [tree("Restoration", 12), tree("Balance", 10)]), { spec: "DRUID:2", spec2: "DRUID:0" });
+	assert.deepEqual(specsOf(11, [tree("Restoration", 12), tree("Balance", 10)]), {
+		spec: "DRUID:2",
+		spec2: "DRUID:0",
+		talented: true,
+	});
 	assert.deepEqual(specsOf(5, [tree("Shadow Magic", 7), tree("Discipline", 2)]), {
 		spec: "PRIEST:2",
 		spec2: undefined,
+		talented: false,
 	});
 	assert.deepEqual(
 		specsOf(5, [tree("Discipline", 9)]),
-		{ spec: "PRIEST:2", spec2: undefined },
+		{ spec: "PRIEST:2", spec2: undefined, talented: false },
 		"under 10: class default (Shadow)",
 	);
 	assert.deepEqual(
 		specsOf(1, [tree("Arms", 10), tree("Protection", 10)]),
-		{ spec: "WARRIOR:0", spec2: "WARRIOR:2" },
+		{ spec: "WARRIOR:0", spec2: "WARRIOR:2", talented: true },
 		"tie: the default wins",
 	);
-	assert.deepEqual(specsOf(1, undefined), { spec: "WARRIOR:0", spec2: undefined });
+	assert.deepEqual(specsOf(1, undefined), { spec: "WARRIOR:0", spec2: undefined, talented: false });
 	// Talent ids place a tree whatever its name.
 	assert.equal(specsOf(11, [{ name: "Whatever", points: 12, talents: [{ id: 134399 }] }])?.spec, "DRUID:1");
 });

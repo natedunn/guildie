@@ -530,6 +530,8 @@ type GuildDataBase = {
 	}[];
 	/** Active guildmates (not the token owner's own characters) for gear-upgrade suggestions. */
 	upgradeMembers: UpgradeMember[];
+	/** Specs from players' own stat priorities that `upgradeMembers` use (shared/upgrades.ts specsFor). */
+	customSpecs: Rules["specs"];
 	characters: GuildData["characters"];
 	requests: GuildData["requests"];
 	myRequests: GuildData["myRequests"];
@@ -627,10 +629,17 @@ export const guildDataBase = internalQuery({
 			});
 		}
 		const requests = await addonRequests(ctx, [...guildIds], row.userId);
+		// Specs made from players' own stat priorities (specsFor): the addon looks members' specs up in the rules.
+		const builtIn = upgradeRules().specs;
+		const customSpecs: Rules["specs"] = {};
+		for (const m of upgradeMembers) {
+			for (const key of [m.spec, m.spec2]) if (key && !(key in builtIn)) customSpecs[key] = rules.specs[key];
+		}
 		return {
 			mine: owned.map((c) => c.name),
 			guilds,
 			upgradeMembers,
+			customSpecs,
 			characters,
 			requests: requests.byItem,
 			myRequests: requests.mine,
@@ -695,6 +704,7 @@ export const guildData = action({
 					.slice(0, 8),
 			};
 		}
+		const rules = upgradeRules();
 		return {
 			version: 1,
 			generatedAt: Date.now(),
@@ -703,7 +713,11 @@ export const guildData = action({
 			recipesKnown: ids.length,
 			recipesInCatalog: reagentsByRecipe.size,
 			reagents,
-			upgrades: { version: 1, rules: upgradeRules(), members: base.upgradeMembers },
+			upgrades: {
+				version: 1,
+				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },
+				members: base.upgradeMembers,
+			},
 			characters: base.characters,
 			requests: base.requests,
 			myRequests: base.myRequests,

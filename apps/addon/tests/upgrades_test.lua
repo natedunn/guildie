@@ -222,6 +222,27 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     eq(#hover(bound), 0, "soulbound")
 end)
 
+test("a player's own stat priority: a custom spec the site adds to the rules", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    stubItems({ GLOVES })
+    local key = "DRUID:1:AGILITY,STAMINA,STRENGTH"
+    local custom = {}
+    for k, v in pairs(vectors.members.Brisket) do custom[k] = v end
+    custom.spec = key
+    local data = guildData({ custom })
+    local specs = {}
+    for k, v in pairs(rules.specs) do specs[k] = v end
+    specs[key] = { name = "Agi/Sta/Str", w = rules.specs["DRUID:1"].w }
+    local withCustom = {}
+    for k, v in pairs(rules) do withCustom[k] = v end
+    withCustom.specs = specs
+    data.upgrades.rules = withCustom
+    _G.GuildieData = data
+    local added = hover(GLOVES)
+    eq(#added, 1)
+    eq(plain(added[1]), "Guildie: upgrade for Brisket (Agi/Sta/Str)")
+end)
+
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     stubItems({ GLOVES })

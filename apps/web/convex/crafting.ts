@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type QueryCtx, query } from "./_generated/server";
 import { access, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
-import { membership } from "./requests";
+import { activeIn, membership } from "./requests";
 import { vRegion } from "./schema";
 import { type ItemInfo, itemInfoFromTooltip, untradeable } from "./shared/itemInfo";
 import { explain, judge, suggest, upgradeRules } from "./shared/upgrades";
@@ -215,7 +215,114 @@ export const upgradesForMe = query({
 	},
 });
 
-/** One of the viewer's characters an item would help, and why. */
+/** How many guildmates "Upgrades I can craft" lists per recipe. */
+const CRAFT_FOR_MAX = 12;
+
+/**
+ * "Upgrades I can craft": the viewer's characters' recipes whose item would
+ * be an upgrade (or a maybe) for someone in the guild, their own other
+ * characters included, by the same rules as everywhere else (with each
+ * player's stat priority, specsFor). A Binds when picked up item only counts
+ * for the character who'd craft it. Each hit: the recipe, which of the
+ * viewer's characters know it, who it helps and why, and the guild's open
+ * requests for it. Null for anyone who isn't a member.
+ */
+export const upgradesICanCraft = query({
+	args: { region: vRegion, slug: v.string() },
+	handler: async (ctx, { region, slug }) => {
+		const guild = await guildByKey(ctx, region, slug);
+		const viewer = guild && (await membership(ctx, guild));
+		if (!guild || !viewer) return null;
+
+		// The viewer's recipes: recipe id -> which of their characters know it.
+		const mineBySlug = new Set(viewer.characters.map((c) => c.slug));
+		const myRecipes = new Map<number, { name: string; slug: string; classId: number; skill?: number }[]>();
+		for (const c of viewer.characters) {
+			for (const p of (await pickProfile(ctx, c)).professions) {
+				for (const id of p.knownRecipes ?? []) {
+					const list = myRecipes.get(id) ?? [];
+					list.push({ name: c.name, slug: c.slug, classId: c.classId, skill: p.skill });
+					myRecipes.set(id, list);
+				}
+			}
+		}
+
+		const members = await ctx.db
+			.query("characters")
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
+			.collect();
+		const rules = upgradeRules();
+		const cache = new Map<number, ItemInfo | undefined>();
+		const found: (NonNullable<Awaited<ReturnType<typeof memberForUpgrades>>> & { character: Doc<"characters"> })[] = [];
+		for (const m of members) {
+			const f = await memberForUpgrades(ctx, m, await pickProfile(ctx, m), rules, cache);
+			if (f) found.push({ ...f, character: m });
+		}
+		const byMember = new Map(found.map((f) => [f.member, f]));
+
+		const requested = new Map<number, { name: string; classId: number }[]>();
+		for (const r of await activeIn(ctx, guild._id)) {
+			if (r.kind !== "craft" || r.recipeId === undefined) continue;
+			const list = requested.get(r.recipeId) ?? [];
+			list.push({ name: r.character.name, classId: r.character.classId });
+			requested.set(r.recipeId, list);
+		}
+
+		const items = new Map<number, Doc<"items"> | null>();
+		const hits = [];
+		const now = Date.now() / 1000;
+		for (const [recipeId, crafters] of myRecipes) {
+			const recipe = await recipeRow(ctx, recipeId);
+			if (!recipe?.craftedItemId) continue;
+			if (!items.has(recipe.craftedItemId)) items.set(recipe.craftedItemId, await itemRow(ctx, recipe.craftedItemId));
+			const made = items.get(recipe.craftedItemId);
+			const info = made ? itemInfoFromTooltip(made.tooltip) : undefined;
+			if (!info) continue;
+			// Binds when picked up: only for the character who crafts it.
+			const bound = !!untradeable(made?.tooltip);
+			const candidates = found.filter((f) => !bound || crafters.some((c) => c.slug === f.character.slug));
+			const picks = suggest(
+				info,
+				candidates.map((f) => f.member),
+				rules,
+				{ now, itemId: recipe.craftedItemId, max: CRAFT_FOR_MAX },
+			);
+			if (picks.length === 0) continue;
+			const helps: (Help & { mine: boolean })[] = picks.map(({ member, verdict }) => {
+				const f = byMember.get(member)!;
+				return {
+					slug: f.character.slug,
+					name: f.character.name,
+					classId: f.character.classId,
+					level: member.level,
+					kind: verdict.kind,
+					gain: verdict.gain,
+					spec: rules.specs[verdict.spec]?.name ?? CLASS_TOKENS[member.classId],
+					at: verdict.at,
+					why: explain(info, verdict, f.worn, rules),
+					mine: mineBySlug.has(f.character.slug),
+				};
+			});
+			hits.push({
+				...(await recipeView(ctx, recipe, items)),
+				crafters: [...crafters].sort((a, b) => (b.skill ?? 0) - (a.skill ?? 0)),
+				for: helps,
+				requested: requested.get(recipeId) ?? [],
+			});
+		}
+		const upgrades = (h: { for: Help[] }) => h.for.filter((x) => x.kind === "upgrade").length;
+		hits.sort(
+			(a, b) =>
+				upgrades(b) - upgrades(a) ||
+				b.for.length - a.for.length ||
+				b.for[0].gain - a.for[0].gain ||
+				a.name.localeCompare(b.name),
+		);
+		return { hits };
+	},
+});
+
+/** A character an item would help, and why. */
 type Help = {
 	slug: string;
 	name: string;

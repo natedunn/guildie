@@ -155,9 +155,29 @@ leveling:
 
 Each spec also has a hand-written stat priority, first to third (`stats` in
 `SPECS`). The roster and character pages show it as "stats to look for".
-It isn't used for suggestions, but each stat in it must have a weight in that
-spec (`statPriority.test.ts`). A player who claimed a character can show
-another tree's priority or their own three instead (`convex/statPriority.ts`).
+Each stat in it must have a weight in that spec (`statPriority.test.ts`). The
+default priority is only for showing; the weights decide.
+
+A player who claimed a character can choose another tree's priority or their
+own three instead (`convex/statPriority.ts`), and suggestions follow that
+choice everywhere: the item panel, the Crafting page's upgrade views and the
+addon's tooltips (`specsFor` in `shared/upgrades.ts`):
+
+- **Another tree:** that tree's weights. The tree their talents put them in
+  becomes the second spec (maybes) if it has 10+ points.
+- **Their own three:** their talents' tree, bent by `customWeights`. Per
+  plain stat point (Attack Power counts half), the first stat is worth as
+  much as the spec's best stat, the second 0.8 of it and the third 0.6, each
+  only raised and never above the one before. Stats left out are capped at
+  0.9 of the third. Weapon DPS and school damage stay; Armor, if named, is
+  doubled (first), ×1.6 or ×1.3. Example: Enhancement as Strength, Intellect,
+  Agility: Strength 1, Intellect 0.45 → 0.8, Agility 0.6, Crit 0.9 → 0.54.
+  It's a spec of its own, `SHAMAN:1:STRENGTH,INTELLECT,AGILITY`, named
+  "Str/Int/Agi" (tooltips say "upgrade for Nate (Str/Int/Agi)"). The site
+  adds it to the rules in `GuildieData.lua`, so the addon needs no change.
+
+In game, a change shows in guildmates' tooltips after their Guildie app's
+next guild data refresh (every 15 minutes) and a `/reload`.
 
 Weapon DPS weights are per point of DPS, so they look large: a Combat Rogue
 values 1 main-hand DPS like about 5 Agility. Blank: the spec ignores that

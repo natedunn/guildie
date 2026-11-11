@@ -108,7 +108,7 @@ async function scansOf(ctx: Ctx, userId: Id<"users">) {
 		.collect();
 }
 
-async function activeIn(ctx: Ctx, guildId: Id<"guilds">) {
+export async function activeIn(ctx: Ctx, guildId: Id<"guilds">) {
 	const lists = await Promise.all(
 		ACTIVE.map((status) =>
 			ctx.db

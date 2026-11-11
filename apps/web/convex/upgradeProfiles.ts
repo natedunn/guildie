@@ -5,8 +5,9 @@ import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
 import { type Rules, type UpgradeMember, upgradeMember, type WornItem } from "./shared/upgrades";
 
 // Guild members as gear-upgrade suggestions see them (shared/upgrades.ts):
-// what they wear, read from each item's tooltip, for the addon's guild data
-// (helper.ts) and the site's item panel (crafting.ts).
+// what they wear, read from each item's tooltip, and the stat priority their
+// player chose (specsFor), for the addon's guild data (helper.ts) and the
+// site's item panel and crafting views (crafting.ts).
 
 /** An item's info from our items table (English, from Blizzard), cached per call. */
 export async function itemInfoById(ctx: QueryCtx, itemId: number, cache: Map<number, ItemInfo | undefined>) {
@@ -57,6 +58,13 @@ export async function memberForUpgrades(
 ): Promise<{ member: UpgradeMember; worn: WornItem[] } | undefined> {
 	if (!profile.equipment) return undefined;
 	const worn = await wornItems(ctx, profile.equipment, cache);
+	// The stat priority the player who claimed it chose, as the roster shows it (guilds.ts).
+	const claim = await ctx.db
+		.query("ownedCharacters")
+		.withIndex("by_slug", (q) =>
+			q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", character.slug),
+		)
+		.first();
 	const member = upgradeMember(
 		{
 			name: character.name,
@@ -66,6 +74,7 @@ export async function memberForUpgrades(
 			seenMs: Math.max(character.lastLoginAt ?? 0, profile.synced?.at ?? 0),
 			talentTrees: profile.talentTrees,
 			equipment: worn,
+			statPriority: claim?.statPriority,
 		},
 		rules,
 	);
