@@ -7,6 +7,8 @@ Monorepo (pnpm workspaces):
 - `apps/web`: the app (TanStack Start + Convex). Its scripts cd to apps/web
   themselves; Workers Builds runs with root directory `apps/web`.
 - `apps/gateway`: the OAuth callback gateway Worker.
+- `apps/mcp`: the MCP server Worker (mcp.guildie.club) that lets AI apps read
+  a player's guild data; tools run in `apps/web/convex/mcp.ts` (docs/mcp.md).
 - `apps/addon`: the in-game addon (Lua 5.1). `apps/desktop`: the Windows app
   (Electron: the site in a window plus the uploader; apps/desktop/README.md).
 - `packages/sync`: the desktop app's SavedVariables reader, uploader and
