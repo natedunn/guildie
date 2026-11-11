@@ -24,6 +24,7 @@ const TAB_LABELS: Record<string, string> = {
 	"/settings/guilds": "Guilds",
 	"/settings/addon": "Addon",
 	"/settings/app": "App",
+	"/g/$region/$slug/feed": "Feed",
 	"/g/$region/$slug/crafting": "Crafting",
 	"/g/$region/$slug/gear": "Gear",
 	"/g/$region/$slug/requests": "Requests",

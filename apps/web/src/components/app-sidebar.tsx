@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import {
+	Activity01Icon,
 	AnvilIcon,
 	Backpack01Icon,
 	Cancel01Icon,
@@ -100,6 +101,12 @@ function SidebarNav() {
 											<HugeiconsIcon icon={UserGroupIcon} size={15} strokeWidth={1.75} />
 											Roster
 										</NavLink>
+										{isMember(g) && (
+											<NavLink to="/g/$region/$slug/feed" params={{ region: g.region, slug: g.slug }} className="pl-3">
+												<HugeiconsIcon icon={Activity01Icon} size={15} strokeWidth={1.75} />
+												Feed
+											</NavLink>
+										)}
 										<NavLink
 											to="/g/$region/$slug/crafting"
 											params={{ region: g.region, slug: g.slug }}

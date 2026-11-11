@@ -149,3 +149,34 @@ export function readiness(d: Pick<Dungeon, "level">, quests: DungeonQuest[], m: 
 	else status = "under";
 	return { status, done, inLog, missing, total: theirs.length };
 }
+
+// ---- First clears (the feed) -------------------------------------------------------
+
+/** "The Hall of Thanes" and "Hall of Thanes" alike. */
+const normal = (name: string) =>
+	name
+		.toLowerCase()
+		.replace(/^the /, "")
+		.replace(/[^a-z]/g, "");
+
+const BY_NORMAL_NAME = new Map(DUNGEONS.map((d) => [normal(d.name), d.key]));
+
+/**
+ * The dungeon a boss-kill statistic is about ("Edwin VanCleef Kills
+ * (Deadmines)", from Blizzard's achievement statistics), or undefined (a
+ * raid, or not a kill count).
+ */
+export function dungeonOfKillStatistic(name: string): string | undefined {
+	const match = /kills \(([^)]+)\)\s*$/i.exec(name);
+	if (!match) return undefined;
+	const place = normal(match[1]);
+	const exact = BY_NORMAL_NAME.get(place);
+	if (exact) return exact;
+	// "Lower Blackrock Spire", "Dire Maul - East"...
+	for (const [n, key] of BY_NORMAL_NAME) if (place.includes(n)) return key;
+	return undefined;
+}
+
+/** The levels a jump crosses that the feed's "every 5 levels" view keeps (25, 30... and 60). */
+export const milestoneLevel = (from: number | undefined, to: number) =>
+	to >= 60 || Math.floor(to / 5) > Math.floor((from ?? to - 1) / 5);

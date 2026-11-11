@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import { noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { vRegion } from "./schema";
@@ -396,7 +397,7 @@ export const create = mutation({
 			throw new ConvexError("You already have an open request for this.");
 
 		const now = Date.now();
-		return await ctx.db.insert("requests", {
+		const request = {
 			guildId: guild._id,
 			userId: member.userId,
 			character: brief(character),
@@ -404,11 +405,14 @@ export const create = mutation({
 			itemId,
 			recipeId,
 			...fields,
-			status: "open",
+			status: "open" as const,
 			mats,
 			createdAt: now,
 			lastActivityAt: now,
-		});
+		};
+		const id = await ctx.db.insert("requests", request);
+		await noteRequest(ctx, "request", { ...request, _id: id });
+		return id;
 	},
 });
 
@@ -459,6 +463,10 @@ export const act = mutation({
 		if (action === "markSent" && r.claim) patch.claim = { ...r.claim, sentAt: now };
 		if (status === "done" || status === "cancelled") patch.closedAt = now;
 		await ctx.db.patch(requestId, patch);
+		// The guild's feed: claimed, and fulfilled (done, by whoever claimed it).
+		if (action === "claim" && claimer) await noteRequest(ctx, "claim", r, brief(claimer));
+		if (status === "done" && r.status !== "done")
+			await noteRequest(ctx, "fulfilled", r, patch.claim?.character ?? r.claim?.character);
 	},
 });
 

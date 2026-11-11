@@ -5,6 +5,7 @@ import { action, internalQuery, type MutationCtx, mutation, type QueryCtx, query
 import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./addonPayload";
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
+import { noteLevel } from "./feed";
 import { mergeProfile } from "./profile";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
@@ -260,6 +261,8 @@ export const ingest = mutation({
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
+			// A level the game shows before Blizzard's roster does: the guild's feed.
+			if (character && top.level) await noteLevel(ctx, character, top.level);
 			accepted.push(match.slug);
 			if (c.inventory && (await storeInventory(ctx, row.userId, key, c.inventory, now))) inventoryChanged = true;
 

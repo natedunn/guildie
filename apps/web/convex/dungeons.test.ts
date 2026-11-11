@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DUNGEONS, minLevelFor, questDetails, questsFor, readiness } from "./shared/dungeons.ts";
+import {
+	DUNGEONS,
+	dungeonOfKillStatistic,
+	milestoneLevel,
+	minLevelFor,
+	questDetails,
+	questsFor,
+	readiness,
+} from "./shared/dungeons.ts";
 
 const deadmines = { level: 16 };
 const quests = [
@@ -65,4 +73,21 @@ test("quest details from Blizzard's data", () => {
 		{ classes: [9], faction: "alliance", rewardItems: [6898, 15109] },
 	);
 	assert.deepEqual(questDetails({ rewards: { reputations: [{ reward: { id: 72 } }, { reward: { id: 76 } }] } }), {});
+});
+
+test("first clears from Blizzard's boss-kill statistics", () => {
+	assert.equal(dungeonOfKillStatistic("Edwin VanCleef Kills (Deadmines)"), "deadmines");
+	assert.equal(dungeonOfKillStatistic("Durgen Dirgehammer Kills (Hall of Thanes)"), "hall-of-thanes");
+	assert.equal(dungeonOfKillStatistic("Bazil Thredd kills (Stormwind Stockade)"), "stockade");
+	assert.equal(dungeonOfKillStatistic("Shade of the Archmage Kills (City of Dalaran)"), "city-of-dalaran");
+	assert.equal(dungeonOfKillStatistic("Ragnaros kills (Molten Core)"), undefined);
+	assert.equal(dungeonOfKillStatistic("Total kills"), undefined);
+});
+
+test("level milestones for the feed's every-5 view", () => {
+	assert.equal(milestoneLevel(24, 25), true);
+	assert.equal(milestoneLevel(23, 24), false);
+	assert.equal(milestoneLevel(23, 26), true);
+	assert.equal(milestoneLevel(59, 60), true);
+	assert.equal(milestoneLevel(undefined, 30), true);
 });

@@ -21,6 +21,7 @@ import type * as crafting from "../crafting.js";
 import type * as crons from "../crons.js";
 import type * as dev from "../dev.js";
 import type * as dungeons from "../dungeons.js";
+import type * as feed from "../feed.js";
 import type * as guilds from "../guilds.js";
 import type * as helper from "../helper.js";
 import type * as http from "../http.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   dev: typeof dev;
   dungeons: typeof dungeons;
+  feed: typeof feed;
   guilds: typeof guilds;
   helper: typeof helper;
   http: typeof http;
