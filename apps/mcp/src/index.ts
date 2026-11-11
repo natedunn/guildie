@@ -9,7 +9,7 @@ import { buildServer, type Props } from "./tools.ts";
 
 // Guildie's MCP server (docs/mcp.md). AI apps register themselves (dynamic
 // client registration or a metadata document), send the player to
-// /authorize, and get OAuth tokens for /mcp. Who the player is comes from
+// /authorize, and get OAuth tokens for /connect. Who the player is comes from
 // guildie.club itself:
 //
 // 1. GET /authorize: our consent page (client name, where tokens go).
@@ -19,7 +19,7 @@ import { buildServer, type Props } from "./tools.ts";
 // 3. GET /callback?state&code: the library checks the state is this
 //    browser's; Convex swaps the code for a connection (POST /mcp/exchange);
 //    we finish the OAuth grant with { userId, connectionId } as its props.
-// 4. POST /mcp: each tool call goes to Convex with the connection id, which
+// 4. POST /connect: each tool call goes to Convex with the connection id, which
 //    the player can delete in Settings to cut the app off.
 
 export interface Env {
@@ -37,6 +37,8 @@ export interface Env {
 	LIMITER?: RateLimit;
 }
 
+/** The MCP endpoint: the address players give their AI app (https://mcp.guildie.club/connect). */
+const ENDPOINT = "/connect";
 const READ = "guildie:read";
 /** Change the player's own characters' stat priority and gear preferences. Asked for on the consent page. */
 const WRITE = "guildie:write";
@@ -58,7 +60,7 @@ const defaultHandler = {
 		const url = new URL(request.url);
 		const oauth = env.OAUTH_PROVIDER;
 		try {
-			if (url.pathname === "/" && request.method === "GET") return homePage(`${trimSlash(env.PUBLIC_URL)}/mcp`);
+			if (url.pathname === "/" && request.method === "GET") return homePage(`${trimSlash(env.PUBLIC_URL)}${ENDPOINT}`);
 
 			if (url.pathname === "/authorize" && request.method === "GET") {
 				const authRequest = await oauth.parseAuthRequest(request);
@@ -157,7 +159,7 @@ function providerFor(env: Env) {
 	const origin = trimSlash(env.PUBLIC_URL);
 	if (!provider || builtFor !== origin) {
 		provider = new OAuthProvider<Env>({
-			apiRoute: "/mcp",
+			apiRoute: ENDPOINT,
 			apiHandler: mcpHandler,
 			defaultHandler,
 			authorizeEndpoint: "/authorize",
@@ -166,7 +168,7 @@ function providerFor(env: Env) {
 			clientIdMetadataDocumentEnabled: true,
 			scopesSupported: [READ, WRITE],
 			resourceMetadata: {
-				resource: `${origin}/mcp`,
+				resource: `${origin}${ENDPOINT}`,
 				authorization_servers: [origin],
 				scopes_supported: [READ, WRITE],
 				resource_name: "Guildie",
