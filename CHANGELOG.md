@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.16
+
 ### Improvements
 
 - **Guildie, Addon:** Gear suggestions now tell a clear upgrade (more of your stats, nothing lost) from a trade-off (gives up some of one stat for more of another), on Crafting → Upgrades for me, the item panel and in-game tooltips.
