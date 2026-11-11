@@ -41,9 +41,10 @@ import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
 import { Route as GRegionSlugCraftingRouteImport } from './routes/g/$region/$slug/crafting'
-import { Route as GRegionSlugDungeonsRouteImport } from './routes/g/$region/$slug/dungeons'
 import { Route as GRegionSlugGearRouteImport } from './routes/g/$region/$slug/gear'
 import { Route as GRegionSlugRequestsRouteImport } from './routes/g/$region/$slug/requests'
+import { Route as GRegionSlugDungeonsIndexRouteImport } from './routes/g/$region/$slug/dungeons.index'
+import { Route as GRegionSlugDungeonsDungeonRouteImport } from './routes/g/$region/$slug/dungeons.$dungeon'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -205,11 +206,6 @@ const GRegionSlugCraftingRoute = GRegionSlugCraftingRouteImport.update({
   path: '/crafting',
   getParentRoute: () => GRegionSlugRoute,
 } as any)
-const GRegionSlugDungeonsRoute = GRegionSlugDungeonsRouteImport.update({
-  id: '/dungeons',
-  path: '/dungeons',
-  getParentRoute: () => GRegionSlugRoute,
-} as any)
 const GRegionSlugGearRoute = GRegionSlugGearRouteImport.update({
   id: '/gear',
   path: '/gear',
@@ -220,6 +216,18 @@ const GRegionSlugRequestsRoute = GRegionSlugRequestsRouteImport.update({
   path: '/requests',
   getParentRoute: () => GRegionSlugRoute,
 } as any)
+const GRegionSlugDungeonsIndexRoute =
+  GRegionSlugDungeonsIndexRouteImport.update({
+    id: '/dungeons/',
+    path: '/dungeons/',
+    getParentRoute: () => GRegionSlugRoute,
+  } as any)
+const GRegionSlugDungeonsDungeonRoute =
+  GRegionSlugDungeonsDungeonRouteImport.update({
+    id: '/dungeons/$dungeon',
+    path: '/dungeons/$dungeon',
+    getParentRoute: () => GRegionSlugRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -252,11 +260,12 @@ export interface FileRoutesByFullPath {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
-  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
   '/g/$region/$slug/': typeof GRegionSlugIndexRoute
+  '/g/$region/$slug/dungeons/$dungeon': typeof GRegionSlugDungeonsDungeonRoute
+  '/g/$region/$slug/dungeons/': typeof GRegionSlugDungeonsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -286,11 +295,12 @@ export interface FileRoutesByTo {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
-  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug': typeof CRegionSlugIndexRoute
   '/g/$region/$slug': typeof GRegionSlugIndexRoute
+  '/g/$region/$slug/dungeons/$dungeon': typeof GRegionSlugDungeonsDungeonRoute
+  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -324,11 +334,12 @@ export interface FileRoutesById {
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
-  '/g/$region/$slug/dungeons': typeof GRegionSlugDungeonsRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
   '/g/$region/$slug/requests': typeof GRegionSlugRequestsRoute
   '/c/$region/$slug/': typeof CRegionSlugIndexRoute
   '/g/$region/$slug/': typeof GRegionSlugIndexRoute
+  '/g/$region/$slug/dungeons/$dungeon': typeof GRegionSlugDungeonsDungeonRoute
+  '/g/$region/$slug/dungeons/': typeof GRegionSlugDungeonsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -363,11 +374,12 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
-    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
     | '/g/$region/$slug/'
+    | '/g/$region/$slug/dungeons/$dungeon'
+    | '/g/$region/$slug/dungeons/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -397,11 +409,12 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
-    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug'
     | '/g/$region/$slug'
+    | '/g/$region/$slug/dungeons/$dungeon'
+    | '/g/$region/$slug/dungeons'
   id:
     | '__root__'
     | '/'
@@ -434,11 +447,12 @@ export interface FileRouteTypes {
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
     | '/g/$region/$slug/crafting'
-    | '/g/$region/$slug/dungeons'
     | '/g/$region/$slug/gear'
     | '/g/$region/$slug/requests'
     | '/c/$region/$slug/'
     | '/g/$region/$slug/'
+    | '/g/$region/$slug/dungeons/$dungeon'
+    | '/g/$region/$slug/dungeons/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -691,13 +705,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GRegionSlugCraftingRouteImport
       parentRoute: typeof GRegionSlugRoute
     }
-    '/g/$region/$slug/dungeons': {
-      id: '/g/$region/$slug/dungeons'
-      path: '/dungeons'
-      fullPath: '/g/$region/$slug/dungeons'
-      preLoaderRoute: typeof GRegionSlugDungeonsRouteImport
-      parentRoute: typeof GRegionSlugRoute
-    }
     '/g/$region/$slug/gear': {
       id: '/g/$region/$slug/gear'
       path: '/gear'
@@ -710,6 +717,20 @@ declare module '@tanstack/react-router' {
       path: '/requests'
       fullPath: '/g/$region/$slug/requests'
       preLoaderRoute: typeof GRegionSlugRequestsRouteImport
+      parentRoute: typeof GRegionSlugRoute
+    }
+    '/g/$region/$slug/dungeons/': {
+      id: '/g/$region/$slug/dungeons/'
+      path: '/dungeons'
+      fullPath: '/g/$region/$slug/dungeons/'
+      preLoaderRoute: typeof GRegionSlugDungeonsIndexRouteImport
+      parentRoute: typeof GRegionSlugRoute
+    }
+    '/g/$region/$slug/dungeons/$dungeon': {
+      id: '/g/$region/$slug/dungeons/$dungeon'
+      path: '/dungeons/$dungeon'
+      fullPath: '/g/$region/$slug/dungeons/$dungeon'
+      preLoaderRoute: typeof GRegionSlugDungeonsDungeonRouteImport
       parentRoute: typeof GRegionSlugRoute
     }
   }
@@ -765,18 +786,20 @@ const CRegionSlugRouteWithChildren = CRegionSlugRoute._addFileChildren(
 
 interface GRegionSlugRouteChildren {
   GRegionSlugCraftingRoute: typeof GRegionSlugCraftingRoute
-  GRegionSlugDungeonsRoute: typeof GRegionSlugDungeonsRoute
   GRegionSlugGearRoute: typeof GRegionSlugGearRoute
   GRegionSlugRequestsRoute: typeof GRegionSlugRequestsRoute
   GRegionSlugIndexRoute: typeof GRegionSlugIndexRoute
+  GRegionSlugDungeonsDungeonRoute: typeof GRegionSlugDungeonsDungeonRoute
+  GRegionSlugDungeonsIndexRoute: typeof GRegionSlugDungeonsIndexRoute
 }
 
 const GRegionSlugRouteChildren: GRegionSlugRouteChildren = {
   GRegionSlugCraftingRoute: GRegionSlugCraftingRoute,
-  GRegionSlugDungeonsRoute: GRegionSlugDungeonsRoute,
   GRegionSlugGearRoute: GRegionSlugGearRoute,
   GRegionSlugRequestsRoute: GRegionSlugRequestsRoute,
   GRegionSlugIndexRoute: GRegionSlugIndexRoute,
+  GRegionSlugDungeonsDungeonRoute: GRegionSlugDungeonsDungeonRoute,
+  GRegionSlugDungeonsIndexRoute: GRegionSlugDungeonsIndexRoute,
 }
 
 const GRegionSlugRouteWithChildren = GRegionSlugRoute._addFileChildren(

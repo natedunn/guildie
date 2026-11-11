@@ -365,9 +365,36 @@ export default defineSchema({
 		area: v.optional(v.string()),
 		level: v.optional(v.number()),
 		minLevel: v.optional(v.number()),
+		/** Only these classes can take it (Blizzard's `requirements.classes`). */
+		classes: v.optional(v.array(v.number())),
+		/** One side only, worked out from the reputations it rewards (dungeons.ts). */
+		faction: v.optional(v.union(v.literal("alliance"), v.literal("horde"))),
+		/** Items it rewards (all of them, or the ones to choose from). */
+		rewardItems: v.optional(v.array(v.number())),
 		partial: v.optional(v.boolean()),
 		syncedAt: v.number(),
 	}).index("by_questId", ["questId"]),
+
+	/**
+	 * Each dungeon's quests (shared/dungeons.ts), from Blizzard's quest areas:
+	 * the ones Blizzard types "Dungeon". Weekly (dungeons.ts).
+	 */
+	dungeonQuests: defineTable({
+		key: v.string(),
+		questIds: v.array(v.number()),
+		syncedAt: v.number(),
+	}).index("by_key", ["key"]),
+
+	/**
+	 * Quests a character has turned in, from Blizzard's profile (as of its last
+	 * logout), with the profile sync. Its own table: the list runs to
+	 * thousands, and most reads of characters don't need it.
+	 */
+	completedQuests: defineTable({
+		characterId: v.id("characters"),
+		ids: v.array(v.number()),
+		syncedAt: v.number(),
+	}).index("by_character", ["characterId"]),
 
 	/**
 	 * Each talent tree's layout, from Blizzard's talent-tree data (talents.ts).

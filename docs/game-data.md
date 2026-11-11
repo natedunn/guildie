@@ -100,3 +100,29 @@ say, and the override it contradicts if any) and, per override that removes
 something, `contradictedBy` (characters that have it: remove the override)
 and `consistentWith` (characters of that class at or above the data's level
 without it: weak support, since skills are trained).
+
+## Dungeons
+
+The Dungeons page (`/g/<region>/<guild>/dungeons`) reads three sources:
+
+- **The dungeon list** (`apps/web/convex/shared/dungeons.generated.ts`):
+  `node apps/web/scripts/gen-dungeons.mjs` reads Forever's LFGDungeons,
+  ContentTuning (the level each dungeon is tuned for), Map, DungeonEncounter
+  (bosses, in order) and LoadingScreens from wago.tools. LFGDungeons has no
+  map ids in Forever, so the script lists which map each finder entry is.
+  Raids are left out. Run it again when Forever adds a dungeon, and add the
+  dungeon's Blizzard quest areas to `AREAS` in `shared/dungeons.ts`.
+- **The art**: each dungeon's loading screen, converted to JPEG and uploaded
+  to the `guildie-assets` R2 bucket (served at `assets.guildie.club/dungeons/<key>.jpg`)
+  by `apps/web/scripts/dungeon-art.py` (needs Pillow and Wrangler; see the
+  script). The images are Blizzard's art, so they stay out of the repository.
+- **Quests** (`convex/dungeons.ts`, weekly cron and on demand:
+  `npx convex run dungeons:syncQuests`): every quest Blizzard lists in the
+  dungeon's quest areas and types "Dungeon", with its class limits
+  (`requirements.classes`), reward items, and side (from the reputations it
+  rewards). Members' turned-in quests come from Blizzard's
+  `/quests/completed` with each profile sync (`completedQuests` table).
+
+Blizzard has no quest chains (prerequisites), boss loot or dungeon maps for
+Forever, and the game files don't either: "ready" counts a quest in the log
+as its chain done, and the page links to Wowhead for loot and maps.

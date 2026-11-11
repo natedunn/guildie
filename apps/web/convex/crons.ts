@@ -18,4 +18,11 @@ crons.daily("backfill item names and icons", { hourUTC: 10, minuteUTC: 30 }, int
 
 crons.daily("backfill quest titles", { hourUTC: 11, minuteUTC: 0 }, internal.quests.backfill, {});
 
+crons.weekly(
+	"sync dungeon quests",
+	{ dayOfWeek: "tuesday", hourUTC: 10, minuteUTC: 0 },
+	internal.dungeons.syncQuests,
+	{},
+);
+
 export default crons;

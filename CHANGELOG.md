@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** A new Dungeons page: a card per dungeon with its art and how many guildmates are ready (level and every dungeon quest for their class picked up or done), partly ready (level only) and completed. Each dungeon has its own page with everyone's status and what they're missing, its quests (class-only ones marked, with rewards) and its bosses.
+
 ## 0.3.12
 
 ### Improvements

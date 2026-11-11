@@ -1,3 +1,4 @@
+import { DUNGEON_BY_KEY } from "@convex/shared/dungeons";
 import { useRouterState } from "@tanstack/react-router";
 import { usePageTitle } from "@/lib/page-title";
 
@@ -10,7 +11,10 @@ type GuildRef = { name: string; region: string; slug: string };
 export type Crumb = {
 	label: string;
 	link?:
-		| { to: "/g/$region/$slug" | "/c/$region/$slug"; params: { region: string; slug: string } }
+		| {
+				to: "/g/$region/$slug" | "/c/$region/$slug" | "/g/$region/$slug/dungeons";
+				params: { region: string; slug: string };
+		  }
 		| { to: "/settings"; params?: undefined };
 };
 
@@ -23,7 +27,7 @@ const TAB_LABELS: Record<string, string> = {
 	"/g/$region/$slug/crafting": "Crafting",
 	"/g/$region/$slug/gear": "Gear",
 	"/g/$region/$slug/requests": "Requests",
-	"/g/$region/$slug/dungeons": "Dungeons",
+	"/g/$region/$slug/dungeons/": "Dungeons",
 	"/c/$region/$slug/talents": "Talents",
 	"/c/$region/$slug/professions": "Professions",
 };
@@ -48,6 +52,12 @@ function crumbsOf(matches: Match[]): Crumb[] | null {
 				label: data.name,
 				link: { to: "/c/$region/$slug", params: { region: m.params.region, slug: m.params.slug } },
 			});
+		} else if (m.routeId === "/g/$region/$slug/dungeons/$dungeon") {
+			crumbs.push({
+				label: "Dungeons",
+				link: { to: "/g/$region/$slug/dungeons", params: { region: m.params.region, slug: m.params.slug } },
+			});
+			crumbs.push({ label: DUNGEON_BY_KEY.get(m.params.dungeon)?.name ?? "Dungeon" });
 		} else if (m.routeId === "/settings") {
 			crumbs.push({ label: "Settings", link: { to: "/settings" } });
 		} else if (TAB_LABELS[m.routeId]) {
