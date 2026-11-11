@@ -22,6 +22,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 - **Addon:** Item tooltips no longer suggest guildmates for Cooking, Fishing or First Aid reagents, since nearly everyone has those.
 - **App:** Installing or reinstalling the addon checks that World of Warcraft: Forever was found first, and says what to do if it wasn't.
 - **Guildie:** In the Windows app, a notice at the bottom of the sidebar when the addon isn't installed. Dismiss it if you don't want the addon.
+- **Guildie:** How gear-upgrade suggestions are worked out, with every spec's stat weights, is written up in docs/gear-upgrades.md.
 
 ## 0.3.11
 

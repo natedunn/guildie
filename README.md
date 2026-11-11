@@ -60,6 +60,7 @@ Details, worktrees and the desktop app against your local site:
 More docs:
 
 - [docs/addon.md](docs/addon.md): the addon, the app and the upload API
+- [docs/gear-upgrades.md](docs/gear-upgrades.md): how gear-upgrade suggestions and stat weights work
 - [docs/deploy.md](docs/deploy.md): production and branch previews
 - [docs/auth-environments.md](docs/auth-environments.md): sign-in, the gateway, settings per tier
 - [docs/blizzard-setup.md](docs/blizzard-setup.md), [docs/setup.md](docs/setup.md): running your own copy
