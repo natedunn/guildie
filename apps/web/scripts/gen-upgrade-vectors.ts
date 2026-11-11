@@ -22,6 +22,17 @@ const rules = {
 		"DRUID:1": { name: "Feral", w: { AGILITY: 1, STRENGTH: 0.9, STAMINA: 0.6, ARMOR: 0.05, ATTACK_POWER: 0.4 } },
 		"DRUID:2": { name: "Restoration", w: { INTELLECT: 1, SPIRIT: 0.8, STAMINA: 0.5, ARMOR: 0.02 } },
 		"WARRIOR:0": { name: "Arms", w: { STRENGTH: 1, AGILITY: 0.7, STAMINA: 0.6, ARMOR: 0.02, DPS: 8 } },
+		// Priority stats (a player's own, up to five): losing any of them makes an upgrade a trade-off.
+		"WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR": {
+			name: "Str/Agi/Sta",
+			w: { STRENGTH: 1, AGILITY: 0.7, STAMINA: 0.6, ARMOR: 0.02, DPS: 8 },
+			stats: ["STRENGTH", "AGILITY", "STAMINA", "ARMOR"],
+		},
+		"MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA": {
+			name: "Int/Spell dmg/Sta",
+			w: { INTELLECT: 1, SPIRIT: 0.5, STAMINA: 0.6, SPELL_POWER: 1.3, SPELL_DAMAGE_DONE: 1.3, ARMOR: 0.02 },
+			stats: ["INTELLECT", "SPELL_DAMAGE_DONE", "STAMINA"],
+		},
 		"WARRIOR:1": {
 			name: "Fury",
 			w: { STRENGTH: 1, AGILITY: 0.8, STAMINA: 0.6, ARMOR: 0.02, ATTACK_POWER: 0.45, DPS: 4.5, OFFHAND_DPS: 1.4 },
@@ -76,6 +87,9 @@ const items: Record<string, any> = {
 	plainCloak: { invType: "CLOAK", cls: 4, subclass: 0, stats: {}, armor: 20 },
 	apMace: { invType: "2HWEAPON", cls: 2, subclass: 5, stats: { ATTACK_POWER: 32, EXTRA_ARMOR: 60 }, dps: 27.7 },
 	spiritRobe: { invType: "ROBE", cls: 4, subclass: 1, stats: { SPIRIT: 9, INTELLECT: 3 }, armor: 40 },
+	strMailGloves: { invType: "HAND", cls: 4, subclass: 3, stats: { STRENGTH: 6, AGILITY: 2 }, armor: 90 },
+	thinStrGloves: { invType: "HAND", cls: 4, subclass: 3, stats: { STRENGTH: 9, STAMINA: 3 }, armor: 40 },
+	agiRingPlain: { invType: "FINGER", cls: 4, subclass: 0, stats: { AGILITY: 7, STAMINA: 2 } },
 };
 const SEEN = 2_000_000;
 const members: Record<string, any> = {
@@ -103,6 +117,26 @@ const members: Record<string, any> = {
 	Frosty: { name: "Frosty", classId: 8, level: 30, spec: "MAGE:2", seen: SEEN, slots: { 1: 5, 10: 4 } },
 	Arrow: { name: "Arrow", classId: 3, level: 39, spec: "HUNTER:0", seen: SEEN, slots: { 5: 8, 18: 40, 16: 10 } },
 	Stale: { name: "Stale", classId: 11, level: 30, spec: "DRUID:1", seen: 0, slots: {} },
+	// Priority stats on what they wear (keys): Strength and armor on the gloves, a Strength ring.
+	Sturdy: {
+		name: "Sturdy",
+		classId: 1,
+		level: 30,
+		spec: "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
+		seen: SEEN,
+		slots: { 10: 5, 11: 3, 12: 6 },
+		keys: { 10: { STRENGTH: 3, ARMOR: 60 }, 11: { STRENGTH: 3 }, 12: { STAMINA: 10 } },
+	},
+	// Spell power on the hat counts as spell damage.
+	Sparky: {
+		name: "Sparky",
+		classId: 8,
+		level: 30,
+		spec: "MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA",
+		seen: SEEN,
+		slots: { 1: 5 },
+		keys: { 1: { INTELLECT: 2, SPELL_DAMAGE_DONE: 4 } },
+	},
 	// Players' armor and weapon type preferences (soft: others count less; strict: left out).
 	Chainmail: {
 		name: "Chainmail",
@@ -178,6 +212,12 @@ const judgeCases: [string, string, string, number?][] = [
 	["prefers daggers: a greatsword counts less", "greatsword", "Stabby"],
 	["bows only: melee weapons aren't covered", "dagger", "Bowman"],
 	["bows only: a bow", "bow", "Bowman"],
+	["more of every priority stat: an upgrade", "strMailGloves", "Sturdy"],
+	["less armor than worn: a trade-off", "thinStrGloves", "Sturdy"],
+	["gives up Strength for Agility: a trade-off", "leatherAgiGloves", "Sturdy"],
+	["ring vs the weaker ring: its Strength is given up", "agiRingPlain", "Sturdy"],
+	["spell power counts as spell damage: an upgrade", "clothIntHead", "Sparky"],
+	["no priority stats known: an upgrade as before", "clothIntHead", "Frosty"],
 ];
 const cases = judgeCases.map(([name, item, member, itemId]) => ({
 	name,
@@ -214,13 +254,14 @@ const usable = [
 	["dagger", "Brisket"],
 ].map(([item, member]) => ({ item, member, expect: usableAt(items[item], members[member], rules) ?? null }));
 // Who the suggest cases rank (the members with preferences have judge cases of their own).
-const suggestMembers = ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale"];
+const suggestMembers = ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy"];
 const suggestCases = [
 	{ name: "agility gloves, everyone", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "own characters skipped", item: "leatherAgiGloves", now: SEEN + 3600, skip: ["Arrow"], max: 3 },
 	{ name: "inactive members skipped", item: "plainCloak", now: SEEN + 20 * 86400, skip: [], max: 3 },
 	{ name: "plain cloak", item: "plainCloak", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "two-hander: upgrades before maybes", item: "greatsword", now: SEEN + 3600, skip: [], max: 3 },
+	{ name: "upgrades before trade-offs", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
 ].map((c) => ({
 	...c,
 	expect: suggest(

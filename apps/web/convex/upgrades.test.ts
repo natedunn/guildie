@@ -234,7 +234,7 @@ test("real weights: plausible picks", () => {
 	const brisket = picks.find((p) => p.member.name === "Brisket")!;
 	assert.equal(
 		explain(agiGloves, brisket.verdict, [gloves[0]], r),
-		"+4 Agility, +4 Stamina over Embossed Leather Gloves",
+		"+4 Agility, +4 Stamina, +15 Armor over Embossed Leather Gloves", // Feral values armor
 	);
 
 	const intHead = itemInfoFromTooltip([
@@ -247,6 +247,10 @@ test("real weights: plausible picks", () => {
 	assert.equal(v?.kind, "upgrade", "empty head slot");
 	assert.equal(judge(intHead, rogue, r), undefined, "intellect doesn't suit a rogue");
 	assert.match(explain(intHead, v!, [], r), /^\+7 Intellect, \+3 Spirit \(nothing worn there\)$/);
+	// Armor when it's a good part of why.
+	const mail = itemInfoFromTooltip([{ left: "Hands", right: "Mail" }, { left: "140 Armor" }, { left: "+2 Agility" }])!;
+	const why = explain(mail, { kind: "upgrade", gain: 1, spec: warrior.spec, against: [10] }, [gloves[0]], r);
+	assert.equal(why, "+100 Armor over Embossed Leather Gloves");
 });
 
 test("worn gear: two-hander flag, unique ids, estimates for unknown items", () => {

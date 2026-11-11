@@ -15,6 +15,11 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, Addon:** Gear suggestions now tell a clear upgrade (more of your stats, nothing lost) from a trade-off (gives up some of one stat for more of another), on Crafting → Upgrades for me, the item panel and in-game tooltips.
+- **Guildie:** Your stat priority can list up to five stats and say how much more the first counts: Even, Balanced, Steep or your own. Pages still show the top three. Change it on your character page, or reorder and set it right on Upgrades for me.
+
 ## 0.3.15
 
 ### New

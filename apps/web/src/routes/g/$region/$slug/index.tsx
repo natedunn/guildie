@@ -81,7 +81,7 @@ function Roster({ members }: { members: Member[] }) {
 				...(m.professions ?? []).map((p) => p.name),
 				...(m.talentTrees ?? []).map((t) => t.name),
 				// "who wants intellect"
-				...(m.statPriority?.stats ?? []).map((s) => PRIORITY_STATS[s]),
+				...(m.statPriority?.stats ?? []).slice(0, 3).map((s) => PRIORITY_STATS[s]),
 			]
 				.filter(Boolean)
 				.join(" ")

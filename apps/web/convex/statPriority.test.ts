@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { itemInfoFromTooltip } from "./shared/itemInfo.ts";
-import { PRIORITY_STATS, statPriority, validStats } from "./shared/statPriority.ts";
+import { PRIORITY_STATS, statPriority, steepnessOf, validStats, validTiers } from "./shared/statPriority.ts";
 import {
 	customWeights,
 	gearPrefs,
@@ -32,6 +32,7 @@ test("from the main talent tree, else the class's default", () => {
 	assert.deepEqual(statPriority(2, [tree("Protection", 31), tree("Holy", 5)]), {
 		tree: "Protection",
 		stats: ["STAMINA", "STRENGTH", "INTELLECT"],
+		shares: [1, 0.6, 0.3],
 		chosen: false,
 	});
 	// No talents yet: Retribution.
@@ -43,13 +44,30 @@ test("the player's choice wins: their own three, else another tree", () => {
 	const talents = [tree("Protection", 31)];
 	assert.deepEqual(statPriority(2, talents, { stats: ["INTELLECT", "SPIRIT", "STAMINA"] }), {
 		stats: ["INTELLECT", "SPIRIT", "STAMINA"],
+		shares: [1, 0.8, 0.6],
+		steepness: "balanced",
 		chosen: true,
 	});
+	// Up to five, with their own shares.
+	const five = ["INTELLECT", "SPIRIT", "STAMINA", "CRIT_RATING", "ARMOR"];
+	assert.deepEqual(statPriority(2, talents, { stats: five, tiers: [1, 0.55, 0.35, 0.25, 0.2] })?.steepness, "steep");
+	assert.deepEqual(statPriority(2, talents, { stats: five, tiers: [1, 0.7, 0.7, 0.3, 0.1] })?.steepness, "custom");
+	assert.equal(statPriority(2, talents, { stats: [...five, "HIT_RATING"] })?.chosen, false, "six is too many");
 	assert.equal(statPriority(2, talents, { tree: 0 })?.tree, "Holy");
 	// Bad choices fall back to the talents.
 	assert.equal(statPriority(2, talents, { tree: 7 })?.chosen, false);
 	assert.equal(statPriority(2, talents, { stats: ["INTELLECT", "INTELLECT", "STAMINA"] })?.chosen, false);
 	assert.equal(validStats(["NOPE", "SPIRIT", "STAMINA"]), undefined);
+});
+
+test("shares: first 1, never more than the one before, else Balanced", () => {
+	assert.deepEqual(validTiers([1, 0.7, 0.4], 3), [1, 0.7, 0.4]);
+	assert.deepEqual(validTiers(undefined, 4), [1, 0.8, 0.6, 0.5]);
+	assert.deepEqual(validTiers([1, 0.6, 0.7], 3), [1, 0.8, 0.6], "rising");
+	assert.deepEqual(validTiers([0.9, 0.6, 0.5], 3), [1, 0.8, 0.6], "first not 1");
+	assert.deepEqual(validTiers([1, 0.6, 0.05], 3), [1, 0.8, 0.6], "below the floor");
+	assert.deepEqual(validTiers([1, 0.6], 3), [1, 0.8, 0.6], "wrong length");
+	assert.equal(steepnessOf([1, 0.9, 0.8]), "even");
 });
 
 // Gear suggestions follow the same choice (shared/upgrades.ts specsFor).
@@ -125,8 +143,50 @@ test("a custom priority changes the verdict: Intellect gloves for an Enhancement
 	])!;
 	assert.equal(judge(intGloves, shaman(), r)?.kind, "maybe", "talents' weights: a small gain");
 	const custom = judge(intGloves, shaman({ stats: ["STRENGTH", "INTELLECT", "AGILITY"] }), r);
-	assert.equal(custom?.kind, "upgrade", "Strength, Intellect, Agility: worth it");
+	assert.equal(custom?.kind, "tradeoff", "Strength, Intellect, Agility: worth it, but 2 Strength is given up");
 	assert.equal(r.specs[custom!.spec].name, "Str/Int/Agi");
+});
+
+test("steepness: Agility pants for a Strength-first shaman are a trade-off, or nothing when steep", () => {
+	const r = upgradeRules();
+	const worn = [
+		{
+			slot: "LEGS",
+			itemId: 1,
+			name: "Sea Dog Britches",
+			quality: "UNCOMMON",
+			info: itemInfoFromTooltip([{ left: "Legs", right: "Leather" }, { left: "70 Armor" }, { left: "+4 Strength" }]),
+		},
+	];
+	const shaman = (tiers?: number[]) =>
+		upgradeMember(
+			{
+				name: "Todd",
+				classId: 7,
+				level: 25,
+				seenMs: 0,
+				talentTrees: [tree("Enhancement", 16)],
+				equipment: worn,
+				statPriority: { stats: ["STRENGTH", "INTELLECT", "AGILITY"], tiers },
+			},
+			r,
+		)!;
+	const pants = itemInfoFromTooltip([
+		{ left: "Legs", right: "Leather" },
+		{ left: "82 Armor" },
+		{ left: "+8 Agility" },
+	])!;
+	assert.equal(judge(pants, shaman(), r)?.kind, "tradeoff", "Balanced: 8 Agility is worth more than 4 Strength");
+	assert.equal(judge(pants, shaman([1, 0.55, 0.35]), r), undefined, "Steep: it isn't");
+	assert.equal(judge(pants, shaman([1, 0.9, 0.8]), r)?.kind, "tradeoff", "Even: still gives up Strength");
+	assert.notEqual(shaman([1, 0.55, 0.35]).spec, shaman().spec, "own shares: their own spec key");
+	const better = itemInfoFromTooltip([
+		{ left: "Legs", right: "Leather" },
+		{ left: "82 Armor" },
+		{ left: "+5 Strength" },
+		{ left: "+3 Agility" },
+	])!;
+	assert.equal(judge(better, shaman(), r)?.kind, "upgrade", "more of every priority stat");
 });
 
 test("gear types: only types the class can use; strict leaves the rest out", () => {

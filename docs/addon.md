@@ -249,8 +249,10 @@ your last login or reload.
   Soulbound), scores it for each of them the same way
   (`Guildie/Upgrades.lua`, a port of `convex/shared/upgrades.ts`; both run
   `apps/addon/tests/upgrade_vectors.json`) and adds a row each for up to 3 people:
-  "Brisket | upgrade (Feral)", "Miller | maybe (at 24)". Upgrade:
-  15%+ better than what they wear there, usable now, main spec. Maybe: 3-15%,
+  "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)", "Miller | maybe (at 24)". Upgrade:
+  15%+ better than what they wear there, usable now, main spec, none of
+  their priority stats lower. Trade-off: the same, but some of a priority
+  stat is given up. Maybe: 3-15%,
   their second spec, or usable within 3 levels. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
   Stamina over Embossed Leather Gloves"). About 20 KB of the file for a guild

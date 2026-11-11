@@ -17,7 +17,11 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 //    DPS terms. An item whose stats are of little use to a spec doesn't suit it.
 // 3. Compared with what they wear where it would go: the weaker ring or
 //    trinket, main hand plus off hand for a two-hander, and so on.
-// 4. Upgrade: gain of `upgrade` or more, usable now, main spec. Maybe: a
+// 4. Upgrade: gain of `upgrade` or more, usable now, main spec, and none of
+//    the spec's priority stats (`stats`, up to five) lower than what it
+//    replaces. Trade-off: the same gain, but it gives up some of one of
+//    those stats for more of another (worth it only by the weights, which
+//    the player can make steeper or flatter: customWeights). Maybe: a
 //    smaller gain (from `maybe`), only the second spec, or usable within
 //    `levelsAhead` levels ("at 24").
 //
@@ -45,8 +49,11 @@ export type Rules = {
 	minBase: number;
 	/** Stat -> plain stat points per point, for the raw total (missing: 1). */
 	points: Record<string, number>;
-	/** "DRUID:1" (class token, tree index) -> name and weights. */
-	specs: Record<string, { name: string; w: Weights }>;
+	/**
+	 * "DRUID:1" (class token, tree index) -> name, weights and its priority
+	 * stats, first to last (up to five; what a trade-off gives up).
+	 */
+	specs: Record<string, { name: string; w: Weights; stats?: string[] }>;
 	classes: Record<number, ClassRules>;
 };
 
@@ -64,6 +71,12 @@ export type UpgradeMember = {
 	slots: Record<number, number>;
 	/** The same for the second spec. */
 	slots2?: Record<number, number>;
+	/**
+	 * Inventory slot -> the main spec's priority stats on what they wear there
+	 * (keyValue; zeros and unknown items left out), to tell an upgrade from a
+	 * trade-off.
+	 */
+	keys?: Record<number, Record<string, number>>;
 	/** Wears a two-hander. */
 	th?: boolean;
 	/** Item ids worn in rings, trinkets and weapon slots (Unique items can't be worn twice). */
@@ -84,7 +97,8 @@ export type UpgradeMember = {
 export type GearPrefs = Pick<UpgradeMember, "armorPref" | "armorStrict" | "weaponPref" | "weaponStrict">;
 
 export type Verdict = {
-	kind: "upgrade" | "maybe";
+	/** Upgrade (nothing of their priority stats lost), trade-off (some lost), maybe. */
+	kind: VerdictKind;
 	/** (new - current) / current, current at least `minBase`. */
 	gain: number;
 	/** The spec it was judged for. */
@@ -97,11 +111,16 @@ export type Verdict = {
 	against: number[];
 };
 
+export type VerdictKind = "upgrade" | "tradeoff" | "maybe";
+
+/** Upgrades, then trade-offs, then maybes. */
+export const kindRank = (kind: VerdictKind) => (kind === "upgrade" ? 0 : kind === "tradeoff" ? 1 : 2);
+
 export function upgradeRules(): Rules {
 	const specs: Rules["specs"] = {};
 	for (const [token, trees] of Object.entries(SPECS)) {
 		trees.forEach((s, i) => {
-			specs[`${token}:${i}`] = { name: s.name, w: s.w };
+			specs[`${token}:${i}`] = { name: s.name, w: s.w, stats: [...s.stats] };
 		});
 	}
 	return { ...THRESHOLDS, points: STAT_POINTS, specs, classes: CLASS_RULES };
@@ -157,8 +176,12 @@ export function specsOf(classId: number, trees: Tree[] | undefined) {
 
 // ---- Stat priority (shared/statPriority.ts) ------------------------------------------
 
-/** A player's stat priority choice (ownedCharacters.statPriority): another tree, or their own three stats. */
-export type StatChoice = { tree?: number; stats?: string[] };
+/**
+ * A player's stat priority choice (ownedCharacters.statPriority): another
+ * tree, or their own three to five stats with how much each counts next to
+ * the first (`tiers`, first 1; missing: BALANCED).
+ */
+export type StatChoice = { tree?: number; stats?: string[]; tiers?: number[] };
 
 /** A player's preferred armor and weapon types (ownedCharacters.gearPreference): subclass ids, strict or not. */
 export type GearChoice = { armor?: { type: number; strict: boolean }; weapon?: { type: number; strict: boolean } };
@@ -207,24 +230,66 @@ export const STAT_SHORT: Record<string, string> = {
 	ARMOR: "Armor",
 };
 
-/** First, second, third: at least this share of the spec's best stat (per plain stat point). */
-const PRIORITY_TIERS = [1, 0.8, 0.6];
-/** Stats left out of the three: at most this share of the third. */
+/**
+ * How much each of a player's own stats counts next to the first (per plain
+ * stat point), first to fifth. Balanced is the default; the player can pick
+ * another or set their own (validTiers).
+ */
+export const TIER_PRESETS = {
+	even: [1, 0.9, 0.8, 0.75, 0.7],
+	balanced: [1, 0.8, 0.6, 0.5, 0.4],
+	steep: [1, 0.55, 0.35, 0.25, 0.2],
+} as const;
+export type Steepness = keyof typeof TIER_PRESETS | "custom";
+/** Smallest share a stat can be set to. */
+export const MIN_TIER = 0.1;
+/** Stats left out of the player's own: at most this share of their last. */
 const PRIORITY_OTHERS = 0.9;
-/** Armor named in the three: its weight times this, first to third (armor is per point of armor, not a stat). */
-const ARMOR_TIERS = [2, 1.6, 1.3];
+/** Armor named in the stats: its weight times this, first to fifth (armor is per point of armor, not a stat). */
+const ARMOR_TIERS = [2, 1.6, 1.3, 1.15, 1.05];
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * A spec's weights bent to a player's own three stats ("Strength, Intellect,
- * Agility" for an Enhancement shaman): the first is worth as much as the
- * spec's best stat, the second and third a bit less (never more than the one
- * before), and other stats count less than the third. Per plain stat point
- * (`points`: Attack Power is half a point), so "Attack Power" means the same
- * as "Strength". Weapon DPS, armor (unless named) and school damage stay.
+ * A player's shares for `n` stats: their own if valid (the first 1, then
+ * never more than the one before, from MIN_TIER, two decimals), else
+ * Balanced's.
  */
-export function customWeights(base: Weights, stats: string[], points: Record<string, number>): Weights {
+export function validTiers(tiers: unknown, n: number): number[] {
+	const fallback = TIER_PRESETS.balanced.slice(0, n);
+	if (!Array.isArray(tiers) || tiers.length !== n) return fallback;
+	if (!tiers.every((t) => typeof t === "number" && Number.isFinite(t))) return fallback;
+	if (tiers[0] !== 1) return fallback;
+	for (let i = 1; i < n; i++) {
+		if (tiers[i] < MIN_TIER || tiers[i] > tiers[i - 1] || round2(tiers[i]) !== tiers[i]) return fallback;
+	}
+	return tiers as number[];
+}
+
+/** Which preset the shares are, or "custom". */
+export function steepnessOf(tiers: number[]): Steepness {
+	for (const [name, preset] of Object.entries(TIER_PRESETS)) {
+		if (tiers.every((t, i) => t === preset[i])) return name as Steepness;
+	}
+	return "custom";
+}
+
+/**
+ * A spec's weights bent to a player's own stats ("Strength, Intellect,
+ * Agility" for an Enhancement shaman): the first is worth as much as the
+ * spec's best stat, each next one its share (`tiers`) of that (never more
+ * than the one before), and other stats count less than the last. Per plain
+ * stat point (`points`: Attack Power is half a point), so "Attack Power"
+ * means the same as "Strength". Weapon DPS, armor (unless named) and school
+ * damage stay.
+ */
+export function customWeights(
+	base: Weights,
+	stats: string[],
+	points: Record<string, number>,
+	tiers: number[] = validTiers(undefined, stats.length),
+): Weights {
 	const per = (k: string) => (base[k] ?? 0) / (points[k] ?? 1);
 	const named = Object.keys(STAT_SHORT).filter((k) => k !== "ARMOR");
 	const top = Math.max(...named.map(per));
@@ -235,7 +300,7 @@ export function customWeights(base: Weights, stats: string[], points: Record<str
 			w.ARMOR = round3((base.ARMOR ?? 0) * ARMOR_TIERS[i]);
 			return;
 		}
-		const value = Math.min(Math.max(per(k), PRIORITY_TIERS[i] * top), prev);
+		const value = Math.min(tiers[i] * top, prev);
 		prev = value;
 		w[k] = round3(value * (points[k] ?? 1));
 	});
@@ -250,20 +315,26 @@ export function customWeights(base: Weights, stats: string[], points: Record<str
 	return w;
 }
 
-/** Three distinct stats a priority can name, or undefined. */
+/** Fewest and most stats a player's own priority names. */
+export const MIN_STATS = 3;
+export const MAX_STATS = 5;
+
+/** Three to five distinct stats a priority can name, or undefined. */
 export function validStats(stats: unknown): string[] | undefined {
-	if (!Array.isArray(stats) || stats.length !== 3) return undefined;
+	if (!Array.isArray(stats) || stats.length < MIN_STATS || stats.length > MAX_STATS) return undefined;
 	if (!stats.every((s) => typeof s === "string" && s in STAT_SHORT)) return undefined;
-	return new Set(stats).size === 3 ? (stats as string[]) : undefined;
+	return new Set(stats).size === stats.length ? (stats as string[]) : undefined;
 }
 
 /**
  * Main and second spec keys with the player's stat priority choice applied,
  * the same choice the roster and character page show (statPriority.ts):
  *
- * - their own three stats: a custom spec ("SHAMAN:1:STRENGTH,INTELLECT,AGILITY",
- *   named "Str/Int/Agi"), their talents' tree with customWeights; it's added
- *   to `rules.specs` (and so reaches the addon with the rules);
+ * - their own stats: a custom spec ("SHAMAN:1:STRENGTH,INTELLECT,AGILITY",
+ *   named after the first three, "Str/Int/Agi"; shares other than
+ *   Balanced's are added to the key, ":1,0.55,0.35"), their talents' tree
+ *   with customWeights; it's added to `rules.specs` (and so reaches the
+ *   addon with the rules);
  * - another tree: that tree, with the talents' tree as the second spec when
  *   it has the points;
  * - nothing: their talents (specsOf).
@@ -273,12 +344,18 @@ export function specsFor(classId: number, trees: Tree[] | undefined, choice: Sta
 	if (!talents) return undefined;
 	const own = validStats(choice?.stats);
 	if (own) {
-		const spec = `${talents.spec}:${own.join(",")}`;
+		const tiers = validTiers(choice?.tiers, own.length);
+		const balanced = steepnessOf(tiers) === "balanced";
+		const spec = `${talents.spec}:${own.join(",")}${balanced ? "" : `:${tiers.join(",")}`}`;
 		const base = rules.specs[talents.spec];
 		if (!base) return talents;
 		rules.specs[spec] ??= {
-			name: own.map((s) => STAT_SHORT[s]).join("/"),
-			w: customWeights(base.w, own, rules.points),
+			name: own
+				.slice(0, 3)
+				.map((s) => STAT_SHORT[s])
+				.join("/"),
+			w: customWeights(base.w, own, rules.points, tiers),
+			stats: own,
 		};
 		return { spec, spec2: talents.spec2 };
 	}
@@ -505,14 +582,44 @@ function gainFor(item: ItemInfo, m: UpgradeMember, specKey: string, slots: Recor
 	return best;
 }
 
-/** Upgrade, maybe, or nothing, for one guildmate. */
+/**
+ * A priority stat's amount on an item: armor for ARMOR, and spell power
+ * ("damage and healing") counts toward spell damage and healing.
+ */
+export function keyValue(item: ItemInfo, stat: string) {
+	if (stat === "ARMOR") return item.armor ?? 0;
+	const own = item.stats[stat] ?? 0;
+	if (stat === "SPELL_DAMAGE_DONE" || stat === "SPELL_HEALING_DONE") return own + (item.stats.SPELL_POWER ?? 0);
+	return own;
+}
+
+/**
+ * Whether the item has less of one of the spec's priority stats than what it
+ * replaces (`against`). Unknown worn items count as none.
+ */
+function loses(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, against: number[]) {
+	if (!stats) return false;
+	for (const k of stats) {
+		let worn = 0;
+		for (const slot of against) worn += m.keys?.[slot]?.[k] ?? 0;
+		if (keyValue(item, k) < worn) return true;
+	}
+	return false;
+}
+
+/** Upgrade, trade-off, maybe, or nothing, for one guildmate. */
 export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: number): Verdict | undefined {
 	const at = usableAt(item, m, rules, itemId);
 	if (at === undefined || excluded(item, m)) return undefined;
 	const later = at > m.level ? at : undefined;
 	const main = gainFor(item, m, m.spec, m.slots, rules);
 	if (main && main.gain >= rules.maybe) {
-		const kind = main.gain >= rules.upgrade && !later ? "upgrade" : "maybe";
+		const kind =
+			main.gain >= rules.upgrade && !later
+				? loses(item, m, rules.specs[m.spec]?.stats, main.against)
+					? "tradeoff"
+					: "upgrade"
+				: "maybe";
 		return { kind, gain: main.gain, spec: m.spec, against: main.against, ...(later ? { at: later } : {}) };
 	}
 	if (m.spec2 && m.slots2) {
@@ -532,7 +639,7 @@ export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: n
 }
 
 /**
- * Who the item would help: upgrades first, then by gain, at most `max`.
+ * Who the item would help: upgrades first, then trade-offs, then by gain, at most `max`.
  * `skip`: names to leave out (the viewer's own characters). `now` in seconds.
  */
 export function suggest(
@@ -550,7 +657,7 @@ export function suggest(
 	}
 	out.sort(
 		(a, b) =>
-			(a.verdict.kind === "upgrade" ? 0 : 1) - (b.verdict.kind === "upgrade" ? 0 : 1) ||
+			kindRank(a.verdict.kind) - kindRank(b.verdict.kind) ||
 			b.verdict.gain - a.verdict.gain ||
 			a.member.name.localeCompare(b.member.name),
 	);
@@ -644,6 +751,23 @@ export function wornScores(
 	return slots;
 }
 
+/** The spec's priority stats on what a member wears, per inventory slot (UpgradeMember.keys). */
+export function wornKeys(items: WornItem[], stats: string[] | undefined) {
+	const keys: Record<number, Record<string, number>> = {};
+	if (!stats) return keys;
+	for (const item of items) {
+		const slot = SLOT_NUMBERS[item.slot];
+		if (!slot || slot === 4 || slot === 19 || !item.info) continue;
+		const values: Record<string, number> = {};
+		for (const k of stats) {
+			const v = keyValue(item.info, k);
+			if (v !== 0) values[k] = v;
+		}
+		if (Object.keys(values).length) keys[slot] = values;
+	}
+	return keys;
+}
+
 /** A guild member's compact profile for upgrade checks, or undefined if nothing's known (no gear read). */
 export function upgradeMember(
 	c: {
@@ -668,6 +792,7 @@ export function upgradeMember(
 	const worn = c.equipment
 		.filter((i) => [11, 12, 13, 14, 16, 17].includes(SLOT_NUMBERS[i.slot] ?? 0))
 		.map((i) => i.itemId);
+	const keys = wornKeys(c.equipment, rules.specs[specs.spec]?.stats);
 	return {
 		name: c.name,
 		classId: c.classId,
@@ -680,6 +805,7 @@ export function upgradeMember(
 		...(specs.spec2 ? { slots2: wornScores(c.equipment, c.level, c.classId, specs.spec2, rules, prefs) } : {}),
 		...(main?.info?.invType === "2HWEAPON" ? { th: true } : {}),
 		...(worn.length ? { worn } : {}),
+		...(Object.keys(keys).length ? { keys } : {}),
 	};
 }
 
@@ -702,6 +828,7 @@ const STAT_LABELS: Record<string, string> = {
 	MANA_REGENERATION: "Mana per 5",
 	CRIT_RATING: "Crit",
 	HIT_RATING: "Hit",
+	ARMOR: "Armor",
 	BONUS_STAT_ARCANE_DAMAGE_DONE: "Arcane Damage",
 	BONUS_STAT_FIRE_DAMAGE_DONE: "Fire Damage",
 	BONUS_STAT_FROST_DAMAGE_DONE: "Frost Damage",
@@ -720,17 +847,23 @@ const signed = (n: number) => `${n > 0 ? "+" : ""}${Number.isInteger(n) ? n : n.
 export function explain(item: ItemInfo, verdict: Verdict, worn: WornItem[], rules: Rules) {
 	const w = rules.specs[verdict.spec]?.w ?? {};
 	const replaced = worn.filter((i) => verdict.against.includes(SLOT_NUMBERS[i.slot] ?? 0));
-	const diff: Record<string, number> = { ...item.stats };
+	const diff: Record<string, number> = { ...item.stats, ARMOR: item.armor ?? 0 };
 	let dps = item.dps ?? 0;
 	let unknown = false;
 	for (const old of replaced) {
 		if (!old.info) unknown = true;
 		for (const [k, v] of Object.entries(old.info?.stats ?? {})) diff[k] = (diff[k] ?? 0) - v;
+		diff.ARMOR -= old.info?.armor ?? 0;
 		if (old.info?.cls === 2 && old.info.dps) dps -= old.info.dps;
 	}
-	const parts = Object.entries(diff)
+	const worth = ([k, v]: [string, number]) => Math.abs(v * (w[k] ?? 0));
+	const sorted = Object.entries(diff)
 		.filter(([k, v]) => v !== 0 && (w[k] ?? 0) > 0 && STAT_LABELS[k])
-		.sort((a, b) => Math.abs(b[1] * (w[b[0]] ?? 0)) - Math.abs(a[1] * (w[a[0]] ?? 0)))
+		.sort((a, b) => worth(b) - worth(a));
+	// Armor only when it counts for a good part of the difference (every armor piece has some).
+	const biggest = sorted[0] ? worth(sorted[0]) : 0;
+	const parts = sorted
+		.filter((e) => e[0] !== "ARMOR" || worth(e) >= 0.25 * biggest)
 		.slice(0, 3)
 		.map(([k, v]) => `${signed(v)} ${STAT_LABELS[k]}`);
 	const dpsKey = RANGED_TYPES.has(item.invType) ? "RANGED_DPS" : "DPS";

@@ -1,5 +1,6 @@
 -- Gear-upgrade suggestions on item tooltips: which guildmates the hovered
--- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Miller | maybe (at 24)").
+-- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)",
+-- "Miller | maybe (at 24)").
 -- A best guess from stat weights, not a sim.
 --
 -- The rules, the weights and each guildmate (level, spec, scores of what they
@@ -174,14 +175,46 @@ local function gainFor(item, m, specKey, slots, rules)
     return best
 end
 
---- { kind = "upgrade"|"maybe", gain, spec, at?, second?, against } or nil.
+--- A priority stat's amount on an item: armor for ARMOR; spell power counts
+--- toward spell damage and healing (keyValue in upgrades.ts).
+function U.keyValue(item, stat)
+    if stat == "ARMOR" then return item.armor or 0 end
+    local own = (item.stats or {})[stat] or 0
+    if stat == "SPELL_DAMAGE_DONE" or stat == "SPELL_HEALING_DONE" then
+        return own + ((item.stats or {}).SPELL_POWER or 0)
+    end
+    return own
+end
+
+--- Whether the item has less of one of the spec's priority stats (spec.stats,
+--- from the rules) than what it replaces (member keys; unknown items: none).
+local function loses(item, m, stats, against)
+    if type(stats) ~= "table" then return false end
+    for _, k in ipairs(stats) do
+        local worn = 0
+        for _, slot in ipairs(against) do
+            local values = m.keys and m.keys[slot]
+            worn = worn + ((values and values[k]) or 0)
+        end
+        if U.keyValue(item, k) < worn then return true end
+    end
+    return false
+end
+
+local KIND_RANK = { upgrade = 0, tradeoff = 1, maybe = 2 }
+
+--- { kind = "upgrade"|"tradeoff"|"maybe", gain, spec, at?, second?, against } or nil.
 function U.judge(item, m, rules, itemID)
     local at = U.usableAt(item, m, rules, itemID)
     if not at or excluded(item, m) then return nil end
     local later = at > m.level and at or nil
     local main = gainFor(item, m, m.spec, m.slots or {}, rules)
     if main and main.gain >= rules.maybe then
-        local kind = (main.gain >= rules.upgrade and not later) and "upgrade" or "maybe"
+        local kind = "maybe"
+        if main.gain >= rules.upgrade and not later then
+            local spec = rules.specs[m.spec]
+            kind = loses(item, m, spec and spec.stats, main.against) and "tradeoff" or "upgrade"
+        end
         return { kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later }
     end
     if m.spec2 and m.slots2 then
@@ -193,7 +226,7 @@ function U.judge(item, m, rules, itemID)
     return nil
 end
 
---- Who the item would help, upgrades first then by gain: { { member, verdict }, ... }.
+--- Who the item would help, upgrades first, then trade-offs, then by gain: { { member, verdict }, ... }.
 --- opts: now (seconds), skip (set of names), itemID, max.
 function U.suggest(item, members, rules, opts)
     local out = {}
@@ -206,8 +239,8 @@ function U.suggest(item, members, rules, opts)
         end
     end
     table.sort(out, function(a, b)
-        local ua, ub = a.verdict.kind == "upgrade", b.verdict.kind == "upgrade"
-        if ua ~= ub then return ua end
+        local ra, rb = KIND_RANK[a.verdict.kind], KIND_RANK[b.verdict.kind]
+        if ra ~= rb then return ra < rb end
         if a.verdict.gain ~= b.verdict.gain then return a.verdict.gain > b.verdict.gain end
         return a.member.name < b.member.name
     end)
@@ -377,8 +410,9 @@ local function upgradeData()
 end
 
 --- Rows under the tooltip's Guildie header, one per person, upgrades first:
---- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Miller", right =
---- "maybe (at 24)" }, or nil. `color(name, classId)` colors a name.
+--- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Pip", right =
+--- "trade-off (Str/Int/Agi)" }, { left = "Miller", right = "maybe (at 24)" },
+--- or nil. `color(name, classId)` colors a name.
 function U.lines(item, itemID, color)
     local data = upgradeData()
     if not data or not item or item.soulbound then return nil end
@@ -389,7 +423,8 @@ function U.lines(item, itemID, color)
     local now = (GetServerTime and GetServerTime()) or time()
     local picks = U.suggest(item, data.members, data.rules, { now = now, skip = skip, itemID = itemID, max = 3 })
     if #picks == 0 then return nil end
-    local ups, maybes = {}, {}
+    local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe" }
+    local rows = {}
     for _, p in ipairs(picks) do
         local v = p.verdict
         local spec = data.rules.specs[v.spec]
@@ -397,11 +432,11 @@ function U.lines(item, itemID, color)
         local notes = {}
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
         if v.at then table.insert(notes, "at " .. v.at) end
-        local right = (v.kind == "upgrade" and "upgrade" or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
-        table.insert(v.kind == "upgrade" and ups or maybes, { left = color(p.member.name, p.member.classId), right = right })
+        local right = (LABELS[v.kind] or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
+        -- Already in order (suggest): upgrades, trade-offs, maybes.
+        table.insert(rows, { left = color(p.member.name, p.member.classId), right = right })
     end
-    for _, row in ipairs(maybes) do table.insert(ups, row) end
-    return ups
+    return rows
 end
 
 --- The tooltip's text lines: from tooltip data (modern clients), else its font strings.

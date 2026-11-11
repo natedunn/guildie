@@ -117,14 +117,24 @@ Agility but no Stamina is weighed against both.
 
 ### 6. The verdict and the order
 
-| Verdict     | When                                                                    |
-| ----------- | ----------------------------------------------------------------------- |
-| **Upgrade** | Gain of 15% or more, usable now, main spec                              |
-| **Maybe**   | Gain of 3% to 15%; or only their second spec; or usable within 3 levels |
-| Nothing     | Under 3%                                                                |
+| Verdict       | When                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| **Upgrade**   | Gain of 15% or more, usable now, main spec, and none of their priority stats goes down   |
+| **Trade-off** | The same gain, but it has less of one of their priority stats than what it would replace |
+| **Maybe**     | Gain of 3% to 15%; or only their second spec; or usable within 3 levels                  |
+| Nothing       | Under 3%                                                                                 |
 
-The list puts every Upgrade before every Maybe, then sorts by gain (biggest
-first), then by name. The addon tooltip shows the top 3; the site's item
+Priority stats are the spec's `stats` (a tree's three, or a player's own
+three to five). A trade-off is only worth it by the weights: +8 Agility for
+−4 Strength wins for a Strength-first shaman at Balanced, not at Steep. To
+tell the two apart, members carry their priority stats on what they wear
+(`keys`, per slot; `keyValue` counts armor for Armor and spell power toward
+spell damage and healing). Unknown worn items count as none. Older addons
+and older guild data without `keys` or `stats` say Upgrade as before.
+
+The list puts every Upgrade before every Trade-off before every Maybe, then
+sorts by gain (biggest first), then by name. The Crafting page's Upgrades
+for me groups them that way. The addon tooltip shows the top 3; the site's item
 panel shows the top 5, each with why ("+6 Agility, +4 Stamina over Embossed
 Leather Gloves").
 
@@ -155,26 +165,33 @@ leveling:
 
 Each spec also has a hand-written stat priority, first to third (`stats` in
 `SPECS`). The roster and character pages show it as "stats to look for".
-Each stat in it must have a weight in that spec (`statPriority.test.ts`). The
-default priority is only for showing; the weights decide.
+Each stat in it must have a weight in that spec (`statPriority.test.ts`).
+The weights decide the gain; the priority decides Upgrade or Trade-off.
 
 A player who claimed a character can choose another tree's priority or their
-own three instead (`convex/statPriority.ts`), and suggestions follow that
+own three to five instead (`convex/statPriority.ts`), and suggestions follow that
 choice everywhere: the item panel, the Crafting page's upgrade views and the
 addon's tooltips (`specsFor` in `shared/upgrades.ts`):
 
 - **Another tree:** that tree's weights. The tree their talents put them in
   becomes the second spec (maybes) if it has 10+ points.
-- **Their own three:** their talents' tree, bent by `customWeights`. Per
-  plain stat point (Attack Power counts half), the first stat is worth as
-  much as the spec's best stat, the second 0.8 of it and the third 0.6, each
-  only raised and never above the one before. Stats left out are capped at
-  0.9 of the third. Weapon DPS and school damage stay; Armor, if named, is
-  doubled (first), ×1.6 or ×1.3. Example: Enhancement as Strength, Intellect,
-  Agility: Strength 1, Intellect 0.45 → 0.8, Agility 0.6, Crit 0.9 → 0.54.
-  It's a spec of its own, `SHAMAN:1:STRENGTH,INTELLECT,AGILITY`, named
-  "Str/Int/Agi" (tooltips say "upgrade for Nate (Str/Int/Agi)"). The site
-  adds it to the rules in `GuildieData.lua`, so the addon needs no change.
+- **Their own three to five:** their talents' tree, bent by `customWeights`.
+  Per plain stat point (Attack Power counts half), the first stat is worth as
+  much as the spec's best stat and each next one its share of that, never
+  above the one before. The shares are the player's steepness
+  (`TIER_PRESETS`): Even 1 / 0.9 / 0.8 / 0.75 / 0.7, Balanced (the default)
+  1 / 0.8 / 0.6 / 0.5 / 0.4, Steep 1 / 0.55 / 0.35 / 0.25 / 0.2, or their own
+  (Custom: from 0.1, never rising; `validTiers`). Stats left out are capped
+  at 0.9 of the last. Weapon DPS and school damage stay; Armor, if named, is
+  ×2, ×1.6, ×1.3, ×1.15 or ×1.05 by its place. Example: Enhancement as
+  Strength, Intellect, Agility at Balanced: Strength 1, Intellect 0.8,
+  Agility 0.6, Crit 0.9 → 0.54. It's a spec of its own,
+  `SHAMAN:1:STRENGTH,INTELLECT,AGILITY` (shares other than Balanced's are
+  added: `…:1,0.55,0.35`), named after the first three, "Str/Int/Agi"
+  (tooltips say "upgrade (Str/Int/Agi)"). The site adds it to the rules in
+  `GuildieData.lua`. Pages show the first three stats; the fourth and fifth
+  count only in suggestions (the character page's editor lists them all).
+  The steepness and order can also be changed on Crafting → Upgrades for me.
 
 In game, a change shows in guildmates' tooltips after their Guildie app's
 next guild data refresh (every 15 minutes) and a `/reload`.
