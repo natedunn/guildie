@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.17
+
 ### New
 
 - **Guildie:** Experimental: ask Claude, ChatGPT or another AI app about your guild. Add Guildie as a connector (Settings → Account → AI apps) and it can read your guilds' rosters, characters, crafters, requests and activity, and your own bags and banks. If you allow it, it can also set your characters' stat priority and gear preferences, and nothing else. Disconnect it any time.
