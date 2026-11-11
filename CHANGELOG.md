@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.15
+
 ### New
 
 - **Guildie:** Upgrades I can craft, on a guild's Crafting page: your recipes that would be an upgrade for someone in the guild (your other characters included), with why and any open requests for them.
