@@ -225,6 +225,7 @@ app.whenReady().then(async () => {
 	};
 	connection.onWowFolder = (folder) => manageAddon(folder);
 	log(`Addon shipped with the app: ${readAddonVersion(addonSource) ?? `missing at ${addonSource}`}`);
+	connection.setExtras({ addonBundled: readAddonVersion(addonSource) });
 
 	// ---- The bridge (preload.ts): only Guildie's own page, on this site ----
 	const fromSite = (event: IpcMainInvokeEvent) => {

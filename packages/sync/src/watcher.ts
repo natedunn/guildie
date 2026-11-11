@@ -52,6 +52,32 @@ export function findSavedVariables(wow?: string): string[] {
 	return found;
 }
 
+/**
+ * The addon version the game last ran: `addonVersion` in the newest saved
+ * Guildie.lua (the addon writes it from 0.10.1; the game saves it at /reload
+ * and logout). `null`: saved by an older addon. `undefined`: nothing saved yet.
+ */
+export function loadedAddonVersion(wow?: string): string | null | undefined {
+	let newest: { file: string; at: number } | undefined;
+	for (const file of findSavedVariables(wow)) {
+		try {
+			const at = statSync(file).mtimeMs;
+			if (!newest || at > newest.at) newest = { file, at };
+		} catch {}
+	}
+	if (!newest) return undefined;
+	// The file can be a few MB: read it again only when the game rewrote it.
+	if (lastRead?.file === newest.file && lastRead.at === newest.at) return lastRead.version;
+	try {
+		const match = readFileSync(newest.file, "utf8").match(/\["addonVersion"\]\s*=\s*"([^"\\]+)"/);
+		lastRead = { ...newest, version: match ? match[1] : null };
+		return lastRead.version;
+	} catch {
+		return undefined;
+	}
+}
+let lastRead: { file: string; at: number; version: string | null } | undefined;
+
 /** Every installed copy of the addon: <wow>/_*_/Interface/AddOns/Guildie. */
 export function findAddonFolders(wow?: string): string[] {
 	const found: string[] = [];

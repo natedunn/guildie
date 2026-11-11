@@ -131,6 +131,7 @@ function wow.reset(state)
         return f
     end
     _G.GetTime = function() return 0 end
+    _G.C_AddOns = { GetAddOnMetadata = function(_, field) if field == "Version" then return state.addonVersion or "0.10.1" end end }
     _G.InCombatLockdown = function() return state.combat or false end
     _G.ReloadUI = function() state.reloads = (state.reloads or 0) + 1 end
     _G.GetServerTime = function() return state.time end

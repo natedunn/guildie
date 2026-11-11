@@ -190,6 +190,15 @@ html[data-desktop="true"] {
 	overflow: visible;
 }
 
+/* The roster keeps every column. Where the pane is narrower than all of them
+   (72rem), its container scrolls sideways instead, giving up the sticky head
+   there (a scrolling container would hold it rather than the pane). */
+@container (width < 72rem) {
+	[data-slot="table-container"]:has(> .roster-table) {
+		overflow-x: auto;
+	}
+}
+
 /* Class colors are the game's; a touch of white keeps Shaman blue legible. */
 .class-color {
 	color: color-mix(in oklab, var(--class) 88%, white);

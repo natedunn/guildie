@@ -5,7 +5,15 @@
 // the pairing flow the helper uses.
 
 import { hostname } from "node:os";
-import { Api, isTokenShaped, isWowFolder, type LastUpload, type Log, SyncEngine } from "@guildie/sync";
+import {
+	Api,
+	isTokenShaped,
+	isWowFolder,
+	type LastUpload,
+	type Log,
+	loadedAddonVersion,
+	SyncEngine,
+} from "@guildie/sync";
 import { net } from "electron";
 import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
@@ -22,6 +30,14 @@ export type Status = {
 	addonVersion?: string;
 	/** False after the player uninstalled the addon: the app leaves it out until they install it again. */
 	addonManaged?: boolean;
+	/** The addon version this app installs. */
+	addonBundled?: string;
+	/**
+	 * The addon version the game last ran (saved at /reload or logout): older
+	 * than `addonVersion` means WoW needs a /reload. null: an addon from before
+	 * 0.10.1 (it didn't say); undefined: nothing saved yet.
+	 */
+	addonLoaded?: string | null;
 	/** An app update downloaded and waiting for a restart (updater.ts). */
 	updateReady?: string;
 	/** Where updating stands (updater.ts UpdateState). */
@@ -41,6 +57,8 @@ export class Connection {
 	private pairingCode: string | undefined;
 	private addonVersion: string | undefined;
 	private addonManaged: boolean | undefined;
+	private addonBundled: string | undefined;
+	private addonLoaded: string | null | undefined;
 	private updateReady: string | undefined;
 	private update: UpdateState | undefined;
 	private timer: NodeJS.Timeout | undefined;
@@ -81,14 +99,23 @@ export class Connection {
 			pairingCode: this.pairingCode,
 			addonVersion: this.addonVersion,
 			addonManaged: this.addonManaged,
+			addonBundled: this.addonBundled,
+			addonLoaded: this.addonLoaded,
 			updateReady: this.updateReady,
 			update: this.update,
 		};
 	}
 
 	/** What main knows about the addon and app updates, shown with the sync status. */
-	setExtras(extras: { addonVersion?: string; addonManaged?: boolean; updateReady?: string; update?: UpdateState }) {
+	setExtras(extras: {
+		addonVersion?: string;
+		addonManaged?: boolean;
+		addonBundled?: string;
+		updateReady?: string;
+		update?: UpdateState;
+	}) {
 		if ("update" in extras) this.update = extras.update;
+		if ("addonBundled" in extras) this.addonBundled = extras.addonBundled;
 		if ("addonVersion" in extras) this.addonVersion = extras.addonVersion;
 		if ("addonManaged" in extras) this.addonManaged = extras.addonManaged;
 		if ("updateReady" in extras) this.updateReady = extras.updateReady;
@@ -117,6 +144,12 @@ export class Connection {
 	}
 
 	private async tick() {
+		// Which addon the game last ran changes when it saves (at /reload or logout).
+		const loaded = loadedAddonVersion(this.sync.wowFolder);
+		if (loaded !== this.addonLoaded) {
+			this.addonLoaded = loaded;
+			this.emit();
+		}
 		if (this.account) return this.sync.tick();
 		// Offline at start (or since): try the saved token again every minute.
 		if (this.api.token && Date.now() - this.lastRetry > RETRY_MS) {

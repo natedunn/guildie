@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Api, isTokenShaped } from "./api.ts";
 import { displayName, SyncEngine } from "./sync.ts";
-import { findAddonFolders, findSavedVariables, findWowFolder } from "./watcher.ts";
+import { findAddonFolders, findSavedVariables, findWowFolder, loadedAddonVersion } from "./watcher.ts";
 
 /** A WoW folder with Forever and Classic, the addon installed in Forever, and a saved file. */
 function fakeWow(payload = '{"version":1,"characters":[]}') {
@@ -163,4 +163,13 @@ test("token shape and display names", () => {
 	assert.ok(!isTokenShaped("gld_abcdefghijklmnop qrstuvwxyz012345"));
 	assert.ok(!isTokenShaped(42));
 	assert.equal(displayName("brenna-ironfoot"), "Brenna");
+});
+
+test("loadedAddonVersion: what the game last ran, from the newest saved file", () => {
+	const { wow, file } = fakeWow();
+	assert.equal(loadedAddonVersion(wow), null, "an addon from before 0.10.1 doesn't say");
+	writeFileSync(file, `GuildieDB = {\n\t["addonVersion"] = "0.10.1",\n\t["payload"] = "{}",\n}\n`);
+	utimesSync(file, new Date(), new Date(Date.now() + 1000));
+	assert.equal(loadedAddonVersion(wow), "0.10.1");
+	assert.equal(loadedAddonVersion(mkdtempSync(join(tmpdir(), "guildie-empty-"))), undefined, "nothing saved");
 });

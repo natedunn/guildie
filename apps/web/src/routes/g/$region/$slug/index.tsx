@@ -161,48 +161,24 @@ function Roster({ members }: { members: Member[] }) {
 				</label>
 			</div>
 
-			<Table className="table-sticky @max-sm:[&_:is(th,td)]:px-1.5">
+			<Table className="table-sticky roster-table w-max min-w-full">
 				<TableHeader>
 					<TableRow>
 						{header("name", "Name")}
-						{header(
-							"level",
-							<>
-								<span className="@max-sm:hidden">Level</span>
-								<span className="@sm:hidden" title="Level">
-									Lvl
-								</span>
-							</>,
-							"right",
-						)}
-						{/* Columns come and go with the pane's width (container queries), so the
-						    table always fits: its head is sticky, so it can't scroll sideways. */}
-						{header(
-							"class",
-							<>
-								<span className="@max-lg:hidden">Race and class</span>
-								<span className="@lg:hidden">Class</span>
-							</>,
-						)}
-						<TableHead className="@max-4xl:hidden">Talents</TableHead>
-						<TableHead className="@max-6xl:hidden">Professions</TableHead>
-						{header(
-							"ilvl",
-							<>
-								<span className="@max-lg:hidden">Item level</span>
-								<span className="@lg:hidden" title="Item level">
-									iLvl
-								</span>
-							</>,
-							"right",
-						)}
-						{header("seen", "Last synced", "right", "@max-2xl:hidden")}
+						{header("level", "Level", "right")}
+						{/* Every column at every width: a narrow pane scrolls the table
+						    sideways (.roster-table in app.css). */}
+						{header("class", "Race and class")}
+						<TableHead>Talents</TableHead>
+						<TableHead>Professions</TableHead>
+						{header("ilvl", "Item level", "right")}
+						{header("seen", "Last synced", "right")}
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{rows.map((m) => (
 						<TableRow key={m._id}>
-							<TableCell className="@max-sm:whitespace-normal">
+							<TableCell>
 								<Tooltip disabled={!m.battletag && !!m.synced}>
 									<TooltipTrigger
 										render={
@@ -216,7 +192,7 @@ function Roster({ members }: { members: Member[] }) {
 										<ClassText classId={m.classId} className="font-medium">
 											{m.name}
 										</ClassText>{" "}
-										<span className="text-muted-foreground @max-xs:hidden">{m.surname}</span>
+										<span className="text-muted-foreground">{m.surname}</span>
 									</TooltipTrigger>
 									{/* Only guild members get BattleTags (guilds.get), and only from players who haven't hidden theirs. */}
 									<TooltipContent side="right" className="block max-w-72 space-y-1">
@@ -246,10 +222,10 @@ function Roster({ members }: { members: Member[] }) {
 							</TableCell>
 							<TableCell className="num text-right">{m.level}</TableCell>
 							<TableCell>
-								<span className="text-muted-foreground @max-lg:hidden">{raceName(m.raceId)} </span>
+								<span className="text-muted-foreground">{raceName(m.raceId)} </span>
 								<ClassText classId={m.classId}>{className(m.classId)}</ClassText>
 							</TableCell>
-							<TableCell className="num @max-4xl:hidden">
+							<TableCell className="num">
 								{m.talentTrees?.map((t, i) => (
 									<span key={t.id} className={cn(i > 0 && "text-muted-foreground")}>
 										{i > 0 && " · "}
@@ -257,7 +233,7 @@ function Roster({ members }: { members: Member[] }) {
 									</span>
 								))}
 							</TableCell>
-							<TableCell className="num text-muted-foreground @max-6xl:hidden">
+							<TableCell className="num text-muted-foreground">
 								{m.professions?.length
 									? m.professions
 											.filter((p) => !p.secondary)
@@ -268,7 +244,7 @@ function Roster({ members }: { members: Member[] }) {
 										: ""}
 							</TableCell>
 							<TableCell className="num text-right">{m.averageItemLevel ?? ""}</TableCell>
-							<TableCell className="num text-right text-muted-foreground @max-2xl:hidden">
+							<TableCell className="num text-right text-muted-foreground">
 								<LastSynced synced={m.synced} />
 							</TableCell>
 						</TableRow>

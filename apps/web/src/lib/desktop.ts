@@ -72,6 +72,14 @@ export type DesktopStatus = {
 	addonVersion?: string;
 	/** False after the player uninstalled the addon (apps 0.3.12+). */
 	addonManaged?: boolean;
+	/** The addon version this app installs (apps 0.3.12+). */
+	addonBundled?: string;
+	/**
+	 * The addon version the game last ran (apps 0.3.12+): older than
+	 * `addonVersion` means WoW needs a /reload. null: an addon from before
+	 * 0.10.1; undefined: unknown.
+	 */
+	addonLoaded?: string | null;
 	updateReady?: string;
 	update?: UpdateState;
 };
