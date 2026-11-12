@@ -84,21 +84,6 @@ pbpaste | npx convex env set --deployment $X AUTH_GATEWAY_SECRET            # th
 npx convex env set --deployment $X AUTH_BATTLENET_CALLBACK_URL https://gateway-dev.guildie.club/oauth/battlenet/callback   # prod: gateway.guildie.club
 ```
 
-Signing keys, once per deployment:
-
-```sh
-node -e '
-const {generateKeyPairSync, randomUUID} = require("crypto");
-const {publicKey, privateKey} = generateKeyPairSync("rsa", {modulusLength: 2048});
-const jwk = publicKey.export({format: "jwk"});
-require("fs").writeFileSync("k", Buffer.from(privateKey.export({type: "pkcs8", format: "pem"})).toString("base64"));
-require("fs").writeFileSync("j", JSON.stringify({keys: [{kty: jwk.kty, n: jwk.n, e: jwk.e, kid: randomUUID(), alg: "RS256", use: "sig"}]}));
-'
-npx convex env set --deployment $X AUTH_PRIVATE_KEY < k
-npx convex env set --deployment $X AUTH_JWKS < j
-/bin/rm k j
-```
-
 Then push code to cloud dev and write the preview defaults:
 
 ```sh
@@ -106,10 +91,10 @@ pnpm push:cloud-dev
 sh apps/web/scripts/preview-defaults.sh
 ```
 
-**Check:** both deployments list exactly `AUTH_PRIVATE_KEY`, `AUTH_JWKS`,
-`AUTH_BATTLENET_CLIENT_ID`, `AUTH_BATTLENET_CLIENT_SECRET`,
-`AUTH_GATEWAY_SECRET`, `AUTH_BATTLENET_CALLBACK_URL`; the preview defaults
-list the same six. And this prints `token: "ok"` and your member count:
+**Check:** both deployments list exactly `AUTH_BATTLENET_CLIENT_ID`,
+`AUTH_BATTLENET_CLIENT_SECRET`, `AUTH_GATEWAY_SECRET`,
+`AUTH_BATTLENET_CALLBACK_URL`; the preview defaults list the same four. (No
+signing keys: the deployment signs session tokens itself.) And this prints `token: "ok"` and your member count:
 
 ```sh
 npx convex run --deployment <dev name> dev:probe '{"guild": "Your Guild", "region": "us"}'

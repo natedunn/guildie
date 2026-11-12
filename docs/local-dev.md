@@ -34,7 +34,7 @@ The first run downloads Convex's local backend, then sets it up
 (`apps/web/scripts/dev-seed.sh`):
 
 - **Settings**, generated on your machine (`apps/web/scripts/dev-env.mjs`):
-  sign-in keys, guest sign-in, and placeholder Battle.net keys.
+  this checkout's URL and placeholder Battle.net keys.
 - **The sample guild** (`apps/web/fixtures/sample`): "Sample Guild" with 64
   members, their gear, talents and professions, the items and recipes they
   use, and every talent tree.
@@ -114,8 +114,7 @@ node apps/web/scripts/sample-export.mjs eu/unbound   # region/slug of the source
 A new backend whose machine is logged in to Convex with access to cloud dev
 (`cloud_dev` in `apps/web/scripts/deployments.sh`) gets instead:
 
-- **Settings from cloud dev:** the Battle.net dev client, dev gateway,
-  signing keys and guest sign-in.
+- **Settings from cloud dev:** the Battle.net dev client and dev gateway.
 - **Data from cloud dev:** the `guilds`, `characters`, `recipes` and
   `talentTreeInfo` tables. Users and claims are not copied.
 

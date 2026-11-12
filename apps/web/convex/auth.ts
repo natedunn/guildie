@@ -34,24 +34,23 @@ export const completeSignInWithBattlenet = battlenet.completeSignIn;
 
 // The desktop app's window: after the player approves the app in their own
 // browser (where any Battle.net login works, Google included), the app swaps a
-// one-time code for a session here. The account is "the user who approved",
-// so createFromDesktop returns that existing user. bindProvider is Convex
-// Auth's provider builder, still internal in this beta (docs/convex-auth.md).
+// one-time code for a session here. The account is "the user who approved".
+// bindMethod is Convex Auth's sign-in method builder, still internal in 2.0
+// (docs/convex-auth.md).
 const vTokens = v.object({
 	accessToken: v.string(),
-	accessTokenExpiresAt: v.number(),
 	refreshToken: v.string(),
 	refreshTokenExpiresAt: v.number(),
 	userId: v.string(),
 });
-const desktop = auth.bindProvider<"desktop", { userId: Id<"users"> }>({
+const desktop = auth.bindMethod<"desktop", { userId: Id<"users"> }>({
 	name: "desktop",
 	createUser: internal.users.createFromDesktop,
 });
 type DesktopSignIn =
 	| { status: "complete"; tokens: Infer<typeof vTokens> }
 	| { status: "error"; userError: { error: "EXPIRED" } };
-// Annotated: inferring it from `internal.users` is circular (like Discord's in Onda).
+// Annotated: inferring it from `internal.users` is circular.
 export const signInWithDesktopCode: RegisteredMutation<
 	"public",
 	{ code: string },
@@ -74,11 +73,14 @@ export const signInWithDesktopCode: RegisteredMutation<
 		if (!row || row.expiresAt < Date.now() || !(await db.get(row.userId))) {
 			return { status: "error" as const, userError: { error: "EXPIRED" as const } };
 		}
-		const providerAccountId = `user:${row.userId}`;
-		const profile = { userId: row.userId };
-		const tokens = (await ctx.convexAuth.resolveUserId(providerAccountId))
-			? await ctx.convexAuth.completeSignIn({ providerAccountId, profile })
-			: await ctx.convexAuth.completeSignUp({ providerAccountId, profile });
+		// The code was issued to this user, so it signs in as them. The session
+		// records the core as the component that authenticated it (there is no
+		// desktop component).
+		const tokens = await ctx.convexAuth.completeSignIn({
+			userId: row.userId,
+			profile: { userId: row.userId },
+			authenticatedBy: components.auth,
+		});
 		return { status: "complete" as const, tokens };
 	},
 });

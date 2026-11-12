@@ -9,7 +9,7 @@ overrides:
 
 patchedDependencies:
   '@convex-dev/auth':
-    hash: db7451216ad6a578232815c2bfe33455da91b18b25fbbd3e521ccdb2ed21e3e2
+    hash: 5f1e3f6b9e2f8668f5dac95644dc0cf123b6cd424e6f9f0e374fedb295ba10c3
     path: patches/@convex-dev__auth.patch
 
 importers:
@@ -93,8 +93,8 @@ importers:
         specifier: ^1.9.0
         version: 1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@convex-dev/auth':
-        specifier: 2.0.0-beta.0
-        version: 2.0.0-beta.0(patch_hash=db7451216ad6a578232815c2bfe33455da91b18b25fbbd3e521ccdb2ed21e3e2)(convex@1.49.0(react@19.3.1))(hono@4.13.18)(prettier@3.9.10)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
+        specifier: 2.0.0
+        version: 2.0.0(patch_hash=5f1e3f6b9e2f8668f5dac95644dc0cf123b6cd424e6f9f0e374fedb295ba10c3)(convex@1.49.0(react@19.3.1))(hono@4.13.18)(prettier@3.9.10)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
       '@convex-dev/react-query':
         specifier: ^0.1.0
         version: 0.1.0(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(convex@1.49.0(react@19.3.1))
@@ -505,12 +505,11 @@ packages:
   '@cloudflare/workers-types@5.20261110.1':
     resolution: {integrity: sha512-XOr3TDQ2sNDiP9zoZtdwYVhuLZ3aFY+G+G4iSeNO9p/HDSveZJpyCbUtmpEElaClLBe9hIzfN26qd0i/S7ksPg==}
 
-  '@convex-dev/auth@2.0.0-beta.0':
-    resolution: {integrity: sha512-GNIYITbRvLg8Ev5YW3j/rJ71Dft/fGYO5kkTJigVwuYCcn3WOeVY9+1IpKDntzMOZou1uDZwlPnR0BcWZWGaKg==}
-    hasBin: true
+  '@convex-dev/auth@2.0.0':
+    resolution: {integrity: sha512-x8tj4BeEkm9R/SlrrVvGS4jvHle4okGM2Ldni7q0KK1lKTpX0QCMDrULagqLUVTepyik23T+TXzcAurNXL1EEg==}
     peerDependencies:
       '@convex-dev/resend': ^0.2.8
-      convex: ^1.46.0
+      convex: ^1.48.0
       next: ^16.0.0
       react: ^18.0.0 || ^19.0.0
     peerDependenciesMeta:
@@ -1894,9 +1893,6 @@ packages:
       dmg-builder: 26.18.0
       electron-builder-squirrel-windows: 26.18.0
 
-  argon2id-wasm@0.0.0-alpha.2:
-    resolution: {integrity: sha512-Bxa3aVWUbpg/hKTyHdjeLT68mJXNLftm1W3tXVXu/X83vmpTJ3zzgOhNMzu33Th2iNDxMU1kU4/MEGgW5udMgQ==}
-
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
@@ -2059,10 +2055,6 @@ packages:
   cli-spinners@2.9.2:
     resolution: {integrity: sha512-ywqV+5MmyL4E7ybXgKys4DugZbX0FC6LnwrhjuykIjnK9k8OQacQ7axGKnjDXWNhns0xot3bZI5h55H8yo9cJg==}
     engines: {node: '>=6'}
-
-  cli-spinners@3.4.0:
-    resolution: {integrity: sha512-bXfOC4QcT1tKXGorxL3wbJm6XJPDqEnij2gQ2m7ESQuE+/z9YFIWnl/5RpTiKWbMq3EVKR4fRLJGn6DVfu0mpw==}
-    engines: {node: '>=18.20'}
 
   cliui@8.0.1:
     resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
@@ -2980,10 +2972,6 @@ packages:
     resolution: {integrity: sha512-i24m8rpwhmPIS4zscNzK6MSEhk0DUWa/8iYQWxhffV8jkI4Phvs3F+quL5xvS0gdQR0FyTCMMH33Y78dDTzzIw==}
     engines: {node: '>=18'}
 
-  log-symbols@7.0.1:
-    resolution: {integrity: sha512-ja1E3yCr9i/0hmBVaM0bfwDjnGy8I/s6PP4DFp+yP+a+mrHO4Rm7DtmnqROTUkHIkqffC84YY7AeqX6oFk0WFg==}
-    engines: {node: '>=18'}
-
   lowercase-keys@2.0.0:
     resolution: {integrity: sha512-tqNXrS78oMOE73NMxK4EMLQsQowWf8jKooH9g7xPavRT706R6bkQJ6DY2Te7QukaZsulxa30wQ7bk0pm4XiHmA==}
     engines: {node: '>=8'}
@@ -3203,10 +3191,6 @@ packages:
     resolution: {integrity: sha512-weP+BZ8MVNnlCm8c0Qdc1WSWq4Qn7I+9CJGm7Qali6g44e/PUzbjNqJX5NJ9ljlNMosfJvg1fKEGILklK9cwnw==}
     engines: {node: '>=18'}
 
-  ora@9.4.1:
-    resolution: {integrity: sha512-6VlU9MLXbjVQD04AZCMX28hVtA5bUoadvUqO76MUCVA0ilwJbMiHsITRPfyVm6p/BC0Av/BXMujx39WCe1LEqw==}
-    engines: {node: '>=20'}
-
   p-cancelable@2.1.1:
     resolution: {integrity: sha512-BZOr3nRQHOntUjTrH8+Lh54smKHoHyur8We1V8DSMVrl5A2malOOwuJRnKRDjSnkoeBh4at6BwEnb5I7Jl31wg==}
     engines: {node: '>=8'}
@@ -3234,6 +3218,9 @@ packages:
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
+
+  password-hash-wasm@0.0.0:
+    resolution: {integrity: sha512-SpVGWB4mMf8VuHM1LqrZWLPtH7B4K2vVqAZ6pAnL/eeTLtPqewwnt0DD7428xUPSDrEWd2SDoLoU4z61gj9sYw==}
 
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
@@ -3623,10 +3610,6 @@ packages:
     resolution: {integrity: sha512-UhDfHmA92YAlNnCfhmq0VeNL5bDbiZGg7sZ2IvPsXubGkiNa9EC+tUTsjBRsYUAz87btI6/1wf4XoVvQ3uRnmQ==}
     engines: {node: '>=18'}
 
-  stdin-discarder@0.3.2:
-    resolution: {integrity: sha512-eCPu1qRxPVkl5605OTWF8Wz40b4Mf45NY5LQmVPQ599knfs5QhASUm9GbJ5BDMDOXgrnh0wyEdvzmL//YMlw0A==}
-    engines: {node: '>=18'}
-
   string-width@4.2.3:
     resolution: {integrity: sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==}
     engines: {node: '>=8'}
@@ -3634,10 +3617,6 @@ packages:
   string-width@7.2.0:
     resolution: {integrity: sha512-tsaTIkKW9b4N+AEj+SVA+WhJzV7/zMhcSu78mLKWSk7cXMOSHsBKFWUs0fWwq8QyK3MgJBQRX6Gbi4kYbdvGkQ==}
     engines: {node: '>=18'}
-
-  string-width@8.3.0:
-    resolution: {integrity: sha512-ZbmZM0JCihQN91dWnxoipT2KOEyHqEyfRXUyjuRhW8b/xnqPDoq4gWEVApTVa9db2wN8mmoikgFBbjh71+cGeQ==}
-    engines: {node: '>=20'}
 
   string_decoder@1.1.1:
     resolution: {integrity: sha512-n/ShnvDi6FHbbVfviro+WojiFzv+s8MPMHBczVePfUpDJLwoLT0ht1l4YwBCbi8pJAveEEdnkHyPyTP/mzRfwg==}
@@ -4379,20 +4358,16 @@ snapshots:
 
   '@cloudflare/workers-types@5.20261110.1': {}
 
-  '@convex-dev/auth@2.0.0-beta.0(patch_hash=db7451216ad6a578232815c2bfe33455da91b18b25fbbd3e521ccdb2ed21e3e2)(convex@1.49.0(react@19.3.1))(hono@4.13.18)(prettier@3.9.10)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)':
+  '@convex-dev/auth@2.0.0(patch_hash=5f1e3f6b9e2f8668f5dac95644dc0cf123b6cd424e6f9f0e374fedb295ba10c3)(convex@1.49.0(react@19.3.1))(hono@4.13.18)(prettier@3.9.10)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)':
     dependencies:
-      '@babel/code-frame': 7.29.7
       '@convex-dev/batch-worker': 0.3.6(convex@1.49.0(react@19.3.1))(hono@4.13.18)(prettier@3.9.10)(react@19.3.1)(typescript@7.0.2)(zod@4.6.7)
       '@convex-dev/rate-limiter': 0.3.2(convex@1.49.0(react@19.3.1))(react@19.3.1)
       '@simplewebauthn/browser': 14.0.0
       '@simplewebauthn/server': 14.1.0
-      argon2id-wasm: 0.0.0-alpha.2
-      chalk: 5.6.2
-      commander: 14.0.3
       convex: 1.49.0(react@19.3.1)
       cookie: 1.1.1
       jose: 5.10.0
-      ora: 9.4.1
+      password-hash-wasm: 0.0.0
     optionalDependencies:
       react: 19.3.1
     transitivePeerDependencies:
@@ -5693,8 +5668,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  argon2id-wasm@0.0.0-alpha.2: {}
-
   argparse@2.0.1: {}
 
   asn1js@3.1.0:
@@ -5870,8 +5843,6 @@ snapshots:
       restore-cursor: 5.1.0
 
   cli-spinners@2.9.2: {}
-
-  cli-spinners@3.4.0: {}
 
   cliui@8.0.1:
     dependencies:
@@ -6794,11 +6765,6 @@ snapshots:
       chalk: 5.6.2
       is-unicode-supported: 1.3.0
 
-  log-symbols@7.0.1:
-    dependencies:
-      is-unicode-supported: 2.1.0
-      yoctocolors: 2.2.0
-
   lowercase-keys@2.0.0: {}
 
   lru-cache@5.1.1:
@@ -7015,17 +6981,6 @@ snapshots:
       string-width: 7.2.0
       strip-ansi: 7.2.0
 
-  ora@9.4.1:
-    dependencies:
-      chalk: 5.6.2
-      cli-cursor: 5.0.0
-      cli-spinners: 3.4.0
-      is-interactive: 2.0.0
-      is-unicode-supported: 2.1.0
-      log-symbols: 7.0.1
-      stdin-discarder: 0.3.2
-      string-width: 8.3.0
-
   p-cancelable@2.1.1: {}
 
   p-limit@2.3.0:
@@ -7045,6 +7000,8 @@ snapshots:
   parse-ms@4.0.0: {}
 
   parseurl@1.3.3: {}
+
+  password-hash-wasm@0.0.0: {}
 
   path-browserify@1.0.1: {}
 
@@ -7488,8 +7445,6 @@ snapshots:
 
   stdin-discarder@0.2.2: {}
 
-  stdin-discarder@0.3.2: {}
-
   string-width@4.2.3:
     dependencies:
       emoji-regex: 8.0.0
@@ -7499,11 +7454,6 @@ snapshots:
   string-width@7.2.0:
     dependencies:
       emoji-regex: 10.6.0
-      get-east-asian-width: 1.7.0
-      strip-ansi: 7.2.0
-
-  string-width@8.3.0:
-    dependencies:
       get-east-asian-width: 1.7.0
       strip-ansi: 7.2.0
 

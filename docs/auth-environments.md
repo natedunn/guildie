@@ -1,6 +1,6 @@
 # Auth environments
 
-Sign-in is Battle.net, through Convex Auth v2 (`@convex-dev/auth@2.0.0-beta.0`,
+Sign-in is Battle.net, through Convex Auth v2 (`@convex-dev/auth@2.0.0`,
 pinned and patched). One Battle.net client per tier, and a gateway Worker per
 tier that forwards Battle.net's callback to whichever Convex deployment
 started the flow. That's what lets every worktree, every branch preview and
@@ -33,7 +33,6 @@ own values per tier):
 
 | Variable                                                   | What                                                                                                  |
 | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `AUTH_PRIVATE_KEY`, `AUTH_JWKS`                            | Session signing key pair. Its own pair per deployment (previews share one).                           |
 | `AUTH_BATTLENET_CLIENT_ID`, `AUTH_BATTLENET_CLIENT_SECRET` | The tier's Battle.net client. Also used for the roster sync.                                          |
 | `AUTH_GATEWAY_SECRET`                                      | The tier's routing secret (same value as its gateway's `ROUTING_SECRET`).                             |
 | `AUTH_BATTLENET_CALLBACK_URL`                              | The tier's gateway sign-in callback. The claim callback is derived from it (`/oauth/claim/callback`). |
@@ -118,8 +117,6 @@ Pipe secrets in so they stay out of shell history.
   `pnpm wrangler secret put ROUTING_SECRET -c wrangler.jsonc --env <dev|prod>`
   (from `apps/gateway`), then `AUTH_GATEWAY_SECRET` on Convex, then (dev)
   preview defaults.
-- **Signing keys:** generate a pair as in `apps/web/scripts/preview-defaults.sh` and
-  set both. Everyone on that deployment signs in again.
 - **Gateway code:** from `apps/gateway`, `pnpm test && pnpm check`, then
   `pnpm deploy:dev` / `pnpm deploy:prod`. `https://<gateway>/` answers
   "Guildie sign-in gateway." when it's up.
