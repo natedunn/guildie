@@ -54,12 +54,18 @@ live health/position remain local and are not yet a site presence feature.
    pixels with `--cell 2`; remeasure on other displays. `on compact` is an alias
    for `on`. The reader defaults to 16 columns; `--columns 32` supports old strips.
 
-   `/guildiepixels edit` pauses export and shows a static dark square with a
-   gray outline. Drag it with the left mouse button. `/guildiepixels lock` hides
-   it; `/guildiepixels on` resumes export at the new position. It accepts no
-   mouse clicks outside edit mode. `/guildiepixels reset` returns it to the
+   Open **WoW's Edit Mode** to show the static amber square labeled **Guildie sync**.
+   Drag it with the left mouse button. Closing Edit Mode resumes export if it was
+   enabled beforehand, or hides the square if it was disabled. Export pauses while
+   editing, and the square accepts no mouse clicks outside editing.
+   `/guildiepixels edit` remains a fallback if this client's Edit Mode manager is
+   unavailable; `/guildiepixels lock` hides it and `/guildiepixels on` resumes export.
+   `/guildiepixels reset` returns it to the
    top-left and disables export. Position is saved across reloads/logins; enabled
-   state is never saved. This is the experiment's own edit mode, not Blizzard's.
+   state is never saved. Position is saved when dragging stops, including when Edit
+   Mode closes during a drag. It is one addon position shared across Blizzard layouts;
+   Blizzard's layout save/cancel controls do not undo it. This integration follows
+   `EditModeManagerFrame` show/hide hooks and still needs verification in Forever.
    **Restart the game once after this update** to register the new SavedVariables
    declaration. After moving the square, stop the reader and remeasure `--left`
    and `--top` in physical screen pixels; it does not follow the square automatically.

@@ -39,7 +39,8 @@ panel:SetMovable(true)
 panel:SetClampedToScreen(true)
 panel:EnableMouse(false)
 panel:RegisterForDrag("LeftButton")
-local editing = false
+local editing, nativeEditing, exportEnabled, dragging = false, false, false, false
+local attachEditMode
 local DEFAULT_CELL_SIZE = 1.6
 local cellSize = DEFAULT_CELL_SIZE
 local theme = "amber"
@@ -54,13 +55,19 @@ local function restorePosition()
     end
 end
 panel:RegisterEvent("ADDON_LOADED")
+panel:RegisterEvent("PLAYER_LOGIN")
 panel:SetScript("OnEvent", function(_, _, name)
     if name == "GuildieLivePixels" then restorePosition() end
+    if attachEditMode then attachEditMode() end
 end)
 panel:SetScript("OnDragStart", function()
-    if editing then panel:StartMoving() end
+    if editing and not read(InCombatLockdown) then
+        dragging = true
+        panel:StartMoving()
+    end
 end)
-panel:SetScript("OnDragStop", function()
+local function savePosition()
+    dragging = false
     panel:StopMovingOrSizing()
     local scale = panel:GetEffectiveScale()
     local parentScale = UIParent:GetEffectiveScale()
@@ -68,7 +75,8 @@ panel:SetScript("OnDragStop", function()
     local y = math.floor(panel:GetTop() - UIParent:GetTop() * parentScale / scale + 0.5)
     GuildieLivePixelsDB = {x = x, y = y}
     place(x, y)
-end)
+end
+panel:SetScript("OnDragStop", savePosition)
 local cells, displayed = {}, {}
 for i = 1, 256 do
     cells[i] = panel:CreateTexture(nil, "OVERLAY")
@@ -130,6 +138,7 @@ panel:SetScript("OnUpdate", function(_, delta)
             snapshot = json({version = GuildieDB and GuildieDB.version or 4, characters = characters})
             if #snapshot > 1048576 then
                 print("Guildie pixels: snapshot exceeds 1 MiB; experiment stopped.")
+                exportEnabled = false
                 panel:Hide()
                 return
             end
@@ -151,17 +160,74 @@ panel:SetScript("OnUpdate", function(_, delta)
         end
     end
 end)
-SLASH_GUILDIELIVEPIXELS1 = "/guildiepixels"
-SlashCmdList.GUILDIELIVEPIXELS = function(command)
-    command = command:lower():match("^%s*(.-)%s*$")
+local editLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+editLabel:SetPoint("LEFT", panel, "RIGHT", 4, 0)
+editLabel:SetText("Guildie sync")
+editLabel:Hide()
+local function beginEditing()
+    editing = true
+    layout(cellSize)
+    for i, cell in ipairs(cells) do
+        local edge = i <= 16 or i > 240 or i % 16 == 0 or i % 16 == 1
+        local shade = edge and 0.65 or 0.16
+        cell:SetColorTexture(shade, shade * 0.75, shade * 0.45, 1)
+    end
+    displayed = {}
+    editLabel:Show()
+    panel:EnableMouse(true)
+    panel:Show()
+end
+local function endEditing()
+    if dragging then savePosition() end
     panel:StopMovingOrSizing()
     editing = false
+    editLabel:Hide()
+    panel:EnableMouse(false)
+    displayed = {}
+    snapshot, live = nil, nil
+    elapsed = 0
+    if exportEnabled then panel:Show() else panel:Hide() end
+end
+-- Follow the manager's visibility, as LibEditMode does, without touching
+-- Blizzard's protected system registrations. Retry when its load-on-demand UI loads.
+local hookedManager
+attachEditMode = function()
+    local manager = EditModeManagerFrame
+    if not manager or manager == hookedManager or type(manager.HookScript) ~= "function" then return end
+    hookedManager = manager
+    local function enter()
+        if nativeEditing then return end
+        nativeEditing = true
+        beginEditing()
+    end
+    manager:HookScript("OnShow", enter)
+    manager:HookScript("OnHide", function()
+        if not nativeEditing then return end
+        nativeEditing = false
+        endEditing()
+    end)
+    if read(manager.IsShown, manager) then enter() end
+end
+attachEditMode()
+SLASH_GUILDIELIVEPIXELS1 = "/guildiepixels"
+SlashCmdList.GUILDIELIVEPIXELS = function(command)
+    if nativeEditing then
+        print("Guildie pixels: close Edit Mode before changing export settings.")
+        return
+    end
+    command = command:lower():match("^%s*(.-)%s*$")
+    if dragging then savePosition() end
+    panel:StopMovingOrSizing()
+    editing = false
+    exportEnabled = false
+    editLabel:Hide()
     panel:EnableMouse(false)
     local requestedTheme = command:match(" (amber)$") or command:match(" (gray)$")
     if requestedTheme then command = command:sub(1, #command - #requestedTheme - 1) end
     local requestedSize = tonumber(command:match("^on (%d+%.?%d*)$"))
     local validSize = requestedSize and requestedSize >= 1 and requestedSize <= 8
     if command == "on" or command == "on compact" or command == "on large" or validSize then
+        exportEnabled = true
         theme = requestedTheme or "amber"
         displayed = {}
         snapshot, live = nil, nil
@@ -170,16 +236,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         panel:Show()
         print("Guildie pixels: " .. theme .. " export enabled. Match reader --theme and recalibrate after moving or resizing.")
     elseif command == "edit" then
-        editing = true
-        layout(cellSize)
-        for i, cell in ipairs(cells) do
-            local edge = i <= 16 or i > 240 or i % 16 == 0 or i % 16 == 1
-            local shade = edge and 0.4 or 0.12
-            cell:SetColorTexture(shade, shade, shade, 1)
-        end
-        displayed = {}
-        panel:EnableMouse(true)
-        panel:Show()
+        beginEditing()
         print("Guildie pixels: drag the square. /guildiepixels lock hides it; /guildiepixels on starts export.")
     elseif command == "reset" then
         GuildieLivePixelsDB = {x = 0, y = 0}

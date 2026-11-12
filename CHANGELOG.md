@@ -17,6 +17,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Addon:** Move the experimental sync square in WoW's Edit Mode; export pauses while positioning it and resumes afterward if it was enabled.
+
 - **App, Addon:** Test syncing complete character snapshots without reloading WoW using the small amber pixel square; the opt-in desktop integration reports capture status and keeps normal saved-file sync available.
 
 - **Addon:** Add a warm amber default palette to the live pixel experiment, with matching reader support and a grayscale debugging option.

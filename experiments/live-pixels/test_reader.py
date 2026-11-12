@@ -63,6 +63,12 @@ dofile(arg[0])
 local frame = {}
 local noop = function() end
 setmetatable(frame, {__index = function() return noop end})
+frame.Show = function() frame.shown = true end
+frame.Hide = function() frame.shown = false end
+frame.EnableMouse = function(_, enabled) frame.mouse = enabled end
+frame.CreateFontString = function()
+    return {SetPoint = noop, SetText = noop, Show = noop, Hide = noop}
+end
 frame.scripts = {}
 frame.SetScript = function(_, event, callback) frame.scripts[event] = callback end
 local expectAmber = false
@@ -95,9 +101,13 @@ C_Map = {
     GetPlayerMapPosition = function() return {GetXY = function() return secret, 0.5 end} end,
 }
 local encode = GuildiePixelProtocol.encode
+local writePackets, packetCount = true, 0
 GuildiePixelProtocol.encode = function(packet)
-    for _, value in ipairs(encode(packet)) do io.write(value, " ") end
-    io.write("\n")
+    packetCount = packetCount + 1
+    if writePackets then
+        for _, value in ipairs(encode(packet)) do io.write(value, " ") end
+        io.write("\n")
+    end
     return encode(packet)
 end
 dofile(arg[1])
@@ -125,6 +135,33 @@ SlashCmdList.GUILDIELIVEPIXELS("on") -- amber is now the default
 expectAmber = true
 for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
 assert(colorCount >= 256)
+writePackets, expectAmber = false, false
+-- Blizzard's UI may load after this addon; attach once when it appears.
+local hooks, hookCount = {}, 0
+EditModeManagerFrame = {
+    HookScript = function(_, event, callback) hooks[event] = callback; hookCount = hookCount + 1 end,
+    IsShown = function() return false end,
+}
+frame.scripts.OnEvent(frame, "ADDON_LOADED", "Blizzard_EditMode")
+frame.scripts.OnEvent(frame, "PLAYER_LOGIN")
+assert(hookCount == 2)
+hooks.OnShow()
+assert(frame.shown and frame.mouse)
+local before = packetCount
+frame.scripts.OnUpdate(frame, 1)
+assert(packetCount == before, "Edit Mode must pause all export")
+SlashCmdList.GUILDIELIVEPIXELS("off") -- settings cannot restart/alter export during Edit Mode
+frame.scripts.OnDragStart()
+hooks.OnHide() -- closing while dragging must save and release it
+assert(GuildieLivePixelsDB.x == 23 and GuildieLivePixelsDB.y == -23)
+assert(frame.shown and not frame.mouse, "previously enabled export must resume")
+frame.scripts.OnUpdate(frame, 0.11)
+assert(packetCount == before + 1)
+SlashCmdList.GUILDIELIVEPIXELS("off")
+hooks.OnShow()
+assert(frame.shown and frame.mouse, "disabled square must still be movable")
+hooks.OnHide()
+assert(not frame.shown and not frame.mouse, "Edit Mode must not enable disabled export")
 """
         output = subprocess.check_output([
             "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),
