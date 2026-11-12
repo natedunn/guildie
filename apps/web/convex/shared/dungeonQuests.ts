@@ -119,6 +119,7 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	96988: { side: H },
 
 	// Scarlet Monastery
+	1051: { side: H },
 	1053: { side: A, after: 1052 },
 	1113: { side: H, after: 1109 },
 	1160: { side: H, after: 1159 },
@@ -728,4 +729,21 @@ export const STARTS_INSIDE = new Set<number>([
 	5122, 5125, 5262,
 	// Scholomance
 	5582,
+	// Shaper's Terrace
+	95790,
+	// Deadmines, Scarlet Monastery (EXTRA_DUNGEON_QUESTS)
+	373, 1051,
 ]);
+
+/**
+ * Dungeon quests Blizzard doesn't type "Dungeon", so the sync doesn't find
+ * them in the dungeon's quest area: they start inside and are done
+ * outside. Looked up and counted like the rest. (Quests only one
+ * profession can take, like Blackrock Spire's "Hot Fiery Death", stay out.)
+ */
+export const EXTRA_DUNGEON_QUESTS: Record<string, number[]> = {
+	// The Unsent Letter: from a letter Edwin VanCleef drops.
+	deadmines: [373],
+	// Vorrel's Revenge: from Vorrel Sengutz inside.
+	"scarlet-monastery": [1051],
+};
