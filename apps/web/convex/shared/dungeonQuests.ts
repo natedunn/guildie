@@ -679,3 +679,53 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	5342: { side: H, after: 5341 },
 	5344: { side: A, after: 5343 },
 };
+
+/**
+ * Dungeon quests that start inside the dungeon: from an item that drops
+ * there, or an NPC or object in it (the Crest of Lordaeron, Knot
+ * Thimblejack). Nobody has them before going in, so they don't count
+ * toward "picked up". The original dungeons' from where Questie's Forever
+ * data has their quest givers, objects and drops; Forever's own from
+ * Wowhead, guides and Blizzard's quest text.
+ */
+export const STARTS_INSIDE = new Set<number>([
+	// Ragefire Chasm
+	5724,
+	// Hall of Thanes
+	96395,
+	// Ruins of Lordaeron
+	92415, 95189, 95195, 95204, 95250, 97288,
+	// Wailing Caverns
+	6981,
+	// Blackfathom Deeps
+	1200, 6561, 6564,
+	// Gnomeregan
+	2904, 2945, 2947, 2949, 2951, 2952, 2953, 4601, 4602, 4603, 4604, 4605, 4606,
+	// Excavation Site
+	95664, 95795, 95809, 95810,
+	// City of Dalaran
+	96987,
+	// Razorfen Downs
+	3523, 3525, 6522,
+	// Uldaman
+	2198,
+	// Krol'dok Stronghold
+	94969,
+	// Sunken Temple
+	3373,
+	// Alcaz Prison
+	95263, 95454, 95483, 96335, 96337, 96369,
+	// Blackrock Depths
+	4264, 7604,
+	// Blackrock Spire
+	4867, 4903, 4982, 4983, 5001, 5002, 5089, 5160, 7761,
+	// Dire Maul
+	1193, 5518, 5519, 5525, 5528, 7429, 7461, 7462, 7463, 7483, 7484, 7485, 7498, 7499, 7500, 7501, 7502, 7503, 7504,
+	7505, 7506, 7507, 7508, 7703, 7877, 8949, 8950, 98685, 98830,
+	// Blackmaw Hold
+	92070,
+	// Stratholme
+	5122, 5125, 5262,
+	// Scholomance
+	5582,
+]);

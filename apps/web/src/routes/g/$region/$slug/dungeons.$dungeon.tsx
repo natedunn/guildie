@@ -158,7 +158,7 @@ function Roster({ people, level }: { people: Person[]; level: number }) {
 						</TableCell>
 						<TableCell className="text-right">
 							{p.toPickUp === 0 ? (
-								<None title="No quests here for them" />
+								<None title={p.total === 0 ? "No quests here for them" : "Their quests here all start inside"} />
 							) : (
 								<Check
 									ok={p.questReady}
@@ -346,7 +346,9 @@ function QuestLine({
 				) : inLog ? (
 					<span className="flex-none text-xs text-muted-foreground">In log</span>
 				) : notPickedUp ? (
-					<span className="flex-none text-xs text-muted-foreground/70">Not picked up</span>
+					<span className="flex-none text-xs text-muted-foreground/70">
+						{here?.startsInside ? "Starts in dungeon" : "Not picked up"}
+					</span>
 				) : otherClass ? (
 					<span className="flex-none text-xs text-muted-foreground/70">Not their class</span>
 				) : null}

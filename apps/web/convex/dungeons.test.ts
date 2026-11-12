@@ -122,6 +122,17 @@ test("whole chains", () => {
 	assert.deepEqual(questChains(rfc, "alliance", (id) => (id > 5725 ? "horde" : undefined))[1]?.length, undefined);
 });
 
+test("quests that start inside don't count toward picked up", () => {
+	// Ruins of Lordaeron, Horde: the Crest drops inside; Light's Justice is picked up in town.
+	const ruins = questGroups([
+		{ id: 92421, title: "Light's Justice" },
+		{ id: 95204, title: "Crest of Lordaeron" },
+	]);
+	assert.equal(ruins.find((g) => g.title === "Crest of Lordaeron")?.startsInside, true);
+	const s = memberStatus({ level: 15 }, ruins, member({ level: 20, inProgress: new Set([92421]) }));
+	assert.deepEqual([s.toPickUp, s.pickedUp, s.questReady, s.total], [1, 1, true, 2]);
+});
+
 test("hand-kept quest facts", () => {
 	for (const [id, f] of Object.entries(DUNGEON_QUEST_FACTS)) {
 		assert.ok(![f.after].flat().includes(Number(id)), `${id}: after itself`);
