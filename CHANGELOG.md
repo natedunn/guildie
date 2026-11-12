@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.24
+
 ### New
 
 - **Guildie, Addon:** Remove a suggestion you don't want under Crafting → Upgrades for me, and it's never suggested for that character again, on the site or in anyone's tooltips in game. "Show removed" brings them back.
