@@ -250,11 +250,11 @@ function NavLink({ className, children, ...props }: LinkProps & { className?: st
 	);
 }
 
-/** Phones: a top bar with the page title, and the sidebar in a sheet. */
+/** Phones: a frosted top bar over the pane (app.css) with the page title, and the sidebar in a sheet. */
 export function AppTopBar() {
 	const title = usePageTitle();
 	return (
-		<div className="app-topbar flex h-12 flex-none items-center gap-2 border-b border-border bg-chrome px-2 md:hidden">
+		<div className="app-topbar flex h-12 flex-none items-center gap-2 border-b border-border px-2 md:hidden">
 			<NavSheet />
 			<span className="truncate font-medium">{title}</span>
 		</div>

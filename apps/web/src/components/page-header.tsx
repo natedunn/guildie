@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-// Every content page starts the same way: a title (weight, not size), an
-// optional line under it, and actions on the right.
+// Every content page starts the same way: a title (weight, not size; tight,
+// fading to grey like the landing's headings), an optional line under it, and
+// actions on the right. The pane draws the faint map and glow behind it
+// (.pane-backdrop, routes/__root.tsx).
 
 export function PageHeader({
 	title,
@@ -22,7 +24,7 @@ export function PageHeader({
 		<div className={cn("pt-6 pb-4", className)}>
 			<div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
 				<div className="min-w-0">
-					<h1 className="truncate text-xl font-semibold tracking-tight">{title}</h1>
+					<h1 className="heading-display text-fade truncate text-xl leading-tight tracking-[-0.025em]">{title}</h1>
 					{description && <div className="mt-1 text-[0.8125rem] text-muted-foreground">{description}</div>}
 				</div>
 				{actions && <div className="flex flex-none items-center gap-2">{actions}</div>}

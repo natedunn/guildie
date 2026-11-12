@@ -47,15 +47,28 @@ export function stepsOf(
 	}));
 }
 
-/** The page around the card: the whole window, the card near the top of the middle. */
+/**
+ * The page around the card: the whole window, the card near the top of the
+ * middle, with the landing hero's faint world map and a glow behind it.
+ */
 export function OnboardingScreen({ children }: { children: ReactNode }) {
 	return (
-		<div className="flex min-h-full flex-col items-center px-4 pt-[max(2rem,14vh)] pb-12">
+		<div className="relative isolate flex min-h-full flex-col items-center overflow-hidden px-4 pt-[max(2rem,14vh)] pb-12">
+			<div
+				aria-hidden
+				className="map-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem] [--map-opacity:0.07] [--map-y:1rem]"
+			/>
 			<div className="mb-5 flex items-center gap-2 text-sm font-semibold">
 				<img src="/favicon.svg" alt="" className="size-5" />
 				Guildie
 			</div>
-			{children}
+			<div className="relative flex w-full flex-col items-center">
+				<div
+					aria-hidden
+					className="glow pointer-events-none absolute -top-10 left-1/2 -z-10 h-72 w-[min(34rem,100%)] -translate-x-1/2 opacity-35"
+				/>
+				{children}
+			</div>
 		</div>
 	);
 }
@@ -82,7 +95,7 @@ export function OnboardingCard({
 	const progress = (done + busy) / steps.length;
 	return (
 		<OnboardingScreen>
-			<section className="w-full max-w-[400px] overflow-hidden rounded-md border border-border bg-surface">
+			<section className="surface-card w-full max-w-[400px] overflow-hidden">
 				<div
 					role="progressbar"
 					aria-label="Progress"
@@ -92,12 +105,12 @@ export function OnboardingCard({
 					className="h-0.5 bg-border"
 				>
 					<div
-						className="h-full bg-foreground/60 transition-[width] duration-500 ease-out"
+						className="h-full bg-highlight/70 transition-[width] duration-500 ease-out"
 						style={{ width: `${progress * 100}%` }}
 					/>
 				</div>
 				<div className="p-6" aria-live="polite">
-					<h1 className="font-semibold">{title}</h1>
+					<h1 className="heading-display text-fade text-base leading-snug tracking-[-0.015em]">{title}</h1>
 					{description && <div className="mt-1 text-[0.8125rem] text-muted-foreground">{description}</div>}
 					<ol className="mt-5 space-y-2.5">
 						{steps.map((step) => (

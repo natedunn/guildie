@@ -110,6 +110,8 @@ function RootComponent() {
 							<AppTitleBar />
 							<AppTopBar />
 							<main id="content" data-scroll-restoration-id="content" className="app-content px-4 sm:px-6">
+								{/* The faint map and glow at the top of every page (app.css). */}
+								<div aria-hidden className="pane-backdrop" />
 								<Outlet />
 							</main>
 							<ItemSheet />

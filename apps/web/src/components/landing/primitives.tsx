@@ -166,7 +166,7 @@ export function SectionHead({
 		>
 			<div>
 				<Eyebrow color={color}>{eyebrow}</Eyebrow>
-				<h2 className="landing-display landing-fade-text mt-4 text-[2.25rem] sm:text-5xl">{title}</h2>
+				<h2 className="heading-display text-fade mt-4 text-[2.25rem] sm:text-5xl">{title}</h2>
 			</div>
 			<div className="max-w-[30rem] text-[0.9375rem] leading-relaxed text-pretty text-muted-foreground lg:pb-1.5">
 				{children}
@@ -186,7 +186,7 @@ export function Section({ id, className, children }: { id?: string; className?: 
 
 /** A framed visual with a hairline that catches the light. */
 export function Card({ className, children }: { className?: string; children: ReactNode }) {
-	return <div className={cn("landing-card overflow-hidden", className)}>{children}</div>;
+	return <div className={cn("surface-card overflow-hidden", className)}>{children}</div>;
 }
 
 /** A small caption above a visual's content ("Roster · Stat priority"). */

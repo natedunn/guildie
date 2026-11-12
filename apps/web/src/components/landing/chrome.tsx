@@ -17,7 +17,7 @@ const NAV = [
 export function LandingNav() {
 	const inApp = useInDesktopApp();
 	return (
-		<header className="landing-nav sticky top-0 z-40 border-b border-white/[0.06]">
+		<header className="landing-nav frosted sticky top-0 z-40 border-b border-white/[0.06]">
 			<div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 select-none sm:px-6 desktop:h-10">
 				<Wordmark />
 				<nav className="flex items-center gap-1 text-[0.8125rem] text-muted-foreground max-md:hidden">

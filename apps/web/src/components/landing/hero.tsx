@@ -14,14 +14,10 @@ export function Hero() {
 	return (
 		<section className="relative isolate">
 			{/* The world map, lines and a glow behind it all. */}
-			<div aria-hidden className="landing-map pointer-events-none absolute inset-x-0 top-0 -z-10 h-[52rem]" />
-			<div aria-hidden className="landing-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem]" />
+			<div aria-hidden className="map-backdrop pointer-events-none absolute inset-x-0 top-0 -z-10 h-[52rem]" />
+			<div aria-hidden className="grid-lines pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem]" />
 			<div className="mx-auto flex max-w-6xl flex-col items-center px-4 pt-16 text-center sm:px-6 sm:pt-24">
-				<a
-					href="#open-source"
-					style={delay(0)}
-					className="landing-enter group inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] py-1 pr-2.5 pl-3 text-xs text-muted-foreground transition-colors hover:border-white/20 hover:text-foreground"
-				>
+				<a href="#open-source" style={delay(0)} className="landing-enter pill group pr-2.5">
 					<span className="text-foreground">Free and open source</span>
 					<span className="h-3 w-px bg-white/15" />
 					Built for WoW: Forever
@@ -33,7 +29,7 @@ export function Hero() {
 				</a>
 				<h1
 					style={delay(80)}
-					className="landing-enter landing-display landing-fade-text mt-7 max-w-4xl text-[2.75rem] sm:text-6xl lg:text-[4.75rem]"
+					className="landing-enter heading-display text-fade mt-7 max-w-4xl text-[2.75rem] sm:text-6xl lg:text-[4.75rem]"
 				>
 					Your whole guild,
 					<br />
@@ -75,14 +71,11 @@ export function Hero() {
 function HeroShot() {
 	return (
 		<div className="relative mx-auto mt-16 max-w-6xl px-4 sm:mt-20 sm:px-6">
-			<div aria-hidden className="landing-glow pointer-events-none absolute inset-x-[4%] -top-24 -z-10 h-[34rem]" />
-			<div className="landing-tilt landing-fade-bottom">
-				<div style={delay(350)} className="landing-enter landing-frame overflow-hidden">
+			<div aria-hidden className="glow pointer-events-none absolute inset-x-[4%] -top-24 -z-10 h-[34rem]" />
+			<div className="landing-tilt fade-bottom">
+				<div style={delay(350)} className="landing-enter landing-frame hairline overflow-hidden">
 					{/* A streak of light along the top edge. */}
-					<div
-						aria-hidden
-						className="absolute inset-x-[12%] top-0 z-10 h-px bg-gradient-to-r from-transparent via-[rgb(255_176_96/0.85)] to-transparent"
-					/>
+					<div aria-hidden className="streak z-10" />
 					<AppMock className="min-w-[38rem]" />
 				</div>
 			</div>

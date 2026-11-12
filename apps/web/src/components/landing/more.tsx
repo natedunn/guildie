@@ -84,7 +84,7 @@ function AppFact({ title, children }: { title: string; children: ReactNode }) {
 function WindowMock() {
 	return (
 		<div className="relative pb-10 sm:pb-0" aria-hidden>
-			<div className="landing-frame overflow-hidden">
+			<div className="landing-frame hairline overflow-hidden">
 				<div className="flex h-8 items-center justify-end border-b border-border bg-chrome text-muted-foreground">
 					{/* minimize / maximize / close, as Windows draws them */}
 					<span className="grid h-full w-11 place-items-center">
@@ -132,7 +132,7 @@ export function AiSection() {
 								Experimental
 							</span>
 						</Eyebrow>
-						<h2 className="landing-display landing-fade-text mt-4 text-3xl sm:text-4xl">Ask about your guild</h2>
+						<h2 className="heading-display text-fade mt-4 text-3xl sm:text-4xl">Ask about your guild</h2>
 						<p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-pretty text-muted-foreground">
 							Connect Claude, ChatGPT or another app that speaks MCP, and ask: who can craft what, what someone's
 							wearing, which requests are open. It sees what you see on Guildie, nothing more.
@@ -371,7 +371,7 @@ export function OpenSourceSection() {
 				<div className="grid items-center gap-10 p-6 sm:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
 					<div>
 						<Eyebrow>Open source</Eyebrow>
-						<h2 className="landing-display landing-fade-text mt-4 text-3xl sm:text-4xl">Free, and built in the open</h2>
+						<h2 className="heading-display text-fade mt-4 text-3xl sm:text-4xl">Free, and built in the open</h2>
 						<p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-pretty text-muted-foreground">
 							Guildie is free, built by guild members, and open source under the MIT license: the site, the app and the
 							addon. Read the code, report a bug, or help build it.
@@ -426,12 +426,12 @@ export function ClosingSection() {
 	const inApp = useInDesktopApp();
 	return (
 		<section className="relative isolate mt-16 overflow-hidden px-4 pt-28 pb-32 text-center sm:mt-24 sm:px-6">
-			<div aria-hidden className="landing-grid pointer-events-none absolute inset-0 -z-10 rotate-180" />
+			<div aria-hidden className="grid-lines pointer-events-none absolute inset-0 -z-10 rotate-180" />
 			<div
 				aria-hidden
-				className="landing-glow pointer-events-none absolute inset-x-[15%] bottom-[-14rem] -z-10 h-[26rem] opacity-80"
+				className="glow pointer-events-none absolute inset-x-[15%] bottom-[-14rem] -z-10 h-[26rem] opacity-80"
 			/>
-			<h2 className="landing-reveal landing-display landing-fade-text mx-auto max-w-3xl text-[2.5rem] sm:text-6xl">
+			<h2 className="landing-reveal heading-display text-fade mx-auto max-w-3xl text-[2.5rem] sm:text-6xl">
 				Bring your guild
 			</h2>
 			<p className="landing-reveal mx-auto mt-5 max-w-md text-base text-pretty text-muted-foreground">
