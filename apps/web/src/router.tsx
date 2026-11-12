@@ -36,7 +36,8 @@ export function getRouter() {
 		context: { convex, queryClient, convexQueryClient, token: null },
 		defaultPreload: "intent",
 		scrollRestoration: true,
-		// The page never scrolls; the content pane does (__root.tsx).
+		// Restore the content pane on desktop; the window also restores normally
+		// when phone browsers use document scrolling.
 		scrollToTopSelectors: ["#content"],
 		defaultErrorComponent: ErrorPage,
 		defaultNotFoundComponent: NotFoundPage,

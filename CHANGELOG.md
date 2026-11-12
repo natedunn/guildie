@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
-- **Guildie:** Match the mobile browser background to the page so the bottom toolbar area does not form a darker band.
+- **Guildie:** Let phone pages scroll behind the browser’s floating controls instead of stopping above an empty bottom area.
 
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
 

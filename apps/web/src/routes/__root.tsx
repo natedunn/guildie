@@ -132,7 +132,7 @@ function RootComponent() {
  */
 function OnboardingShell() {
 	return (
-		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
+		<div className="onboarding-shell flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
 			<div className="app-sidebar-drag hidden h-10 flex-none desktop:block" />
 			<main
 				id="content"
