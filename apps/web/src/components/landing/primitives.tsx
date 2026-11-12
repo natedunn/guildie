@@ -222,7 +222,8 @@ export function GameTooltip({
 				<ItemTooltipBody item={item} />
 				<div className="mt-3 text-[13px] leading-snug">
 					<div className="flex items-center gap-1.5 font-semibold text-[#d9b559]">
-						<img src="/favicon.svg" alt="" className="size-3.5 rounded-[2px]" />
+						{/* The addon's icon (apps/addon/Guildie/icon.tga), not the site's. */}
+						<img src="/landing/addon-icon.svg" alt="" className="size-3.5" />
 						Guildie
 					</div>
 					{lines.map((line) => (

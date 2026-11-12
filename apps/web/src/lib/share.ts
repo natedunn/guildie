@@ -9,7 +9,7 @@ const SITE = (import.meta.env.VITE_SITE_URL as string | undefined) || "https://g
 
 export const DEFAULT_TITLE = "Guildie";
 export const DEFAULT_DESCRIPTION =
-	"Your World of Warcraft guild's roster, gear, talents and crafters, for WoW: Forever.";
+	"Your whole guild, in sync: roster, gear, talents and crafters for WoW: Forever, on the web, in a Windows app and on your tooltips in game.";
 
 /** The default tags, on every page (root route). */
 export const defaultShareMeta = [
@@ -21,7 +21,10 @@ export const defaultShareMeta = [
 	{ property: "og:image", content: `${SITE}/og.png` },
 	{ property: "og:image:width", content: "1200" },
 	{ property: "og:image:height", content: "630" },
-	{ property: "og:image:alt", content: "Guildie: your guild's roster, gear, talents and crafters." },
+	{
+		property: "og:image:alt",
+		content: "Guildie: your whole guild, in sync. A guild roster with class colors and levels.",
+	},
 	{ name: "twitter:card", content: "summary_large_image" },
 	{ name: "twitter:title", content: DEFAULT_TITLE },
 	{ name: "twitter:description", content: DEFAULT_DESCRIPTION },

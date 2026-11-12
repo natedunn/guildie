@@ -22,3 +22,10 @@ PLAYWRIGHT_DIR=/tmp/pw node apps/web/scripts/gen-icons.mjs
 ```
 
 Check the maskable one at <https://maskable.app>.
+
+The same tile is also `public/favicon.svg` (by hand: the mark at 26/32 on a
+rounded `--chrome` square) and the Windows app's icon
+(`apps/desktop/scripts/make-icon.py`); change them together. The gold outline
+shield is the in-game addon's icon (`apps/addon/Guildie/icon.tga`, and
+`public/landing/addon-icon.svg` for the landing page's tooltip mock), kept
+gold to sit with the game's tooltip colors.
