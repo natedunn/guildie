@@ -18,7 +18,7 @@ export const Route = createFileRoute("/claim/callback")({
 	}),
 	head: () => ({ meta: [{ title: "Reading your characters · Guildie" }] }),
 	// A step of the sign-in flow (components/onboarding.tsx): the same card as /sign-in.
-	staticData: { onboarding: true },
+	staticData: { shell: "onboarding" },
 	component: ClaimCallback,
 });
 

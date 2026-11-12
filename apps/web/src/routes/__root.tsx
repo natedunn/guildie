@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { type ConvexQueryClient, convexQuery } from "@convex-dev/react-query";
-import type { QueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router";
 import { type ConvexReactClient, useConvexAuth } from "convex/react";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -8,12 +8,12 @@ import { AppSidebar, AppTopBar } from "@/components/app-sidebar";
 import { AppTitleBar } from "@/components/app-titlebar";
 import { DesktopBridge } from "@/components/desktop-bridge";
 import { ItemSheet } from "@/components/item-sheet";
-import { useOnboardingRoute } from "@/components/onboarding";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAuthToken } from "@/lib/convex-auth-start/functions";
 import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
 import { readDesktopInfo } from "@/lib/desktop";
 import { defaultShareMeta } from "@/lib/share";
+import { useRouteShell } from "@/lib/shell";
 import appCss from "@/styles/app.css?url";
 
 export type RouterContext = {
@@ -88,15 +88,21 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootComponent() {
 	const { convex, token } = Route.useRouteContext();
-	// Signing in is one card on its own, without the sidebar (components/onboarding.tsx).
-	const onboarding = useOnboardingRoute();
+	// Pages that don't use the app shell (lib/shell.ts): the sign-in flow's
+	// card, and the landing page for signed-out visitors. The root loader has
+	// the viewer, so this is decided on the server too.
+	const routeShell = useRouteShell();
+	const { data: viewer, isSuccess } = useQuery(convexQuery(api.users.viewer, {}));
+	const shell = routeShell === "landing" ? (isSuccess && !viewer ? "landing" : undefined) : routeShell;
 	return (
 		<ConvexAuthStartProvider client={convex} initialToken={token}>
 			<TooltipProvider>
 				<AuthSync />
 				<DesktopBridge />
-				{onboarding ? (
+				{shell === "onboarding" ? (
 					<OnboardingShell />
+				) : shell === "landing" ? (
+					<LandingShell />
 				) : (
 					<div className="app-shell">
 						<AppSidebar />
@@ -132,6 +138,20 @@ function OnboardingShell() {
 				<Outlet />
 			</main>
 		</div>
+	);
+}
+
+/**
+ * The landing page (components/landing): full width, and the window scrolls
+ * rather than a pane (`.landing-shell` in styles/app.css), so phones get their
+ * usual page scrolling. Its own nav and footer; in the desktop app the nav is
+ * the title bar.
+ */
+function LandingShell() {
+	return (
+		<main id="content" className="landing-shell">
+			<Outlet />
+		</main>
 	);
 }
 

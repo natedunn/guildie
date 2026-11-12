@@ -18,7 +18,7 @@ export const Route = createFileRoute("/helper/connect")({
 	head: () => ({ meta: [{ title: "Connect the Guildie app · Guildie" }] }),
 	// The browser's side of the app's sign-in (components/onboarding.tsx): signing
 	// in from here keeps the same card through /sign-in and /claim/callback.
-	staticData: { onboarding: true },
+	staticData: { shell: "onboarding" },
 	component: Connect,
 });
 

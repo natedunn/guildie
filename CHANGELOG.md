@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
-- **Guildie:** A new home page: what Guildie does, with in-game tooltips and a sample roster, the Windows app, and sign-in with Battle.net in one click. Guild search is gone for now.
+- **Guildie:** A new home page for visitors who aren't signed in: a full-width tour of what Guildie does (the roster, gear upgrades, crafting and requests, dungeons, the addon's tooltips, the Windows app), with sign-in with Battle.net in one click. Guild search is gone for now.
 - **Guildie:** The guild roster has a Gear tab: what each member can wear and wield at their level, the armor, weapons and stats they prefer, and whether the player set those or they follow their talents.
 
 ### Improvements

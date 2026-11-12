@@ -31,7 +31,7 @@ export const Route = createFileRoute("/sign-in")({
 	},
 	head: () => ({ meta: [{ title: "Sign in · Guildie" }] }),
 	// The first card of the sign-in flow (components/onboarding.tsx).
-	staticData: { onboarding: true },
+	staticData: { shell: "onboarding" },
 	component: SignIn,
 });
 

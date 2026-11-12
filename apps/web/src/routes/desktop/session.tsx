@@ -18,7 +18,7 @@ export const Route = createFileRoute("/desktop/session")({
 	}),
 	head: () => ({ meta: [{ title: "Signing in · Guildie" }] }),
 	// The last card of the app's sign-in flow (components/onboarding.tsx), after /sign-in's.
-	staticData: { onboarding: true },
+	staticData: { shell: "onboarding" },
 	component: DesktopSession,
 });
 

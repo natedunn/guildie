@@ -1,6 +1,5 @@
 import { Cancel01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { useMatches } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,20 +9,9 @@ import { cn } from "@/lib/utils";
 // (Battle.net's redirects): /sign-in → /claim/callback → your guild. In the
 // desktop app: /sign-in (in the window) → the browser's /helper/connect →
 // /desktop/session (in the window). Each of those routes sets
-// `staticData: { onboarding: true }`, so the root renders it on its own,
-// without the sidebar (OnboardingShell), and draws this card in the same place.
-
-declare module "@tanstack/react-router" {
-	interface StaticDataRouteOption {
-		/** Render without the app shell, as a step of the sign-in flow (components/onboarding.tsx). */
-		onboarding?: boolean;
-	}
-}
-
-/** Whether the current page is a step of the sign-in flow (no sidebar). */
-export function useOnboardingRoute() {
-	return useMatches({ select: (matches) => matches.some((m) => m.staticData?.onboarding) });
-}
+// `staticData: { shell: "onboarding" }` (lib/shell.ts), so the root renders it
+// on its own, without the sidebar (OnboardingShell), and draws this card in
+// the same place.
 
 /** The steps each flow shows, the same on every route it passes through. */
 export const FLOWS = {
