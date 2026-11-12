@@ -146,8 +146,7 @@
 }
 
 /* The web's frosted bars float over the pane (.app-titlebar, .app-topbar):
-   the phone top bar, then the breadcrumbs from md up. The desktop app's title
-   bar sits above the pane instead. */
+   the phone top bar, then the breadcrumbs from md up. */
 html:not([data-desktop="true"]) {
 	--pane-inset: 3rem;
 }
@@ -155,6 +154,10 @@ html:not([data-desktop="true"]) {
 	html:not([data-desktop="true"]) {
 		--pane-inset: 40px;
 	}
+}
+/* The desktop app's title bar floats over the pane too (.app-titlebar, below). */
+html[data-desktop="true"] {
+	--pane-inset: 40px;
 }
 
 /* Windows draws the app in Segoe; the site keeps Inter elsewhere. */
@@ -436,12 +439,14 @@ select:not([multiple]) {
 	   scrolls under stays out of the way rather than showing through. */
 	@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
 		.frosted,
+		html[data-desktop="true"] .app-titlebar,
 		html:not([data-desktop="true"]) :is(.app-titlebar, .app-topbar) {
 			background-color: rgb(26 24 21 / 0.96);
 		}
 	}
 	@media (prefers-reduced-transparency: reduce) {
 		.frosted,
+		html[data-desktop="true"] .app-titlebar,
 		html:not([data-desktop="true"]) :is(.app-titlebar, .app-topbar) {
 			background-color: rgb(26 24 21 / 0.96);
 		}
@@ -501,16 +506,26 @@ select:not([multiple]) {
 
 	/* ---- The Windows app ---- */
 
+	/* The title bar floats over the top of the pane, like the web's bar: the
+	   page's map and glow run up behind it and the page scrolls under it,
+	   frosted, so the sidebar is the only chrome and the pane meets it in one
+	   hairline instead of a solid strip with an edge under it. */
 	html[data-desktop="true"] .app-titlebar {
+		position: absolute;
+		inset-inline: 0;
+		top: 0;
+		z-index: 20;
 		display: flex;
 		height: 40px;
-		flex: none;
 		align-items: center;
 		gap: 0.25rem;
 		padding-left: 0.5rem;
 		/* Room for minimize / maximize / close (titleBarOverlay). */
 		padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
-		background-color: var(--chrome);
+		background-color: rgb(26 24 21 / 0.62);
+		-webkit-backdrop-filter: blur(16px) saturate(140%);
+		backdrop-filter: blur(16px) saturate(140%);
+		transform: translateZ(0);
 		-webkit-app-region: drag;
 		app-region: drag;
 	}
@@ -522,11 +537,9 @@ select:not([multiple]) {
 		-webkit-app-region: drag;
 		app-region: drag;
 	}
-	/* The pane is a layer on the window: rounded where it meets the chrome. */
+	/* The pane meets the sidebar in one hairline, top to bottom. */
 	html[data-desktop="true"] .app-content {
-		border-top: 1px solid var(--border);
 		border-left: 1px solid var(--border);
-		border-top-left-radius: 8px;
 	}
 	html[data-desktop="true"] .app-sidebar {
 		border-right: 0;
@@ -550,7 +563,7 @@ select:not([multiple]) {
 	html[data-material="mica"] body {
 		background-color: transparent;
 	}
-	html[data-material="mica"] :is(.app-sidebar, .app-titlebar) {
+	html[data-material="mica"] .app-sidebar {
 		background-color: rgb(19 17 14 / 0.9);
 	}
 

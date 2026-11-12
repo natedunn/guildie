@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **App:** The title bar blends into the page instead of sitting on top of it as a separate strip.
+
 ## 0.3.24
 
 ### New
