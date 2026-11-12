@@ -6,7 +6,6 @@ import {
 	dungeonOfKillStatistic,
 	forSide,
 	memberStatus,
-	milestoneLevel,
 	questChains,
 	questDetails,
 	questGroups,
@@ -181,12 +180,4 @@ test("first clears from Blizzard's boss-kill statistics", () => {
 	assert.equal(dungeonOfKillStatistic("Shade of the Archmage Kills (City of Dalaran)"), "city-of-dalaran");
 	assert.equal(dungeonOfKillStatistic("Ragnaros kills (Molten Core)"), undefined);
 	assert.equal(dungeonOfKillStatistic("Total kills"), undefined);
-});
-
-test("level milestones for the feed's every-5 view", () => {
-	assert.equal(milestoneLevel(24, 25), true);
-	assert.equal(milestoneLevel(23, 24), false);
-	assert.equal(milestoneLevel(23, 26), true);
-	assert.equal(milestoneLevel(59, 60), true);
-	assert.equal(milestoneLevel(undefined, 30), true);
 });

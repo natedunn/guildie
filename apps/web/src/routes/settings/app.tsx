@@ -5,7 +5,7 @@ import { HelperTokens } from "@/components/helper-tokens";
 import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { WhatsNew } from "@/components/whats-new";
+import { AllReleasesLink, WhatsNew } from "@/components/whats-new";
 import { desktop, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
 import { ago } from "@/lib/format";
 import { markSeen } from "@/lib/release-notes";
@@ -30,7 +30,10 @@ function AppSettings() {
 		<div className="max-w-3xl pb-12">
 			{inApp ? <ThisApp /> : <GetTheApp />}
 			<section id="whats-new" className="mt-10 scroll-mt-4">
-				<SectionTitle>What's new</SectionTitle>
+				<div className="flex items-baseline justify-between gap-3">
+					<SectionTitle>What's new</SectionTitle>
+					<AllReleasesLink />
+				</div>
 				<WhatsNew upTo={inApp ? desktop()?.version : undefined} />
 			</section>
 			<section id="computers" className="mt-10 scroll-mt-4">

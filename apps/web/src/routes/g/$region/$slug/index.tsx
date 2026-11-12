@@ -8,6 +8,7 @@ import {
 	ArrowDown01Icon,
 	ArrowUp01Icon,
 	CheckmarkBadge01Icon,
+	FilterHorizontalIcon,
 	GameController03Icon,
 	HourglassIcon,
 } from "@hugeicons/core-free-icons";
@@ -20,8 +21,13 @@ import { UNFETCHED_NOTE } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { AUTO, nameOf, strictness } from "@/components/gear-preference";
 import { GROUPS } from "@/components/proficiencies";
+import {
+	DropdownMenu,
+	DropdownMenuCheckboxItem,
+	DropdownMenuContent,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -45,6 +51,13 @@ export const Route = createFileRoute("/g/$region/$slug/")({
 		search.view === "stats" || search.view === "gear" || search.view === "professions" ? { view: search.view } : {},
 	component: GuildPage,
 });
+
+/** Who the Filter menu leaves out; everyone by default. */
+type Filters = { maxOnly: boolean; unpublished: boolean; unclaimed: boolean };
+const NO_FILTERS: Filters = { maxOnly: false, unpublished: true, unclaimed: true };
+
+/** Members who joined within this long get a "New" tag. */
+const NEW_FOR_MS = 7 * 86_400_000;
 
 type SortKey = "name" | "level" | "class" | "ilvl" | "seen" | "profession";
 
@@ -71,7 +84,7 @@ function Roster({ members }: { members: Member[] }) {
 		});
 	const [search, setSearch] = useState("");
 	const [classFilter, setClassFilter] = useState<number | null>(null);
-	const [maxOnly, setMaxOnly] = useState(false);
+	const [filters, setFilters] = useState<Filters>(NO_FILTERS);
 	const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "level", desc: true });
 
 	const rows = useMemo(() => {
@@ -98,7 +111,9 @@ function Roster({ members }: { members: Member[] }) {
 			(m) =>
 				(words.length === 0 || ((text) => words.every((w) => text.includes(w)))(haystack(m))) &&
 				(classFilter === null || m.classId === classFilter) &&
-				(!maxOnly || m.level === 60),
+				(!filters.maxOnly || m.level === 60) &&
+				(filters.unpublished || !!m.synced) &&
+				(filters.unclaimed || m.claimed),
 		);
 		const value = (m: Member): string | number => {
 			switch (sort.key) {
@@ -121,7 +136,10 @@ function Roster({ members }: { members: Member[] }) {
 			const cmp = x < y ? -1 : x > y ? 1 : a.name.localeCompare(b.name);
 			return sort.desc ? -cmp : cmp;
 		});
-	}, [members, search, classFilter, maxOnly, sort]);
+	}, [members, search, classFilter, filters, sort]);
+
+	// For "New": render time is close enough.
+	const now = Date.now();
 
 	const classCounts = useMemo(() => {
 		const counts = new Map<number, number>();
@@ -189,10 +207,7 @@ function Roster({ members }: { members: Member[] }) {
 							</button>
 						))}
 				</div>
-				<label className="ml-auto flex items-center gap-2 text-[0.8125rem] text-muted-foreground select-none">
-					<Switch size="sm" checked={maxOnly} onCheckedChange={setMaxOnly} />
-					Level 60 only
-				</label>
+				<FilterMenu filters={filters} onChange={setFilters} />
 			</div>
 
 			<Tabs value={view} onValueChange={(v) => setView(v as View)}>
@@ -250,44 +265,57 @@ function Roster({ members }: { members: Member[] }) {
 					{rows.map((m) => (
 						<TableRow key={m._id}>
 							<TableCell>
-								<Tooltip disabled={!m.battletag && !!m.synced}>
-									<TooltipTrigger
-										render={
-											<Link
-												to="/c/$region/$slug"
-												params={(p) => ({ region: p.region ?? "us", slug: m.slug })}
-												className="hover:underline underline-offset-4"
-											/>
-										}
-									>
-										<ClassText classId={m.classId} className="font-medium">
-											{m.name}
-										</ClassText>{" "}
-										<span className="text-muted-foreground">{m.surname}</span>
-									</TooltipTrigger>
-									{/* Only guild members get BattleTags (guilds.get), and only from players who haven't hidden theirs. */}
-									<TooltipContent side="right" className="block max-w-72 space-y-1">
-										{m.battletag && <p>{m.battletag}</p>}
-										{!m.synced && <p className={m.battletag ? "text-muted-foreground" : undefined}>{UNFETCHED_NOTE}</p>}
-									</TooltipContent>
-								</Tooltip>
+								<Link
+									to="/c/$region/$slug"
+									params={(p) => ({ region: p.region ?? "us", slug: m.slug })}
+									className="hover:underline underline-offset-4"
+								>
+									<ClassText classId={m.classId} className="font-medium">
+										{m.name}
+									</ClassText>{" "}
+									<span className="text-muted-foreground">{m.surname}</span>
+								</Link>
 								{!m.synced && (
-									<span
-										className="ml-1.5 inline-flex translate-y-[2px] text-muted-foreground/60"
-										role="img"
-										aria-label="Not published by Blizzard yet"
-									>
-										<HugeiconsIcon icon={HourglassIcon} size={13} strokeWidth={1.75} />
-									</span>
+									<Tooltip>
+										<TooltipTrigger
+											render={
+												<span
+													className="ml-1.5 inline-flex translate-y-[2px] text-muted-foreground/60"
+													role="img"
+													aria-label="Not published by Blizzard yet"
+												/>
+											}
+										>
+											<HugeiconsIcon icon={HourglassIcon} size={13} strokeWidth={1.75} />
+										</TooltipTrigger>
+										<TooltipContent side="right" className="block max-w-72">
+											{UNFETCHED_NOTE}
+										</TooltipContent>
+									</Tooltip>
 								)}
 								{m.claimed && (
-									<span
-										className="ml-1.5 inline-flex translate-y-[2px] text-muted-foreground/70"
-										title="Claimed on Guildie"
-										role="img"
-										aria-label="Claimed on Guildie"
-									>
-										<HugeiconsIcon icon={CheckmarkBadge01Icon} size={14} strokeWidth={1.75} />
+									<Tooltip>
+										<TooltipTrigger
+											render={
+												<span
+													className="ml-1.5 inline-flex translate-y-[2px] text-muted-foreground/70 hover:text-foreground"
+													role="img"
+													aria-label={m.battletag ? `Claimed by ${m.battletag}` : "Claimed on Guildie"}
+												/>
+											}
+										>
+											<HugeiconsIcon icon={CheckmarkBadge01Icon} size={14} strokeWidth={1.75} />
+										</TooltipTrigger>
+										{/* Only guild members get BattleTags (guilds.get), and only from players who haven't hidden theirs. */}
+										<TooltipContent side="right" className="block max-w-72 space-y-0.5">
+											{m.battletag && <p className="font-medium">{m.battletag}</p>}
+											<p className={m.battletag ? "text-muted-foreground" : undefined}>Claimed on Guildie</p>
+										</TooltipContent>
+									</Tooltip>
+								)}
+								{m.joinedAt !== undefined && now - m.joinedAt < NEW_FOR_MS && (
+									<span className="pill ml-1.5 px-1.5 py-0 text-[0.6875rem]" title={`Joined ${ago(m.joinedAt)}`}>
+										New
 									</span>
 								)}
 							</TableCell>
@@ -330,6 +358,32 @@ function Roster({ members }: { members: Member[] }) {
 						: "Talents, professions, gear and last synced fill in once a character is level 10 and has logged out. Blizzard's API doesn't say who's online right now."}
 			</p>
 		</section>
+	);
+}
+
+/** The Filter menu next to the class chips: who to leave out of the table. */
+function FilterMenu({ filters, onChange }: { filters: Filters; onChange: (next: Filters) => void }) {
+	const active = (Object.keys(NO_FILTERS) as (keyof Filters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
+	const toggle = (key: keyof Filters) => (checked: boolean) => onChange({ ...filters, [key]: checked });
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger className="chip ml-auto" data-active={active > 0}>
+				<HugeiconsIcon icon={FilterHorizontalIcon} size={13} strokeWidth={1.75} />
+				Filter
+				{active > 0 && <span className="num text-muted-foreground">{active}</span>}
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-56">
+				<DropdownMenuCheckboxItem checked={filters.maxOnly} onCheckedChange={toggle("maxOnly")}>
+					Level 60 only
+				</DropdownMenuCheckboxItem>
+				<DropdownMenuCheckboxItem checked={filters.unpublished} onCheckedChange={toggle("unpublished")}>
+					Show unpublished characters
+				</DropdownMenuCheckboxItem>
+				<DropdownMenuCheckboxItem checked={filters.unclaimed} onCheckedChange={toggle("unclaimed")}>
+					Show unclaimed characters
+				</DropdownMenuCheckboxItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
 	);
 }
 

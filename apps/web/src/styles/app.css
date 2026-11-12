@@ -253,9 +253,16 @@ select:not([multiple]) {
 /* The roster keeps every column. Where the pane is narrower than all of them
    (72rem), its container scrolls sideways instead, giving up the sticky head
    there (a scrolling container would hold it rather than the pane). */
+/* It runs out to the pane's edges (through its side padding, --pane-gutter),
+   so columns slide off the edge of the screen instead of being cut off a
+   margin short of it, which read as broken and hid that it scrolls. */
 @container (width < 72rem) {
 	[data-slot="table-container"]:has(> .roster-table) {
 		overflow-x: auto;
+		width: calc(100% + 2 * var(--pane-gutter));
+		margin-inline: calc(-1 * var(--pane-gutter));
+		padding-inline: var(--pane-gutter);
+		scrollbar-width: none;
 	}
 }
 
@@ -358,6 +365,11 @@ select:not([multiple]) {
 		/* The page starts under the frosted bar and scrolls beneath it. */
 		padding-top: var(--pane-inset);
 		scroll-padding-top: var(--pane-inset);
+		/* Its side padding (px-4 sm:px-6 in __root.tsx), for what bleeds through it. */
+		--pane-gutter: 1rem;
+		@media (width >= 40rem) {
+			--pane-gutter: 1.5rem;
+		}
 		/* Scrolls under the home indicator, but the last line clears it. */
 		padding-bottom: env(safe-area-inset-bottom);
 		background-color: var(--background);

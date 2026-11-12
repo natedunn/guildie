@@ -9,22 +9,24 @@ import { compareVersions } from "@/lib/versions";
 const formatDate = (iso: string) =>
 	new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 
-/** The latest few releases' notes (up to `upTo`, the app's version, when given), and a link to them all. */
+/** The latest few releases' notes (up to `upTo`, the app's version, when given). */
 export function WhatsNew({ upTo, count = 3 }: { upTo?: string; count?: number }) {
 	const { data, isPending, isError } = useReleaseNotes();
 	if (isPending) return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Loading…</p>;
 	if (isError || !data) return <NotesError />;
 	const shown = data.releases.filter((r) => !upTo || compareVersions(r.version, upTo) <= 0).slice(0, count);
+	return <ReleaseList releases={shown} current={upTo} />;
+}
+
+/** "All releases", for the right end of the What's new heading. */
+export function AllReleasesLink() {
 	return (
-		<>
-			<ReleaseList releases={shown} current={upTo} />
-			<Link
-				to="/settings/app/changelog"
-				className="mt-2 inline-block px-1 text-[0.8125rem] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-			>
-				All releases
-			</Link>
-		</>
+		<Link
+			to="/settings/app/changelog"
+			className="text-[0.8125rem] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+		>
+			All releases
+		</Link>
 	);
 }
 

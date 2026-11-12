@@ -11,10 +11,12 @@ import {
 } from "@convex/shared/statPriority";
 import { CLASS_TOKENS, SPECS } from "@convex/shared/weights";
 import { className, type Region } from "@convex/shared/wow";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { type DragEvent, type KeyboardEvent, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useEffect, useState } from "react";
 import { Panel, panelAction } from "@/components/panel";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -179,86 +181,108 @@ export function StatPrioritySection({
 /** "1.25", "1.7", "3": how many of a stat one point of the first is worth. */
 const times = (n: number) => (n >= 10 ? String(Math.round(n)) : String(Math.round(n * 100) / 100));
 
-/**
- * What the shares mean in plain words: "1 Strength counts as much as 1.25
- * Intellect or 1.7 Agility", and a trade that shows the steepness.
- */
-function SharesInWords({ stats, tiers }: { stats: string[]; tiers: number[] }) {
-	const shown = stats
-		.slice(0, SHOWN_STATS)
-		.map((s, i) => ({ s, t: tiers[i] }))
-		.filter((x) => x.s !== "ARMOR");
-	const [first, ...rest] = shown;
-	if (!first || rest.length === 0 || first.s !== stats[0]) return null;
-	const last = rest[rest.length - 1];
-	// Give up 4 of the first for 8 of the last: worth it when the last counts more than half.
-	const worth = 8 * last.t > 4;
+/** What each weighting does, in a few words. */
+const WEIGHTING_HINTS: Record<Steepness, string> = {
+	even: "Every stat counts nearly as much as the first",
+	balanced: "Each stat counts a bit less than the one above",
+	steep: "The first stat counts far more than the rest",
+	custom: "You set how much each stat counts",
+};
+
+/** Even / Balanced / Steep / Manual, as a select. Balanced is the default. */
+function WeightingSelect({ value, onChange }: { value: Steepness; onChange: (s: Steepness) => void }) {
+	const options: { key: Steepness; name: string }[] = [...STEEPNESS, { key: "custom", name: STEEPNESS_NAMES.custom }];
 	return (
-		<div className="space-y-1 text-xs text-muted-foreground">
-			<p>
-				1 <span className="text-foreground">{label(first.s)}</span> counts as much as{" "}
-				{rest.map((x, i) => (
-					<span key={x.s}>
-						{i > 0 ? " or " : null}
-						<span className="text-foreground">
-							{times(1 / x.t)} {label(x.s)}
-						</span>
-					</span>
-				))}
-				. Stats you didn't list count less than the last.
-			</p>
-			<p>
-				Giving up 4 {label(first.s)} for 8 {label(last.s)}:{" "}
-				<span className="text-foreground">{worth ? "worth it" : "not worth it"}</span>. Such items show as trade-offs,
-				never as plain upgrades.
-			</p>
-		</div>
+		<select
+			value={value}
+			onChange={(e) => onChange(e.target.value as Steepness)}
+			className="h-8 w-40 rounded-md border bg-well px-1.5 text-[0.8125rem] pointer-coarse:h-10 pointer-coarse:text-base"
+		>
+			{options.map((o) => (
+				<option key={o.key} value={o.key}>
+					{o.name}
+					{o.key === "balanced" ? " (default)" : ""}
+				</option>
+			))}
+		</select>
 	);
 }
 
-/** Even / Balanced / Steep (/ Custom): a segmented control. */
-export function SteepnessControl({
-	value,
-	onChange,
-	custom,
-	disabled,
-	size = "md",
-}: {
-	value: Steepness | undefined;
-	onChange: (s: Steepness) => void;
-	/** Offer Custom (the editor); elsewhere it only shows when it's set. */
-	custom?: boolean;
-	disabled?: boolean;
-	size?: "sm" | "md";
-}) {
-	const options: { key: Steepness; name: string }[] = [
-		...STEEPNESS,
-		...(custom || value === "custom" ? [{ key: "custom" as const, name: STEEPNESS_NAMES.custom }] : []),
-	];
+/**
+ * "How does this work?": every stat the player listed (up to five) with how
+ * much it counts and what one point of the first is worth in it, then a
+ * trade that shows what the weighting means for items.
+ */
+function HowWeightingWorks({ stats, tiers }: { stats: string[]; tiers: number[] }) {
+	const first = stats[0];
+	const firstIsStat = first !== "ARMOR";
+	const last = stats
+		.map((s, i) => ({ s, t: tiers[i] }))
+		.slice(1)
+		.filter((x) => x.s !== "ARMOR")
+		.at(-1);
+	// Give up 4 of the first for 8 of the last: worth it when the last counts more than half.
+	const worth = last && 8 * last.t > 4;
 	return (
-		<div
-			role="radiogroup"
-			aria-label="How much more the first stat counts"
-			className={cn("flex rounded-md border border-border bg-well p-0.5", size === "sm" ? "w-auto" : "w-full")}
-		>
-			{options.map((o) => (
-				<button
-					key={o.key}
-					type="button"
-					role="radio"
-					aria-checked={value === o.key}
-					disabled={disabled || (o.key === "custom" && !custom)}
-					onClick={() => onChange(o.key)}
-					className={cn(
-						"rounded-[4px] text-[0.8125rem] text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground",
-						size === "sm" ? "px-2.5 py-0.5" : "flex-1 py-1",
-						value === o.key && "bg-selected text-foreground disabled:hover:text-foreground",
+		<details className="group surface-card text-[0.8125rem]">
+			<summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2 text-muted-foreground select-none hover:text-foreground [&::-webkit-details-marker]:hidden">
+				<HugeiconsIcon
+					icon={ArrowRight01Icon}
+					size={13}
+					strokeWidth={2}
+					className="transition-transform group-open:rotate-90"
+				/>
+				How does this work?
+			</summary>
+			<div className="space-y-3 border-t border-border px-3 pt-2.5 pb-3">
+				<p className="text-xs text-muted-foreground">
+					Gear suggestions add up an item's stats, each point times how much that stat counts. Your first stat counts
+					fully; the weighting sets how much each one after it counts.
+				</p>
+				<table className="w-full text-left">
+					<thead className="text-xs text-muted-foreground">
+						<tr>
+							<th className="w-8 py-1 font-normal">#</th>
+							<th className="py-1 font-normal">Stat</th>
+							<th className="py-1 text-right font-normal">Counts</th>
+							{firstIsStat && <th className="py-1 pl-4 text-right font-normal">1 {label(first)} is worth</th>}
+						</tr>
+					</thead>
+					<tbody className="divide-y divide-border">
+						{stats.map((s, i) => (
+							<tr key={s}>
+								<td className="num py-1.5 text-muted-foreground">{i + 1}</td>
+								<td className={cn("py-1.5", i === 0 && "font-semibold")}>{label(s)}</td>
+								{s === "ARMOR" ? (
+									<td colSpan={firstIsStat ? 2 : 1} className="py-1.5 text-right text-xs text-muted-foreground">
+										By points of armor, more the higher it's listed
+									</td>
+								) : (
+									<>
+										<td className="num py-1.5 text-right">{pct(tiers[i] ?? 1)}</td>
+										{firstIsStat && (
+											<td className="num py-1.5 pl-4 text-right">
+												{times(1 / (tiers[i] ?? 1))} {label(s)}
+											</td>
+										)}
+									</>
+								)}
+							</tr>
+						))}
+					</tbody>
+				</table>
+				<div className="space-y-1 text-xs text-muted-foreground">
+					<p>Stats you didn't list still count, but less than your last one.</p>
+					{firstIsStat && last && (
+						<p>
+							Say an item gives 4 less {label(first)} and 8 more {label(last.s)}:{" "}
+							<span className="text-foreground">{worth ? "worth it" : "not worth it"}</span>. Items like that show as
+							trade-offs, never as plain upgrades.
+						</p>
 					)}
-				>
-					{o.name}
-				</button>
-			))}
-		</div>
+				</div>
+			</div>
+		</details>
 	);
 }
 
@@ -346,12 +370,15 @@ export function StatPriorityEditor({
 	classId,
 	priority,
 	talentTrees,
+	onDirtyChange,
 }: {
 	region: string;
 	slug: string;
 	classId: number;
 	priority: StatPriority;
 	talentTrees: Parameters<typeof statPriority>[1];
+	/** Told whether there are changes that aren't saved (the page asks before leaving). */
+	onDirtyChange?: (dirty: boolean) => void;
 }) {
 	const trees = SPECS[CLASS_TOKENS[classId] ?? ""] ?? [];
 	const fromTalents = statPriority(classId, talentTrees);
@@ -375,6 +402,7 @@ export function StatPriorityEditor({
 	const choice: Choice = mode === "talents" ? null : mode === "own" ? ownChoice(own, tiers) : { tree: mode };
 	const changed = JSON.stringify(choice) !== JSON.stringify(choiceOf(priority, trees));
 	const duplicate = mode === "own" && new Set(own).size < own.length;
+	useEffect(() => onDirtyChange?.(changed), [changed, onDirtyChange]);
 
 	const edit =
 		<T,>(fn: (v: T) => void) =>
@@ -528,24 +556,24 @@ export function StatPriorityEditor({
 					{duplicate && <p className="text-xs text-muted-foreground">Pick different stats.</p>}
 
 					<div className="space-y-2.5">
-						<p className="text-[0.8125rem]">How much more does your first stat count?</p>
-						<div className="max-w-md">
-							<SteepnessControl
+						<label className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+							<span className="text-[0.8125rem] font-medium">Weighting</span>
+							<WeightingSelect
 								value={steepness}
 								onChange={edit((next: Steepness) => {
-									// Custom starts from where the preset was.
+									// Manual starts from where the preset was.
 									if (next === "custom" && steepness !== "custom") setCustom(presetTiers(steepness, own.length));
 									setSteepness(next);
 								})}
-								custom
 							/>
-						</div>
+							<span className="text-xs text-muted-foreground">{WEIGHTING_HINTS[steepness]}</span>
+						</label>
 						{steepness === "custom" && (
 							<p className="text-xs text-muted-foreground">
 								Drag each stat's slider. A stat can count at most as much as the one above it.
 							</p>
 						)}
-						{!duplicate && <SharesInWords stats={own} tiers={tiers} />}
+						{!duplicate && <HowWeightingWorks stats={own} tiers={tiers} />}
 					</div>
 				</div>
 			) : preview ? (

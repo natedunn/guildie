@@ -74,6 +74,9 @@ export const search = query({
 	},
 });
 
+/** Characters first seen this long after the guild was added joined it then (earlier: its first roster). */
+const JOINED_AFTER_MS = 86_400_000;
+
 export const get = query({
 	args: { region: vRegion, slug: v.string() },
 	handler: async (ctx, { region, slug }) => {
@@ -145,6 +148,9 @@ export const get = query({
 				synced: profiles[i].synced,
 				avatarUrl: c.avatarUrl,
 				profileMissing: c.profileMissing,
+				// When they joined, for the roster's "New" tag: when we first saw them
+				// in this guild, unless that was its first roster sync (everyone).
+				joinedAt: c._creationTime > guild._creationTime + JOINED_AFTER_MS ? c._creationTime : undefined,
 				claimed: claimed[i] !== null,
 				battletag: claimed[i] ? tags.get(claimed[i].userId) : undefined,
 				statPriority: statPriority(c.classId, profiles[i].talentTrees, prefs[i].statPriority),

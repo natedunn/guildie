@@ -5,7 +5,7 @@ import type { Region } from "@convex/shared/wow";
 import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Panel, panelAction } from "@/components/panel";
 import { Grip, moved, useReorder } from "@/components/stat-priority";
 import { Button } from "@/components/ui/button";
@@ -106,12 +106,15 @@ export function GearPreferenceEditor({
 	classId,
 	level,
 	preference,
+	onDirtyChange,
 }: {
 	region: string;
 	slug: string;
 	classId: number;
 	level: number;
 	preference: GearChoice | undefined;
+	/** Told whether there are changes that aren't saved (the page asks before leaving). */
+	onDirtyChange?: (dirty: boolean) => void;
 }) {
 	const set = useMutation(api.statPriority.setGear);
 	const [armor, setArmor] = useState<KindPick>(pickOf(preference?.armor));
@@ -120,6 +123,7 @@ export function GearPreferenceEditor({
 	const [saving, setSaving] = useState(false);
 	const [saved, setSaved] = useState(false);
 	const changed = !samePick(armor, pickOf(preference?.armor)) || !samePick(weapon, pickOf(preference?.weapon));
+	useEffect(() => onDirtyChange?.(changed), [changed, onDirtyChange]);
 
 	const save = async () => {
 		setSaving(true);

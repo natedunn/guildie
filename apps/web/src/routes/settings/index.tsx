@@ -142,7 +142,8 @@ function BattletagSetting({ hidden }: { hidden: boolean }) {
 			<span>
 				Hide my BattleTag from guildmates
 				<span className="block text-muted-foreground">
-					Members of your guilds see it when they hover your characters on the roster. Nobody else ever does.
+					On Guildie, your guildmates can see your BattleTag on the roster next to each character you've claimed. People
+					outside your guilds never see it.
 				</span>
 			</span>
 		</label>
