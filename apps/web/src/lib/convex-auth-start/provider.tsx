@@ -3,7 +3,7 @@ import { oauth } from "@convex-dev/auth/methods/oauth/react";
 import { useRouter } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
 import { ConvexProviderWithAuth, type ConvexReactClient } from "convex/react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AuthProvider, type AuthSignInApi, useAuth } from "#convex-auth-react-internal";
 
 type AuthSessionResponse = { tokens: { accessToken: string } | null };
@@ -108,8 +108,22 @@ export function ConvexAuthStartProvider({
 	return (
 		<AuthProvider authClient={authClient} signInApi={signInApi}>
 			<ConvexProviderWithAuth client={client} useAuth={useAuth}>
+				<ResumeWhenSignedOut client={client} />
 				{children}
 			</ConvexProviderWithAuth>
 		</AuthProvider>
 	);
+}
+
+/**
+ * The Convex client holds queries until auth is set (`expectAuth` in
+ * router.tsx), but ConvexProviderWithAuth only sets it for a signed-in
+ * player. Signed out, settle it as "no token" so the queries go out.
+ */
+function ResumeWhenSignedOut({ client }: { client: ConvexReactClient }) {
+	const { isLoading, isAuthenticated } = useAuth();
+	useEffect(() => {
+		if (!isLoading && !isAuthenticated) client.setAuth(async () => null);
+	}, [client, isLoading, isAuthenticated]);
+	return null;
 }

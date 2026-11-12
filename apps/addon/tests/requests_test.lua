@@ -193,5 +193,28 @@ test("window: the rows show and hide", function()
     eq(shown, true, "requests row shown")
 end)
 
+test("ongoing: first, 'wants all you have', and no 'might want' row for the same person", function()
+    local data = {}
+    for k, v in pairs(DATA) do data[k] = v end
+    data.requests = {
+        [4306] = {
+            { kind = "item", quantity = 20, name = "Miller", classId = 4 },
+            { kind = "item", ongoing = true, name = "Todd", classId = 1 },
+        },
+        [4305] = { { kind = "item", ongoing = true, name = "Lich", classId = 5 } },
+    }
+    data.reagents = { [4306] = { name = "Silk Cloth", users = {
+        { name = "Todd", classId = 1, profession = "Tailoring" },
+        { name = "Brenna", classId = 8, profession = "Tailoring" },
+    } } }
+    local ns = load(data)
+    local lines = hover(ns, 4306)
+    eq(#lines, 3)
+    eq(plain(lines[1]), "Todd | wants all you have")
+    eq(plain(lines[2]), "Miller | requesting 20")
+    eq(plain(lines[3]), "Brenna | might want (Tailoring)")
+    eq(plain(hover(ns, 4305)[1]), "You | collecting")
+end)
+
 print(string.format("%d passed, %d failed", passed, failures))
 os.exit(failures == 0 and 0 or 1)
