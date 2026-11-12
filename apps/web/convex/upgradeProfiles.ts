@@ -1,5 +1,6 @@
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
+import { preferencesOf } from "./preferences";
 import type { Profile } from "./profile";
 import { type ItemInfo, itemInfoFromTooltip } from "./shared/itemInfo";
 import { type Rules, type StatChoice, type UpgradeMember, upgradeMember, type WornItem } from "./shared/upgrades";
@@ -65,6 +66,7 @@ export async function memberForUpgrades(
 			q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", character.slug),
 		)
 		.first();
+	const prefs = await preferencesOf(ctx, claim);
 	const member = upgradeMember(
 		{
 			name: character.name,
@@ -74,11 +76,11 @@ export async function memberForUpgrades(
 			seenMs: Math.max(character.lastLoginAt ?? 0, profile.synced?.at ?? 0),
 			talentTrees: profile.talentTrees,
 			equipment: worn,
-			statPriority: claim?.statPriority,
-			gearPreference: claim?.gearPreference,
-			dismissed: claim?.dismissedItems,
+			statPriority: prefs.statPriority,
+			gearPreference: prefs.gearPreference,
+			dismissed: prefs.dismissedItems,
 		},
 		rules,
 	);
-	return member && { member, worn, choice: claim?.statPriority };
+	return member && { member, worn, choice: prefs.statPriority };
 }

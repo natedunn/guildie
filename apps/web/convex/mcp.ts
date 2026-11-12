@@ -5,6 +5,7 @@ import { sha256 } from "./claims";
 import { guildCrafters } from "./crafting";
 import { guildsOf, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
+import { preferencesOf } from "./preferences";
 import { activeIn } from "./requests";
 import { DUNGEON_BY_KEY } from "./shared/dungeons";
 import { ago, capped, gearType, matches, quality, slotName, statKey } from "./shared/mcpText";
@@ -310,7 +311,8 @@ export const character = internalQuery({
 			.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
 			.collect();
 		const mine = claims.find((x) => x.userId === userId);
-		const priority = statPriority(c.classId, p.talentTrees, (mine ?? claims[0])?.statPriority);
+		const prefs = await preferencesOf(ctx, mine ?? claims[0]);
+		const priority = statPriority(c.classId, p.talentTrees, prefs.statPriority);
 		const lines = [
 			`${fullName(c)}: level ${p.level} ${raceName(c.raceId)} ${className(c.classId)}, <${guild?.name}> ${
 				c.rank === 0 ? "guild master" : `rank ${c.rank}`
@@ -337,8 +339,8 @@ export const character = internalQuery({
 				} (×: worth per point next to the first)`,
 			);
 		}
-		const prefs = gearPrefText((mine ?? claims[0])?.gearPreference);
-		if (prefs) lines.push(`Gear preference: ${prefs}`);
+		const gearText = gearPrefText(prefs.gearPreference);
+		if (gearText) lines.push(`Gear preference: ${gearText}`);
 		if (mine) lines.push(...choicesFor(c.classId));
 		if (p.professions.length) {
 			lines.push(
@@ -622,7 +624,8 @@ async function priorityText(
 		.first();
 	if (!claim) return "";
 	const p = row ? await pickProfile(ctx, row) : undefined;
-	const priority = statPriority(row?.classId ?? claim.classId ?? 0, p?.talentTrees, claim.statPriority);
+	const { statPriority: choice } = await preferencesOf(ctx, claim);
+	const priority = statPriority(row?.classId ?? claim.classId ?? 0, p?.talentTrees, choice);
 	if (!priority) return "";
 	return `${priority.stats
 		.map((s, i) => `${PRIORITY_STATS[s] ?? s}${i > 0 ? ` ×${Math.round((priority.shares[i] ?? 0) * 100) / 100}` : ""}`)
@@ -661,7 +664,8 @@ export const setStatPriorityTool = internalMutation({
 		} else {
 			// New stats, or the ones they chose before with a new steepness.
 			const names = stats?.length ? stats : undefined;
-			const current = own.claim.statPriority?.stats;
+			const chosen = (await preferencesOf(ctx, own.claim)).statPriority;
+			const current = chosen?.stats;
 			if (!names && !(preset && current)) {
 				throw new ConvexError(
 					"Give the stats (3 to 10, most important first, optionally with a steepness), a talent tree, or reset.",
@@ -679,7 +683,7 @@ export const setStatPriorityTool = internalMutation({
 				? TIER_PRESETS[preset as keyof typeof TIER_PRESETS].slice(0, keys.length)
 				: names
 					? undefined
-					: own.claim.statPriority?.tiers;
+					: chosen?.tiers;
 			choice = tiers ? { stats: keys, tiers } : { stats: keys };
 		}
 		await setStatPriority(ctx, userId, own.claim.region, own.claim.slug, choice);
@@ -700,7 +704,7 @@ export const setGearPreferenceTool = internalMutation({
 		const own = await ownCharacter(ctx, userId, character);
 		if (armor === undefined && weapon === undefined)
 			throw new ConvexError("Give an armor type, a weapon type, or both.");
-		const current = own.claim.gearPreference;
+		const current = (await preferencesOf(ctx, own.claim)).gearPreference;
 		const pick = (kind: "armor" | "weapon", given: string | string[] | undefined): TypeChoice => {
 			const now = current?.[kind];
 			if (given === undefined) {

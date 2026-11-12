@@ -46,6 +46,15 @@ wrappers, no ORM.
   `ctx.scheduler.runAfter(i * STAGGER_MS, ...)` to stay under Blizzard's rate
   limits and Convex's per-function limits (see `items.ensure`,
   `recipes.syncCatalog`).
+- **Never wipe what a player chose.** Server data (characters, rosters,
+  claims) may be rewritten from Blizzard or the addon at any time; a player's
+  own settings may not. Character preferences (stat priority, gear types,
+  removed items) live in `characterPreferences` (`preferences.ts`), apart
+  from claims, which `claims.save` rewrites on every sign-in. Only
+  `updatePreferences` writes them, and nothing deletes them;
+  `preferences.test.ts` checks the code for it. A new per-player setting goes
+  in its own row, keyed by the player, not on a row that sync or claims
+  rewrite.
 - **Tests** are plain `node --test` over pure functions (`*.test.ts` next to
   the code, `pnpm --filter @guildie/web test`). Put logic you want to test in
   a pure function, not inside a handler.

@@ -92,6 +92,17 @@ export const vTypeChoice = v.object({
 });
 
 /** A character as a request shows it. */
+const vStatPriority = v.object({
+	tree: v.optional(v.number()),
+	stats: v.optional(v.array(v.string())),
+	tiers: v.optional(v.array(v.number())),
+});
+
+const vGearPreference = v.object({
+	armor: v.optional(vTypeChoice),
+	weapon: v.optional(vTypeChoice),
+});
+
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
 
 export default defineSchema({
@@ -191,38 +202,51 @@ export default defineSchema({
 		classId: v.optional(v.number()),
 		claimedAt: v.number(),
 		/**
+		 * Legacy: preferences used to live here, and claims.save rewrote the row
+		 * on every sign-in, wiping them. They're in characterPreferences now;
+		 * preferences:backfill moves these over and clears them. Read only as a
+		 * fallback (preferences.ts preferencesOf); remove once backfilled.
+		 */
+		statPriority: v.optional(vStatPriority),
+		gearPreference: v.optional(vGearPreference),
+		dismissedItems: v.optional(v.array(v.number())),
+	})
+		.index("by_user", ["userId"])
+		.index("by_slug", ["flavor", "region", "slug"]),
+
+	/**
+	 * What a player chose for one of their characters (preferences.ts). The
+	 * player's own: claims come and go with Battle.net (sign-in, someone else
+	 * claiming, a character leaving the account) and never touch these, so a
+	 * re-claim gets them back. Only the player changes them; nothing deletes
+	 * them.
+	 */
+	characterPreferences: defineTable({
+		userId: v.id("users"),
+		flavor: vFlavor,
+		region: vRegion,
+		slug: v.string(),
+		/**
 		 * The stats this character looks for on gear, if the player chose:
 		 * another talent tree's (index in the class), or their own three to
-		 * five with how much each counts next to the first (`tiers`, unset:
+		 * ten with how much each counts next to the first (`tiers`, unset:
 		 * Balanced) (shared/statPriority.ts). Unset: from their talents.
 		 */
-		statPriority: v.optional(
-			v.object({
-				tree: v.optional(v.number()),
-				stats: v.optional(v.array(v.string())),
-				tiers: v.optional(v.array(v.number())),
-			}),
-		),
+		statPriority: v.optional(vStatPriority),
 		/**
 		 * The armor and weapon types this character prefers, if the player
 		 * chose (armor and weapon subclass ids): others count less in gear
 		 * suggestions, or (strict) aren't suggested (shared/upgrades.ts).
 		 */
-		gearPreference: v.optional(
-			v.object({
-				armor: v.optional(vTypeChoice),
-				weapon: v.optional(vTypeChoice),
-			}),
-		),
+		gearPreference: v.optional(vGearPreference),
 		/**
 		 * Items (ids) the player removed from this character's gear
 		 * suggestions ("Remove" on Upgrades for me): never suggested for it
 		 * again, on the site or in anyone's addon tooltips.
 		 */
 		dismissedItems: v.optional(v.array(v.number())),
-	})
-		.index("by_user", ["userId"])
-		.index("by_slug", ["flavor", "region", "slug"]),
+		updatedAt: v.number(),
+	}).index("by_user_slug", ["userId", "flavor", "region", "slug"]),
 
 	/** In-flight "claim my characters" OAuth flows (every region at once). */
 	claimRequests: defineTable({

@@ -2,7 +2,7 @@
 // with Electron's safeStorage (DPAPI on Windows, the Keychain on macOS) and
 // kept per site origin, so a preview's token never applies to guildie.club.
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { app, safeStorage } from "electron";
 
@@ -25,20 +25,36 @@ let cache: Stored | undefined;
 
 function load(): Stored {
 	if (cache) return cache;
+	let text: string;
 	try {
-		const raw = JSON.parse(readFileSync(file(), "utf8")) as Partial<Stored>;
+		text = readFileSync(file(), "utf8");
+	} catch (error) {
+		// No file yet: a fresh start. Any other failure (the file locked by
+		// antivirus, say) is not cached, and save() won't write over a file it
+		// couldn't read: the player's settings are never replaced with nothing.
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") return (cache = { tokens: {} });
+		return { tokens: {} };
+	}
+	try {
+		const raw = JSON.parse(text) as Partial<Stored>;
 		cache = { ...raw, tokens: raw.tokens && typeof raw.tokens === "object" ? raw.tokens : {} };
 	} catch {
+		// Unreadable JSON: keep a copy before starting over.
+		try {
+			copyFileSync(file(), `${file()}.broken-${Date.now()}`);
+		} catch {}
 		cache = { tokens: {} };
 	}
 	return cache;
 }
 
 function save() {
+	// Not loaded (the file couldn't be read): writing now would erase it.
+	if (!cache) return;
 	const path = file();
 	mkdirSync(dirname(path), { recursive: true });
 	// Write then rename, so a crash never leaves half a file.
-	writeFileSync(`${path}.tmp`, JSON.stringify(load(), null, 2));
+	writeFileSync(`${path}.tmp`, JSON.stringify(cache, null, 2));
 	renameSync(`${path}.tmp`, path);
 }
 

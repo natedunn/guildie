@@ -195,14 +195,14 @@ export function specsOf(classId: number, trees: Tree[] | undefined) {
 // ---- Stat priority (shared/statPriority.ts) ------------------------------------------
 
 /**
- * A player's stat priority choice (ownedCharacters.statPriority): another
+ * A player's stat priority choice (characterPreferences.statPriority): another
  * tree, or their own three to ten stats with how much each counts next to
  * the first (`tiers`, first 1; missing: BALANCED).
  */
 export type StatChoice = { tree?: number; stats?: string[]; tiers?: number[] };
 
 /**
- * One kind's preferred types (ownedCharacters.gearPreference): subclass ids,
+ * One kind's preferred types (characterPreferences.gearPreference): subclass ids,
  * first to last, and whether others are left out (strict). `type` is the
  * one-type shape from before lists; `typesOf` reads either.
  */

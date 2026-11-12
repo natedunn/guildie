@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { pickProfile } from "./helper";
+import { preferencesOf } from "./preferences";
 import { vRegion, vVisibility } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import { statPriority } from "./shared/statPriority";
@@ -104,6 +105,7 @@ export const get = query({
 					.first(),
 			),
 		);
+		const prefs = await Promise.all(claimed.map((claim) => preferencesOf(ctx, claim)));
 		const tags = new Map<Id<"users">, string | undefined>();
 		if (isMember) {
 			for (const claim of claimed) {
@@ -145,9 +147,9 @@ export const get = query({
 				profileMissing: c.profileMissing,
 				claimed: claimed[i] !== null,
 				battletag: claimed[i] ? tags.get(claimed[i].userId) : undefined,
-				statPriority: statPriority(c.classId, profiles[i].talentTrees, claimed[i]?.statPriority),
+				statPriority: statPriority(c.classId, profiles[i].talentTrees, prefs[i].statPriority),
 				// The armor and weapon types the player chose, if any (the roster's Gear view).
-				gearPreference: claimed[i]?.gearPreference,
+				gearPreference: prefs[i].gearPreference,
 			})),
 		};
 	},
@@ -171,6 +173,7 @@ export const character = query({
 			.collect();
 		const userId = await getAuthUserId(ctx);
 		const mine = userId ? claims.find((c) => c.userId === userId) : undefined;
+		const prefs = await preferencesOf(ctx, mine ?? claims[0]);
 		const equipment = await Promise.all(
 			(profile.equipment ?? []).map(async (item) => {
 				const known = await itemRow(ctx, item.itemId);
@@ -195,9 +198,9 @@ export const character = query({
 			sources: profile.sources,
 			talentSource: profile.sources.talents,
 			synced: profile.synced,
-			statPriority: statPriority(character.classId, profile.talentTrees, (mine ?? claims[0])?.statPriority),
+			statPriority: statPriority(character.classId, profile.talentTrees, prefs.statPriority),
 			/** Preferred armor and weapon types for gear suggestions (shared/upgrades.ts gearPrefs), if chosen. */
-			gearPreference: (mine ?? claims[0])?.gearPreference,
+			gearPreference: prefs.gearPreference,
 			/** The viewer claimed this character: they can choose its stat priority. */
 			canEdit: mine !== undefined,
 			talentLayouts: layouts

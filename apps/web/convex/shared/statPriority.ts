@@ -39,7 +39,7 @@ export const PRIORITY_STATS: Record<string, string> = {
 	ARMOR: "Armor",
 };
 
-/** A player's choice, stored on their claim (ownedCharacters.statPriority). Gear suggestions use it too (upgrades.ts specsFor). */
+/** A player's choice, stored per player (characterPreferences.statPriority). Gear suggestions use it too (upgrades.ts specsFor). */
 export type { StatChoice, Steepness };
 export { MAX_STATS, MIN_STATS, steepnessOf, TIER_PRESETS, validStats, validTiers };
 

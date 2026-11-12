@@ -29,6 +29,7 @@ import type * as inventory from "../inventory.js";
 import type * as items from "../items.js";
 import type * as mcp from "../mcp.js";
 import type * as origins from "../origins.js";
+import type * as preferences from "../preferences.js";
 import type * as proficiencies from "../proficiencies.js";
 import type * as profile from "../profile.js";
 import type * as quests from "../quests.js";
@@ -86,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   items: typeof items;
   mcp: typeof mcp;
   origins: typeof origins;
+  preferences: typeof preferences;
   proficiencies: typeof proficiencies;
   profile: typeof profile;
   quests: typeof quests;
