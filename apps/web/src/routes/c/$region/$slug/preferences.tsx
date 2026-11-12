@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useCharacter } from "@/components/character-data";
 import { GearPreferenceEditor } from "@/components/gear-preference";
 import { StatPriorityEditor } from "@/components/stat-priority";
+import { UnsavedChangesGuard } from "@/components/unsaved-changes";
 
 // Preferences: where the player who claimed this character sets what gear
 // suggestions look for (stats, and armor and weapon types). The Gear tab shows
@@ -15,6 +16,9 @@ export const Route = createFileRoute("/c/$region/$slug/preferences")({
 function PreferencesPage() {
 	const params = Route.useParams();
 	const data = useCharacter();
+	// Either editor with changes not saved: ask before leaving the page.
+	const [statsDirty, setStatsDirty] = useState(false);
+	const [gearDirty, setGearDirty] = useState(false);
 	if (!data) return null;
 	const c = data.character;
 	if (!data.canEdit) {
@@ -30,6 +34,7 @@ function PreferencesPage() {
 	}
 	return (
 		<div className="@container max-w-4xl space-y-10 pb-12">
+			<UnsavedChangesGuard dirty={statsDirty || gearDirty} />
 			<Section
 				title="Stats to look for"
 				description={
@@ -46,6 +51,7 @@ function PreferencesPage() {
 						classId={c.classId}
 						priority={data.statPriority}
 						talentTrees={c.talentTrees}
+						onDirtyChange={setStatsDirty}
 					/>
 				) : (
 					<p className="text-sm text-muted-foreground">No stat priority for this class yet.</p>
@@ -66,6 +72,7 @@ function PreferencesPage() {
 					classId={c.classId}
 					level={c.level}
 					preference={data.gearPreference}
+					onDirtyChange={setGearDirty}
 				/>
 			</Section>
 		</div>

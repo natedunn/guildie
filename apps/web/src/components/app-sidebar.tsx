@@ -1,5 +1,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
+import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
 	Activity01Icon,
@@ -28,6 +29,7 @@ import { SyncButton } from "@/components/sync-button";
 import { UpdateReady } from "@/components/update-ready";
 import { UpdatedNotice } from "@/components/whats-new";
 import { useCurrentGuild } from "@/lib/breadcrumbs";
+import { feedDayStart } from "@/lib/feed-day";
 import { usePageTitle } from "@/lib/page-title";
 import { cn } from "@/lib/utils";
 
@@ -100,7 +102,7 @@ function SidebarNav() {
 										<NavLink
 											to="/g/$region/$slug"
 											params={{ region: g.region, slug: g.slug }}
-											activeOptions={{ exact: true }}
+											activeOptions={{ exact: true, includeSearch: false }}
 											className="pl-3"
 										>
 											<HugeiconsIcon icon={UserGroupIcon} size={15} strokeWidth={1.75} />
@@ -109,7 +111,8 @@ function SidebarNav() {
 										{isMember(g) && (
 											<NavLink to="/g/$region/$slug/feed" params={{ region: g.region, slug: g.slug }} className="pl-3">
 												<HugeiconsIcon icon={Activity01Icon} size={15} strokeWidth={1.75} />
-												Feed
+												<span className="flex-1">Feed</span>
+												<FeedToday region={g.region} slug={g.slug} />
 											</NavLink>
 										)}
 										<NavLink
@@ -230,6 +233,29 @@ function SidebarNav() {
 				)}
 			</div>
 		</nav>
+	);
+}
+
+/** How many things happened in a guild today (since 4am, like the Feed's days). */
+function FeedToday({ region, slug }: { region: string; slug: string }) {
+	// Client only: "today" is the viewer's own.
+	const [since, setSince] = useState<number>();
+	useEffect(() => {
+		const update = () => setSince(feedDayStart(Date.now()).getTime());
+		update();
+		// Roll over at 4am without a reload.
+		const timer = window.setInterval(update, 60_000);
+		return () => window.clearInterval(timer);
+	}, []);
+	const { data: count } = useQuery({
+		...convexQuery(api.feed.today, { region: region as Region, slug, since: since ?? 0 }),
+		enabled: since !== undefined,
+	});
+	if (!count) return null;
+	return (
+		<span className="num text-xs text-muted-foreground" title="Today in the feed">
+			{count >= 100 ? "99+" : count}
+		</span>
 	);
 }
 

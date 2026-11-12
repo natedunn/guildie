@@ -129,6 +129,26 @@ export async function noteRequest(
 
 // ---- Reading ---------------------------------------------------------------------
 
+/**
+ * The sidebar's count next to Feed: events since `since` (the start of the
+ * viewer's feed day, 4am their time). Members only; null for anyone else.
+ */
+export const today = query({
+	args: { region: vRegion, slug: v.string(), since: v.number() },
+	handler: async (ctx, { region, slug, since }) => {
+		const guild = await ctx.db
+			.query("guilds")
+			.withIndex("by_key", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.unique();
+		if (!guild || !(await access(ctx, guild)).isMember) return null;
+		const events = await ctx.db
+			.query("feedEvents")
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", since))
+			.take(100);
+		return events.length;
+	},
+});
+
 /** The newest events, with what the page shows: avatars, item names and icons, quest titles. */
 export const list = query({
 	args: { region: vRegion, slug: v.string(), limit: v.optional(v.number()) },

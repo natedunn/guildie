@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { DUNGEON_BY_KEY, dungeonArtUrl, milestoneLevel } from "@convex/shared/dungeons";
+import { DUNGEON_BY_KEY, dungeonArtUrl } from "@convex/shared/dungeons";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
@@ -20,19 +20,20 @@ import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { PageTabButton, PageTabs } from "@/components/page-tabs";
-import { Switch } from "@/components/ui/switch";
+import { feedDayStart, feedDaysAgo } from "@/lib/feed-day";
 import { cn } from "@/lib/utils";
 
 // Feed: what the guild's members did, newest first, by day: level-ups,
 // first dungeon clears, dungeon quests turned in, and requests made,
 // claimed and fulfilled (convex/feed.ts). Filters live in the URL.
-// Days only, never times: Blizzard tells us hours late. Within a day, alike
+// Days only, never times: Blizzard tells us hours late. A day runs from 4am
+// (lib/feed-day.ts), so a late night counts with its evening. Within a day, alike
 // events share a row: everyone who cleared a dungeon, everyone who turned in
 // its quests, everyone who reached the same level (a character's level-ups
 // first merge into one).
 
 type Show = "all" | "levels" | "dungeons" | "quests" | "requests";
-type Search = { show?: Show; every5?: boolean };
+type Search = { show?: Show };
 const SHOWS: Show[] = ["all", "levels", "dungeons", "quests", "requests"];
 const SHOW_LABEL: Record<Show, string> = {
 	all: "All",
@@ -46,7 +47,6 @@ const PAGE = 100;
 export const Route = createFileRoute("/g/$region/$slug/feed")({
 	validateSearch: (search: Record<string, unknown>): Search => ({
 		...(SHOWS.includes(search.show as Show) && search.show !== "all" ? { show: search.show as Show } : {}),
-		...(search.every5 === true || search.every5 === "true" ? { every5: true } : {}),
 	}),
 	loader: async ({ context, params }) => {
 		await context.queryClient.ensureQueryData(
@@ -73,10 +73,7 @@ function FeedPage() {
 	const setSearch = (next: Search) =>
 		navigate({ search: (prev) => ({ ...prev, ...next }), replace: true, resetScroll: false });
 	const events = data.events.filter((e) => {
-		if (e.kind === "level") {
-			if (show !== "all" && show !== "levels") return false;
-			return !search.every5 || milestoneLevel(e.fromLevel, e.level ?? 0);
-		}
+		if (e.kind === "level") return show === "all" || show === "levels";
 		if (e.kind === "dungeon") return show === "all" || show === "dungeons";
 		if (e.kind === "quests") return show === "all" || show === "quests";
 		return show === "all" || show === "requests";
@@ -85,7 +82,7 @@ function FeedPage() {
 
 	return (
 		<div className="@container max-w-3xl space-y-5 pb-12">
-			<div className="space-y-3">
+			<div>
 				{/* No gaps and a shorter label where the five don't fit on one line (phones). */}
 				<PageTabs className="@max-sm:gap-0">
 					{SHOWS.map((s) => (
@@ -101,16 +98,6 @@ function FeedPage() {
 						</PageTabButton>
 					))}
 				</PageTabs>
-				{(show === "all" || show === "levels") && (
-					<label className="flex w-fit items-center gap-2 text-[0.8125rem] text-muted-foreground select-none">
-						<Switch
-							size="sm"
-							checked={!!search.every5}
-							onCheckedChange={(on) => setSearch({ every5: on || undefined })}
-						/>
-						Level-ups every 5 levels
-					</label>
-				)}
 			</div>
 
 			{days.length === 0 ? (
@@ -147,15 +134,13 @@ function FeedPage() {
 type FeedData = Extract<NonNullable<FunctionReturnType<typeof api.feed.list>>, { hidden: false }>;
 type Event = FeedData["events"][number];
 
-/** "Today", "Yesterday", then "Monday, Nov 3". */
+/** "Today", "Yesterday", then "Monday, Nov 3"; days start at 4am. */
 function byDay(events: Event[]): [string, Event[]][] {
 	const out: [string, Event[]][] = [];
-	const today = new Date();
-	today.setHours(0, 0, 0, 0);
+	const now = Date.now();
 	for (const e of events) {
-		const d = new Date(e.at);
-		d.setHours(0, 0, 0, 0);
-		const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+		const d = feedDayStart(e.at);
+		const diff = feedDaysAgo(e.at, now);
 		const label =
 			diff === 0
 				? "Today"

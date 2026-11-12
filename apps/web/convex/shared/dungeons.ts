@@ -386,7 +386,3 @@ export function dungeonOfKillStatistic(name: string): string | undefined {
 	for (const [n, key] of BY_NORMAL_NAME) if (place.includes(n)) return key;
 	return undefined;
 }
-
-/** The levels a jump crosses that the feed's "every 5 levels" view keeps (25, 30... and 60). */
-export const milestoneLevel = (from: number | undefined, to: number) =>
-	to >= 60 || Math.floor(to / 5) > Math.floor((from ?? to - 1) / 5);
