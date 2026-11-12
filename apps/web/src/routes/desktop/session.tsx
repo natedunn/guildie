@@ -4,7 +4,8 @@ import { convexQuery } from "@convex-dev/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
 import { useEffect, useRef, useState } from "react";
-import { Page, PageHeader } from "@/components/page-header";
+import { OnboardingCard, stepsOf } from "@/components/onboarding";
+import { Button } from "@/components/ui/button";
 import { landingPath } from "@/lib/claim";
 
 // The desktop app opens this in its window with a one-time code, after the
@@ -16,6 +17,8 @@ export const Route = createFileRoute("/desktop/session")({
 		code: typeof search.code === "string" ? search.code : "",
 	}),
 	head: () => ({ meta: [{ title: "Signing in · Guildie" }] }),
+	// The last card of the app's sign-in flow (components/onboarding.tsx), after /sign-in's.
+	staticData: { onboarding: true },
 	component: DesktopSession,
 });
 
@@ -25,6 +28,7 @@ function DesktopSession() {
 	const router = useRouter();
 	const started = useRef(false);
 	const [failed, setFailed] = useState(false);
+	const [done, setDone] = useState(false);
 
 	useEffect(() => {
 		if (started.current) return;
@@ -37,6 +41,7 @@ function DesktopSession() {
 				const result = await proxy.mutation(api.auth.signInWithDesktopCode, { code });
 				if (result.status !== "complete") return setFailed(true);
 				await setSession(result.tokens);
+				setDone(true);
 				await router.invalidate();
 				const viewer = await router.options.context.queryClient.fetchQuery(convexQuery(api.users.viewer, {}));
 				await router.navigate({ href: landingPath(viewer), replace: true });
@@ -47,21 +52,21 @@ function DesktopSession() {
 	}, [code, router, setSession]);
 
 	return (
-		<Page width="narrow">
-			<PageHeader title="Signing in" />
-			<p className="text-muted-foreground">
-				{failed ? (
-					<>
-						That sign-in link expired or was already used.{" "}
-						<Link to="/sign-in" className="text-foreground underline underline-offset-4">
-							Sign in again
-						</Link>
-						.
-					</>
-				) : (
-					"One moment…"
-				)}
-			</p>
-		</Page>
+		<OnboardingCard
+			title={failed ? "Couldn't sign the app in" : done ? "Signed in" : "Signing the app in"}
+			description={failed ? undefined : done ? "Opening your guild…" : "One moment…"}
+			steps={stepsOf("app", done ? 3 : 2, { error: failed, details: { 1: "Connected in your browser" } })}
+		>
+			{failed && (
+				<>
+					<p className="mb-4 text-[0.8125rem] text-muted-foreground">
+						That sign-in link expired or was already used. Start again; it takes a moment.
+					</p>
+					<Button size="lg" className="w-full" render={<Link to="/sign-in" />}>
+						Sign in again
+					</Button>
+				</>
+			)}
+		</OnboardingCard>
 	);
 }

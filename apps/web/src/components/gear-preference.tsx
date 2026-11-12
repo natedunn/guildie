@@ -27,15 +27,15 @@ function options(classId: number, kind: Kind) {
 	);
 }
 
-const nameOf = (kind: Kind, type: number) =>
+export const nameOf = (kind: Kind, type: number) =>
 	PROFICIENCY_TYPES.find((t) => t.kind === kind && t.subclass === type)?.name ?? "?";
 
 /** What no preference means, per kind. */
-const AUTO: Record<Kind, string> = { armor: "Best you can wear", weapon: "Any" };
+export const AUTO: Record<Kind, string> = { armor: "Best you can wear", weapon: "Any" };
 const TITLES: Record<Kind, string> = { armor: "Armor", weapon: "Weapons" };
 
 /** "only these" / "only this" / "preferred", after the types. */
-const strictness = (n: number, strict: boolean) => (strict ? (n > 1 ? "only these" : "only this") : "preferred");
+export const strictness = (n: number, strict: boolean) => (strict ? (n > 1 ? "only these" : "only this") : "preferred");
 
 /** The Gear tab's panel: the preferred types, if any. The claimant edits them on Preferences. */
 export function GearPreferenceSection({

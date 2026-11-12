@@ -8,6 +8,7 @@ import { AppSidebar, AppTopBar } from "@/components/app-sidebar";
 import { AppTitleBar } from "@/components/app-titlebar";
 import { DesktopBridge } from "@/components/desktop-bridge";
 import { ItemSheet } from "@/components/item-sheet";
+import { useOnboardingRoute } from "@/components/onboarding";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAuthToken } from "@/lib/convex-auth-start/functions";
 import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
@@ -87,24 +88,50 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootComponent() {
 	const { convex, token } = Route.useRouteContext();
+	// Signing in is one card on its own, without the sidebar (components/onboarding.tsx).
+	const onboarding = useOnboardingRoute();
 	return (
 		<ConvexAuthStartProvider client={convex} initialToken={token}>
 			<TooltipProvider>
 				<AuthSync />
 				<DesktopBridge />
-				<div className="app-shell">
-					<AppSidebar />
-					<div className="app-main">
-						<AppTitleBar />
-						<AppTopBar />
-						<main id="content" data-scroll-restoration-id="content" className="app-content px-4 sm:px-6">
-							<Outlet />
-						</main>
-						<ItemSheet />
+				{onboarding ? (
+					<OnboardingShell />
+				) : (
+					<div className="app-shell">
+						<AppSidebar />
+						<div className="app-main">
+							<AppTitleBar />
+							<AppTopBar />
+							<main id="content" data-scroll-restoration-id="content" className="app-content px-4 sm:px-6">
+								<Outlet />
+							</main>
+							<ItemSheet />
+						</div>
 					</div>
-				</div>
+				)}
 			</TooltipProvider>
 		</ConvexAuthStartProvider>
+	);
+}
+
+/**
+ * The sign-in flow's routes: just the page (the onboarding card), filling the
+ * window. In the desktop app a strip along the top still drags the window and
+ * leaves room for Windows' minimize / maximize / close.
+ */
+function OnboardingShell() {
+	return (
+		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
+			<div className="app-sidebar-drag hidden h-10 flex-none desktop:block" />
+			<main
+				id="content"
+				data-scroll-restoration-id="content"
+				className="min-h-0 flex-1 overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)]"
+			>
+				<Outlet />
+			</main>
+		</div>
 	);
 }
 

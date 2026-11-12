@@ -1,5 +1,7 @@
 import { api } from "@convex/_generated/api";
+import { ARMOR_SUBCLASS, CLASS_RULES, type ProficiencyType, proficienciesOf } from "@convex/shared/proficiencies";
 import { PRIORITY_STATS } from "@convex/shared/statPriority";
+import { canPrefer, typesOf } from "@convex/shared/upgrades";
 import { CLASSES, className, type Region, raceName } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
@@ -16,6 +18,8 @@ import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, useMemo, useState } from "react";
 import { UNFETCHED_NOTE } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { AUTO, nameOf, strictness } from "@/components/gear-preference";
+import { GROUPS } from "@/components/proficiencies";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -30,6 +34,7 @@ import { cn } from "@/lib/utils";
 const VIEWS = [
 	{ key: "overview", label: "Overview" },
 	{ key: "stats", label: "Stat priority" },
+	{ key: "gear", label: "Gear" },
 	{ key: "professions", label: "Professions" },
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
@@ -37,7 +42,7 @@ type View = (typeof VIEWS)[number]["key"];
 export const Route = createFileRoute("/g/$region/$slug/")({
 	// The layout ($slug.tsx) loads the guild and draws its header.
 	validateSearch: (search: Record<string, unknown>): { view?: Exclude<View, "overview"> } =>
-		search.view === "stats" || search.view === "professions" ? { view: search.view } : {},
+		search.view === "stats" || search.view === "gear" || search.view === "professions" ? { view: search.view } : {},
 	component: GuildPage,
 });
 
@@ -82,6 +87,9 @@ function Roster({ members }: { members: Member[] }) {
 				...(m.talentTrees ?? []).map((t) => t.name),
 				// "who wants intellect"
 				...(m.statPriority?.stats ?? []).slice(0, 3).map((s) => PRIORITY_STATS[s]),
+				// "prefers mail"
+				...preferredTypes(m, "armor").map((t) => nameOf("armor", t)),
+				...preferredTypes(m, "weapon").map((t) => nameOf("weapon", t)),
 			]
 				.filter(Boolean)
 				.join(" ")
@@ -220,6 +228,16 @@ function Roster({ members }: { members: Member[] }) {
 								<TableHead>3rd</TableHead>
 							</>
 						)}
+						{view === "gear" && (
+							<>
+								<TableHead>Wears</TableHead>
+								<TableHead>Wields</TableHead>
+								<TableHead>Prefers armor</TableHead>
+								<TableHead>Prefers weapons</TableHead>
+								<TableHead>Stats</TableHead>
+								<TableHead>Set by</TableHead>
+							</>
+						)}
 						{view === "professions" && (
 							<>
 								{header("profession", "Professions")}
@@ -288,6 +306,7 @@ function Roster({ members }: { members: Member[] }) {
 								</>
 							)}
 							{view === "stats" && <StatCells member={m} />}
+							{view === "gear" && <GearCells member={m} />}
 							{view === "professions" && (
 								<>
 									<TableCell className="num">
@@ -306,7 +325,9 @@ function Roster({ members }: { members: Member[] }) {
 			<p className="mt-4 text-xs text-muted-foreground">
 				{view === "stats"
 					? "What each character looks for on gear, from their main talent tree. A general guide; players can change their own on their character's page."
-					: "Talents, professions, gear and last synced fill in once a character is level 10 and has logged out. Blizzard's API doesn't say who's online right now."}
+					: view === "gear"
+						? "What each character can wear and wield at their level, and what they look for on gear. From their talents unless the player set it on their character's Preferences."
+						: "Talents, professions, gear and last synced fill in once a character is level 10 and has logged out. Blizzard's API doesn't say who's online right now."}
 			</p>
 		</section>
 	);
@@ -393,5 +414,128 @@ function LastSynced({ synced }: { synced: Synced }) {
 				)}
 			</TooltipContent>
 		</Tooltip>
+	);
+}
+
+/** The armor or weapon types a member's player prefers, first to last; ones their class can't use are left out (as gearPrefs does). */
+const preferredTypes = (m: Member, kind: "armor" | "weapon") =>
+	typesOf(m.gearPreference?.[kind]).filter((t) => canPrefer(CLASS_RULES[m.classId], kind, t));
+
+const isShield = (t: ProficiencyType) => t.key === `armor:${ARMOR_SUBCLASS.SHIELD}`;
+
+/**
+ * The Gear view's cells: what the class can use at their level (the heaviest
+ * body armor and shields; weapons, hover for everything with the levels later
+ * ones come at), the armor and weapon types and stats they look for, and
+ * whether the player set those or they follow the talents.
+ */
+function GearCells({ member: m }: { member: Member }) {
+	const all = proficienciesOf(m.classId);
+	const now = all.filter((p) => p.from <= m.level);
+	const body = all.filter((p) => p.type.group === "armor");
+	const best = body.filter((p) => p.from <= m.level).at(-1);
+	const next = body.find((p) => p.from > m.level);
+	const shield = now.find((p) => isShield(p.type));
+	const weapons = now.filter(
+		(p) => p.type.group === "melee" || p.type.group === "ranged" || p.type.kind === "dualWield",
+	);
+	const p = m.statPriority;
+	const gearSet = preferredTypes(m, "armor").length > 0 || preferredTypes(m, "weapon").length > 0;
+
+	return (
+		<>
+			<TableCell>
+				{best?.type.name}
+				{shield && <span className="text-muted-foreground">, {shield.type.name}</span>}
+				{next && (
+					<span className="text-muted-foreground">
+						{best ? " · " : ""}
+						{next.type.name} at <span className="num">{next.from}</span>
+					</span>
+				)}
+			</TableCell>
+			<TableCell>
+				{all.length > 0 && (
+					<Tooltip>
+						<TooltipTrigger render={<span className="block max-w-64 truncate" />}>
+							{weapons.map((w) => w.type.name).join(", ")}
+						</TooltipTrigger>
+						<TooltipContent side="bottom" className="block max-w-80">
+							<CanUseList all={all} level={m.level} />
+						</TooltipContent>
+					</Tooltip>
+				)}
+			</TableCell>
+			<PreferenceCell member={m} kind="armor" />
+			<PreferenceCell member={m} kind="weapon" />
+			<TableCell>
+				{p?.stats.slice(0, 3).map((s, i) => (
+					<span key={s} className={cn(i > 0 && "text-muted-foreground")}>
+						{i > 0 && ", "}
+						{PRIORITY_STATS[s]}
+					</span>
+				))}
+			</TableCell>
+			<TableCell className="text-muted-foreground">
+				{(p || gearSet) && (
+					<Tooltip>
+						<TooltipTrigger render={<span className={cn(p?.chosen || gearSet ? "text-foreground" : undefined)} />}>
+							{p?.chosen || gearSet ? "Player" : "Talents"}
+						</TooltipTrigger>
+						<TooltipContent side="left" className="block max-w-72 space-y-1">
+							<p>
+								Stats:{" "}
+								{!p
+									? "none for this class yet"
+									: p.chosen
+										? p.tree
+											? `chosen by the player (${p.tree}'s priority)`
+											: "the player's own"
+										: `from their talents (${p.tree})`}
+							</p>
+							<p>Armor and weapon types: {gearSet ? "chosen by the player" : "not set, any they can use"}</p>
+						</TooltipContent>
+					</Tooltip>
+				)}
+			</TableCell>
+		</>
+	);
+}
+
+/** Preferred types first to last and how strictly, or what no preference means (muted). */
+function PreferenceCell({ member: m, kind }: { member: Member; kind: "armor" | "weapon" }) {
+	const types = preferredTypes(m, kind);
+	if (!types.length) return <TableCell className="text-muted-foreground/60">{AUTO[kind]}</TableCell>;
+	return (
+		<TableCell>
+			{types.map((t) => nameOf(kind, t)).join(", ")}
+			<span className="text-muted-foreground">, {strictness(types.length, !!m.gearPreference?.[kind]?.strict)}</span>
+		</TableCell>
+	);
+}
+
+/** Everything a class can use, by group, later ones muted with their level (like a character's "Can use"). */
+function CanUseList({ all, level }: { all: ReturnType<typeof proficienciesOf>; level: number }) {
+	return (
+		<dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1">
+			{GROUPS.map((g) => {
+				const list = all.filter((p) => p.type.group === g.key);
+				if (!list.length) return null;
+				return (
+					<div key={g.key} className="contents">
+						<dt className="text-muted-foreground">{g.label}</dt>
+						<dd>
+							{list.map((p, i) => (
+								<span key={p.type.key} className={cn(p.from > level && "text-muted-foreground")}>
+									{i > 0 && ", "}
+									{p.type.name}
+									{p.from > level && <span className="num"> at {p.from}</span>}
+								</span>
+							))}
+						</dd>
+					</div>
+				);
+			})}
+		</dl>
 	);
 }

@@ -413,9 +413,17 @@ select:not([multiple]) {
 
 	/* ---- Tooltips and popovers ---- */
 
-	/* The game's tooltip: navy-black, a thin light-grey edge. Plain tooltips and
-	   item tooltips (components/item.tsx) both. */
-	[data-slot="tooltip-content"],
+	/* Plain tooltips: a popover (the menus' surface, edge and shadow). */
+	[data-slot="tooltip-content"]:not(.item-tooltip) {
+		color: var(--popover-foreground);
+		background-color: var(--popover);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius);
+		box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+	}
+
+	/* Item and talent tooltips (components/item.tsx, talent-tree.tsx): the
+	   game's, navy-black with a thin light-grey edge. */
 	.item-tooltip {
 		color: #fff;
 		background-color: var(--tooltip);

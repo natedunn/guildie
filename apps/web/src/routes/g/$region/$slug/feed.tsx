@@ -19,6 +19,7 @@ import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
+import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
@@ -79,23 +80,25 @@ function FeedPage() {
 	const days = byDay(events);
 
 	return (
-		<div className="max-w-3xl space-y-5 pb-12">
-			<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-				<div className="flex flex-wrap gap-1.5" role="group" aria-label="Show">
+		<div className="@container max-w-3xl space-y-5 pb-12">
+			<div className="space-y-3">
+				{/* No gaps and a shorter label where the five don't fit on one line (phones). */}
+				<PageTabs className="@max-sm:gap-0">
 					{SHOWS.map((s) => (
-						<button
-							key={s}
-							type="button"
-							className="chip"
-							data-active={show === s}
-							onClick={() => setSearch({ show: s === "all" ? undefined : s })}
-						>
-							{SHOW_LABEL[s]}
-						</button>
+						<PageTabButton key={s} active={show === s} onClick={() => setSearch({ show: s === "all" ? undefined : s })}>
+							{s === "levels" ? (
+								<>
+									<span className="@max-sm:hidden">Level-ups</span>
+									<span className="@sm:hidden">Levels</span>
+								</>
+							) : (
+								SHOW_LABEL[s]
+							)}
+						</PageTabButton>
 					))}
-				</div>
+				</PageTabs>
 				{(show === "all" || show === "levels") && (
-					<label className="ml-auto flex items-center gap-2 text-[0.8125rem] text-muted-foreground select-none">
+					<label className="flex w-fit items-center gap-2 text-[0.8125rem] text-muted-foreground select-none">
 						<Switch
 							size="sm"
 							checked={!!search.every5}
