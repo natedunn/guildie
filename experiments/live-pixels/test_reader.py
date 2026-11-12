@@ -3,10 +3,22 @@ from pathlib import Path
 import subprocess
 import unittest
 
-from reader import Assembler, decode
+from reader import Assembler, decode, sample_values
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_square_and_legacy_sampling(self):
+        for columns in (16, 32):
+            for cell in (4, 5, 8, 10):
+                class Shot:
+                    def pixel(self, x, y):
+                        assert x % cell == cell // 2 and y % cell == cell // 2
+                        assert 0 <= x < columns * cell
+                        assert 0 <= y < (256 // columns) * cell
+                        value = (y // cell) * columns + x // cell
+                        return value, value, value
+                self.assertEqual(sample_values(Shot(), cell, columns), list(range(256)))
+
     def test_lua_encoder_python_decoder(self):
         protocol = Path(__file__).parent / "GuildieLivePixels/Protocol.lua"
         script = 'dofile(arg[0]); for _, v in ipairs(GuildiePixelProtocol.encode(io.read("*a"))) do io.write(v, " ") end'
@@ -42,11 +54,12 @@ dofile(arg[0])
 local frame = {}
 local noop = function() end
 setmetatable(frame, {__index = function() return noop end})
-frame.SetScript = function(_, _, update) frame.update = update end
+frame.scripts = {}
+frame.SetScript = function(_, event, callback) frame.scripts[event] = callback end
 frame.CreateTexture = function()
     return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = noop}
 end
-frame.SetSize = function(_, width, height) assert(width == 128 and height == 32) end
+frame.SetSize = function(_, width, height) assert(width == 64 and height == 64) end
 CreateFrame = function() return frame end
 print = noop
 UIParent = {GetEffectiveScale = function() return 1 end}
@@ -67,8 +80,19 @@ GuildiePixelProtocol.encode = function(packet)
     return encode(packet)
 end
 dofile(arg[1])
+SlashCmdList.GUILDIELIVEPIXELS("edit")
+frame.scripts.OnUpdate(frame, 1) -- editing must not emit any packets
+frame.GetEffectiveScale = function() return 1 end
+frame.GetLeft = function() return 23.4 end
+frame.GetTop = function() return 477.2 end
+UIParent.GetTop = function() return 500 end
+frame.scripts.OnDragStop()
+assert(GuildieLivePixelsDB.x == 23 and GuildieLivePixelsDB.y == -23)
+frame.SetPoint = function(_, _, _, _, x, y) assert(x == 23 and y == -23) end
+frame.scripts.OnEvent(frame, "ADDON_LOADED", "GuildieLivePixels")
+SlashCmdList.GUILDIELIVEPIXELS("lock")
 SlashCmdList.GUILDIELIVEPIXELS("on compact")
-for _ = 1, 3 do frame:update(0.11) end
+for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
 """
         output = subprocess.check_output([
             "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),

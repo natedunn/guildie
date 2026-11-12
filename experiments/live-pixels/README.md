@@ -34,27 +34,40 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
    .venv/bin/python -m pip install -r requirements.txt
    ```
 
-3. Type `/guildiepixels on` and leave the strip at the top-left of the game's
-   content visible. Fullscreen and windowed modes can both work. Start capture
+3. Type `/guildiepixels on` to show a compact 16×16-cell square, initially
+   at the top-left of the game content. Fullscreen and windowed modes can both work. Start capture
    with the physical screen coordinates
    of that strip (not the window border):
 
    ```sh
-   .venv/bin/python reader.py --left 0 --top 0 --cell 8
+   .venv/bin/python reader.py --left 0 --top 0 --cell 4
    ```
 
    Replace coordinates and cell size for your screen. `--cell` is the measured
    physical pixel width of each square; display scaling can change it. macOS
    requires Screen Recording permission for the terminal/Python host. The reader
    can capture anything covering that rectangle, so keep it unobstructed.
-   Use `/guildiepixels on compact` for half-width cells. Measure the physical
-   cell size again when switching modes.
+   Use `/guildiepixels on large` for 8-unit cells instead of the default 4.
+   At 125% Windows scaling, the compact square is expected to be 80×80 physical
+   pixels with `--cell 5`; measure rather than assuming. `on compact` is an alias
+   for `on`. The reader defaults to 16 columns; `--columns 32` supports old strips.
+
+   `/guildiepixels edit` pauses export and shows a static dark square with a
+   gray outline. Drag it with the left mouse button. `/guildiepixels lock` hides
+   it; `/guildiepixels on` resumes export at the new position. It accepts no
+   mouse clicks outside edit mode. `/guildiepixels reset` returns it to the
+   top-left and disables export. Position is saved across reloads/logins; enabled
+   state is never saved. This is the experiment's own edit mode, not Blizzard's.
+   **Restart the game once after this update** to register the new SavedVariables
+   declaration. After moving the square, stop the reader and remeasure `--left`
+   and `--top` in physical screen pixels; it does not follow the square automatically.
+   On Windows use `.venv\Scripts\python.exe` in place of `.venv/bin/python`.
 4. Change zone/health or inventory and watch JSON lines. `/guildiepixels off`
    hides the strip; Ctrl-C stops the reader. Remove the experimental addon to uninstall.
 
 ## Protocol and limits
 
-32×8 grayscale cells, each carrying a byte. Header `GLP`, protocol version 1,
+16×16 opaque grayscale cells, each carrying a byte. Header `GLP`, protocol version 1,
 one-byte length, up to 240 bytes of packet, Adler-32 of header plus packet
 (big endian), then padding. Packet: `channel|transferId|part|total|bytes`.
 Payload chunks are 180 bytes; UTF-8 is decoded only after reassembly.
@@ -84,3 +97,7 @@ Run from the repository root; requires LuaJIT. Tests exercise the actual Lua enc
 against the Python decoder, checksum rejection, split UTF-8, out-of-order chunks,
 duplicate suppression, interleaved streams and size bounds. Live game rendering and
 OS screen capture still need manual verification on Windows/macOS.
+
+Square layout and dragging are covered by stubbed Lua/Python tests. Live rendering,
+position persistence and decoding after a drag still need in-game validation.
+Colors remain unchanged: custom tints or transparency are not supported by this decoder.

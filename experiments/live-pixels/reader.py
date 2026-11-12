@@ -47,34 +47,39 @@ class Assembler:
         return {"channel": "snapshot" if channel == b"S" else "live", "data": value}
 
 
+def sample_values(shot, cell, columns=16):
+    values = []
+    for i in range(256):
+        x = (i % columns) * cell + cell // 2
+        y = (i // columns) * cell + cell // 2
+        red, green, blue = shot.pixel(x, y)
+        if max(red, green, blue) - min(red, green, blue) > 2:
+            raise ValueError("non-grayscale cell")
+        values.append(red)
+    return values
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--left", type=int, required=True)
     parser.add_argument("--top", type=int, required=True)
     parser.add_argument("--cell", type=int, default=8,
                         help="Actual captured pixels per cell, including display scaling")
+    parser.add_argument("--columns", type=int, choices=(16, 32), default=16,
+                        help="16 for square; 32 for older strip addons")
     args = parser.parse_args()
     if not 2 <= args.cell <= 64:
         parser.error("cell must be between 2 and 64")
     import mss
     region = {"left": args.left, "top": args.top,
-              "width": 32 * args.cell, "height": 8 * args.cell}
+              "width": args.columns * args.cell, "height": (256 // args.columns) * args.cell}
     assembler = Assembler()
     with mss.mss() as capture:
         try:
             while True:
                 shot = capture.grab(region)
-                values = []
-                for i in range(256):
-                    x = (i % 32) * args.cell + args.cell // 2
-                    y = (i // 32) * args.cell + args.cell // 2
-                    red, green, blue = shot.pixel(x, y)
-                    if max(red, green, blue) - min(red, green, blue) > 2:
-                        values = []
-                        break
-                    values.append(red)
                 try:
-                    message = assembler.feed(decode(values))
+                    message = assembler.feed(decode(sample_values(shot, args.cell, args.columns)))
                 except (ValueError, UnicodeError):
                     message = None
                 if message is not None:

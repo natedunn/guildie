@@ -35,17 +35,50 @@ local panel = CreateFrame("Frame", nil, UIParent)
 panel:SetFrameStrata("TOOLTIP")
 panel:SetScale(1 / UIParent:GetEffectiveScale())
 panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
+panel:SetMovable(true)
+panel:SetClampedToScreen(true)
+panel:EnableMouse(false)
+panel:RegisterForDrag("LeftButton")
+local editing = false
+local cellSize = 4
+local function place(x, y)
+    panel:ClearAllPoints()
+    panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+end
+local function restorePosition()
+    local position = GuildieLivePixelsDB
+    if type(position) == "table" and type(position.x) == "number" and type(position.y) == "number" then
+        place(position.x, position.y)
+    end
+end
+panel:RegisterEvent("ADDON_LOADED")
+panel:SetScript("OnEvent", function(_, _, name)
+    if name == "GuildieLivePixels" then restorePosition() end
+end)
+panel:SetScript("OnDragStart", function()
+    if editing then panel:StartMoving() end
+end)
+panel:SetScript("OnDragStop", function()
+    panel:StopMovingOrSizing()
+    local scale = panel:GetEffectiveScale()
+    local parentScale = UIParent:GetEffectiveScale()
+    local x = math.floor(panel:GetLeft() + 0.5)
+    local y = math.floor(panel:GetTop() - UIParent:GetTop() * parentScale / scale + 0.5)
+    GuildieLivePixelsDB = {x = x, y = y}
+    place(x, y)
+end)
 local cells, displayed = {}, {}
 for i = 1, 256 do
     cells[i] = panel:CreateTexture(nil, "OVERLAY")
 end
-local function layout(cellSize)
-    panel:SetSize(32 * cellSize, 8 * cellSize)
+local function layout(size)
+    cellSize = size
+    panel:SetSize(16 * cellSize, 16 * cellSize)
     for i, cell in ipairs(cells) do
         cell:ClearAllPoints()
         cell:SetSize(cellSize, cellSize)
         cell:SetPoint("TOPLEFT", panel, "TOPLEFT",
-            ((i - 1) % 32) * cellSize, -math.floor((i - 1) / 32) * cellSize)
+            ((i - 1) % 16) * cellSize, -math.floor((i - 1) / 16) * cellSize)
     end
 end
 panel:Hide()
@@ -75,6 +108,7 @@ local function liveState()
 end
 local liveIndex = 1
 panel:SetScript("OnUpdate", function(_, delta)
+    if editing then return end
     elapsed = elapsed + delta
     if elapsed < 0.1 then return end
     elapsed = 0
@@ -115,13 +149,35 @@ panel:SetScript("OnUpdate", function(_, delta)
 end)
 SLASH_GUILDIELIVEPIXELS1 = "/guildiepixels"
 SlashCmdList.GUILDIELIVEPIXELS = function(command)
-    if command == "on" or command == "on compact" then
+    command = command:lower():match("^%s*(.-)%s*$")
+    panel:StopMovingOrSizing()
+    editing = false
+    panel:EnableMouse(false)
+    if command == "on" or command == "on compact" or command == "on large" then
         snapshot, live = nil, nil
-        layout(command == "on compact" and 4 or 8)
+        elapsed = 0
+        layout(command == "on large" and 8 or 4)
         panel:Show()
-        print("Guildie pixels: experimental screen export enabled.")
+        print("Guildie pixels: export enabled. Recalibrate the reader after moving or resizing.")
+    elseif command == "edit" then
+        editing = true
+        layout(cellSize)
+        for i, cell in ipairs(cells) do
+            local edge = i <= 16 or i > 240 or i % 16 == 0 or i % 16 == 1
+            local shade = edge and 0.4 or 0.12
+            cell:SetColorTexture(shade, shade, shade, 1)
+        end
+        displayed = {}
+        panel:EnableMouse(true)
+        panel:Show()
+        print("Guildie pixels: drag the square. /guildiepixels lock hides it; /guildiepixels on starts export.")
+    elseif command == "reset" then
+        GuildieLivePixelsDB = {x = 0, y = 0}
+        place(0, 0)
+        panel:Hide()
+        print("Guildie pixels: position reset; export disabled.")
     else
         panel:Hide()
-        print("Guildie pixels: disabled. Use /guildiepixels on or /guildiepixels on compact to enable.")
+        print("Guildie pixels: disabled. Commands: on, on large, edit, lock, off, reset.")
     end
 end
