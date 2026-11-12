@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **App:** The sidebar and title bar are one continuous dark frame around the page, with no seam where they meet.
+
 ## 0.3.24
 
 ### New
