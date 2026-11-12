@@ -14,7 +14,7 @@ local function json(value)
     end
     assert(kind == "table", "unsupported telemetry value")
     local parts = {}
-    if #value > 0 then
+    if #value > 0 or next(value) == nil then
         for i = 1, #value do parts[#parts + 1] = json(value[i]) end
         return "[" .. table.concat(parts, ",") .. "]"
     end
@@ -42,7 +42,7 @@ panel:RegisterForDrag("LeftButton")
 local editing = false
 local DEFAULT_CELL_SIZE = 1.6
 local cellSize = DEFAULT_CELL_SIZE
-local theme = "gray"
+local theme = "amber"
 local function place(x, y)
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
@@ -162,7 +162,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     local requestedSize = tonumber(command:match("^on (%d+%.?%d*)$"))
     local validSize = requestedSize and requestedSize >= 1 and requestedSize <= 8
     if command == "on" or command == "on compact" or command == "on large" or validSize then
-        theme = requestedTheme or "gray"
+        theme = requestedTheme or "amber"
         displayed = {}
         snapshot, live = nil, nil
         elapsed = 0

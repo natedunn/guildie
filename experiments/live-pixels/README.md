@@ -1,7 +1,8 @@
 # Live pixel export experiment
 
-Manual, outbound-only prototype. Not bundled with Guildie, installed automatically,
-or connected to the server. Blizzard approval of this transport is unconfirmed.
+Manual, outbound-only prototype. Not bundled with Guildie or installed automatically.
+The standalone reader stays local; the opt-in desktop pilot below uploads complete
+snapshots through your signed-in Guildie connection. Blizzard approval of this transport is unconfirmed.
 The addon starts disabled every login/reload. The reader captures only the rectangle
 you specify, and emits decoded JSON to stdout; it does not send data over the network.
 
@@ -21,7 +22,8 @@ you specify, and emits decoded JSON to stdout; it does not send data over the ne
 
 This is transport groundwork, not support for every possible future field. New
 live fields can be added to `liveState`; new persisted fields follow Guildie's
-normal capture/schema workflow. No UI, upload endpoint or presence feature uses it yet.
+normal capture/schema workflow. The desktop pilot uses the existing snapshot endpoint;
+live health/position remain local and are not yet a site presence feature.
 
 ## Try it
 
@@ -67,7 +69,7 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
 
 ## Protocol and limits
 
-16×16 opaque cells (grayscale by default), each carrying a byte. Header `GLP`, protocol version 1,
+16×16 opaque cells (amber by default), each carrying a byte. Header `GLP`, protocol version 1,
 one-byte length, up to 240 bytes of packet, Adler-32 of header plus packet
 (big endian), then padding. Packet: `channel|transferId|part|total|bytes`.
 Payload chunks are 180 bytes; UTF-8 is decoded only after reassembly.
@@ -100,7 +102,7 @@ duplicate suppression, interleaved streams and size bounds. See the Windows resu
 Square layout and dragging are covered by stubbed Lua/Python tests. Dragging and
 decoding at the new position were tested in game; persistence across a further
 login/reload has not been independently verified.
-The optional amber palette is described below. Arbitrary custom tints and transparency
+The amber palette is described below. Arbitrary custom tints and transparency
 are not supported.
 
 ## Smaller cells and interrupted visibility
@@ -156,12 +158,13 @@ respected; this experiment does not force itself over cinematic/dialogue UI.
 - Reader stopped after tests. Capture coordinates are machine-specific and must
   be recalibrated after dragging; automatic relocation is not implemented.
 
-## Optional amber palette test
+## Amber palette test
 
 `/guildiepixels on amber` uses warm bronze/amber tones at the default small size.
 `/guildiepixels on 4 amber` uses the larger size with that palette. Match the reader
-with `--theme amber`; plain `/guildiepixels on` and reader `--theme gray` restore
-grayscale. After moving in edit mode, use `on amber` again to select the palette.
+with `--theme amber`. Amber is now also the default for plain `/guildiepixels on`
+and reader launches without `--theme`. For debugging, `/guildiepixels on gray`
+and reader `--theme gray` restore grayscale.
 Reload the UI after installing the updated Live.lua; no new addon files were added.
 
 Each byte v maps to opaque RGB `(v, floor(v*0.75+0.5), floor(v*0.45+0.5))`.
@@ -179,3 +182,73 @@ one pixel too low decoded only some packets. Testing neighboring sampling origin
 found the reliable position; the figures above are from that corrected position.
 Validate multiple changing frames before accepting calibration. This was a local
 calibration correction, not an automatic relocation feature in reader.py.
+
+## Desktop upload pilot
+
+This phase connects the tested capture transport to Guildie's existing uploader.
+It is a development launch option, not a shipped release or default setting.
+No server deployment is required. The selected site's normal character ownership,
+payload validation and timestamp rules apply; the server keeps the newest sections
+when older SavedVariables uploads arrive later.
+
+1. Pull this branch, install workspace dependencies with `pnpm install --frozen-lockfile`,
+   and copy the updated experimental addon into WoW. `/reload` loads the Lua changes,
+   including the empty-list serialization fix required for server compatibility.
+   Then `/guildiepixels on` starts the default small amber square.
+2. Keep the Python virtual environment and `mss` dependency from the earlier test.
+   Stop the standalone reader. Save `experiments/live-pixels/pixel-config.json`
+   (ignored by Git) with absolute paths and the **previously verified** coordinates:
+
+   ```json
+   {
+     "python": "C:/path/to/guildie/experiments/live-pixels/.venv/Scripts/python.exe",
+     "reader": "C:/path/to/guildie/experiments/live-pixels/reader.py",
+     "left": 0,
+     "top": 0,
+     "cell": 2,
+     "theme": "amber"
+   }
+   ```
+
+   Coordinates above are placeholders. The config launches that Python executable
+   and script locally; use only the trusted files from your checkout. No API token
+   belongs in this file or in the reader.
+3. Quit the installed Guildie app from its tray. From the repository root:
+
+   ```sh
+   pnpm --filter @guildie/desktop build
+   pnpm --filter @guildie/desktop exec electron . --live-pixels-config "C:/path/to/guildie/experiments/live-pixels/pixel-config.json"
+   ```
+
+   This uses the app's usual signed-in site (`guildie.club` by default). `--url`
+   can select a configured preview instead. Sign in normally if necessary. This
+   launch **uploads your claimed characters' complete snapshots** to that site.
+   Never copy or print the app's stored token.
+4. The tray shows `Live capture: waiting`, then `receiving` when complete records
+   arrive. `stale` means no complete record for ten seconds (covered/hidden square,
+   stopped export, etc.). `failed` means the process stopped or emitted invalid
+   output; run the reader standalone for diagnostics, then restart the app.
+   Receiving alone does not mean a snapshot has uploaded: check Last upload and
+   the app log for `Uploaded live pixel snapshot` and any rejection message.
+5. Change bag contents without `/reload`, wait for a complete snapshot, and verify
+   the inventory on Guildie. Then test gear, bank (open it), professions (open each
+   window), and quests. Large snapshots still take time; capture timing is unchanged.
+6. Cover the square or use `/guildiepixels off`: the tray should become stale.
+   Re-enable it and verify recovery. Sign out: capture must stop. Sign back in:
+   capture must restart. Quit the app: its Python child must exit.
+
+The sync engine retains only the latest pending complete snapshot, attempts pixel
+uploads at most every 30 seconds, retries failures, and suppresses repeated successful
+payloads. It discards pending data on disconnect. Capture records are consumed in
+memory, not logged or written to disk. Only snapshot records upload; live records
+provide capture liveness and are discarded. Ordinary SavedVariables sync remains active.
+The in-game "On Guildie" display still needs a reload to load returned GuildieData.lua.
+
+Restart without `--live-pixels-config` to disable this pilot entirely. The experiment
+still starts disabled after WoW reload/login; enable it explicitly in game.
+Moving the square requires updating the config and restarting the app.
+
+Local verification covers Lua-to-Python framing, palettes and empty arrays; bounded
+process output and lifecycle; and snapshot coalescing, throttling, retry and disconnect.
+The new desktop-to-server path still needs the Windows checklist above. Record only
+counts, timings and pass/fail results in this repository, never raw character records.

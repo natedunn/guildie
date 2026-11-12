@@ -214,3 +214,11 @@ installing the addon into a real WoW: Forever folder (and the folder swap
 while the game runs; if Windows won't rename the folder the app overwrites
 the files one by one instead), self-updates from a release (needs two
 releases to see one), and Start with Windows surviving an update.
+## Experimental live pixel sync
+
+Development builds can start the separately installed pixel reader with
+`--live-pixels-config <absolute JSON path>`. Setup, calibration and the Windows
+verification checklist are in [the experiment guide](../../experiments/live-pixels/README.md#desktop-upload-pilot).
+The app owns capture for that run, uses its existing authenticated snapshot uploader,
+and shows capture state in the tray. This does not change the web bridge or enable
+capture in ordinary launches. The Python reader and experimental addon are not bundled.

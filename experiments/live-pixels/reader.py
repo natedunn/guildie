@@ -71,7 +71,7 @@ def main():
                         help="Actual captured pixels per cell, including display scaling")
     parser.add_argument("--columns", type=int, choices=(16, 32), default=16,
                         help="16 for square; 32 for older strip addons")
-    parser.add_argument("--theme", choices=("gray", "amber"), default="gray",
+    parser.add_argument("--theme", choices=("gray", "amber"), default="amber",
                         help="Must match the addon palette")
     args = parser.parse_args()
     if not 2 <= args.cell <= 64:
@@ -89,7 +89,7 @@ def main():
                 except (ValueError, UnicodeError):
                     message = None
                 if message is not None:
-                    print(json.dumps({"receivedAt": time.time(), **message}), flush=True)
+                    print(json.dumps({"receivedAt": time.time(), **message}, ensure_ascii=False), flush=True)
                 time.sleep(0.025)
         except KeyboardInterrupt:
             pass

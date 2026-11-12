@@ -58,7 +58,7 @@ class ProtocolTests(unittest.TestCase):
 
     def test_live_export_omits_protected_values(self):
         addon = Path(__file__).parent / "GuildieLivePixels"
-        script = """
+        script = r"""
 dofile(arg[0])
 local frame = {}
 local noop = function() end
@@ -85,6 +85,7 @@ CreateFrame = function() return frame end
 print = noop
 UIParent = {GetEffectiveScale = function() return 1 end}
 SlashCmdList = {}
+GuildieDB = {version = 4, characters = {test = {talents = {}, inventory = {bags = {capturedAt = 1, items = {}}}}}}
 local secret = {}
 issecretvalue = function(value) return value == secret end
 UnitHealth = function() return secret end
@@ -95,9 +96,8 @@ C_Map = {
 }
 local encode = GuildiePixelProtocol.encode
 GuildiePixelProtocol.encode = function(packet)
-    if packet:sub(1, 1) == "L" then
-        for _, value in ipairs(encode(packet)) do io.write(value, " ") end
-    end
+    for _, value in ipairs(encode(packet)) do io.write(value, " ") end
+    io.write("\n")
     return encode(packet)
 end
 dofile(arg[1])
@@ -121,7 +121,7 @@ SlashCmdList.GUILDIELIVEPIXELS("on 1.6")
 expectedSize = 25.6
 SlashCmdList.GUILDIELIVEPIXELS("on")
 SlashCmdList.GUILDIELIVEPIXELS("on compact")
-SlashCmdList.GUILDIELIVEPIXELS("on amber")
+SlashCmdList.GUILDIELIVEPIXELS("on") -- amber is now the default
 expectAmber = true
 for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
 assert(colorCount >= 256)
@@ -129,8 +129,13 @@ assert(colorCount >= 256)
         output = subprocess.check_output([
             "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),
         ])
-        result = Assembler().feed(decode(map(int, output.split())))
-        self.assertEqual(result, {"channel": "live", "data": {
+        assembler = Assembler()
+        records = [assembler.feed(decode(map(int, line.split()))) for line in output.splitlines()]
+        records = [record for record in records if record is not None]
+        self.assertEqual(records[0], {"channel": "snapshot", "data": {
+            "version": 4, "characters": [{"talents": [], "inventory": {"bags": {"capturedAt": 1, "items": []}}}],
+        }})
+        self.assertEqual(records[-1], {"channel": "live", "data": {
             "version": 1, "guid": "test-guid", "mapId": 42, "y": 0.5,
         }})
 

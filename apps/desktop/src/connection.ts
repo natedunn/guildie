@@ -15,10 +15,12 @@ import {
 	SyncEngine,
 } from "@guildie/sync";
 import { net } from "electron";
+import { LivePixels, type PixelConfig, type PixelStatus } from "./live-pixels.ts";
 import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
 
 export type Status = {
+	livePixels?: PixelStatus;
 	connected: boolean;
 	account?: string;
 	lastUpload?: LastUpload;
@@ -63,13 +65,15 @@ export class Connection {
 	private update: UpdateState | undefined;
 	private timer: NodeJS.Timeout | undefined;
 	private lastRetry = 0;
+	private readonly pixels: LivePixels | undefined;
+	private pixelStatus: PixelStatus | undefined;
 	private readonly listeners = new Set<(status: Status) => void>();
 	/** Notices for the user (shown as notifications by main). */
 	onNotice: (title: string, body: string) => void = () => {};
 	/** The WoW folder was chosen (main installs or updates the addon there). */
 	onWowFolder: (folder: string) => void = () => {};
 
-	constructor(origin: string, log: Log) {
+	constructor(origin: string, log: Log, pixelConfig?: PixelConfig) {
 		this.origin = origin;
 		this.log = log;
 		const saved = loadToken(origin);
@@ -87,10 +91,23 @@ export class Connection {
 			onUnmatched: (names) =>
 				this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
 		});
+		if (pixelConfig)
+			this.pixels = new LivePixels(
+				pixelConfig,
+				(data) => {
+					if (this.account && !this.sync.queuePixelSnapshot(data)) log("Live pixels: invalid snapshot ignored.");
+				},
+				(state) => {
+					this.pixelStatus = state;
+					log(`Live pixels: ${state}`);
+					this.emit();
+				},
+			);
 	}
 
 	get status(): Status {
 		return {
+			livePixels: this.pixelStatus,
 			connected: !!this.account,
 			account: this.account,
 			lastUpload: this.sync.lastUpload,
@@ -141,6 +158,8 @@ export class Connection {
 
 	stop() {
 		clearInterval(this.timer);
+		this.pixels?.stop();
+		this.sync.reset();
 	}
 
 	private async tick() {
@@ -167,6 +186,7 @@ export class Connection {
 			return false;
 		}
 		this.account = me.battletag ?? this.account ?? "you";
+		this.pixels?.start();
 		if (this.api.token) saveToken(this.origin, this.api.token, this.account);
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		if (!me.characters.length)
@@ -188,17 +208,23 @@ export class Connection {
 		if (!saveToken(this.origin, token, this.account))
 			this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
 		this.sync.reset();
+		this.pixels?.stop();
+		this.pixels?.start();
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		this.emit();
 	}
 
 	/** Disconnect this computer: the site forgets the token (unless it already has) and so do we. */
 	async disconnect(revoke = true) {
-		if (revoke && this.api.token) await this.api.signOut();
+		this.account = undefined;
+		this.pixels?.stop();
+		this.sync.reset();
+		const revocation = revoke && this.api.token ? this.api.signOut() : undefined;
 		this.api.token = undefined;
 		forgetToken(this.origin);
 		this.sync.reset();
 		this.emit();
+		await revocation;
 	}
 
 	/** "Upload now": upload the saved files again and refresh guild data. */

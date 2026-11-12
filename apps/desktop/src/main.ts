@@ -32,6 +32,7 @@ import {
 	uninstallAddon,
 } from "./addon.ts";
 import { Connection, type Status } from "./connection.ts";
+import { LivePixels, type PixelConfig } from "./live-pixels.ts";
 import { allowsSelfSigned, isGuildieUrl, originOf } from "./origins.ts";
 import { settings } from "./settings.ts";
 import { runSmokeTest } from "./smoke.ts";
@@ -163,7 +164,20 @@ app.whenReady().then(async () => {
 		if (helperWow) settings.wow = helperWow;
 	}
 
-	const connection = new Connection(origin, log);
+	let pixelConfig: PixelConfig | undefined;
+	const pixelConfigPath = flag("--live-pixels-config");
+	if (pixelConfigPath && !smokeTest) {
+		try {
+			pixelConfig = LivePixels.configFile(pixelConfigPath);
+		} catch {
+			dialog.showErrorBox(
+				"Live pixels configuration",
+				"Could not read the pixel config. Check the paths, coordinates, cell size and theme. Capture is disabled.",
+			);
+		}
+	}
+	const connection = new Connection(origin, log, pixelConfig);
+	app.on("before-quit", () => connection.stop());
 	connection.onNotice = notify;
 	log(`Guildie ${__VERSION__} for ${origin}`);
 
