@@ -1,23 +1,31 @@
 import { api } from "@convex/_generated/api";
-import { DUNGEON_BY_KEY, dungeonArtUrl, type Readiness } from "@convex/shared/dungeons";
-import { wowheadQuestUrl } from "@convex/shared/quests";
+import { DUNGEON_RESOURCES } from "@convex/shared/dungeonResources";
+import { DUNGEON_BY_KEY, dungeonArtUrl } from "@convex/shared/dungeons";
+import { questDifficulty, wowheadQuestUrl } from "@convex/shared/quests";
 import { className as classNameOf, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
+import { LinkSquare02Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { Fragment, type ReactNode, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
-import { DungeonArt, MembersOnly } from "@/components/dungeon";
+import { DoneMark, DungeonArt, MembersOnly, ViewAs, viewAsSearch, viewerKey } from "@/components/dungeon";
 import { SectionTitle } from "@/components/page-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-// A dungeon's page: its art, three tiles (ready, partly ready, completed)
-// that pick whose list shows, each person with a square per quest (done, in
-// their log, missing), the quests with the guild's progress, and
-// the bosses. Members only (dungeons:detail).
+// A dungeon's page: a header (small art, name, level, how the guild stands),
+// the roster with a column each for level, quests picked up and quests
+// turned in, and the dungeon's quests for the guild's side, on their own or
+// as whole chains, colored by level and ticked for one guildmate ("View
+// as"), then links to read up on it. It replaces the guild's header
+// ($slug.tsx). Members only
+// (dungeons:detail).
 
 export const Route = createFileRoute("/g/$region/$slug/dungeons/$dungeon")({
+	validateSearch: viewAsSearch,
 	loader: async ({ context, params }) => {
 		if (!DUNGEON_BY_KEY.has(params.dungeon)) throw notFound();
 		await context.queryClient.ensureQueryData(
@@ -35,9 +43,6 @@ export const Route = createFileRoute("/g/$region/$slug/dungeons/$dungeon")({
 
 type Detail = NonNullable<Extract<ReturnType<typeof useDetail>, { hidden: false }>>;
 type Person = Detail["people"][number];
-type Quest = Detail["quests"][number];
-/** Quests shown as one row: the same title more than once (one per side or class) is merged. */
-type QuestGroup = Quest & { ids: number[] };
 
 function useDetail() {
 	const params = Route.useParams();
@@ -46,314 +51,362 @@ function useDetail() {
 	).data;
 }
 
-const TILES: { status: Exclude<Readiness, "under">; label: string; hint: string }[] = [
-	{ status: "ready", label: "Ready", hint: "Level, and every quest picked up or done" },
-	{ status: "partial", label: "Partly ready", hint: "Level only" },
-	{ status: "completed", label: "Completed", hint: "Every quest done" },
-];
-
 function DungeonPage() {
 	const data = useDetail();
 	if (!data) return null;
-	if (data.hidden) return <MembersOnly />;
+	if (data.hidden) {
+		return (
+			<div className="pt-6">
+				<MembersOnly />
+			</div>
+		);
+	}
 	return <Dungeon data={data} />;
 }
 
 function Dungeon({ data }: { data: Detail }) {
-	const { dungeon, quests, people } = data;
-	const count = (s: Readiness) => people.filter((p) => p.status === s).length;
-	const [selected, setSelected] = useState<Readiness>(
-		() => TILES.find((t) => count(t.status) > 0)?.status ?? "partial",
-	);
-	const groups = mergeQuests(quests);
-	const areas = DUNGEON_BY_KEY.get(dungeon.key)?.areas ?? [];
-	const under = count("under");
+	const { dungeon, quests, items, people, side } = data;
+	const search = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
+	const viewer = viewerKey(people, search.as);
+	const setViewer = (as: string) => navigate({ search: (s) => ({ ...s, as }), replace: true });
+	const viewing = people.find((p) => p.key === viewer);
+	const count = (f: (p: Person) => boolean | undefined) => people.filter((p) => f(p)).length;
+	const sideName = side === "horde" ? "Horde" : side === "alliance" ? "Alliance" : undefined;
 
 	return (
-		<div className="@container space-y-8 pb-12">
-			<div>
-				<DungeonArt src={dungeonArtUrl(dungeon.key)} className="aspect-[21/6] rounded-t-md border border-border" />
-				<div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-b-md border border-t-0 border-border px-4 py-3">
-					<h2 className="text-lg font-semibold">{dungeon.name}</h2>
-					<div className="flex flex-wrap gap-1.5 text-xs">
-						<Fact label="Level" value={dungeon.level} />
-						<Fact label="Counts from" value={`Lvl ${dungeon.minLevel}`} />
-						<Fact label="Bosses" value={dungeon.bosses.length} />
-						<Fact label="Quests" value={groups.length} />
-					</div>
+		<div className="@container pb-12">
+			<header className="flex items-center gap-5 pt-6 pb-6">
+				<DungeonArt
+					src={dungeonArtUrl(dungeon.key)}
+					className="hidden h-32 w-60 flex-none rounded-md border border-border @md:block"
+				/>
+				<div className="min-w-0">
+					<h1 className="truncate text-xl font-semibold tracking-tight">{dungeon.name}</h1>
+					<p className="num mt-1 text-[0.8125rem] text-muted-foreground">
+						Level {dungeon.level} · {quests} {quests === 1 ? "quest" : "quests"}
+						{sideName && ` for the ${sideName}`}
+					</p>
+					<p className="num mt-0.5 text-[0.8125rem] text-muted-foreground">
+						<span className="text-foreground">{count((p) => p.levelReady)}</span> of {people.length} level ready ·{" "}
+						<span className="text-foreground">{count((p) => p.questReady)}</span> quest ready ·{" "}
+						<span className="text-foreground">{count((p) => p.questsCompleted)}</span> done with its quests
+					</p>
 				</div>
-			</div>
+			</header>
 
-			<section>
-				<div className="grid grid-cols-3 gap-2">
-					{TILES.map((t) => (
-						<button
-							key={t.status}
-							type="button"
-							onClick={() => setSelected(t.status)}
-							aria-pressed={selected === t.status}
-							className={cn(
-								"rounded-md border px-4 py-3 text-left transition-colors",
-								selected === t.status
-									? "border-foreground/40 bg-[var(--selected)]"
-									: "border-border hover:border-foreground/20",
-							)}
-						>
-							<div className="num text-3xl leading-none font-semibold">{count(t.status)}</div>
-							<div className="mt-1.5 text-[0.8125rem] font-medium">{t.label}</div>
-							<div className="mt-0.5 hidden text-xs text-muted-foreground @lg:block">{t.hint}</div>
-						</button>
-					))}
-				</div>
-				<PeopleList people={people.filter((p) => p.status === selected)} groups={groups} status={selected} />
-				{under > 0 && (
-					<button
-						type="button"
-						onClick={() => setSelected("under")}
-						className={cn(
-							"mt-2 text-xs underline-offset-4 hover:underline",
-							selected === "under" ? "text-foreground" : "text-muted-foreground",
-						)}
-					>
-						<span className="num">{under}</span> below level {dungeon.minLevel}
-					</button>
-				)}
-			</section>
-
-			<div className="grid gap-8 @4xl:grid-cols-[minmax(0,1fr)_16rem]">
+			<div className="grid gap-8 @5xl:grid-cols-[minmax(0,1fr)_32rem]">
 				<section>
-					<SectionTitle>Quests</SectionTitle>
-					{groups.length === 0 ? (
-						<p className="mt-2 text-[0.8125rem] text-muted-foreground">
-							Blizzard lists no dungeon quests here for your side.
-						</p>
-					) : (
-						<div className="mt-2 overflow-x-auto rounded-md border border-border">
-							<table className="w-full min-w-[26rem] text-[0.8125rem]">
-								<thead>
-									<tr className="border-b border-border text-left text-xs text-muted-foreground">
-										<th className="px-3 py-2 font-medium">Quest</th>
-										<th className="w-48 px-3 py-2 font-medium">Guild</th>
-									</tr>
-								</thead>
-								<tbody className="divide-y divide-border">
-									{groups.map((q) => (
-										<QuestRow key={q.id} quest={q} members={people.length} />
-									))}
-								</tbody>
-							</table>
-						</div>
-					)}
+					<SectionTitle>Roster</SectionTitle>
+					<Roster people={people} level={dungeon.level} />
 				</section>
-
-				<section>
-					<SectionTitle>Bosses</SectionTitle>
-					<ol className="mt-2 space-y-px">
-						{dungeon.bosses.map((b, i) => (
-							<li key={b} className="flex items-center gap-2.5 rounded-md px-2 py-1 text-[0.8125rem]">
-								<span className="num grid size-5 flex-none place-items-center rounded-full border border-border text-[10px] text-muted-foreground">
-									{i + 1}
-								</span>
-								{b}
-							</li>
-						))}
-					</ol>
-					{areas[0] !== undefined && (
-						<a
-							href={`https://www.wowhead.com/forever/zone=${areas[0]}`}
-							target="_blank"
-							rel="noreferrer"
-							className="mt-3 inline-block text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-						>
-							Loot and map on Wowhead
-						</a>
+				<section className="order-first @5xl:order-none">
+					<div className="flex items-center justify-between gap-3">
+						<SectionTitle>Quests</SectionTitle>
+						<ViewAs people={people} value={viewer} onChange={setViewer} />
+					</div>
+					{viewing && !viewing.questsDone && (
+						<p className="mt-2 text-xs text-muted-foreground">
+							{viewing.name}'s turned-in quests aren't known yet (Blizzard publishes them at logout), so only the ones
+							in their log are marked.
+						</p>
 					)}
+					<QuestList items={items} viewer={viewing} />
+					<Resources dungeonKey={dungeon.key} name={dungeon.name} />
 				</section>
 			</div>
 		</div>
 	);
 }
 
-function Fact({ label, value }: { label: string; value: string | number }) {
+// ---- Roster ---------------------------------------------------------------------------
+
+function Roster({ people, level }: { people: Person[]; level: number }) {
+	const params = Route.useParams();
+	if (people.length === 0) {
+		return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Nobody in the roster yet.</p>;
+	}
 	return (
-		<span className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1">
-			<span className="text-muted-foreground">{label}</span>
-			<span className="num font-medium">{value}</span>
+		<Table className="mt-2">
+			<TableHeader>
+				<TableRow>
+					<TableHead>Name</TableHead>
+					<TableHead className="w-24 text-right">Level</TableHead>
+					<TableHead className="w-28 text-right">Picked up</TableHead>
+					<TableHead className="w-28 text-right">Completed</TableHead>
+				</TableRow>
+			</TableHeader>
+			<TableBody>
+				{people.map((p) => (
+					<TableRow key={p.key}>
+						<TableCell>
+							<span className="flex items-center gap-2.5">
+								<CharacterAvatar url={p.avatarUrl} size={22} className="rounded-full" />
+								<Link
+									to="/c/$region/$slug"
+									params={{ region: params.region, slug: p.key }}
+									className="truncate font-medium underline-offset-4 hover:underline"
+								>
+									<ClassText classId={p.classId}>{p.name}</ClassText>
+								</Link>
+							</span>
+						</TableCell>
+						<TableCell className="text-right">
+							<Check ok={p.levelReady} title={p.levelReady ? undefined : `Under level ${level}`}>
+								{p.level}
+							</Check>
+						</TableCell>
+						<TableCell className="text-right">
+							{p.toPickUp === 0 ? (
+								<None title="No quests here for them" />
+							) : (
+								<Check
+									ok={p.questReady}
+									title={p.missing.length ? `Not picked up: ${p.missing.join(", ")}` : undefined}
+								>
+									{p.pickedUp}/{p.toPickUp}
+								</Check>
+							)}
+						</TableCell>
+						<TableCell className="text-right">
+							{p.total === 0 ? (
+								<None title="No quests here for them" />
+							) : !p.known ? (
+								<None title="Turned-in quests not known yet (Blizzard publishes them at logout)" />
+							) : (
+								<Check ok={!!p.questsCompleted}>
+									{p.done}/{p.total}
+								</Check>
+							)}
+						</TableCell>
+					</TableRow>
+				))}
+			</TableBody>
+		</Table>
+	);
+}
+
+/** A value with the done mark when it's met; muted when it isn't. */
+function Check({ ok, title, children }: { ok: boolean; title?: string; children: ReactNode }) {
+	return (
+		<span title={title} className={cn("num inline-flex items-center gap-1.5", !ok && "text-muted-foreground")}>
+			{children}
+			<span className="inline-flex w-4 justify-center">{ok && <DoneMark label="Yes" />}</span>
 		</span>
 	);
 }
 
-/** One row per quest title; ids kept so a person's squares follow the table's order. */
-function mergeQuests(quests: Quest[]): QuestGroup[] {
-	const out: QuestGroup[] = [];
-	for (const q of quests) {
-		const same = out.find((o) => o.title === q.title && JSON.stringify(o.classes) === JSON.stringify(q.classes));
-		if (same) {
-			same.ids.push(q.id);
-			same.done += q.done;
-			same.inLog += q.inLog;
-		} else out.push({ ...q, ids: [q.id] });
-	}
-	return out;
+function None({ title }: { title: string }) {
+	return (
+		<span title={title} className="inline-flex items-center gap-1.5 text-muted-foreground">
+			–<span className="inline-block w-4" />
+		</span>
+	);
 }
 
-function PeopleList({ people, groups, status }: { people: Person[]; groups: QuestGroup[]; status: Readiness }) {
-	const [all, setAll] = useState(false);
-	const LIMIT = 18;
-	const shown = all ? people : people.slice(0, LIMIT);
-	if (people.length === 0) {
+// ---- Quests ---------------------------------------------------------------------------
+
+type Item = Detail["items"][number];
+type Step = Extract<Item, { kind: "chain" }>["steps"][number];
+type Here = NonNullable<Step["here"]>;
+
+function QuestList({ items, viewer }: { items: Item[]; viewer?: Person }) {
+	if (items.length === 0) {
 		return (
-			<p className="mt-3 rounded-md border border-dashed border-border px-4 py-6 text-center text-[0.8125rem] text-muted-foreground">
-				{status === "ready"
-					? "Nobody is ready yet."
-					: status === "completed"
-						? "Nobody has finished it yet."
-						: "Nobody here."}
+			<p className="mt-2 text-[0.8125rem] text-muted-foreground">
+				Blizzard lists no dungeon quests here for your side.
 			</p>
 		);
 	}
 	return (
-		<div className="mt-3">
-			<ul className="grid gap-2 @3xl:grid-cols-2 @6xl:grid-cols-3">
-				{shown.map((p) => (
-					<PersonRow key={p.key} person={p} groups={groups} />
-				))}
-			</ul>
-			<div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-				<Legend />
-				{people.length > shown.length && (
-					<button
-						type="button"
-						onClick={() => setAll(true)}
-						className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-					>
-						Show all {people.length}
-					</button>
-				)}
-			</div>
+		<ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+			{items.map((item) =>
+				item.kind === "quest" ? (
+					<li key={item.key} className="px-3 py-2">
+						<QuestLine ids={item.ids} id={item.id} title={item.title} level={item.level} here={item} viewer={viewer} />
+					</li>
+				) : (
+					<li key={item.steps[0].id} className="px-3 py-2">
+						<Chain steps={item.steps} viewer={viewer} />
+					</li>
+				),
+			)}
+		</ul>
+	);
+}
+
+/** Very long chains show the dungeon's steps, the ones next to them, and the first and last; the rest on demand. */
+const SHOW_ALL_UP_TO = 12;
+
+function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
+	const [all, setAll] = useState(false);
+	const near = (i: number) =>
+		i === 0 || i === steps.length - 1 || steps.slice(Math.max(0, i - 1), i + 2).some((s) => s.here);
+	const shown = all || steps.length <= SHOW_ALL_UP_TO ? steps.map(() => true) : steps.map((_, i) => near(i));
+	return (
+		<div>
+			<p className="text-xs font-medium text-muted-foreground">Chain</p>
+			<ol className="mt-1">
+				{steps.map((s, i) => {
+					if (shown[i]) {
+						return (
+							<li key={`${s.id}-${i}`} className="flex items-center gap-2.5 py-0.5">
+								<span className="num grid size-4 flex-none place-items-center rounded-full border border-border text-[9px] text-muted-foreground">
+									{s.step}
+								</span>
+								<div className="min-w-0 flex-1">
+									<QuestLine
+										ids={s.ids}
+										id={s.id}
+										title={s.title}
+										level={s.level}
+										here={s.here}
+										viewer={viewer}
+										badge={!!s.here}
+									/>
+								</div>
+							</li>
+						);
+					}
+					// A run of hidden steps: one button where it starts.
+					if (i > 0 && !shown[i - 1]) return null;
+					let n = 0;
+					while (i + n < steps.length && !shown[i + n]) n++;
+					return (
+						<li key={`more-${s.id}-${i}`} className="py-0.5 pl-[1.625rem]">
+							<button
+								type="button"
+								onClick={() => setAll(true)}
+								className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+							>
+								{n} more {n === 1 ? "step" : "steps"}
+							</button>
+						</li>
+					);
+				})}
+			</ol>
 		</div>
 	);
 }
 
-type Mark = "done" | "log" | "missing";
-
-function PersonRow({ person: p, groups }: { person: Person; groups: QuestGroup[] }) {
-	const params = Route.useParams();
-	const state = (id: number): Mark | undefined =>
-		p.done.includes(id) ? "done" : p.inLog.includes(id) ? "log" : p.missing.includes(id) ? "missing" : undefined;
-	// A square per quest of theirs, in the table's order.
-	const marks = groups.flatMap((g) => {
-		const states = g.ids.map(state).filter((s): s is Mark => s !== undefined);
-		if (!states.length) return [];
-		const best: Mark = states.includes("done") ? "done" : states.includes("log") ? "log" : "missing";
-		return [{ title: g.title, mark: best }];
-	});
-	const done = marks.filter((m) => m.mark === "done").length;
+/**
+ * One quest: its level in brackets, in the color the game's quest log would
+ * give it for the viewer, its title, a Wowhead link, and on the right where
+ * the viewer stands: turned in (the done mark), in their log, not picked up,
+ * or another class's quest.
+ */
+function QuestLine({
+	ids,
+	id,
+	title,
+	level,
+	here,
+	viewer,
+	badge,
+}: {
+	ids: number[];
+	id: number;
+	title: string;
+	level?: number;
+	here?: Here;
+	viewer?: Person;
+	/** Mark it as done in this dungeon (a chain's steps here). */
+	badge?: boolean;
+}) {
+	const done = viewer?.questsDone?.some((q) => ids.includes(q));
+	const inLog = !done && viewer?.questsInLog.some((q) => ids.includes(q));
+	// Another class's quest isn't theirs to pick up; "not picked up" only when their turned-in quests are known.
+	const otherClass = !!viewer && !!here?.classes && !here.classes.includes(viewer.classId);
+	const notPickedUp = !done && !inLog && !otherClass && !!viewer?.questsDone;
+	const color = level && viewer ? `qd-${questDifficulty(level, viewer.level)}` : undefined;
 	return (
-		<li className="flex items-center gap-3 rounded-md border border-border px-3 py-2">
-			<CharacterAvatar url={p.avatarUrl} size={28} className="rounded-full" />
-			<div className="min-w-0 flex-1">
-				<div className="flex items-baseline gap-2">
-					<Link
-						to="/c/$region/$slug"
-						params={{ region: params.region, slug: p.key }}
-						className="truncate text-[0.8125rem] font-medium underline-offset-4 hover:underline"
+		<div>
+			<div className="flex items-center gap-2">
+				<span className={cn("num w-8 flex-none text-right text-xs", color ?? "text-muted-foreground")}>
+					{level ? `[${level}]` : ""}
+				</span>
+				<span className="flex min-w-0 flex-1 items-center gap-2">
+					<a
+						href={wowheadQuestUrl(id)}
+						target="_blank"
+						rel="noreferrer"
+						title="Open on Wowhead"
+						className="min-w-0 truncate text-[0.8125rem] underline-offset-4 hover:underline"
 					>
-						<ClassText classId={p.classId}>{p.name}</ClassText>
-					</Link>
-					{p.mine && (
-						<span className="rounded-sm border border-border px-1 text-[10px] text-muted-foreground">You</span>
-					)}
-				</div>
-				<div className="num text-xs text-muted-foreground">Lvl {p.level}</div>
-			</div>
-			{marks.length === 0 ? (
-				<span className="text-xs text-muted-foreground">No quests for them</span>
-			) : !p.known && !p.inLog.length ? (
-				<span className="text-xs text-muted-foreground">Quests not known yet</span>
-			) : (
-				<div className="flex items-center gap-2.5">
-					<div className="flex flex-wrap justify-end gap-1">
-						{marks.map((m, i) => (
-							<Square key={`${m.title}-${i}`} mark={m.mark} title={`${m.title}: ${MARK_LABEL[m.mark]}`} />
-						))}
-					</div>
-					<span className="num w-9 text-right text-xs text-muted-foreground">
-						{done}/{marks.length}
-					</span>
-				</div>
-			)}
-		</li>
-	);
-}
-
-const MARK_LABEL: Record<Mark, string> = { done: "done", log: "in their quest log", missing: "not picked up" };
-
-function Square({ mark, title }: { mark: Mark; title?: string }) {
-	return (
-		<span
-			title={title}
-			className={cn(
-				"inline-block size-2.5 rounded-[2px] border",
-				mark === "done" && "border-foreground/80 bg-foreground/80",
-				mark === "log" && "border-foreground/60 bg-foreground/30",
-				mark === "missing" && "border-foreground/30",
-			)}
-		/>
-	);
-}
-
-function Legend({ className }: { className?: string }) {
-	return (
-		<div className={cn("flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground", className)}>
-			<span className="inline-flex items-center gap-1.5">
-				<Square mark="done" /> Done
-			</span>
-			<span className="inline-flex items-center gap-1.5">
-				<Square mark="log" /> In quest log
-			</span>
-			<span className="inline-flex items-center gap-1.5">
-				<Square mark="missing" /> Not picked up
-			</span>
-		</div>
-	);
-}
-
-function QuestRow({ quest: q, members }: { quest: QuestGroup; members: number }) {
-	const pct = (n: number) => `${Math.min(100, (n / Math.max(members, 1)) * 100)}%`;
-	return (
-		<tr className="align-middle">
-			<td className="px-3 py-2.5">
-				<a
-					href={wowheadQuestUrl(q.id)}
-					target="_blank"
-					rel="noreferrer"
-					title="Open on Wowhead"
-					className="underline-offset-4 hover:underline"
-				>
-					{q.title}
-				</a>
-				<div className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-					{q.minLevel ? <span className="num">Lvl {q.minLevel}+</span> : null}
-					{q.classes?.map((c) => (
-						<span key={c}>
-							<ClassText classId={c}>{classNameOf(c)}</ClassText> only
+						{title}
+					</a>
+					{badge && (
+						<span className="flex-none rounded-sm border border-border px-1 py-px text-[10px] leading-none text-muted-foreground">
+							In Dungeon
 						</span>
+					)}
+				</span>
+				{done ? (
+					<DoneMark label={`${viewer?.name} turned it in`} />
+				) : inLog ? (
+					<span className="flex-none text-xs text-muted-foreground">In log</span>
+				) : notPickedUp ? (
+					<span className="flex-none text-xs text-muted-foreground/70">Not picked up</span>
+				) : otherClass ? (
+					<span className="flex-none text-xs text-muted-foreground/70">Not their class</span>
+				) : null}
+			</div>
+			{here?.classes?.length ? (
+				<p className="mt-0.5 pl-10 text-xs text-muted-foreground">
+					Class quest:{" "}
+					{here.classes.map((c, i) => (
+						<Fragment key={c}>
+							{i > 0 && ", "}
+							<ClassText classId={c}>{classNameOf(c)}</ClassText>
+						</Fragment>
 					))}
-				</div>
-			</td>
-			<td className="px-3 py-2.5">
-				<div
-					className="flex h-1.5 overflow-hidden rounded-full bg-muted"
-					title={`${q.done} done, ${q.inLog} in their quest log, of ${members}`}
-				>
-					<div className="bg-foreground/80" style={{ width: pct(q.done) }} />
-					<div className="bg-foreground/35" style={{ width: pct(q.inLog) }} />
-				</div>
-				<div className="num mt-1 text-xs text-muted-foreground">
-					{q.done} done{q.inLog ? ` · ${q.inLog} in log` : ""}
-				</div>
-			</td>
-		</tr>
+				</p>
+			) : null}
+		</div>
+	);
+}
+
+// ---- Resources ------------------------------------------------------------------------
+
+/** Wowhead's guide (one per wing), the entrance on its world map, and the dungeon map where the guide has one. */
+function Resources({ dungeonKey, name }: { dungeonKey: string; name: string }) {
+	const r = DUNGEON_RESOURCES[dungeonKey];
+	const links = [
+		...(r?.guides ?? []).map((g) => ({
+			label: g.wing ? `${g.wing} guide` : "Dungeon guide",
+			url: g.url,
+		})),
+		...(r?.dungeonMap ? [{ label: "Dungeon map", url: r.dungeonMap }] : []),
+		...(r?.entrance ? [{ label: "Entrance on the world map", url: r.entrance }] : []),
+	];
+	return (
+		<div className="mt-8">
+			<SectionTitle>Resources</SectionTitle>
+			{links.length === 0 ? (
+				<p className="mt-2 text-[0.8125rem] text-muted-foreground">Wowhead has no guide for {name} yet.</p>
+			) : (
+				<ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+					{links.map((l) => (
+						<li key={l.url}>
+							<a
+								href={l.url}
+								target="_blank"
+								rel="noreferrer"
+								className="flex items-center gap-2 px-3 py-2 text-[0.8125rem] transition-colors hover:bg-hover"
+							>
+								<span className="min-w-0 flex-1 truncate">{l.label}</span>
+								<span className="flex-none text-xs text-muted-foreground">Wowhead</span>
+								<HugeiconsIcon
+									icon={LinkSquare02Icon}
+									size={13}
+									strokeWidth={1.75}
+									className="flex-none text-muted-foreground"
+								/>
+							</a>
+						</li>
+					))}
+				</ul>
+			)}
+		</div>
 	);
 }

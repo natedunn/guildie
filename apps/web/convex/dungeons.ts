@@ -7,23 +7,30 @@ import { appToken, blizzardGet } from "./blizzard";
 import { access } from "./guilds";
 import { pickProfile } from "./helper";
 import { vRegion } from "./schema";
+import { DUNGEON_QUEST_FACTS } from "./shared/dungeonQuests";
 import {
+	chainIds,
 	DUNGEON_BY_KEY,
 	DUNGEONS,
 	type Dungeon,
+	type DungeonQuest,
+	forSide,
 	type MemberQuests,
-	minLevelFor,
+	memberStatus,
+	questChains,
 	questDetails,
-	type Readiness,
-	readiness,
+	questGroups,
 	sideOf,
+	withFacts,
 } from "./shared/dungeons";
+import { QUEST_LEVELS } from "./shared/questLevels";
 
-// A guild's Dungeons page: each dungeon (shared/dungeons.ts) with who's ready
-// for it, and its detail view. Readiness comes from each member's quests: in
-// their log (Blizzard's profile or the addon's newer read) and turned in
-// (Blizzard's completed list, sync.ts). Members only, like the rest of the
-// guild's quest data.
+// A guild's Dungeons page: each dungeon (shared/dungeons.ts) with how many
+// members are level ready, quest ready and done with its quests, and its
+// detail view (the roster and the quests). It comes from each member's level
+// and quests: in their log (Blizzard's profile or the addon's newer read) and
+// turned in (Blizzard's completed list, sync.ts). Only the guild's side's
+// quests count. Members only, like the rest of the guild's quest data.
 
 // ---- Each dungeon's quests (weekly) ------------------------------------------------
 
@@ -32,7 +39,12 @@ type Quest = {
 	title?: string;
 	type?: { name?: string };
 	area?: { name?: string };
-	requirements?: { level?: number | { min?: number }; min_character_level?: number; classes?: { id: number }[] };
+	requirements?: {
+		level?: number | { min?: number };
+		min_character_level?: number;
+		classes?: { id: number }[];
+		faction?: { type?: string };
+	};
 	rewards?: Parameters<typeof questDetails>[0]["rewards"];
 };
 
@@ -47,7 +59,11 @@ export const syncQuests = internalAction({
 	},
 });
 
-/** One dungeon: its areas' quests, each looked up; the "Dungeon" ones are its quests. */
+/**
+ * One dungeon: its areas' quests, each looked up; the "Dungeon" ones are its
+ * quests. The other steps of their chains (DUNGEON_QUEST_FACTS) are looked
+ * up too, for their titles and sides.
+ */
 export const syncDungeon = internalAction({
 	args: { key: v.string() },
 	handler: async (ctx, { key }) => {
@@ -62,10 +78,13 @@ export const syncDungeon = internalAction({
 			for (const q of res.data.quests ?? []) ids.add(q.id);
 		}
 		const rows = [];
-		for (const questId of ids) {
+		// The rest of their chains, for titles and sides.
+		const others = chainIds([...ids]).filter((id) => !ids.has(id));
+		for (const questId of [...ids, ...others]) {
+			const dungeonQuest = ids.has(questId);
 			try {
 				const res = await blizzardGet<Quest>({ ...common, path: `/data/wow/quest/${questId}` });
-				if (!res.ok || res.data.type?.name !== "Dungeon") continue;
+				if (!res.ok || (dungeonQuest && res.data.type?.name !== "Dungeon")) continue;
 				const r = res.data.requirements;
 				const minLevel = typeof r?.level === "number" ? r.level : (r?.level?.min ?? r?.min_character_level);
 				rows.push({
@@ -81,7 +100,10 @@ export const syncDungeon = internalAction({
 			}
 		}
 		await ctx.runMutation(internal.quests.save, { quests: rows });
-		await ctx.runMutation(internal.dungeons.saveQuests, { key, questIds: rows.map((r) => r.questId) });
+		await ctx.runMutation(internal.dungeons.saveQuests, {
+			key,
+			questIds: rows.filter((r) => ids.has(r.questId)).map((r) => r.questId),
+		});
 	},
 });
 
@@ -100,22 +122,34 @@ export const saveQuests = internalMutation({
 
 // ---- Reading -------------------------------------------------------------------------
 
-type QuestRow = Doc<"quests">;
+const questRow = (ctx: QueryCtx, questId: number) =>
+	ctx.db
+		.query("quests")
+		.withIndex("by_questId", (q) => q.eq("questId", questId))
+		.unique();
 
-async function dungeonQuestRows(ctx: QueryCtx, key: string) {
+/** A dungeon's quests the guild's side can take, with the hand-kept facts applied. */
+async function dungeonQuests(ctx: QueryCtx, key: string, side: ReturnType<typeof sideOf>) {
 	const row = await ctx.db
 		.query("dungeonQuests")
 		.withIndex("by_key", (q) => q.eq("key", key))
 		.unique();
-	const out: QuestRow[] = [];
+	const out: (DungeonQuest & { minLevel?: number; level?: number })[] = [];
 	for (const id of row?.questIds ?? []) {
-		const q = await ctx.db
-			.query("quests")
-			.withIndex("by_questId", (x) => x.eq("questId", id))
-			.unique();
-		if (q) out.push(q);
+		const q = await questRow(ctx, id);
+		const quest =
+			q &&
+			withFacts({
+				id,
+				title: q.title,
+				classes: q.classes,
+				faction: q.faction,
+				minLevel: q.minLevel,
+				level: q.level ?? QUEST_LEVELS[id],
+			});
+		if (quest) out.push(quest);
 	}
-	return out;
+	return forSide(out, side);
 }
 
 type Member = {
@@ -157,59 +191,58 @@ async function membersOf(ctx: QueryCtx, region: Doc<"guilds">["region"], slug: s
 			quests: {
 				level: profile.level,
 				classId: c.classId,
-				side: sideOf(c.faction ?? guild.faction),
 				inProgress: new Set((profile.quests ?? []).map((q) => q.id)),
 				completed: completed ? new Set(completed.ids) : undefined,
 			},
 		});
 	}
-	return { hidden: false as const, guild, members };
+	return { hidden: false as const, guild, members, side: sideOf(guild.faction) };
 }
 
-const asQuests = (rows: QuestRow[]) => rows.map((q) => ({ id: q.questId, classes: q.classes, faction: q.faction }));
-
-/** The cards: each dungeon with how many members are completed, ready and partly ready. */
+/**
+ * The Dungeons page: each dungeon with how many members are level ready and
+ * quest ready, and each member with the dungeons they have quests in and
+ * the ones they've turned all of them in for ("View as").
+ */
 export const guild = query({
 	args: { region: vRegion, slug: v.string() },
 	handler: async (ctx, { region, slug }) => {
 		const data = await membersOf(ctx, region, slug);
 		if (!data || data.hidden) return data;
-		const side = sideOf(data.guild.faction);
+		const people = data.members.map((m) => ({
+			key: m.character.slug,
+			name: m.character.name,
+			classId: m.character.classId,
+			avatarUrl: m.character.avatarUrl,
+			level: m.quests.level,
+			mine: m.mine,
+			/** Their turned-in quests are known (else nothing counts as complete yet). */
+			known: m.quests.completed !== undefined,
+			/** Dungeons with quests for them, and the ones they've turned them all in for. */
+			available: [] as string[],
+			complete: [] as string[],
+		}));
 		const dungeons = [];
 		for (const d of DUNGEONS) {
-			const rows = await dungeonQuestRows(ctx, d.key);
-			const quests = asQuests(rows);
-			const counts: Record<Readiness, number> = { completed: 0, ready: 0, partial: 0, under: 0 };
-			const mine: { name: string; status: Readiness }[] = [];
-			for (const m of data.members) {
-				const r = readiness(d, quests, m.quests);
-				counts[r.status]++;
-				if (m.mine) mine.push({ name: m.character.name, status: r.status });
+			const quests = await dungeonQuests(ctx, d.key, data.side);
+			const groups = questGroups(quests);
+			const counts = { levelReady: 0, questReady: 0 };
+			for (const [i, m] of data.members.entries()) {
+				const s = memberStatus(d, groups, m.quests);
+				if (s.levelReady) counts.levelReady++;
+				if (s.questReady) counts.questReady++;
+				if (s.total > 0) people[i].available.push(d.key);
+				if (s.questsCompleted) people[i].complete.push(d.key);
 			}
-			const sideQuests = rows.filter((q) => !q.faction || !side || q.faction === side);
-			dungeons.push({
-				key: d.key,
-				name: d.name,
-				level: d.level,
-				minLevel: minLevelFor(d),
-				bosses: d.bosses.length,
-				quests: sideQuests.length,
-				classQuests: sideQuests.filter((q) => q.classes?.length).length,
-				counts,
-				mine,
-			});
+			// The game gives a dungeon one level; its quests for the guild's side say how high it goes.
+			const levelMax = Math.max(d.level, ...quests.map((q) => q.level ?? 0));
+			dungeons.push({ key: d.key, name: d.name, level: d.level, levelMax, counts });
 		}
-		return {
-			hidden: false as const,
-			dungeons,
-			members: data.members.length,
-			/** Members whose turned-in quests we have (the rest can only be "partly ready"). */
-			withCompleted: data.members.filter((m) => m.quests.completed).length,
-		};
+		return { hidden: false as const, dungeons, people };
 	},
 });
 
-/** One dungeon in full: its bosses, quests and everyone's status. */
+/** One dungeon: the roster with each member's status, and its quests. */
 export const detail = query({
 	args: { region: vRegion, slug: v.string(), key: v.string() },
 	handler: async (ctx, { region, slug, key }) => {
@@ -217,54 +250,82 @@ export const detail = query({
 		if (!dungeon) return null;
 		const data = await membersOf(ctx, region, slug);
 		if (!data || data.hidden) return data;
-		const side = sideOf(data.guild.faction);
-		const rows = (await dungeonQuestRows(ctx, key)).filter((q) => !q.faction || !side || q.faction === side);
-		const quests = asQuests(rows);
+		const quests = await dungeonQuests(ctx, key, data.side);
+		const groups = questGroups(quests);
+		/** Every quest on the page: the dungeon's and the rest of their chains. */
+		const pageIds = chainIds(quests.map((q) => q.id));
 		const people = data.members
-			.map((m) => {
-				const r = readiness(dungeon, quests, m.quests);
-				return {
-					key: m.character.slug,
-					name: m.character.name,
-					surname: m.character.surname,
-					classId: m.character.classId,
-					avatarUrl: m.character.avatarUrl,
-					level: m.quests.level,
-					mine: m.mine,
-					known: m.quests.completed !== undefined,
-					...r,
-				};
-			})
+			.map((m) => ({
+				key: m.character.slug,
+				name: m.character.name,
+				classId: m.character.classId,
+				avatarUrl: m.character.avatarUrl,
+				level: m.quests.level,
+				mine: m.mine,
+				known: m.quests.completed !== undefined,
+				...memberStatus(dungeon, groups, m.quests),
+				/** Of the page's quests: turned in, and in their log (for "View as"). */
+				questsDone: m.quests.completed ? pageIds.filter((id) => m.quests.completed?.has(id)) : undefined,
+				questsInLog: pageIds.filter((id) => m.quests.inProgress.has(id) && !m.quests.completed?.has(id)),
+			}))
 			.sort(
 				(a, b) =>
-					Number(b.mine) - Number(a.mine) ||
-					b.done.length + b.inLog.length - (a.done.length + a.inLog.length) ||
+					Number(b.questsCompleted ?? false) - Number(a.questsCompleted ?? false) ||
+					Number(b.questReady) - Number(a.questReady) ||
+					Number(b.levelReady) - Number(a.levelReady) ||
 					b.level - a.level ||
 					a.name.localeCompare(b.name),
 			);
+		const byId = new Map(quests.map((q) => [q.id, q]));
+		const row = (g: (typeof groups)[number]) => ({
+			key: g.key,
+			id: g.ids[0],
+			/** Any of them counts (the same quest listed twice). */
+			ids: g.ids,
+			title: g.title,
+			classes: g.classes,
+			level: g.ids.map((id) => byId.get(id)?.level).find((l) => l),
+		});
+		// Whole chains: the steps outside the dungeon by title and side as Blizzard has them.
+		const outside = new Map<number, { title: string; faction?: "alliance" | "horde"; level?: number }>();
+		for (const id of pageIds) {
+			if (byId.has(id)) continue;
+			const q = await questRow(ctx, id);
+			if (q) outside.set(id, { title: q.title, faction: q.faction, level: q.level });
+		}
+		const chains = questChains(groups, data.side, (id) => DUNGEON_QUEST_FACTS[id]?.side ?? outside.get(id)?.faction);
+		const inChain = new Set(chains.flatMap((c) => c.flatMap((s) => (s.group ? [s.group] : []))));
+		const byKey = new Map(groups.map((g) => [g.key, g]));
+		const items = [
+			...chains.map((steps) => ({
+				kind: "chain" as const,
+				steps: steps.map((s) => {
+					const g = s.group ? byKey.get(s.group) : undefined;
+					return {
+						step: s.depth + 1,
+						id: s.id,
+						ids: g?.ids ?? [s.id],
+						title: g?.title ?? outside.get(s.id)?.title ?? `Quest ${s.id}`,
+						level: g ? row(g).level : (outside.get(s.id)?.level ?? QUEST_LEVELS[s.id]),
+						here: g ? row(g) : undefined,
+					};
+				}),
+			})),
+			...groups.filter((g) => !inChain.has(g.key)).map((g) => ({ kind: "quest" as const, ...row(g) })),
+		];
+		const titleOf = (i: (typeof items)[number]) =>
+			i.kind === "quest" ? i.title : (i.steps.find((s) => s.here)?.title ?? "");
+		const classOf = (i: (typeof items)[number]) =>
+			i.kind === "quest" ? !!i.classes : i.steps.some((s) => s.here?.classes);
+		items.sort((a, b) => Number(classOf(a)) - Number(classOf(b)) || titleOf(a).localeCompare(titleOf(b)));
 		return {
 			hidden: false as const,
-			dungeon: {
-				key: dungeon.key,
-				name: dungeon.name,
-				level: dungeon.level,
-				minLevel: minLevelFor(dungeon),
-				bosses: dungeon.bosses,
-			},
-			quests: rows
-				.map((q) => ({
-					id: q.questId,
-					title: q.title,
-					minLevel: q.minLevel,
-					level: q.level,
-					classes: q.classes,
-					faction: q.faction,
-					/** Members (in this guild) for whom it's done or in their log. */
-					done: people.filter((p) => p.done.includes(q.questId)).length,
-					inLog: people.filter((p) => p.inLog.includes(q.questId)).length,
-				}))
-				.sort((a, b) => Number(!!a.classes) - Number(!!b.classes) || a.title.localeCompare(b.title)),
-			people,
+			dungeon: { key: dungeon.key, name: dungeon.name, level: dungeon.level },
+			quests: groups.length,
+			items,
+			people: people.map(({ doneKeys, inLogKeys, ...p }) => p),
+			/** The guild's side, for the header. */
+			side: data.side,
 		};
 	},
 });
