@@ -1,5 +1,5 @@
 import { api } from "@convex/_generated/api";
-import { type CookieStore, ServerAuthSession, setupConvexAuthServer } from "@convex-dev/auth/ssr";
+import { AUTH_JWT_COOKIE, type CookieStore, ServerAuthSession, setupConvexAuthServer } from "@convex-dev/auth/ssr";
 import { deleteCookie, getCookie, setCookie } from "@tanstack/react-start/server";
 import { ConvexHttpClient } from "convex/browser";
 
@@ -32,10 +32,30 @@ export async function readAuthToken(): Promise<string | null> {
 		cookieOptions,
 	});
 	try {
+		// A token from before Convex Auth 2.0 (a different audience) still
+		// looks unexpired for up to its 10 minutes, but Convex rejects it, which
+		// would break the server render. Refresh instead: its refresh token is
+		// gone too, so that clears the cookies and the page renders signed out.
+		const token = getCookie(AUTH_JWT_COOKIE);
+		if (token && !isCurrentToken(token)) {
+			const result = await session.refresh();
+			return result.kind === "rotated" ? result.tokens.accessToken : null;
+		}
 		return await session.getToken();
 	} catch (error) {
-		// The beta throws when a refresh fails outright (convex-auth#729).
+		// Thrown when a refresh fails outright (convex-auth#729).
 		console.error("convex-auth-start: token refresh failed", error);
 		return null;
+	}
+}
+
+/** Whether a JWT has the audience Convex Auth 2.0 issues. Unverified: Convex checks the signature. */
+function isCurrentToken(token: string) {
+	try {
+		const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+		const aud = payload.aud;
+		return aud === "convex-auth" || (Array.isArray(aud) && aud.includes("convex-auth"));
+	} catch {
+		return false;
 	}
 }

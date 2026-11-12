@@ -3,9 +3,9 @@ import { AuthClient, JWT_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY, type TokenStora
 import { oauth } from "@convex-dev/auth/methods/oauth/react";
 import { useRouter } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
-import { ConvexProviderWithAuth, type ConvexReactClient } from "convex/react";
-import { type ReactNode, useState } from "react";
-import { AuthProvider, type AuthSignInApi, SessionWatcher, useAuth } from "#convex-auth-react-internal";
+import { ConvexProviderWithAuth, type ConvexReactClient, useConvexAuth, useQuery } from "convex/react";
+import { type ReactNode, useEffect, useState } from "react";
+import { AuthProvider, type AuthSignInApi, useAuth } from "#convex-auth-react-internal";
 
 type AuthSessionResponse = { tokens: { accessToken: string } | null };
 
@@ -49,6 +49,27 @@ function pageStorage(): TokenStorage {
 			else local?.removeItem(key);
 		},
 	};
+}
+
+/**
+ * Notices when this page's session ends elsewhere (signed out in another tab
+ * or window, or revoked) and catches up with the cookie session. Not the
+ * package's SessionWatcher: that calls signOut, which revokes whatever session
+ * the shared cookie holds now, so a tab waking up late would sign out a newer
+ * session started in another tab. A refresh only reads the cookie: no session
+ * there signs this page out; a newer one reloads the page into it.
+ */
+function SessionGuard({ authClient }: { authClient: AuthClient }) {
+	const { isAuthenticated } = useConvexAuth();
+	const live = useQuery(api.auth.isAuthenticated, isAuthenticated ? {} : "skip");
+	const ended = live === false;
+	useEffect(() => {
+		if (!ended) return;
+		void authClient.fetchAccessToken({ forceRefreshToken: true }).then((token) => {
+			if (token !== null) window.location.reload();
+		});
+	}, [ended, authClient]);
+	return null;
 }
 
 export function ConvexAuthStartProvider({
@@ -109,8 +130,7 @@ export function ConvexAuthStartProvider({
 	return (
 		<AuthProvider authClient={authClient} signInApi={signInApi}>
 			<ConvexProviderWithAuth client={client} useAuth={useAuth}>
-				{/* Signs this page out as soon as its session ends elsewhere. */}
-				<SessionWatcher isAuthenticated={api.auth.isAuthenticated} />
+				<SessionGuard authClient={authClient} />
 				{children}
 			</ConvexProviderWithAuth>
 		</AuthProvider>
