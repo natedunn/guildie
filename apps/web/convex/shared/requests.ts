@@ -201,3 +201,23 @@ export function matsLabel(state: MatsState | undefined) {
 	if (state === "declared") return "Has the mats (says so)";
 	return "Mats not confirmed";
 }
+
+/** Full requests the viewer can fill using their own latest inventory scans. */
+export function canHelpFromInventory(
+	request: { kind: "item" | "craft"; status: string; quantity: number; itemId?: number; recipeId?: number },
+	mine: boolean,
+	known: Set<number>,
+	scans: InventoryScan[],
+	reagents?: { itemId: number; name: string; quantity: number }[],
+) {
+	if (mine || request.status !== "open") return false;
+	if (request.kind === "item") {
+		return request.itemId !== undefined && (sumInventory(scans).counts.get(request.itemId) ?? 0) >= request.quantity;
+	}
+	return (
+		request.recipeId !== undefined &&
+		known.has(request.recipeId) &&
+		!!reagents &&
+		matsCheck(reagents, request.quantity, scans).covered
+	);
+}

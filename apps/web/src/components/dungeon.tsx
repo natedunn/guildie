@@ -69,6 +69,7 @@ export function ViewAs({
 	label: title = "View as",
 	placeholder = "Search the guild",
 	align = "end",
+	combinedLabel,
 }: {
 	people: Viewable[];
 	value: string | undefined;
@@ -76,14 +77,17 @@ export function ViewAs({
 	label?: string;
 	placeholder?: string;
 	align?: "start" | "end";
+	combinedLabel?: string;
 }) {
 	const byKey = new Map(people.map((p) => [p.key, p]));
 	const keys = [...people].sort((a, b) => Number(b.mine) - Number(a.mine) || b.level - a.level).map((p) => p.key);
-	const label = (key: string) => byKey.get(key)?.name ?? key;
+	const combinedKey = "__all__";
+	if (combinedLabel) keys.unshift(combinedKey);
+	const label = (key: string) => (key === combinedKey ? (combinedLabel ?? key) : (byKey.get(key)?.name ?? key));
 	return (
 		<Combobox.Root
 			items={keys}
-			value={value ?? null}
+			value={value ?? (combinedLabel ? combinedKey : null)}
 			onValueChange={(key) => key && onChange(key)}
 			itemToStringLabel={label}
 			autoHighlight
@@ -94,7 +98,7 @@ export function ViewAs({
 					{value && byKey.get(value) ? (
 						<ClassText classId={byKey.get(value)?.classId ?? 0}>{label(value)}</ClassText>
 					) : (
-						"someone"
+						(combinedLabel ?? "someone")
 					)}
 				</span>
 				<HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} />
@@ -112,7 +116,15 @@ export function ViewAs({
 						<Combobox.List className="max-h-72 overflow-y-auto p-1 empty:hidden">
 							{(key: string) => {
 								const p = byKey.get(key);
-								if (!p) return null;
+								if (!p)
+									return combinedLabel && key === combinedKey ? (
+										<Combobox.Item
+											value={key}
+											className="cursor-default rounded-sm px-2 py-1.5 text-[0.8125rem] outline-none data-highlighted:bg-accent"
+										>
+											{combinedLabel}
+										</Combobox.Item>
+									) : null;
 								return (
 									<Combobox.Item
 										key={key}

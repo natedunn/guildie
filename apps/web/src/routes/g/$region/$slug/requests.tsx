@@ -47,8 +47,8 @@ function RequestsPage() {
 		return {
 			open: all.filter(isActive),
 			mine: all.filter((r) => r.mine),
-			// What you could fill, and what you claimed and still have to finish.
-			help: all.filter((r) => isActive(r) && (r.canClaim || r.claim?.mine)),
+			// Only full requests covered by the viewer’s latest inventory scans.
+			help: all.filter((r) => r.canHelp),
 		};
 	}, [data]);
 
@@ -110,12 +110,19 @@ function RequestsPage() {
 				))}
 			</div>
 
+			{view === "help" && (
+				<p className="text-xs text-muted-foreground">
+					Requests covered by your characters’ last synced bags and banks. Crafts also require a known recipe and all
+					materials.
+				</p>
+			)}
+
 			{shown.length === 0 ? (
 				<Empty>
 					{view === "mine"
 						? "You haven't asked for anything lately."
 						: view === "help"
-							? "Nothing you can help with right now. Crafts show here when one of your characters knows the recipe."
+							? "No matching requests right now."
 							: "No open requests. Search above to ask the guild for something."}
 				</Empty>
 			) : (

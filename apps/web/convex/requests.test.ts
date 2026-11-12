@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
 	type Action,
+	canHelpFromInventory,
 	check,
 	EXPIRE_MS,
 	isStale,
@@ -165,4 +166,27 @@ test("mats: no scan is never covered; guildmates see a label, not counts", () =>
 	assert.equal(matsLabel("inventory"), "Has the mats");
 	assert.equal(matsLabel("declared"), "Has the mats (says so)");
 	assert.equal(matsLabel("missing"), "Mats not confirmed");
+});
+
+test("help requires full inventory coverage and a known craft, never just eligibility", () => {
+	const scans = [
+		{
+			bags: { capturedAt: NOW, items: [{ id: 1, count: 3 }] },
+			bank: { capturedAt: NOW, items: [{ id: 1, count: 2 }] },
+		},
+	];
+	const item = { kind: "item" as const, status: "open", quantity: 5, itemId: 1 };
+	const known = new Set([10]);
+	assert.equal(canHelpFromInventory(item, false, known, scans), true);
+	assert.equal(canHelpFromInventory({ ...item, quantity: 6 }, false, known, scans), false);
+	assert.equal(canHelpFromInventory(item, false, known, []), false);
+	assert.equal(canHelpFromInventory(item, true, known, scans), false);
+	assert.equal(canHelpFromInventory({ ...item, status: "claimed" }, false, known, scans), false);
+	const craft = { kind: "craft" as const, status: "open", quantity: 2, recipeId: 10 };
+	const reagents = [{ itemId: 1, name: "Cloth", quantity: 2 }];
+	assert.equal(canHelpFromInventory(craft, false, known, scans, reagents), true);
+	assert.equal(canHelpFromInventory({ ...craft, quantity: 3 }, false, known, scans, reagents), false);
+	assert.equal(canHelpFromInventory(craft, false, new Set(), scans, reagents), false);
+	assert.equal(canHelpFromInventory(craft, false, known, scans, []), false);
+	assert.equal(canHelpFromInventory(craft, false, known, scans), false);
 });

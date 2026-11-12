@@ -259,8 +259,10 @@ function EventRow({ row }: { row: Row }) {
 		</Link>
 	);
 	const item = e.item && (
-		<ItemHover item={e.item} className="inline-flex items-center gap-1.5 align-middle">
-			<ItemIcon icon={e.item.icon} quality={e.item.quality} size={18} />
+		<ItemHover item={e.item} className="inline align-baseline">
+			<span className="mr-1.5 inline-block align-middle">
+				<ItemIcon icon={e.item.icon} quality={e.item.quality} size={18} />
+			</span>
 			<span className="font-medium" style={{ color: QUALITY_COLORS[e.item.quality ?? "COMMON"] }}>
 				{(e.quantity ?? 1) > 1 && <span className="num">{e.quantity}× </span>}
 				{e.item.name}
