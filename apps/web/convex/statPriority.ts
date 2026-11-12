@@ -47,6 +47,32 @@ export const setGear = mutation({
 	},
 });
 
+/** Most items a character can have removed from its suggestions. */
+const MAX_DISMISSED = 500;
+
+/**
+ * The player who claimed a character removes an item from its gear
+ * suggestions (`removed`), or puts it back: the rules leave removed items out
+ * for it everywhere (Upgrades for me, the item panel, the addon's tooltips
+ * after the app's next refresh).
+ */
+export const dismissItem = mutation({
+	args: { region: vRegion, slug: v.string(), itemId: v.number(), removed: v.boolean() },
+	handler: async (ctx, { region, slug, itemId, removed }) => {
+		const userId = await requireUserId(ctx);
+		const claim = (
+			await ctx.db
+				.query("ownedCharacters")
+				.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+				.collect()
+		).find((c) => c.userId === userId);
+		if (!claim) throw new ConvexError("Only the player who claimed this character can change it.");
+		const list = (claim.dismissedItems ?? []).filter((id) => id !== itemId);
+		if (removed) list.push(itemId);
+		await ctx.db.patch(claim._id, { dismissedItems: list.slice(-MAX_DISMISSED) });
+	},
+});
+
 type Region = "us" | "eu" | "kr" | "tw";
 export type Choice = null | { tree: number } | { stats: string[]; tiers?: number[] };
 export type TypeChoice = null | GearTypeChoice;

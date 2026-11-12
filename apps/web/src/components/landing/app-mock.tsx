@@ -18,6 +18,7 @@ import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { GuildieMark } from "@/components/mark";
 import { cn } from "@/lib/utils";
 import { MEMBERS } from "./primitives";
 
@@ -95,10 +96,7 @@ function MockSidebar() {
 	return (
 		<div className="flex w-[220px] flex-none flex-col border-r border-border text-[0.8125rem] @max-2xl:hidden">
 			<div className="flex h-10 flex-none items-center gap-2 px-4 text-[0.9375rem] font-semibold tracking-tight">
-				<svg viewBox="0 0 32 32" aria-hidden="true" className="size-[18px]">
-					<path d="M16 4l10 4.2v7.3c0 6-4.1 10.4-10 12.1-5.9-1.7-10-6.1-10-12.1V8.2z" fill="currentColor" />
-					<path d="M16 10.5v11M10.5 16h11" stroke="var(--chrome)" strokeWidth="2.25" strokeLinecap="round" />
-				</svg>
+				<GuildieMark />
 				Guildie
 			</div>
 			<div className="flex-1 space-y-5 px-2 pt-2">

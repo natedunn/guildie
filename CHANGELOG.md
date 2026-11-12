@@ -15,6 +15,16 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie, Addon:** Remove a suggestion you don't want under Crafting → Upgrades for me, and it's never suggested for that character again, on the site or in anyone's tooltips in game. "Show removed" brings them back into view to restore.
+
+### Improvements
+
+- **Guildie:** Upgrades for me and Upgrades I can craft are grouped into cards (Upgrades, Trade-offs, Maybe) with cleaner rows, and the Crafting tabs show with the page instead of a moment later.
+- **Guildie, App:** The Guildie icon is gold now: the sidebar, the browser tab, the installed web app and the Windows app.
+- **App:** The sidebar and title bar keep the site's warm dark color instead of letting the Windows wallpaper tint them.
+
 ## 0.3.23
 
 ### Improvements

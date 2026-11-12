@@ -22,6 +22,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AddonNotice } from "@/components/addon-notice";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { GuildieMark } from "@/components/mark";
 import { OMNI_SEARCH_EVENT, SearchButton, SearchIconButton } from "@/components/omni-search";
 import { SyncButton } from "@/components/sync-button";
 import { UpdateReady } from "@/components/update-ready";
@@ -54,10 +55,7 @@ function SidebarHead() {
 export function Wordmark() {
 	return (
 		<Link to="/" className="flex items-center gap-2 rounded-md px-1 text-[0.9375rem] font-semibold tracking-tight">
-			<svg viewBox="0 0 32 32" aria-hidden="true" className="size-[18px]">
-				<path d="M16 4l10 4.2v7.3c0 6-4.1 10.4-10 12.1-5.9-1.7-10-6.1-10-12.1V8.2z" fill="currentColor" />
-				<path d="M16 10.5v11M10.5 16h11" stroke="var(--chrome)" strokeWidth="2.25" strokeLinecap="round" />
-			</svg>
+			<GuildieMark />
 			Guildie
 		</Link>
 	);

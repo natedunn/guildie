@@ -76,6 +76,7 @@ export async function memberForUpgrades(
 			equipment: worn,
 			statPriority: claim?.statPriority,
 			gearPreference: claim?.gearPreference,
+			dismissed: claim?.dismissedItems,
 		},
 		rules,
 	);

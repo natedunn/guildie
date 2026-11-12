@@ -506,14 +506,15 @@ select:not([multiple]) {
 		-webkit-user-drag: none;
 	}
 
-	/* Windows 11 Mica behind the sidebar and title bar (the window sets it up). */
+	/* Windows 11 Mica behind the sidebar and title bar (the window sets it up),
+	   under a warm tint of the site's chrome: the wallpaper's color only
+	   shifts the shade a little, and the app keeps the web's warm near-black. */
 	html[data-material="mica"],
 	html[data-material="mica"] body {
 		background-color: transparent;
 	}
 	html[data-material="mica"] :is(.app-sidebar, .app-titlebar) {
-		background-color: transparent;
-		background-image: none;
+		background-color: rgb(19 17 14 / 0.9);
 	}
 
 	/* ---- Tooltips and popovers ---- */

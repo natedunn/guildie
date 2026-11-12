@@ -183,9 +183,13 @@ export const upgradesForMe = query({
 			const helps: Help[] = [];
 			for (const f of mine) {
 				if (bound && !crafters.some((c) => c.slug === f.character.slug)) continue;
-				const verdict = judge(info, f.member, rules, recipe.craftedItemId);
+				// Removed ones are judged anyway, flagged, for "Show removed".
+				const removed = !!f.member.dismissed?.includes(recipe.craftedItemId);
+				const member = removed ? { ...f.member, dismissed: undefined } : f.member;
+				const verdict = judge(info, member, rules, recipe.craftedItemId);
 				if (!verdict) continue;
 				helps.push({
+					...(removed ? { removed: true } : {}),
 					slug: f.character.slug,
 					name: f.character.name,
 					classId: f.character.classId,
@@ -341,6 +345,8 @@ type Help = {
 	spec: string;
 	at?: number;
 	why: string;
+	/** The player removed this item from the character's suggestions. */
+	removed?: boolean;
 };
 
 /** Most names the item panel's "Upgrade for" lists (the addon's tooltip line shows 3). */
