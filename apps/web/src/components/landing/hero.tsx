@@ -13,7 +13,8 @@ export function Hero() {
 	const inApp = useInDesktopApp();
 	return (
 		<section className="relative isolate">
-			{/* Lines and a glow behind it all. */}
+			{/* The world map, lines and a glow behind it all. */}
+			<div aria-hidden className="landing-map pointer-events-none absolute inset-x-0 top-0 -z-10 h-[52rem]" />
 			<div aria-hidden className="landing-grid pointer-events-none absolute inset-x-0 top-0 -z-10 h-[46rem]" />
 			<div className="mx-auto flex max-w-6xl flex-col items-center px-4 pt-16 text-center sm:px-6 sm:pt-24">
 				<a
@@ -80,7 +81,7 @@ function HeroShot() {
 					{/* A streak of light along the top edge. */}
 					<div
 						aria-hidden
-						className="absolute inset-x-[12%] top-0 z-10 h-px bg-gradient-to-r from-transparent via-[rgb(200_140_255/0.8)] to-transparent"
+						className="absolute inset-x-[12%] top-0 z-10 h-px bg-gradient-to-r from-transparent via-[rgb(255_176_96/0.85)] to-transparent"
 					/>
 					<AppMock className="min-w-[38rem]" />
 				</div>

@@ -497,7 +497,7 @@ select:not([multiple]) {
 /* ---- The landing page (components/landing): "/" for signed-out visitors ----
    A marketing page, not the app: the window scrolls rather than a pane, and
    it's the one place the no-gradients/no-glows rule bends. Glows and fades
-   take their color from the game (epic purple, legendary orange) on the same
+   take their color from the game (legendary orange) on the same
    neutral dark greys; no new accent colors. */
 @layer components {
 	html:has(.landing-shell),
@@ -508,7 +508,6 @@ select:not([multiple]) {
 		overscroll-behavior: auto;
 	}
 	.landing-shell {
-		--landing-epic: #a335ee;
 		--landing-legendary: #ff8000;
 		display: block;
 		min-height: 100dvh;
@@ -553,6 +552,22 @@ select:not([multiple]) {
 		color: transparent;
 	}
 
+	/* The old world map of Azeroth, barely there behind the hero: no color of
+	   its own (warmed toward the glow), fading out to the sides and down. */
+	.landing-map {
+		background-image: url("/landing/azeroth.jpg");
+		background-size: min(1500px, 125%) auto;
+		background-position: center 1.5rem;
+		background-repeat: no-repeat;
+		filter: grayscale(1) sepia(0.6) contrast(1.15) brightness(0.9);
+		opacity: 0.11;
+		mask-image:
+			radial-gradient(ellipse 52% 62% at 50% 34%, #000 30%, transparent 80%),
+			linear-gradient(to bottom, #000 45%, transparent 100%);
+		mask-composite: intersect;
+		-webkit-mask-composite: source-in;
+	}
+
 	/* Faint lines behind the hero, fading out from the top center. */
 	.landing-grid {
 		background-image:
@@ -562,11 +577,11 @@ select:not([multiple]) {
 		background-position: center top;
 		mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 0%, transparent 75%);
 	}
-	/* A soft glow in the game's epic purple, legendary orange at its edge. */
+	/* A soft glow in the game's legendary orange, warmer amber at its edge. */
 	.landing-glow {
 		background:
-			radial-gradient(closest-side, rgb(163 53 238 / 0.42), transparent),
-			radial-gradient(closest-side at 72% 62%, rgb(255 128 0 / 0.2), transparent);
+			radial-gradient(closest-side, rgb(255 128 0 / 0.34), transparent),
+			radial-gradient(closest-side at 72% 62%, rgb(255 176 64 / 0.18), transparent);
 		filter: blur(40px);
 	}
 
