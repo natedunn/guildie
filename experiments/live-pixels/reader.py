@@ -47,14 +47,18 @@ class Assembler:
         return {"channel": "snapshot" if channel == b"S" else "live", "data": value}
 
 
-def sample_values(shot, cell, columns=16):
+def sample_values(shot, cell, columns=16, theme="gray"):
+    if theme not in ("gray", "amber"):
+        raise ValueError("unknown theme")
     values = []
     for i in range(256):
         x = (i % columns) * cell + cell // 2
         y = (i // columns) * cell + cell // 2
         red, green, blue = shot.pixel(x, y)
-        if max(red, green, blue) - min(red, green, blue) > 2:
-            raise ValueError("non-grayscale cell")
+        expected_green = int(red * 0.75 + 0.5) if theme == "amber" else red
+        expected_blue = int(red * 0.45 + 0.5) if theme == "amber" else red
+        if abs(green - expected_green) > 2 or abs(blue - expected_blue) > 2:
+            raise ValueError("cell does not match theme")
         values.append(red)
     return values
 
@@ -67,6 +71,8 @@ def main():
                         help="Actual captured pixels per cell, including display scaling")
     parser.add_argument("--columns", type=int, choices=(16, 32), default=16,
                         help="16 for square; 32 for older strip addons")
+    parser.add_argument("--theme", choices=("gray", "amber"), default="gray",
+                        help="Must match the addon palette")
     args = parser.parse_args()
     if not 2 <= args.cell <= 64:
         parser.error("cell must be between 2 and 64")
@@ -79,7 +85,7 @@ def main():
             while True:
                 shot = capture.grab(region)
                 try:
-                    message = assembler.feed(decode(sample_values(shot, args.cell, args.columns)))
+                    message = assembler.feed(decode(sample_values(shot, args.cell, args.columns, args.theme)))
                 except (ValueError, UnicodeError):
                     message = None
                 if message is not None:

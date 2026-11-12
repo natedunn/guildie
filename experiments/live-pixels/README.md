@@ -67,7 +67,7 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
 
 ## Protocol and limits
 
-16×16 opaque grayscale cells, each carrying a byte. Header `GLP`, protocol version 1,
+16×16 opaque cells (grayscale by default), each carrying a byte. Header `GLP`, protocol version 1,
 one-byte length, up to 240 bytes of packet, Adler-32 of header plus packet
 (big endian), then padding. Packet: `channel|transferId|part|total|bytes`.
 Payload chunks are 180 bytes; UTF-8 is decoded only after reassembly.
@@ -100,7 +100,8 @@ duplicate suppression, interleaved streams and size bounds. See the Windows resu
 Square layout and dragging are covered by stubbed Lua/Python tests. Dragging and
 decoding at the new position were tested in game; persistence across a further
 login/reload has not been independently verified.
-Colors remain unchanged: custom tints or transparency are not supported by this decoder.
+The optional amber palette is described below. Arbitrary custom tints and transparency
+are not supported.
 
 ## Smaller cells and interrupted visibility
 
@@ -154,3 +155,27 @@ respected; this experiment does not force itself over cinematic/dialogue UI.
   changes, inbound transport, private output committed, or gameplay automation.
 - Reader stopped after tests. Capture coordinates are machine-specific and must
   be recalibrated after dragging; automatic relocation is not implemented.
+
+## Optional amber palette test
+
+`/guildiepixels on amber` uses warm bronze/amber tones at the default small size.
+`/guildiepixels on 4 amber` uses the larger size with that palette. Match the reader
+with `--theme amber`; plain `/guildiepixels on` and reader `--theme gray` restore
+grayscale. After moving in edit mode, use `on amber` again to select the palette.
+Reload the UI after installing the updated Live.lua; no new addon files were added.
+
+Each byte v maps to opaque RGB `(v, floor(v*0.75+0.5), floor(v*0.45+0.5))`.
+Red retains the original byte; the reader checks the other channels against the
+known palette before checksum validation. Packet capacity and timing are unchanged.
+This removes white flashes but does not remove all brightness changes. All 256
+values and the Lua rendering formula are tested. Windows in-game amber test at
+32×32 after dragging: 60.5 seconds, 1,813 valid samples, zero rejected samples,
+101 live records and one complete snapshot. macOS/HDR/color management still need
+validation. No automatic theme detection.
+
+Calibration caution: the first checksum-valid frame alone is not sufficient to
+choose an origin at two-pixel cells. After dragging to the bottom-left, a candidate
+one pixel too low decoded only some packets. Testing neighboring sampling origins
+found the reliable position; the figures above are from that corrected position.
+Validate multiple changing frames before accepting calibration. This was a local
+calibration correction, not an automatic relocation feature in reader.py.

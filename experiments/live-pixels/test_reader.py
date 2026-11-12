@@ -19,6 +19,15 @@ class ProtocolTests(unittest.TestCase):
                         return value, value, value
                 self.assertEqual(sample_values(Shot(), cell, columns), list(range(256)))
 
+    def test_amber_palette(self):
+        class Shot:
+            def pixel(self, x, y):
+                value = (y // 2) * 16 + x // 2
+                return value, int(value * 0.75 + 0.5), int(value * 0.45 + 0.5)
+        self.assertEqual(sample_values(Shot(), 2, theme="amber"), list(range(256)))
+        with self.assertRaises(ValueError):
+            sample_values(Shot(), 2, theme="gray")
+
     def test_lua_encoder_python_decoder(self):
         protocol = Path(__file__).parent / "GuildieLivePixels/Protocol.lua"
         script = 'dofile(arg[0]); for _, v in ipairs(GuildiePixelProtocol.encode(io.read("*a"))) do io.write(v, " ") end'
@@ -56,8 +65,19 @@ local noop = function() end
 setmetatable(frame, {__index = function() return noop end})
 frame.scripts = {}
 frame.SetScript = function(_, event, callback) frame.scripts[event] = callback end
+local expectAmber = false
+local colorCount = 0
+local color = function(_, r, g, b, a)
+    if expectAmber then
+        local value = math.floor(r * 255 + 0.5)
+        assert(math.abs(g * 255 - math.floor(value * 0.75 + 0.5)) < 0.00001)
+        assert(math.abs(b * 255 - math.floor(value * 0.45 + 0.5)) < 0.00001)
+        assert(a == 1)
+        colorCount = colorCount + 1
+    end
+end
 frame.CreateTexture = function()
-    return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = noop}
+    return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = color}
 end
 local expectedSize = 25.6
 frame.SetSize = function(_, width, height) assert(width == expectedSize and height == expectedSize) end
@@ -101,7 +121,10 @@ SlashCmdList.GUILDIELIVEPIXELS("on 1.6")
 expectedSize = 25.6
 SlashCmdList.GUILDIELIVEPIXELS("on")
 SlashCmdList.GUILDIELIVEPIXELS("on compact")
+SlashCmdList.GUILDIELIVEPIXELS("on amber")
+expectAmber = true
 for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
+assert(colorCount >= 256)
 """
         output = subprocess.check_output([
             "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),

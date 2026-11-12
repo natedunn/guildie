@@ -17,6 +17,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Addon:** Add an optional warm amber palette to the live pixel experiment, with matching local reader support.
+
 - **Addon:** Make the experimental pixel export a compact square (32×32 on the tested Windows display) with a draggable edit mode and remembered position; restart WoW once after updating the experiment.
 
 - **Addon:** Add a manually installed experiment for reading character snapshots and live player state through a screen pixel strip; installing it requires a full game restart.

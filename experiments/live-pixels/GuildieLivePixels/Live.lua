@@ -42,6 +42,7 @@ panel:RegisterForDrag("LeftButton")
 local editing = false
 local DEFAULT_CELL_SIZE = 1.6
 local cellSize = DEFAULT_CELL_SIZE
+local theme = "gray"
 local function place(x, y)
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
@@ -143,7 +144,9 @@ panel:SetScript("OnUpdate", function(_, delta)
     for i, value in ipairs(protocol.encode(packet)) do
         if displayed[i] ~= value then
             local shade = value / 255
-            cells[i]:SetColorTexture(shade, shade, shade, 1)
+            local green = theme == "amber" and math.floor(value * 0.75 + 0.5) / 255 or shade
+            local blue = theme == "amber" and math.floor(value * 0.45 + 0.5) / 255 or shade
+            cells[i]:SetColorTexture(shade, green, blue, 1)
             displayed[i] = value
         end
     end
@@ -154,14 +157,18 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     panel:StopMovingOrSizing()
     editing = false
     panel:EnableMouse(false)
+    local requestedTheme = command:match(" (amber)$") or command:match(" (gray)$")
+    if requestedTheme then command = command:sub(1, #command - #requestedTheme - 1) end
     local requestedSize = tonumber(command:match("^on (%d+%.?%d*)$"))
     local validSize = requestedSize and requestedSize >= 1 and requestedSize <= 8
     if command == "on" or command == "on compact" or command == "on large" or validSize then
+        theme = requestedTheme or "gray"
+        displayed = {}
         snapshot, live = nil, nil
         elapsed = 0
         layout(validSize and requestedSize or (command == "on large" and 8 or DEFAULT_CELL_SIZE))
         panel:Show()
-        print("Guildie pixels: export enabled. Recalibrate the reader after moving or resizing.")
+        print("Guildie pixels: " .. theme .. " export enabled. Match reader --theme and recalibrate after moving or resizing.")
     elseif command == "edit" then
         editing = true
         layout(cellSize)
@@ -181,6 +188,6 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         print("Guildie pixels: position reset; export disabled.")
     else
         panel:Hide()
-        print("Guildie pixels: disabled. Commands: on, on <cell size 1-8>, on large, edit, lock, off, reset.")
+        print("Guildie pixels: disabled. Commands: on, on amber, on <cell size 1-8> amber, on large, edit, lock, off, reset.")
     end
 end
