@@ -59,7 +59,8 @@ frame.SetScript = function(_, event, callback) frame.scripts[event] = callback e
 frame.CreateTexture = function()
     return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = noop}
 end
-frame.SetSize = function(_, width, height) assert(width == 64 and height == 64) end
+local expectedSize = 64
+frame.SetSize = function(_, width, height) assert(width == expectedSize and height == expectedSize) end
 CreateFrame = function() return frame end
 print = noop
 UIParent = {GetEffectiveScale = function() return 1 end}
@@ -91,6 +92,13 @@ assert(GuildieLivePixelsDB.x == 23 and GuildieLivePixelsDB.y == -23)
 frame.SetPoint = function(_, _, _, _, x, y) assert(x == 23 and y == -23) end
 frame.scripts.OnEvent(frame, "ADDON_LOADED", "GuildieLivePixels")
 SlashCmdList.GUILDIELIVEPIXELS("lock")
+expectedSize = 51.2
+SlashCmdList.GUILDIELIVEPIXELS("on 3.2")
+expectedSize = 38.4
+SlashCmdList.GUILDIELIVEPIXELS("on 2.4")
+expectedSize = 25.6
+SlashCmdList.GUILDIELIVEPIXELS("on 1.6")
+expectedSize = 64
 SlashCmdList.GUILDIELIVEPIXELS("on compact")
 for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
 """

@@ -101,3 +101,23 @@ OS screen capture still need manual verification on Windows/macOS.
 Square layout and dragging are covered by stubbed Lua/Python tests. Live rendering,
 position persistence and decoding after a drag still need in-game validation.
 Colors remain unchanged: custom tints or transparency are not supported by this decoder.
+
+## Smaller cells and interrupted visibility
+
+`/guildiepixels on <size>` accepts a cell size from 1 to 8 addon units.
+At the measured 125% scaling on the test PC, try `on 3.2` (64×64 physical
+pixels, reader `--cell 4`), then `on 2.4` (48×48, `--cell 3`), then
+`on 1.6` (32×32, `--cell 2`). These are candidates, not verified minimums.
+Use whole physical pixels and remeasure after changing display/UI scaling.
+`on` restores the tested 80×80 square on that PC. Smaller cells retain the
+same packet capacity but have less tolerance for capture alignment and rendering.
+
+The panel is a child of UIParent: hiding that parent hides the panel and pauses
+its OnUpdate. Another addon can also cover the panel while transmission continues.
+The reader discards frames that fail validation; it never emits partial JSON.
+When visibility returns, unchanged snapshot chunks can accumulate across repeat
+cycles. A changed snapshot replaces the unfinished transfer, so sustained changes
+or long interruptions can prevent completion. Live updates missed during an
+interruption are not replayed. There is no acknowledgement or automatic retry
+request, and no current user-facing disconnected/stale indicator. Hiding is
+respected; this experiment does not force itself over cinematic/dialogue UI.

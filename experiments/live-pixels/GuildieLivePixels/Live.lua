@@ -153,10 +153,12 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     panel:StopMovingOrSizing()
     editing = false
     panel:EnableMouse(false)
-    if command == "on" or command == "on compact" or command == "on large" then
+    local requestedSize = tonumber(command:match("^on (%d+%.?%d*)$"))
+    local validSize = requestedSize and requestedSize >= 1 and requestedSize <= 8
+    if command == "on" or command == "on compact" or command == "on large" or validSize then
         snapshot, live = nil, nil
         elapsed = 0
-        layout(command == "on large" and 8 or 4)
+        layout(validSize and requestedSize or (command == "on large" and 8 or 4))
         panel:Show()
         print("Guildie pixels: export enabled. Recalibrate the reader after moving or resizing.")
     elseif command == "edit" then
@@ -178,6 +180,6 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         print("Guildie pixels: position reset; export disabled.")
     else
         panel:Hide()
-        print("Guildie pixels: disabled. Commands: on, on large, edit, lock, off, reset.")
+        print("Guildie pixels: disabled. Commands: on, on <cell size 1-8>, on large, edit, lock, off, reset.")
     end
 end
