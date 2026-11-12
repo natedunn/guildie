@@ -4,7 +4,7 @@ import { DUNGEON_BY_KEY, dungeonArtUrl } from "@convex/shared/dungeons";
 import { questDifficulty, wowheadQuestUrl } from "@convex/shared/quests";
 import { className as classNameOf, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
-import { LinkSquare02Icon } from "@hugeicons/core-free-icons";
+import { LinkSquare02Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
@@ -204,12 +204,14 @@ function Roster({ people, level }: { people: Person[]; level: number }) {
 	);
 }
 
-/** A value with the done mark when it's met; muted when it isn't. */
+/** A value with a tick when it's met; muted when it isn't. */
 function Check({ ok, title, children }: { ok: boolean; title?: string; children: ReactNode }) {
 	return (
 		<span title={title} className={cn("num inline-flex items-center gap-1.5", !ok && "text-muted-foreground")}>
 			{children}
-			<span className="inline-flex w-4 justify-center">{ok && <DoneMark label="Yes" />}</span>
+			<span className="inline-flex w-4 justify-center">
+				{ok && <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2} aria-label="Yes" />}
+			</span>
 		</span>
 	);
 }
@@ -268,8 +270,8 @@ function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
 				{steps.map((s, i) => {
 					if (shown[i]) {
 						return (
-							<li key={`${s.id}-${i}`} className="flex items-center gap-2.5 py-0.5">
-								<span className="num grid size-4 flex-none place-items-center rounded-full border border-border text-[9px] text-muted-foreground">
+							<li key={`${s.id}-${i}`} className="flex items-start gap-2.5 py-0.5">
+								<span className="num mt-0.5 grid size-4 flex-none place-items-center rounded-full border border-border text-[9px] text-foreground/85">
 									{s.step}
 								</span>
 								<div className="min-w-0 flex-1">
@@ -280,7 +282,7 @@ function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
 										level={s.level}
 										here={s.here}
 										viewer={viewer}
-										badge={!!s.here}
+										inChain
 									/>
 								</div>
 							</li>
@@ -320,7 +322,7 @@ function QuestLine({
 	level,
 	here,
 	viewer,
-	badge,
+	inChain,
 }: {
 	ids: number[];
 	id: number;
@@ -328,14 +330,34 @@ function QuestLine({
 	level?: number;
 	here?: Here;
 	viewer?: Person;
-	/** Mark it as done in this dungeon (a chain's steps here). */
-	badge?: boolean;
+	/** A chain's step: its steps elsewhere get no line, its steps here always one. */
+	inChain?: boolean;
 }) {
 	const done = viewer?.questsDone?.some((q) => ids.includes(q));
 	const inLog = !done && viewer?.questsInLog.some((q) => ids.includes(q));
 	// Another class's quest isn't theirs to pick up; "not picked up" only when their turned-in quests are known.
 	const otherClass = !!viewer && !!here?.classes && !here.classes.includes(viewer.classId);
-	const notPickedUp = !done && !inLog && !otherClass && !!viewer?.questsDone;
+	// One that starts inside can't be had yet; the line under its title says so.
+	const notPickedUp = !done && !inLog && !otherClass && !here?.startsInside && !!viewer?.questsDone;
+	// Under the title: where it starts and ends, and the class it's for.
+	const facts: ReactNode[] = [];
+	const where = (label: string) => <span className="text-[10px] font-medium tracking-wider uppercase">{label}</span>;
+	if (here?.startsInside) facts.push(where("Starts inside"));
+	if (here?.endsInside) facts.push(where("Ends inside"));
+	if (here && inChain && !facts.length) facts.push(where("Done inside"));
+	if (here?.classes?.length) {
+		facts.push(
+			<>
+				Class quest:{" "}
+				{here.classes.map((c, i) => (
+					<Fragment key={c}>
+						{i > 0 && ", "}
+						<ClassText classId={c}>{classNameOf(c)}</ClassText>
+					</Fragment>
+				))}
+			</>,
+		);
+	}
 	const color = level && viewer ? `qd-${questDifficulty(level, viewer.level)}` : undefined;
 	return (
 		<div>
@@ -343,41 +365,35 @@ function QuestLine({
 				<span className={cn("num w-8 flex-none text-right text-xs", color ?? "text-muted-foreground")}>
 					{level ? `[${level}]` : ""}
 				</span>
-				<span className="flex min-w-0 flex-1 items-center gap-2">
-					<a
-						href={wowheadQuestUrl(id)}
-						target="_blank"
-						rel="noreferrer"
-						title="Open on Wowhead"
-						className="min-w-0 truncate text-[0.8125rem] underline-offset-4 hover:underline"
-					>
-						{title}
-					</a>
-					{badge && <span className="pill flex-none px-1.5 py-0 text-[10px] leading-4">In dungeon</span>}
-				</span>
+				<a
+					href={wowheadQuestUrl(id)}
+					target="_blank"
+					rel="noreferrer"
+					title="Open on Wowhead"
+					className="min-w-0 flex-1 truncate text-[0.8125rem] underline-offset-4 hover:underline"
+				>
+					{title}
+				</a>
 				{done ? (
 					<DoneMark label={`${viewer?.name} turned it in`} />
 				) : inLog ? (
 					<span className="flex-none text-xs text-muted-foreground">In log</span>
 				) : notPickedUp ? (
-					<span className="flex-none text-xs text-muted-foreground/70">
-						{here?.startsInside ? "Starts in dungeon" : "Not picked up"}
-					</span>
+					<span className="flex-none text-xs text-muted-foreground/70">Not picked up</span>
 				) : otherClass ? (
 					<span className="flex-none text-xs text-muted-foreground/70">Not their class</span>
 				) : null}
 			</div>
-			{here?.classes?.length ? (
+			{facts.length > 0 && (
 				<p className="mt-0.5 pl-10 text-xs text-muted-foreground">
-					Class quest:{" "}
-					{here.classes.map((c, i) => (
-						<Fragment key={c}>
-							{i > 0 && ", "}
-							<ClassText classId={c}>{classNameOf(c)}</ClassText>
+					{facts.map((f, i) => (
+						<Fragment key={i}>
+							{i > 0 && " · "}
+							{f}
 						</Fragment>
 					))}
 				</p>
-			) : null}
+			)}
 		</div>
 	);
 }

@@ -295,6 +295,7 @@ export const detail = query({
 			classes: g.classes,
 			level: g.ids.map((id) => byId.get(id)?.level).find((l) => l),
 			startsInside: g.startsInside,
+			endsInside: g.endsInside,
 		});
 		// Whole chains: the steps outside the dungeon by title and side as Blizzard has them.
 		const outside = new Map<number, { title: string; faction?: "alliance" | "horde"; level?: number }>();
