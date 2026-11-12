@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **App:** The title bar blends into the page instead of sitting on top of it as a separate strip.
+- **App:** The sidebar and title bar are one continuous dark frame around the page, with no seam where they meet.
 
 ## 0.3.24
 
