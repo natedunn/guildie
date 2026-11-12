@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Addon:** Add a manually installed experiment for reading character snapshots and live player state through a screen pixel strip; installing it requires a full game restart.
+
 ### Fixes
 
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
