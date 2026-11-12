@@ -1,5 +1,5 @@
-import { type ErrorComponentProps, Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { type ErrorComponentProps, Link, useRouter } from "@tanstack/react-router";
+import { type ReactNode, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -62,4 +62,32 @@ export function ErrorPage({ error }: ErrorComponentProps) {
 			</div>
 		</PaneHero>
 	);
+}
+
+/** When each page last retried by itself (RetryingErrorPage), so it never loops. */
+const retriedAt = new Map<string, number>();
+
+/**
+ * For pages whose data can fail for a moment (a heavy query while the
+ * connection or sign-in settles): retry once by itself, showing `loading`,
+ * and only show the error if that fails too.
+ */
+export function RetryingErrorPage(props: ErrorComponentProps & { loading: ReactNode }) {
+	const router = useRouter();
+	const [gaveUp, setGaveUp] = useState(false);
+	useEffect(() => {
+		const key = router.state.location.pathname;
+		const last = retriedAt.get(key) ?? 0;
+		if (Date.now() - last < 15_000) {
+			setGaveUp(true);
+			return;
+		}
+		retriedAt.set(key, Date.now());
+		const t = setTimeout(() => {
+			props.reset();
+			void router.invalidate();
+		}, 400);
+		return () => clearTimeout(t);
+	}, [router, props.reset]);
+	return gaveUp ? <ErrorPage {...props} /> : props.loading;
 }

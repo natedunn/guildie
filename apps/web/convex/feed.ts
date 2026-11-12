@@ -13,6 +13,11 @@ import { vRegion } from "./schema";
 // - quests: dungeon quests newly in Blizzard's completed list (profile sync).
 // - request, claim, fulfilled: requests.ts.
 // Members only, like the guild's other quest and request data.
+//
+// When: Blizzard's data only says what was true at a character's last logout
+// (and we read it minutes to hours later), so events from it are dated at
+// that logout (`lastLoginAt`) when we have it. The addon saves the time of
+// the level-up itself. Either way the page shows only the day, never a time.
 
 type Character = Pick<Doc<"characters">, "_id" | "guildId" | "slug" | "name" | "classId" | "inRoster" | "feedLevel">;
 
@@ -22,18 +27,34 @@ const who = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
 	classId: c.classId,
 });
 
-/** A level the feed hasn't seen: a "level" event (after the baseline). */
-export async function noteLevel(ctx: MutationCtx, c: Character, level: number) {
+/** When an event happened, as well as we know it; `exact`: the game saw it happen (the addon). */
+export type When = { at: number; exact: boolean };
+
+/** Blizzard's view: as of the character's last logout, if we have it (never in the future). */
+export const blizzardWhen = (lastLoginAt: number | undefined): When => ({
+	at: Math.min(Date.now(), lastLoginAt ?? Date.now()),
+	exact: false,
+});
+
+/**
+ * A level the feed hasn't seen: a "level" event (after the baseline). An
+ * exact time for a level the roster already reported (the addon's upload
+ * comes after Blizzard's) fixes that event's time.
+ */
+export async function noteLevel(ctx: MutationCtx, c: Character, level: number, when: When) {
 	if (c.feedLevel === undefined) {
 		await ctx.db.patch(c._id, { feedLevel: level });
 		return;
 	}
-	if (level <= c.feedLevel) return;
+	if (level <= c.feedLevel) {
+		if (when.exact && level === c.feedLevel) await fixLevelTime(ctx, c, level, when.at);
+		return;
+	}
 	await ctx.db.patch(c._id, { feedLevel: level });
 	if (!c.inRoster) return;
 	await ctx.db.insert("feedEvents", {
 		guildId: c.guildId,
-		at: Date.now(),
+		at: when.at,
 		kind: "level",
 		character: who(c),
 		level,
@@ -41,34 +62,43 @@ export async function noteLevel(ctx: MutationCtx, c: Character, level: number) {
 	});
 }
 
+async function fixLevelTime(ctx: MutationCtx, c: Character, level: number, at: number) {
+	const recent = await ctx.db
+		.query("feedEvents")
+		.withIndex("by_guild", (q) => q.eq("guildId", c.guildId).gte("at", at - 2 * 86_400_000))
+		.order("desc")
+		.take(200);
+	const event = recent.find((e) => e.kind === "level" && e.level === level && e.character.slug === c.slug);
+	if (event && event.at !== at) await ctx.db.patch(event._id, { at });
+}
+
 /** Dungeons cleared for the first time (after the baseline read). */
 export async function noteClears(
 	ctx: MutationCtx,
 	c: Character & Pick<Doc<"characters">, "clearedDungeons">,
 	cleared: string[],
+	when: When,
 ) {
 	const before = c.clearedDungeons;
 	const all = [...new Set([...(before ?? []), ...cleared])].sort();
 	if (before && all.length === before.length) return;
 	await ctx.db.patch(c._id, { clearedDungeons: all });
 	if (!before || !c.inRoster) return;
-	const now = Date.now();
 	for (const dungeon of all.filter((k) => !before.includes(k))) {
-		await ctx.db.insert("feedEvents", { guildId: c.guildId, at: now, kind: "dungeon", character: who(c), dungeon });
+		await ctx.db.insert("feedEvents", { guildId: c.guildId, at: when.at, kind: "dungeon", character: who(c), dungeon });
 	}
 }
 
 /** Dungeon quests newly turned in: one event per dungeon. */
-export async function noteQuests(ctx: MutationCtx, c: Character, newlyCompleted: number[]) {
+export async function noteQuests(ctx: MutationCtx, c: Character, newlyCompleted: number[], when: When) {
 	if (!newlyCompleted.length || !c.inRoster) return;
 	const fresh = new Set(newlyCompleted);
-	const now = Date.now();
 	for (const row of await ctx.db.query("dungeonQuests").collect()) {
 		const questIds = row.questIds.filter((id) => fresh.has(id));
 		if (!questIds.length) continue;
 		await ctx.db.insert("feedEvents", {
 			guildId: c.guildId,
-			at: now,
+			at: when.at,
 			kind: "quests",
 			character: who(c),
 			dungeon: row.key,

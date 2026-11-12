@@ -262,8 +262,13 @@ export const ingest = mutation({
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
-			// A level the game shows before Blizzard's roster does: the guild's feed.
-			if (character && top.level) await noteLevel(ctx, character, top.level);
+			// A level the game shows before Blizzard's roster does: the guild's feed,
+			// at the time the addon saw it reached (else as of this read, roughly).
+			if (character && top.level) {
+				const exact = c.levelAt !== undefined && c.level === top.level;
+				const at = Math.min(exact ? (c.levelAt as number) : top.capturedAt, now);
+				await noteLevel(ctx, character, top.level, { at, exact });
+			}
 			accepted.push(match.slug);
 			if (c.inventory && (await storeInventory(ctx, row.userId, key, c.inventory, now))) inventoryChanged = true;
 

@@ -50,7 +50,9 @@ function SettingsLayout() {
 					<PageTab to="/settings">Account</PageTab>
 					<PageTab to="/settings/guilds">Guilds</PageTab>
 					<PageTab to="/settings/addon">Addon</PageTab>
-					<PageTab to="/settings/app">App</PageTab>
+					<PageTab to="/settings/app" activeOptions={{ includeSearch: false }}>
+						App
+					</PageTab>
 				</PageTabs>
 			</PageHeader>
 			<div className="pt-6">

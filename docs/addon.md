@@ -100,6 +100,7 @@ used); the account page lists them with Disconnect.
     "guid": "Player-4904-004E2BA2", "name": "Lich", "level": 23,
     "xp": 1200, "xpMax": 15000, "classToken": "PRIEST", "raceToken": "NightElf",
     "capturedAt": 1794336950,                 // game server time, seconds
+    "levelAt": 1794330000,                    // optional: when `level` was reached (seen in game)
     "guild": { "name": "Unbound", "rank": "Member", "rankIndex": 5 },
     "talents": [ { "id": 134214, "rank": 5, "name": "Wand Specialization" } ],
     "equipment": {

@@ -35,6 +35,7 @@ import { Route as ApiHelperSignoutRouteImport } from './routes/api/helper/signou
 import { Route as ApiHelperSnapshotRouteImport } from './routes/api/helper/snapshot'
 import { Route as CRegionSlugRouteImport } from './routes/c/$region/$slug'
 import { Route as GRegionSlugRouteImport } from './routes/g/$region/$slug'
+import { Route as SettingsAppChangelogRouteImport } from './routes/settings/app_.changelog'
 import { Route as ApiHelperPairPollRouteImport } from './routes/api/helper/pair/poll'
 import { Route as CRegionSlugIndexRouteImport } from './routes/c/$region/$slug/index'
 import { Route as CRegionSlugInventoryRouteImport } from './routes/c/$region/$slug/inventory'
@@ -179,6 +180,11 @@ const GRegionSlugRoute = GRegionSlugRouteImport.update({
   path: '/g/$region/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsAppChangelogRoute = SettingsAppChangelogRouteImport.update({
+  id: '/app_/changelog',
+  path: '/app/changelog',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const ApiHelperPairPollRoute = ApiHelperPairPollRouteImport.update({
   id: '/poll',
   path: '/poll',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
   '/c/$region/$slug': typeof CRegionSlugRouteWithChildren
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
+  '/settings/app/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
@@ -312,6 +319,7 @@ export interface FileRoutesByTo {
   '/api/helper/pair': typeof ApiHelperPairRouteWithChildren
   '/api/helper/signout': typeof ApiHelperSignoutRoute
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
+  '/settings/app/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
@@ -354,6 +362,7 @@ export interface FileRoutesById {
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
   '/c/$region/$slug': typeof CRegionSlugRouteWithChildren
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
+  '/settings/app_/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
@@ -397,6 +406,7 @@ export interface FileRouteTypes {
     | '/api/helper/snapshot'
     | '/c/$region/$slug'
     | '/g/$region/$slug'
+    | '/settings/app/changelog'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
@@ -435,6 +445,7 @@ export interface FileRouteTypes {
     | '/api/helper/pair'
     | '/api/helper/signout'
     | '/api/helper/snapshot'
+    | '/settings/app/changelog'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
@@ -476,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/helper/snapshot'
     | '/c/$region/$slug'
     | '/g/$region/$slug'
+    | '/settings/app_/changelog'
     | '/api/helper/pair/poll'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
@@ -700,6 +712,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GRegionSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/app_/changelog': {
+      id: '/settings/app_/changelog'
+      path: '/app/changelog'
+      fullPath: '/settings/app/changelog'
+      preLoaderRoute: typeof SettingsAppChangelogRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/api/helper/pair/poll': {
       id: '/api/helper/pair/poll'
       path: '/poll'
@@ -799,6 +818,7 @@ interface SettingsRouteChildren {
   SettingsAppRoute: typeof SettingsAppRoute
   SettingsGuildsRoute: typeof SettingsGuildsRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
+  SettingsAppChangelogRoute: typeof SettingsAppChangelogRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
@@ -806,6 +826,7 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAppRoute: SettingsAppRoute,
   SettingsGuildsRoute: SettingsGuildsRoute,
   SettingsIndexRoute: SettingsIndexRoute,
+  SettingsAppChangelogRoute: SettingsAppChangelogRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(

@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, internalAction, internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
 import { guildOfProfile } from "./claimRegions";
-import { noteClears, noteLevel, noteQuests } from "./feed";
+import { blizzardWhen, noteClears, noteLevel, noteQuests } from "./feed";
 import { setOwner } from "./guilds";
 import { type ItemPreview, tooltipLines } from "./items";
 import { isSampleGuild } from "./sample";
@@ -146,7 +146,7 @@ export const applyRoster = internalMutation({
 			if (row) {
 				await ctx.db.patch(row._id, { ...member, inRoster: true });
 				id = row._id;
-				await noteLevel(ctx, { ...row, inRoster: true }, member.level);
+				await noteLevel(ctx, { ...row, inRoster: true }, member.level, { at: now, exact: false });
 			} else {
 				id = await ctx.db.insert("characters", {
 					...member,
@@ -425,12 +425,13 @@ export const applyProfile = internalMutation({
 					ctx,
 					character,
 					ids.filter((id) => !before.has(id)),
+					blizzardWhen(character.lastLoginAt),
 				);
 			}
 		}
 		if (clearedDungeons) {
 			const character = await ctx.db.get(characterId);
-			if (character) await noteClears(ctx, character, clearedDungeons);
+			if (character) await noteClears(ctx, character, clearedDungeons, blizzardWhen(character.lastLoginAt));
 		}
 		if (data.talentTrees) await learnTreeInfo(ctx, data.talentTrees);
 	},

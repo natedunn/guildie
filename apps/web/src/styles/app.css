@@ -284,6 +284,14 @@ select:not([multiple]) {
 	--class: #ff8000;
 }
 
+/* A stat gained or lost by an upgrade, as the game's item comparison colors them. */
+.stat-gain {
+	color: color-mix(in oklab, #1eff00 80%, white);
+}
+.stat-loss {
+	color: color-mix(in oklab, #ff2020 80%, white);
+}
+
 /* A quest's level as the game's quest log colors it (shared/quests.ts questDifficulty). */
 .qd-impossible {
 	color: #ff1a1a;
@@ -389,9 +397,11 @@ select:not([multiple]) {
 	/* Frosted glass: what scrolls under it blurs (the landing's nav, the pane's
 	   title bar and top bar). */
 	.frosted {
-		background-color: rgb(19 17 14 / 0.72);
-		backdrop-filter: blur(14px) saturate(140%);
-		-webkit-backdrop-filter: blur(14px) saturate(140%);
+		background-color: rgb(19 17 14 / 0.8);
+		-webkit-backdrop-filter: blur(16px) saturate(140%);
+		backdrop-filter: blur(16px) saturate(140%);
+		/* Its own compositing layer: Safari otherwise can skip the blur over a scrolled pane. */
+		transform: translateZ(0);
 	}
 
 	/* The web's bars float over the top of the pane, frosted, and the page
@@ -405,9 +415,24 @@ select:not([multiple]) {
 		inset-inline: 0;
 		top: 0;
 		z-index: 20;
-		background-color: rgb(26 24 21 / 0.7);
-		backdrop-filter: blur(14px) saturate(140%);
-		-webkit-backdrop-filter: blur(14px) saturate(140%);
+		background-color: rgb(26 24 21 / 0.78);
+		-webkit-backdrop-filter: blur(16px) saturate(140%);
+		backdrop-filter: blur(16px) saturate(140%);
+		transform: translateZ(0);
+	}
+	/* No blur (older browsers, reduced transparency): nearly solid, so what
+	   scrolls under stays out of the way rather than showing through. */
+	@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+		.frosted,
+		html:not([data-desktop="true"]) :is(.app-titlebar, .app-topbar) {
+			background-color: rgb(26 24 21 / 0.96);
+		}
+	}
+	@media (prefers-reduced-transparency: reduce) {
+		.frosted,
+		html:not([data-desktop="true"]) :is(.app-titlebar, .app-topbar) {
+			background-color: rgb(26 24 21 / 0.96);
+		}
 	}
 	@media (min-width: 48rem) {
 		html:not([data-desktop="true"]) .app-titlebar {

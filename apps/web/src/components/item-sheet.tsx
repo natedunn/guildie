@@ -11,6 +11,7 @@ import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
 import { RequestButton, RequestRow } from "@/components/requests";
 import { buttonVariants } from "@/components/ui/button";
+import { UpgradeWhy } from "@/components/upgrade-why";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
@@ -226,7 +227,9 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 											{verdictLabel(u.kind, u.at)}
 										</span>
 									</div>
-									<p className="text-xs text-muted-foreground">{u.why}</p>
+									<p className="text-xs text-muted-foreground">
+										<UpgradeWhy text={u.why} />
+									</p>
 								</div>
 							))}
 						</div>

@@ -242,6 +242,12 @@ local function capture(reason, recipes)
         inventory = previous.inventory,
         quests = previous.quests,
     }
+    -- When the level last went up (game time): the guild's feed shows it.
+    if character.level and previous.level and character.level > previous.level then
+        character.levelAt = now
+    else
+        character.levelAt = previous.levelAt
+    end
     if okGear and equipment then
         equipment.capturedAt = now
         character.equipment = equipment

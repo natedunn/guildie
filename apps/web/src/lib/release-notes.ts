@@ -45,23 +45,28 @@ type GithubRelease = {
 	prerelease: boolean;
 };
 
-export function useReleaseNotes() {
+/** One page of release notes, newest first; `more`: there's an older page. */
+export function useReleaseNotes(page = 1, perPage = 10) {
 	return useQuery({
-		queryKey: ["release-notes"],
+		queryKey: ["release-notes", page, perPage],
 		staleTime: 60 * 60_000,
-		queryFn: async (): Promise<ReleaseNotes[]> => {
-			const res = await fetch("https://api.github.com/repos/natedunn/guildie/releases?per_page=20", {
-				headers: { Accept: "application/vnd.github+json" },
-			});
+		queryFn: async (): Promise<{ releases: ReleaseNotes[]; more: boolean }> => {
+			const res = await fetch(
+				`https://api.github.com/repos/natedunn/guildie/releases?per_page=${perPage}&page=${page}`,
+				{ headers: { Accept: "application/vnd.github+json" } },
+			);
 			if (!res.ok) throw new Error(`GitHub ${res.status}`);
 			const releases = (await res.json()) as GithubRelease[];
-			return releases
-				.filter((r) => !r.draft && !r.prerelease && r.tag_name.startsWith("desktop-v"))
-				.map((r) => ({
-					version: r.tag_name.replace(/^desktop-v/, ""),
-					date: r.published_at,
-					sections: parseNotes(r.body ?? ""),
-				}));
+			return {
+				releases: releases
+					.filter((r) => !r.draft && !r.prerelease && r.tag_name.startsWith("desktop-v"))
+					.map((r) => ({
+						version: r.tag_name.replace(/^desktop-v/, ""),
+						date: r.published_at,
+						sections: parseNotes(r.body ?? ""),
+					})),
+				more: /rel="next"/.test(res.headers.get("Link") ?? ""),
+			};
 		},
 	});
 }

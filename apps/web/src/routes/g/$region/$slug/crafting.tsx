@@ -18,6 +18,7 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
+import { RetryingErrorPage } from "@/components/status-pages";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { UpgradeWhy } from "@/components/upgrade-why";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
@@ -69,7 +71,13 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		]);
 	},
 	component: CraftingPage,
+	pendingComponent: CraftingLoading,
+	errorComponent: (props) => <RetryingErrorPage {...props} loading={<CraftingLoading />} />,
 });
+
+function CraftingLoading() {
+	return <p className="py-10 text-center text-sm text-muted-foreground">Loading the guild's recipes...</p>;
+}
 
 /** Rendering every row's tooltips at once is the slow part; show this many until asked. */
 const PAGE = 150;
@@ -535,14 +543,9 @@ function ResultRow({ recipe, region, member }: { recipe: GuildRecipe; region: st
 	);
 }
 
-/** The item and, under its name, the profession that makes it. */
+/** The item and, under its name, the profession that makes it, beside an icon as tall as both lines. */
 function ItemCell({ recipe }: { recipe: GuildRecipe }) {
-	return (
-		<div className="min-w-0">
-			<RecipeItem recipe={recipe} />
-			<div className="mt-0.5 pl-[38px] text-xs text-muted-foreground">{recipe.profession}</div>
-		</div>
-	);
+	return <RecipeItem recipe={recipe} size={36} detail={recipe.profession} />;
 }
 
 /**
@@ -567,7 +570,9 @@ function UpgradeRow({
 		<li className={cn(ROW, FOR_ME_COLS)}>
 			<ItemCell recipe={recipe} />
 			<div className="min-w-0 text-[13px]">
-				<p>{h?.why}</p>
+				<p>
+					<UpgradeWhy text={h?.why} />
+				</p>
 				<p className="truncate text-xs text-muted-foreground">
 					{h?.spec}
 					{h?.at ? ` · from level ${h.at}` : null}
@@ -637,7 +642,9 @@ function CraftRow({
 								) : null}
 							</span>
 						</div>
-						<p className="text-xs text-muted-foreground">{h.why}</p>
+						<p className="text-xs text-muted-foreground">
+							<UpgradeWhy text={h.why} />
+						</p>
 					</div>
 				))}
 				{hidden > 0 ? (
