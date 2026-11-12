@@ -45,7 +45,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			// viewport-fit=cover: phones draw the page under the notch and home
 			// indicator; .app-shell keeps to the safe area (styles/app.css).
 			{ name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-			{ name: "theme-color", content: "#13110e" },
+			{ name: "theme-color", content: "#1a1815" },
 			// Installable from the home screen (public/manifest.webmanifest). On iOS
 			// the status bar goes translucent over the chrome color.
 			{ name: "mobile-web-app-capable", content: "yes" },
@@ -132,9 +132,13 @@ function RootComponent() {
  */
 function OnboardingShell() {
 	return (
-		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
 			<div className="app-sidebar-drag hidden h-10 flex-none desktop:block" />
-			<main id="content" data-scroll-restoration-id="content" className="min-h-0 flex-1 overflow-y-auto bg-background">
+			<main
+				id="content"
+				data-scroll-restoration-id="content"
+				className="min-h-0 flex-1 overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)]"
+			>
 				<Outlet />
 			</main>
 		</div>

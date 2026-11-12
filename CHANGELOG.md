@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
-- **Guildie:** Keep scrolling content above the iPhone home indicator, including on sign-in pages.
+- **Guildie:** Match the mobile browser background to the page so the bottom toolbar area does not form a darker band.
 
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
 
