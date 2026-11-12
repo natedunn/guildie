@@ -47,6 +47,8 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
    physical pixel width of each square; display scaling can change it. macOS
    requires Screen Recording permission for the terminal/Python host. The reader
    can capture anything covering that rectangle, so keep it unobstructed.
+   Use `/guildiepixels on compact` for half-width cells. Measure the physical
+   cell size again when switching modes.
 4. Change zone/health or inventory and watch JSON lines. `/guildiepixels off`
    hides the strip; Ctrl-C stops the reader. Remove the experimental addon to uninstall.
 

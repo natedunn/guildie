@@ -43,8 +43,12 @@ local frame = {}
 local noop = function() end
 setmetatable(frame, {__index = function() return noop end})
 frame.SetScript = function(_, _, update) frame.update = update end
-frame.CreateTexture = function() return {SetSize = noop, SetPoint = noop, SetColorTexture = noop} end
+frame.CreateTexture = function()
+    return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = noop}
+end
+frame.SetSize = function(_, width, height) assert(width == 128 and height == 32) end
 CreateFrame = function() return frame end
+print = noop
 UIParent = {GetEffectiveScale = function() return 1 end}
 SlashCmdList = {}
 local secret = {}
@@ -63,6 +67,7 @@ GuildiePixelProtocol.encode = function(packet)
     return encode(packet)
 end
 dofile(arg[1])
+SlashCmdList.GUILDIELIVEPIXELS("on compact")
 for _ = 1, 3 do frame:update(0.11) end
 """
         output = subprocess.check_output([

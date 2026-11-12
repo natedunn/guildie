@@ -34,14 +34,19 @@ end
 local panel = CreateFrame("Frame", nil, UIParent)
 panel:SetFrameStrata("TOOLTIP")
 panel:SetScale(1 / UIParent:GetEffectiveScale())
-panel:SetSize(256, 64)
 panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
-local cells = {}
+local cells, displayed = {}, {}
 for i = 1, 256 do
-    local cell = panel:CreateTexture(nil, "OVERLAY")
-    cell:SetSize(8, 8)
-    cell:SetPoint("TOPLEFT", panel, "TOPLEFT", ((i - 1) % 32) * 8, -math.floor((i - 1) / 32) * 8)
-    cells[i] = cell
+    cells[i] = panel:CreateTexture(nil, "OVERLAY")
+end
+local function layout(cellSize)
+    panel:SetSize(32 * cellSize, 8 * cellSize)
+    for i, cell in ipairs(cells) do
+        cell:ClearAllPoints()
+        cell:SetSize(cellSize, cellSize)
+        cell:SetPoint("TOPLEFT", panel, "TOPLEFT",
+            ((i - 1) % 32) * cellSize, -math.floor((i - 1) / 32) * cellSize)
+    end
 end
 panel:Hide()
 local session = tostring(read(GetServerTime) or 0) .. "-" .. tostring(math.floor((read(GetTime) or 0) * 1000))
@@ -101,17 +106,22 @@ panel:SetScript("OnUpdate", function(_, delta)
     end
     local packet = channel .. "|" .. id .. "|" .. part .. "|" .. math.ceil(#data / 180) .. "|" .. data:sub((part - 1) * 180 + 1, part * 180)
     for i, value in ipairs(protocol.encode(packet)) do
-        cells[i]:SetColorTexture(value / 255, value / 255, value / 255, 1)
+        if displayed[i] ~= value then
+            local shade = value / 255
+            cells[i]:SetColorTexture(shade, shade, shade, 1)
+            displayed[i] = value
+        end
     end
 end)
 SLASH_GUILDIELIVEPIXELS1 = "/guildiepixels"
 SlashCmdList.GUILDIELIVEPIXELS = function(command)
-    if command == "on" then
+    if command == "on" or command == "on compact" then
         snapshot, live = nil, nil
+        layout(command == "on compact" and 4 or 8)
         panel:Show()
         print("Guildie pixels: experimental screen export enabled.")
     else
         panel:Hide()
-        print("Guildie pixels: disabled. Use /guildiepixels on to enable.")
+        print("Guildie pixels: disabled. Use /guildiepixels on or /guildiepixels on compact to enable.")
     end
 end
