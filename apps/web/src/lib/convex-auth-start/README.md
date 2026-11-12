@@ -12,6 +12,9 @@ It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
   `beforeLoad` to hand the SSR token to Convex and the client.
 - `provider.tsx` — the client provider (port of the Next.js one, minus its
   `history.replaceState(null)` hack, which would wipe TanStack Router's state).
+  It keeps the access token in page memory, not localStorage (`pageStorage`),
+  and the Convex client reuses the page's first token (`initialAuthTokenReuse`
+  in `router.tsx`): see the comments there for the mobile sign-in bug both fix.
 - Routes: `apps/web/src/routes/auth/{signin,refresh,signout}.ts`.
 
 Workaround: `AuthProvider`/`useAuth` aren't in the package's exports map, so
