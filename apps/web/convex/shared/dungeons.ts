@@ -1,4 +1,4 @@
-import { DUNGEON_QUEST_FACTS, STARTS_INSIDE } from "./dungeonQuests.ts";
+import { DUNGEON_QUEST_FACTS, ENDS_INSIDE, STARTS_INSIDE } from "./dungeonQuests.ts";
 import { GENERATED_DUNGEONS, type GeneratedDungeon } from "./dungeons.generated.ts";
 
 // Dungeons: the list (dungeons.generated.ts, from the game's data), which of
@@ -160,6 +160,8 @@ export type QuestGroup = {
 	depth: number;
 	/** Picked up inside the dungeon (STARTS_INSIDE), so not before going in. */
 	startsInside?: true;
+	/** Turned in inside the dungeon (ENDS_INSIDE). */
+	endsInside?: true;
 };
 
 /** The dungeon's quests as rows, each chain's later steps under the one before, in display order. */
@@ -175,6 +177,7 @@ export function questGroups(quests: DungeonQuest[]): QuestGroup[] {
 		}
 		g.ids.push(q.id);
 		if (STARTS_INSIDE.has(q.id)) g.startsInside = true;
+		if (ENDS_INSIDE.has(q.id)) g.endsInside = true;
 		groupOf.set(q.id, g);
 	}
 	for (const q of quests) {

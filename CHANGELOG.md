@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** A dungeon's quests say under their name whether they start inside, end inside or (in a chain) are done inside, and the roster's ticks are plain checkmarks.
+
 ### Fixes
 
 - **App:** Signed out, the app opens the sign-in card again (with its title bar), not the website's landing page.

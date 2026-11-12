@@ -747,3 +747,39 @@ export const EXTRA_DUNGEON_QUESTS: Record<string, number[]> = {
 	// Vorrel's Revenge: from Vorrel Sengutz inside.
 	"scarlet-monastery": [1051],
 };
+
+/**
+ * Dungeon quests turned in inside the dungeon (to someone or something in
+ * it: Knot Thimblejack, the Sparklematic 5200). The original dungeons' from
+ * where Questie's Forever data has their quest enders; Forever's own from
+ * Wowhead's quest pages and who gives them.
+ */
+export const ENDS_INSIDE = new Set<number>([
+	// Ragefire Chasm
+	5722,
+	// Shadowfang Keep
+	1098,
+	// Blackfathom Deeps
+	1198,
+	// Gnomeregan
+	2945, 2951, 2952, 2953, 4601, 4602, 4603, 4604, 4605, 4606,
+	// Razorfen Downs
+	3523, 3525,
+	// Sunken Temple
+	3373, 3446, 3447,
+	// Blackrock Spire
+	4867, 4981, 4982, 5001, 7761,
+	// Dire Maul
+	1193, 5518, 5519, 5525, 5528, 7429, 7461, 7462, 7463, 7483, 7484, 7485, 7498, 7499, 7500, 7501, 7502, 7503, 7504,
+	7505, 7506, 7507, 7508, 7703, 7877, 8948, 8949, 8950, 98685,
+	// Stratholme
+	5122, 5125, 5463,
+	// Ruins of Lordaeron
+	95250,
+	// Hall of Thanes
+	96395,
+	// Alcaz Prison
+	95454, 96335, 96369,
+	// City of Dalaran
+	96987,
+]);
