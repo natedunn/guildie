@@ -174,13 +174,17 @@ function ByCharacter({ characters }: { characters: Character[] }) {
 						</div>
 					</div>
 					{c.quests && c.quests.length > 0 && (
-						<ul className="mt-2">
+						<ul className="surface-card mt-2.5 card-clip">
 							{c.quests.map((q) => (
 								<QuestRow key={q.id} quest={q} level={c.level} />
 							))}
 						</ul>
 					)}
-					{c.quests?.length === 0 && <p className="mt-2 text-[0.8125rem] text-muted-foreground">No quests.</p>}
+					{c.quests?.length === 0 && (
+						<p className="surface-card px-5 mt-2.5 py-6 text-center text-[0.8125rem] text-muted-foreground">
+							No quests.
+						</p>
+					)}
 				</section>
 			))}
 		</div>
@@ -202,7 +206,8 @@ function ByZone({ characters }: { characters: Character[] }) {
 		}
 		return [...byZone.entries()].sort(([a], [b]) => (a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b)));
 	}, [characters]);
-	if (!zones.length) return <p className="text-[0.8125rem] text-muted-foreground">No quests.</p>;
+	if (!zones.length)
+		return <p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">No quests.</p>;
 	const several = characters.length > 1;
 	return (
 		<div className="space-y-6">
@@ -211,7 +216,7 @@ function ByZone({ characters }: { characters: Character[] }) {
 					<SectionTitle>
 						{area} <span className="num font-normal text-muted-foreground">{entries.length}</span>
 					</SectionTitle>
-					<ul className="mt-1">
+					<ul className="surface-card mt-2.5 card-clip">
 						{entries.map(({ quest, holders }) => (
 							<QuestRow
 								key={quest.id}
@@ -244,7 +249,7 @@ function QuestRow({
 	const meta = [hideArea ? undefined : q.area, q.type].filter(Boolean).join(" · ");
 	const state = q.failed ? "Failed" : q.complete ? "Complete" : undefined;
 	return (
-		<li className="border-b border-border py-2 text-[0.8125rem]">
+		<li className="border-b border-border px-3 py-2 text-[0.8125rem] last:border-b-0">
 			<div className="flex items-baseline gap-2">
 				{q.level !== undefined && (
 					<span className={cn("num w-6 flex-none text-right text-xs", `qd-${questDifficulty(q.level, level)}`)}>
@@ -260,7 +265,9 @@ function QuestRow({
 				>
 					{q.title}
 				</a>
-				{state && <span className="flex-none text-xs font-medium">{state}</span>}
+				{state && (
+					<span className={cn("pill flex-none self-center px-2 py-0", !q.failed && "text-foreground")}>{state}</span>
+				)}
 			</div>
 			<div className={cn("mt-0.5 space-y-0.5 text-xs text-muted-foreground", q.level !== undefined && "pl-8")}>
 				{(meta || holders) && (

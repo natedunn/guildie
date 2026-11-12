@@ -642,6 +642,15 @@ select:not([multiple]) {
 		background-color: var(--card-fill);
 		background-image: var(--card-sheen);
 	}
+	/* Clipping a card's content (a table, full-bleed art): overflow: clip
+	   out to the border box, so the hairline drawn in the border survives and
+	   no scroll box is made (sticky headers keep working). `overflow-hidden`
+	   on a card means this too. */
+	.surface-card.overflow-hidden,
+	.card-clip {
+		overflow: clip;
+		overflow-clip-margin: var(--card-border-width, 1px);
+	}
 	/* Link and button cards light up a little under the pointer. */
 	:is(a, button).surface-card {
 		transition: background-color 0.15s;

@@ -114,7 +114,8 @@ function UpdateLine({ update, ready }: { update?: UpdateState; ready?: string })
 
 function GetTheApp() {
 	return (
-		<section className="max-w-xl text-[0.8125rem]">
+		<section className="surface-card max-w-xl p-5 text-[0.8125rem]">
+			<span aria-hidden className="streak" />
 			<SectionTitle>Guildie for Windows</SectionTitle>
 			<p className="mt-1 text-muted-foreground">
 				Guildie in its own window, plus the Guildie addon: it installs the addon in World of Warcraft, keeps it up to

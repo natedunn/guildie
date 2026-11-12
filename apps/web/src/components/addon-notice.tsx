@@ -2,6 +2,7 @@ import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { type DesktopStatus, desktop, useDesktopStatus } from "@/lib/desktop";
 import { compareVersions } from "@/lib/versions";
 
@@ -75,12 +76,9 @@ export function AddonNotice() {
 				<p className="mt-0.5 text-xs text-muted-foreground">
 					It keeps your characters current as you play and adds guild hints to item tooltips.
 				</p>
-				<Link
-					to="/settings/addon"
-					className="mt-2 flex h-7 w-full items-center justify-center rounded-md border border-border text-xs font-medium hover:bg-hover"
-				>
+				<Button size="sm" variant="outline" className="mt-2 w-full text-xs" render={<Link to="/settings/addon" />}>
 					Set up the addon
-				</Link>
+				</Button>
 			</Card>
 		);
 	if (notice.kind === "update")
@@ -89,14 +87,9 @@ export function AddonNotice() {
 				<p className="mt-0.5 text-xs text-muted-foreground">
 					Guildie addon <span className="num">{notice.version}</span> is ready to install.
 				</p>
-				<button
-					type="button"
-					disabled={busy}
-					onClick={update}
-					className="mt-2 h-7 w-full rounded-md bg-primary text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
-				>
+				<Button size="sm" disabled={busy} onClick={update} className="mt-2 w-full text-xs">
 					{busy ? "Updating…" : "Update addon"}
-				</button>
+				</Button>
 				{error && <p className="mt-1.5 text-xs text-destructive">{error}</p>}
 			</Card>
 		);
@@ -113,12 +106,12 @@ export function AddonNotice() {
 
 function Card({ title, onDismiss, children }: { title: string; onDismiss: () => void; children: ReactNode }) {
 	return (
-		<div className="relative mx-0.5 mb-2 rounded-md border border-border px-3 py-2.5 text-[0.8125rem]">
+		<div className="surface-card mx-0.5 mb-2 px-3 py-2.5 text-[0.8125rem]">
 			<button
 				type="button"
 				aria-label="Dismiss"
 				onClick={onDismiss}
-				className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground"
+				className="absolute top-1.5 right-1.5 z-3 grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground pointer-coarse:size-9"
 			>
 				<HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={1.75} />
 			</button>

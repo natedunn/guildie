@@ -39,16 +39,23 @@ function ConnectAi() {
 		<Page width="narrow">
 			<PageHeader title="Connect an AI app" />
 			{!state ? (
-				<p className="text-muted-foreground">This link is incomplete. Start connecting again from your AI app.</p>
+				<p className="surface-card px-4 py-3 text-[0.8125rem] text-muted-foreground">
+					This link is incomplete. Start connecting again from your AI app.
+				</p>
 			) : !viewer ? (
-				<p>
+				<p className="surface-card px-4 py-3 text-[0.8125rem] text-muted-foreground">
 					<Link to="/sign-in" search={{ next: here }} className="text-foreground underline underline-offset-4">
 						Sign in
 					</Link>{" "}
 					first, then you'll come back here.
 				</p>
 			) : (
-				<>
+				<section className="surface-card p-5 text-[0.8125rem]">
+					<span aria-hidden className="streak" />
+					<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+						<h2 className="text-sm font-semibold">{name}</h2>
+						<span className="pill px-2 py-0">{access === "write" ? "Reads, sets characters" : "Reads only"}</span>
+					</div>
 					<p className="text-muted-foreground">
 						<span className="text-foreground">{name}</span> will read your Guildie data as{" "}
 						<span className="text-foreground">{viewer.battletag ?? viewer.name}</span>: your guilds' rosters,
@@ -63,7 +70,7 @@ function ConnectAi() {
 						</p>
 					)}
 					<p className="mt-3 text-muted-foreground">Disconnect it any time in Settings → Account.</p>
-					<div className="mt-5 flex gap-2">
+					<div className="mt-5 flex gap-2 border-t border-border pt-5">
 						<Button
 							size="lg"
 							disabled={pending}
@@ -86,7 +93,7 @@ function ConnectAi() {
 						</Button>
 					</div>
 					{error && <p className="mt-3 text-destructive">{error}</p>}
-				</>
+				</section>
 			)}
 		</Page>
 	);

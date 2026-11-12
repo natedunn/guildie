@@ -195,7 +195,7 @@ function SidebarNav() {
 						to="/g/$region/$slug/requests"
 						params={{ region: g.region, slug: g.slug }}
 						search={{ view: "mine" }}
-						className="mx-0.5 mb-2 block rounded-md border border-border px-3 py-2 text-[0.8125rem] hover:bg-hover"
+						className="surface-card mx-0.5 mb-2 block px-3 py-2 text-[0.8125rem]"
 					>
 						<span className="block font-medium">
 							{g.stale === 1 ? "1 request is" : `${g.stale} requests are`} over a week old

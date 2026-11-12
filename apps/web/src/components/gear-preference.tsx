@@ -199,7 +199,7 @@ function TypeList({
 				)}
 			</div>
 			{n > 0 ? (
-				<ol className="divide-y divide-border rounded-md border border-border">
+				<ol className="surface-card divide-y divide-border">
 					{value.types.map((type, i) => {
 						const t = byType.get(type);
 						return (

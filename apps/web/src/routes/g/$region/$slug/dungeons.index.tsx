@@ -78,19 +78,22 @@ function DungeonsPage() {
 			</div>
 
 			{shown.length === 0 ? (
-				<p className="text-[0.8125rem] text-muted-foreground">No dungeon by that name.</p>
+				<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
+					No dungeon by that name.
+				</p>
 			) : (
 				<div className="grid grid-cols-1 gap-3 @lg:grid-cols-2 @3xl:grid-cols-3 @5xl:grid-cols-4">
 					{shown.map((d) => {
 						const complete = person?.complete.includes(d.key);
 						return (
 							<div key={d.key} className="relative">
-								{/* The whole card opens the dungeon; hovering it underlines the name. */}
+								{/* The whole card opens the dungeon; hovering it lights the card and underlines
+								    the name. Clipped 1px out, so the art keeps the corners but not the hairline. */}
 								<Link
 									to="/g/$region/$slug/dungeons/$dungeon"
 									params={{ region: params.region, slug: params.slug, dungeon: d.key }}
 									search={{ as: viewer }}
-									className="group block overflow-hidden rounded-md border border-border bg-card transition-colors hover:border-foreground/25"
+									className="surface-card group block card-clip"
 								>
 									<DungeonArt src={dungeonArtUrl(d.key)} className="aspect-[2/1]" />
 									<div className="border-t border-border px-3 py-2.5">
@@ -113,7 +116,7 @@ function DungeonsPage() {
 												</span>{" "}
 												quest ready
 											</p>
-											<span className="inline-flex h-7 flex-none items-center rounded-md border border-input px-2.5 text-xs font-medium transition-colors hover:border-foreground/40 hover:bg-foreground/10">
+											<span className="inline-flex h-7 flex-none items-center rounded-md border border-input px-2.5 text-xs font-medium text-muted-foreground transition-colors group-hover:border-border-strong group-hover:text-foreground">
 												Details
 											</span>
 										</div>

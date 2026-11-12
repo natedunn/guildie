@@ -27,12 +27,14 @@ function GuildSettings() {
 				it members only.
 			</p>
 			{viewer.guilds.length === 0 ? (
-				<p className="mt-4 text-[0.8125rem] text-muted-foreground">None yet.</p>
+				<p className="mt-3 rounded-[var(--card-radius)] border border-dashed border-border px-3.5 py-3 text-[0.8125rem] text-muted-foreground">
+					None yet. Your guilds show up here once Guildie finds them from your characters.
+				</p>
 			) : (
-				<ul className="mt-3 divide-y divide-border rounded-md border border-border">
+				<ul className="surface-card mt-3 divide-y divide-border">
 					{viewer.guilds.map((g) => (
-						<li key={g._id} className="px-3 py-3 text-[0.8125rem]">
-							<div className="flex items-baseline justify-between gap-3">
+						<li key={g._id} className="px-3.5 py-3 text-[0.8125rem]">
+							<div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
 								<Link
 									to="/g/$region/$slug"
 									params={{ region: g.region, slug: g.slug }}
@@ -40,8 +42,9 @@ function GuildSettings() {
 								>
 									{g.name}
 								</Link>
-								<span className="num text-muted-foreground">
-									{g.region.toUpperCase()} · {g.memberCount} members{g.isOwner ? " · you own it" : ""}
+								<span className="num flex items-center gap-2 text-muted-foreground">
+									{g.region.toUpperCase()} · {g.memberCount} members
+									{g.isOwner && <span className="pill px-2 py-0">You own it</span>}
 								</span>
 							</div>
 							{g.isOwner ? (

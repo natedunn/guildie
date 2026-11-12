@@ -101,9 +101,9 @@ function WhoCanUse({ type, members, region }: { type: ProficiencyType; members: 
 	}, [members, type]);
 	const classes = CLASS_IDS.filter((id) => unlockLevel(id, type) !== undefined);
 	return (
-		<div className="mt-4 max-w-3xl space-y-3 text-[0.8125rem]">
+		<div className="surface-card mt-4 max-w-3xl space-y-3 p-3.5 text-[0.8125rem]">
 			<p className="text-muted-foreground">
-				{type.name}:{" "}
+				<span className="font-semibold text-foreground">{type.name}</span>:{" "}
 				{classes.length ? (
 					classes.map((id, i) => {
 						const from = unlockLevel(id, type) ?? 1;

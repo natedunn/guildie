@@ -121,7 +121,7 @@ export function RequestButton({
 			</Dialog.Trigger>
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
-				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-md border border-border bg-background shadow-2xl transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					{open && <RequestForm guild={guild} target={target} characters={characters} onDone={() => setOpen(false)} />}
 				</Dialog.Popup>
 			</Dialog.Portal>
@@ -259,7 +259,7 @@ function RequestForm({
 			</div>
 
 			{target.kind === "craft" && (
-				<div className="space-y-2 rounded-md border border-border p-3">
+				<div className="surface-card space-y-2 p-3">
 					<div className="flex items-baseline justify-between gap-2">
 						<span className="text-xs font-medium text-muted-foreground">Your mats</span>
 						{mats && (
@@ -432,7 +432,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						({showMats ? "hide" : "details"})
 					</button>
 					{showMats && (
-						<div className="max-w-sm space-y-2 rounded-md border border-border p-3">
+						<div className="surface-card max-w-sm space-y-2 p-3">
 							<MatsList check={r.matsCheck} />
 							{!r.matsCheck.covered && (
 								<label className="flex items-center gap-2 text-[13px]">

@@ -77,27 +77,45 @@ function Dungeon({ data }: { data: Detail }) {
 	return (
 		<div className="@container pb-12">
 			<header className="flex items-center gap-5 pt-6 pb-6">
-				<DungeonArt
-					src={dungeonArtUrl(dungeon.key)}
-					className="hidden h-32 w-60 flex-none rounded-md border border-border @md:block"
-				/>
+				{/* The page's one featured card: the art, lit along its top edge. */}
+				<div className="surface-card hidden h-32 w-60 flex-none card-clip @md:block">
+					<DungeonArt src={dungeonArtUrl(dungeon.key)} className="size-full" />
+					<span className="streak" />
+				</div>
 				<div className="min-w-0">
-					<h1 className="truncate text-xl font-semibold tracking-tight">{dungeon.name}</h1>
+					<h1 className="heading-display text-fade truncate text-xl leading-tight tracking-[-0.025em]">
+						{dungeon.name}
+					</h1>
 					<p className="num mt-1 text-[0.8125rem] text-muted-foreground">
 						Level {dungeon.level} · {quests} {quests === 1 ? "quest" : "quests"}
 						{sideName && ` for the ${sideName}`}
 					</p>
-					<p className="num mt-0.5 text-[0.8125rem] text-muted-foreground">
-						<span className="text-foreground">{count((p) => p.levelReady)}</span> of {people.length} level ready ·{" "}
-						<span className="text-foreground">{count((p) => p.questReady)}</span> quest ready ·{" "}
-						<span className="text-foreground">{count((p) => p.questsCompleted)}</span> done with its quests
-					</p>
+					<div className="num mt-3 flex flex-wrap gap-1.5">
+						<span className="pill">
+							<span>
+								<span className="text-foreground">{count((p) => p.levelReady)}</span> of {people.length} level ready
+							</span>
+						</span>
+						<span className="pill">
+							<span>
+								<span className="text-foreground">{count((p) => p.questReady)}</span> quest ready
+							</span>
+						</span>
+						<span className="pill">
+							<span>
+								<span className="text-foreground">{count((p) => p.questsCompleted)}</span> done with its quests
+							</span>
+						</span>
+					</div>
 				</div>
 			</header>
 
 			<div className="grid gap-8 @5xl:grid-cols-[minmax(0,1fr)_32rem]">
 				<section>
-					<SectionTitle>Roster</SectionTitle>
+					{/* As tall as the Quests heading's row (View as), so the two line up. */}
+					<div className="flex h-7 items-center">
+						<SectionTitle>Roster</SectionTitle>
+					</div>
 					<Roster people={people} level={dungeon.level} />
 				</section>
 				<section className="order-first @5xl:order-none">
@@ -213,13 +231,13 @@ type Here = NonNullable<Step["here"]>;
 function QuestList({ items, viewer }: { items: Item[]; viewer?: Person }) {
 	if (items.length === 0) {
 		return (
-			<p className="mt-2 text-[0.8125rem] text-muted-foreground">
+			<p className="surface-card mt-2 px-4 py-6 text-center text-[0.8125rem] text-muted-foreground">
 				Blizzard lists no dungeon quests here for your side.
 			</p>
 		);
 	}
 	return (
-		<ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+		<ul className="surface-card mt-2 divide-y divide-border">
 			{items.map((item) =>
 				item.kind === "quest" ? (
 					<li key={item.key} className="px-3 py-2">
@@ -335,11 +353,7 @@ function QuestLine({
 					>
 						{title}
 					</a>
-					{badge && (
-						<span className="flex-none rounded-sm border border-border px-1 py-px text-[10px] leading-none text-muted-foreground">
-							In Dungeon
-						</span>
-					)}
+					{badge && <span className="pill flex-none px-1.5 py-0 text-[10px] leading-4">In dungeon</span>}
 				</span>
 				{done ? (
 					<DoneMark label={`${viewer?.name} turned it in`} />
@@ -385,9 +399,11 @@ function Resources({ dungeonKey, name }: { dungeonKey: string; name: string }) {
 		<div className="mt-8">
 			<SectionTitle>Resources</SectionTitle>
 			{links.length === 0 ? (
-				<p className="mt-2 text-[0.8125rem] text-muted-foreground">Wowhead has no guide for {name} yet.</p>
+				<p className="surface-card mt-2 px-4 py-6 text-center text-[0.8125rem] text-muted-foreground">
+					Wowhead has no guide for {name} yet.
+				</p>
 			) : (
-				<ul className="mt-2 divide-y divide-border rounded-md border border-border bg-card">
+				<ul className="surface-card mt-2 divide-y divide-border card-clip">
 					{links.map((l) => (
 						<li key={l.url}>
 							<a

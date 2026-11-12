@@ -64,7 +64,7 @@ export function TalentTree({ layout, tree }: { layout: TalentLayout; tree: Chara
 		}),
 	);
 	return (
-		<section className="rounded-md border border-border bg-card">
+		<section className="surface-card">
 			<header className="flex items-baseline justify-between border-b border-border px-3 py-2">
 				<h2 className="text-sm font-semibold">{layout.name}</h2>
 				<span className={cn("num text-sm", points ? "text-foreground" : "text-muted-foreground")}>{points}</span>
@@ -203,7 +203,7 @@ function TalentTooltipBody({ node }: { node: PlacedNode }) {
 /** When layouts haven't synced: the character's talents as plain lists. */
 export function TalentList({ tree }: { tree: CharacterTree }) {
 	return (
-		<section className="rounded-md border border-border bg-card">
+		<section className="surface-card">
 			<header className="flex items-baseline justify-between border-b border-border px-3 py-2">
 				<h2 className="text-sm font-semibold">{tree.name}</h2>
 				<span className="num text-sm">{tree.points}</span>

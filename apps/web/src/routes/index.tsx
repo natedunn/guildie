@@ -7,7 +7,7 @@ import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useState } from "react";
 import { Landing } from "@/components/landing/landing";
-import { Page, PageHeader } from "@/components/page-header";
+import { PaneHero } from "@/components/status-pages";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -31,13 +31,13 @@ function Home() {
 	const { data: viewer } = useSuspenseQuery(convexQuery(api.users.viewer, {}));
 	if (!viewer) return <Landing />;
 	return (
-		<Page width="medium">
-			<PageHeader
-				title="No guild found yet"
-				description="Guildie finds your guild from your characters. A character shows up once it's level 10 and has logged out since joining the guild; then sign out and in again. Or add your guild."
-			/>
+		<PaneHero
+			pill={<>Signed in as {viewer.battletag ?? viewer.name}</>}
+			title="No guild found yet"
+			description="Guildie finds your guild from your characters. A character shows up once it's level 10 and has logged out since joining the guild; then sign out and in again. Or add your guild."
+		>
 			<AddGuild />
-		</Page>
+		</PaneHero>
 	);
 }
 
@@ -51,6 +51,7 @@ function AddGuild() {
 	const [error, setError] = useState<string | null>(null);
 	return (
 		<form
+			className="surface-card mt-8 w-full max-w-lg p-5 text-left"
 			onSubmit={async (e) => {
 				e.preventDefault();
 				setError(null);
@@ -62,15 +63,16 @@ function AddGuild() {
 				}
 			}}
 		>
-			<label htmlFor="guild-name" className="text-[0.8125rem] font-medium">
+			<span aria-hidden className="streak" />
+			<label htmlFor="guild-name" className="text-sm font-semibold">
 				Not on Guildie yet? Add it
 			</label>
-			<div className="mt-1.5 flex gap-2">
+			<div className="mt-3 flex gap-2">
 				<select
 					aria-label="Region"
 					value={region}
 					onChange={(e) => setRegion(e.target.value as Region)}
-					className="h-8 rounded-md border px-1.5 text-[0.8125rem] pointer-coarse:h-10"
+					className="h-8 rounded-md border border-input bg-transparent px-1.5 text-[0.8125rem] outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-highlight/12 pointer-coarse:h-10"
 				>
 					{REGIONS.map((r) => (
 						<option key={r} value={r}>

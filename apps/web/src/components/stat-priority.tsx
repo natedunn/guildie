@@ -70,7 +70,7 @@ export function ownChoice(stats: string[], tiers: number[]) {
 }
 
 const RANK =
-	"num flex size-6 flex-none items-center justify-center rounded-md border border-border bg-well text-xs text-muted-foreground";
+	"num flex size-6 flex-none items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-xs text-muted-foreground";
 
 const pct = (share: number) => `${Math.round(share * 100)}%`;
 
@@ -79,7 +79,7 @@ function ShareBar({ stat, share }: { stat: string; share: number }) {
 	if (stat === "ARMOR") return <span className="w-[7.5rem] flex-none" />;
 	return (
 		<span className="flex w-[7.5rem] flex-none items-center gap-2" title={`Counts ${pct(share)} as much as the first`}>
-			<span className="relative h-1.5 flex-1 overflow-hidden rounded-full border border-border bg-well">
+			<span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-well">
 				<span className="absolute inset-y-0 left-0 rounded-full bg-foreground/70" style={{ width: pct(share) }} />
 			</span>
 			<span className="num w-8 text-right text-xs text-muted-foreground">{pct(share)}</span>
@@ -449,7 +449,7 @@ export function StatPriorityEditor({
 
 			{mode === "own" ? (
 				<div className="space-y-4">
-					<ol className="divide-y divide-border rounded-md border border-border">
+					<ol className="surface-card divide-y divide-border">
 						{own.map((stat, i) => (
 							<li
 								key={stat}
@@ -549,7 +549,7 @@ export function StatPriorityEditor({
 					</div>
 				</div>
 			) : preview ? (
-				<div className="rounded-md border border-border px-3 py-2.5">
+				<div className="surface-card px-3 py-2.5">
 					<RankedStats stats={preview.stats} />
 				</div>
 			) : null}
@@ -590,8 +590,9 @@ function OptionCard({
 			aria-checked={active}
 			onClick={onClick}
 			className={cn(
-				"rounded-md border border-border px-3 py-2 text-left transition-colors hover:bg-hover",
-				active && "border-border-strong bg-selected hover:bg-selected",
+				"surface-card px-3 py-2 text-left",
+				// The chosen one: warm fill and an amber edge, like an active chip.
+				active && "bg-selected shadow-[inset_0_0_0_1px_rgb(255_176_96/0.28)] hover:bg-selected",
 			)}
 		>
 			<span className={cn("block text-[0.8125rem]", active && "font-semibold")}>{title}</span>

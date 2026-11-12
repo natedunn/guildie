@@ -110,14 +110,15 @@ function FeedPage() {
 			</div>
 
 			{days.length === 0 ? (
-				<p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
+				<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
 					Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen.
 				</p>
 			) : (
 				days.map(([day, list]) => (
 					<section key={day}>
-						<h2 className="sticky top-0 z-[1] bg-background py-1.5 text-xs font-medium text-muted-foreground">{day}</h2>
-						<ul className="divide-y divide-border rounded-md border border-border">
+						{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
+						<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">{day}</h2>
+						<ul className="surface-card divide-y divide-border">
 							{list.map((e) => (
 								<EventRow key={e.id} event={e} />
 							))}

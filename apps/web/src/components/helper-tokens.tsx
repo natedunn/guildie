@@ -9,18 +9,20 @@ export function HelperTokens() {
 	const revoke = useMutation(api.helper.revokeToken);
 	return (
 		<div>
-			<p className="mt-1 text-muted-foreground">
+			<p className="mt-1 text-[0.8125rem] text-muted-foreground">
 				Computers signed in with the Guildie app, which upload your addon's data. Disconnect one you no longer use.
 			</p>
 			{tokens && tokens.length === 0 && (
-				<p className="mt-2 text-muted-foreground">None yet. Sign in inside the app to connect it.</p>
+				<p className="mt-3 rounded-[var(--card-radius)] border border-dashed border-border px-3.5 py-3 text-[0.8125rem] text-muted-foreground">
+					None yet. Sign in inside the app to connect it.
+				</p>
 			)}
 			{tokens && tokens.length > 0 && (
-				<ul className="mt-3 divide-y divide-border border-y border-border">
+				<ul className="surface-card mt-3 divide-y divide-border text-[0.8125rem]">
 					{tokens.map((t) => (
-						<li key={t._id} className="flex h-9 items-center justify-between gap-4">
-							<span>{t.label}</span>
-							<span className="num flex items-center gap-4 text-muted-foreground">
+						<li key={t._id} className="flex min-h-10 items-center justify-between gap-4 py-1.5 pr-1.5 pl-3.5">
+							<span className="min-w-0 truncate">{t.label}</span>
+							<span className="num flex shrink-0 items-center gap-4 text-muted-foreground">
 								{t.lastUsedAt ? `used ${ago(t.lastUsedAt)}` : `connected ${ago(t.createdAt)}`}
 								<Button
 									variant="ghost"

@@ -91,7 +91,7 @@ element win):
 
 | Class | Use |
 | --- | --- |
-| `.surface-card` | Any card or boxed group: replaces `rounded-md border border-border bg-surface` with the same box. `Panel`/`PANEL` and the sign-in card use it. Add `overflow-hidden` when it holds a table or a full-bleed header. Link/button cards brighten on hover. |
+| `.surface-card` | Any card or boxed group: replaces `rounded-md border border-border bg-surface` with the same box. `Panel`/`PANEL` and the sign-in card use it. To clip its content (a table, a full-bleed header), add `card-clip` (or `overflow-hidden`, which the card turns into the same thing): it clips to the border box so the lit edge survives, and makes no scroll box, so sticky headers still work. Link/button cards brighten on hover. |
 | `.hairline` | Just the lit edge, on something with its own fill and no border (the landing's frame). |
 | `.heading-display` + `.text-fade` | Tight, faded titles. `PageHeader` has them; use for a page's own header (the character page) and hero titles. Not for section titles or table text. |
 | `.pane-backdrop` | The map and glow at the top of the pane; the root shell draws it on every page. Don't add another. |

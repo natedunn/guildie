@@ -32,7 +32,7 @@ function GearPage() {
 			<div className={cn("grid items-start gap-5", SIDE)}>
 				<div className="min-w-0">
 					{missing ? (
-						<p className="max-w-xl text-sm text-muted-foreground">
+						<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground text-balance">
 							Blizzard hasn't published this character's profile yet. That happens once they're level 10 and log out.
 						</p>
 					) : (
