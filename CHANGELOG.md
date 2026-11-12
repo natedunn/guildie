@@ -17,6 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
+- **Guildie:** Deadmines lists The Unsent Letter and Scarlet Monastery lists Vorrel's Revenge, dungeon quests Blizzard doesn't mark as such; Shaper's Terrace's Digestible Research is shown as starting in the dungeon.
 - **Guildie:** Dungeon quests that start inside the dungeon (from a drop, like the Crest of Lordaeron, or someone you meet in there) say "Starts in dungeon" instead of "Not picked up", and no longer count against being quest ready.
 - **Guildie:** Dungeon quest chains show every step's name, instead of "Quest 97289" for steps Blizzard doesn't list as dungeon quests.
 

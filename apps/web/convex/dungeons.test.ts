@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DUNGEON_QUEST_FACTS } from "./shared/dungeonQuests.ts";
+import { DUNGEON_QUEST_FACTS, EXTRA_DUNGEON_QUESTS, STARTS_INSIDE } from "./shared/dungeonQuests.ts";
 import {
 	DUNGEONS,
 	dungeonOfKillStatistic,
@@ -131,6 +131,15 @@ test("quests that start inside don't count toward picked up", () => {
 	assert.equal(ruins.find((g) => g.title === "Crest of Lordaeron")?.startsInside, true);
 	const s = memberStatus({ level: 15 }, ruins, member({ level: 20, inProgress: new Set([92421]) }));
 	assert.deepEqual([s.toPickUp, s.pickedUp, s.questReady, s.total], [1, 1, true, 2]);
+});
+
+test("extra dungeon quests start inside and have a side", () => {
+	for (const ids of Object.values(EXTRA_DUNGEON_QUESTS)) {
+		for (const id of ids) {
+			assert.ok(STARTS_INSIDE.has(id), `${id}: starts inside`);
+			assert.ok(DUNGEON_QUEST_FACTS[id]?.side, `${id}: side`);
+		}
+	}
 });
 
 test("hand-kept quest facts", () => {

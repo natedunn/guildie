@@ -7,7 +7,7 @@ import { appToken, blizzardGet } from "./blizzard";
 import { access } from "./guilds";
 import { pickProfile } from "./helper";
 import { vRegion } from "./schema";
-import { DUNGEON_QUEST_FACTS } from "./shared/dungeonQuests";
+import { DUNGEON_QUEST_FACTS, EXTRA_DUNGEON_QUESTS } from "./shared/dungeonQuests";
 import {
 	chainIds,
 	DUNGEON_BY_KEY,
@@ -97,9 +97,13 @@ export const syncDungeon = internalAction({
 				console.warn(`dungeons: ${key}: quest ${questId}: ${(e as Error).message}`);
 			}
 		};
-		// The area's quests; the ones Blizzard types "Dungeon" are the dungeon's.
-		for (const questId of areaIds) await lookUp(questId);
-		const dungeonIds = [...fetched.values()].filter((q) => q.type === "Dungeon").map((q) => q.questId);
+		// The area's quests; the ones Blizzard types "Dungeon" are the dungeon's, and
+		// the ones it doesn't but that are (EXTRA_DUNGEON_QUESTS).
+		const extra = EXTRA_DUNGEON_QUESTS[key] ?? [];
+		for (const questId of new Set([...areaIds, ...extra])) await lookUp(questId);
+		const dungeonIds = [...fetched.values()]
+			.filter((q) => q.type === "Dungeon" || extra.includes(q.questId))
+			.map((q) => q.questId);
 		// The rest of their chains, for titles and sides: some steps are in the
 		// area without being typed "Dungeon" (Unending Torment's later steps).
 		const steps = chainIds(dungeonIds).filter((id) => !dungeonIds.includes(id));
