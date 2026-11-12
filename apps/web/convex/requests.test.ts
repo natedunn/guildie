@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
 	type Action,
+	canChange,
 	canHelpFromInventory,
 	check,
 	EXPIRE_MS,
@@ -10,6 +11,9 @@ import {
 	matsLabel,
 	matsState,
 	nextStatus,
+	ONGOING_DAYS,
+	ongoingUntil,
+	REQUEST_LIMITS,
 	type RequestLike,
 	rosterCharacters,
 	STALE_MS,
@@ -116,8 +120,8 @@ test("new requests: limits on count, quantity and note", () => {
 		quantity: 20,
 		note: "for my alt",
 	});
-	assert.deepEqual(validateNew({ quantity: 1, note: "   ", openCount: 9 }), { quantity: 1, note: undefined });
-	assert.throws(() => validateNew({ quantity: 1, openCount: 10 }), /10 open requests/);
+	assert.deepEqual(validateNew({ quantity: 1, note: "   ", openCount: 14 }), { quantity: 1, note: undefined });
+	assert.throws(() => validateNew({ quantity: 1, openCount: 15 }), /15 open requests/);
 	for (const quantity of [0, 1001, 2.5, Number.NaN]) {
 		assert.throws(() => validateNew({ quantity, openCount: 0 }), /Quantity is 1 to 1000/, String(quantity));
 	}
@@ -189,4 +193,58 @@ test("help requires full inventory coverage and a known craft, never just eligib
 	assert.equal(canHelpFromInventory(craft, false, new Set(), scans, reagents), false);
 	assert.equal(canHelpFromInventory(craft, false, known, scans, []), false);
 	assert.equal(canHelpFromInventory(craft, false, known, scans), false);
+});
+
+// ---- Ongoing requests ------------------------------------------------------------
+
+const DAY = 86_400_000;
+const ongoing = (over: Partial<RequestLike> = {}) => req({ ongoing: true, until: NOW + 30 * DAY, ...over });
+
+test("ongoing: 2 weeks, 1 month or 3 months, nothing longer", () => {
+	assert.deepEqual([...ONGOING_DAYS], [14, 30, 90]);
+	assert.equal(ongoingUntil(30, NOW), NOW + 30 * DAY);
+	for (const days of [0, 7, 91, 365, Number.NaN]) assert.throws(() => ongoingUntil(days, NOW), /2 weeks/, String(days));
+});
+
+test("ongoing: no quantity, their own cap of 20 apart from the 15 fixed", () => {
+	assert.equal(REQUEST_LIMITS.ongoing, 20);
+	assert.deepEqual(validateNew({ ongoing: true, quantity: 0, openCount: 19 }), { quantity: 0, note: undefined });
+	assert.deepEqual(validateNew({ ongoing: true, quantity: 5000, openCount: 0 }), { quantity: 0, note: undefined });
+	assert.throws(() => validateNew({ ongoing: true, quantity: 0, openCount: 20 }), /20 ongoing requests/);
+	assert.throws(() => validateNew({ ongoing: true, quantity: 0, note: "x".repeat(141), openCount: 0 }), /140/);
+});
+
+test("ongoing: nobody claims it; the requester only stops it", () => {
+	for (const action of ["claim", "unclaim", "markSent", "complete", "keep", "setMats"] as Action[]) {
+		assert.equal(ok(action, ongoing(), MILLER, true), false, `${action} by a guildmate`);
+		assert.equal(ok(action, ongoing(), TODD), false, `${action} by the requester`);
+	}
+	assert.equal(ok("cancel", ongoing(), TODD), true);
+	assert.equal(ok("cancel", ongoing(), MILLER), false);
+});
+
+test("ongoing: ends at its date, never goes stale", () => {
+	const r = ongoing({ lastActivityAt: NOW - 60 * DAY, until: NOW + DAY });
+	assert.equal(isStale(r, NOW), false);
+	assert.equal(shouldExpire(r, NOW), false, "quiet for 60 days but not ended");
+	assert.equal(shouldExpire(r, NOW + DAY), true);
+	assert.equal(shouldExpire({ ...r, status: "cancelled" }, NOW + DAY), false);
+});
+
+test("changing a request: your own open item request only", () => {
+	assert.equal(canChange(req(), TODD).ok, true);
+	assert.equal(canChange(ongoing(), TODD).ok, true);
+	assert.equal(canChange(req(), MILLER).ok, false);
+	assert.equal(canChange(req({ kind: "craft" }), TODD).ok, false);
+	assert.equal(canChange(req({ status: "claimed", claim: { userId: MILLER } }), TODD).ok, false);
+	assert.equal(canChange(req({ status: "done" }), TODD).ok, false);
+});
+
+test("ongoing: you can help with any amount you have", () => {
+	const scans = [{ bags: { capturedAt: NOW, items: [{ id: 1, count: 1 }] } }];
+	const want = { kind: "item" as const, status: "open", quantity: 0, itemId: 1, ongoing: true };
+	assert.equal(canHelpFromInventory(want, false, new Set(), scans), true);
+	assert.equal(canHelpFromInventory({ ...want, itemId: 2 }, false, new Set(), scans), false);
+	assert.equal(canHelpFromInventory(want, true, new Set(), scans), false, "your own");
+	assert.equal(canHelpFromInventory(want, false, new Set(), []), false, "no scan");
 });

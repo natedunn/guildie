@@ -486,6 +486,8 @@ export default defineSchema({
 		requestKind: v.optional(v.union(v.literal("item"), v.literal("craft"))),
 		itemId: v.optional(v.number()),
 		quantity: v.optional(v.number()),
+		/** An ongoing request ("is collecting Silk Cloth"). */
+		ongoing: v.optional(v.boolean()),
 		other: v.optional(vRequestCharacter),
 	}).index("by_guild", ["guildId", "at"]),
 
@@ -571,8 +573,15 @@ export default defineSchema({
 		/** The item wanted, or the crafted item (none for enchants). */
 		itemId: v.optional(v.number()),
 		recipeId: v.optional(v.number()),
+		/** 0 for ongoing requests (no amount). */
 		quantity: v.number(),
 		note: v.optional(v.string()),
+		/**
+		 * Ongoing ("send me any you have"): items only, never claimed, closes
+		 * as expired at `until` (2 weeks to 3 months after it was set).
+		 */
+		ongoing: v.optional(v.boolean()),
+		until: v.optional(v.number()),
 		status: v.union(
 			v.literal("open"),
 			v.literal("claimed"),
@@ -605,7 +614,8 @@ export default defineSchema({
 	})
 		.index("by_guild_status", ["guildId", "status"])
 		.index("by_user_status", ["userId", "status"])
-		.index("by_status_activity", ["status", "lastActivityAt"]),
+		.index("by_status_activity", ["status", "lastActivityAt"])
+		.index("by_status_until", ["status", "until"]),
 
 	/** Cached client-credentials tokens for the Blizzard API. */
 	apiTokens: defineTable({

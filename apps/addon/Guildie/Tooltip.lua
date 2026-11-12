@@ -1,5 +1,6 @@
 -- Adds a Guildie block to item tooltips: guild requests for this item ("Todd
--- requesting 20"), guildmates whose known recipes use it (reagents), and
+-- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
+-- whose known recipes use it (reagents), and
 -- guildmates it might be a gear upgrade for (Upgrades.lua).
 -- Suggestions, not certainties: knowing a recipe doesn't mean they're still
 -- making it. Data comes from GuildieData.lua, which the helper downloads.
@@ -33,13 +34,14 @@ end
 
 --- One row per guildmate whose known recipes use it, with their professions
 --- merged: { left = "Brenna", right = "might want (Tailoring)" }, then
---- "+2 more" past MAX_NAMES people.
-local function reagentRows(itemID)
+--- "+2 more" past MAX_NAMES people. `skip`: names already on a request row
+--- (someone who wants all of it doesn't also "might want" it).
+local function reagentRows(itemID, skip)
     local entry = GuildieData and GuildieData.reagents and GuildieData.reagents[itemID]
     if not entry then return {} end
     local rows, byName, extra = {}, {}, 0
     for _, user in ipairs(entry.users or {}) do
-        if not isMine(user.name) then
+        if not isMine(user.name) and not (skip and skip[user.name]) then
             local row = byName[user.name]
             if row then
                 table.insert(row.professions, user.profession)
@@ -64,15 +66,20 @@ ns.reagentRows = reagentRows
 
 --- One two-column row per open request for this item (GuildieData.requests,
 --- addon 0.8.0): { left = "Todd", right = "requesting 20, claimed by Miller" }.
+--- Ongoing requests (no quantity, never claimed) come first: "Todd
+--- wants all you have". Also returns the names with an ongoing request.
 local function requestRows(itemID)
     local list = GuildieData and type(GuildieData.requests) == "table" and GuildieData.requests[itemID]
-    if type(list) ~= "table" then return {} end
-    local rows = {}
+    if type(list) ~= "table" then return {}, {} end
+    local rows, later, ongoing = {}, {}, {}
     for _, r in ipairs(list) do
         if type(r) == "table" and r.name then
             local mine = isMine(r.name)
             local right
-            if r.kind == "craft" then
+            if r.ongoing then
+                right = mine and "collecting" or "wants all you have"
+                ongoing[r.name] = true
+            elseif r.kind == "craft" then
                 right = mine and "want it crafted" or "wants it crafted"
                 if (r.quantity or 1) > 1 then right = right .. string.format(" (%d)", r.quantity) end
             else
@@ -81,10 +88,12 @@ local function requestRows(itemID)
             if type(r.claimedBy) == "table" and r.claimedBy.name then
                 right = right .. ", claimed by " .. classColored(r.claimedBy.name, r.claimedBy.classId)
             end
-            table.insert(rows, { left = mine and "You" or classColored(r.name, r.classId), right = right })
+            local row = { left = mine and "You" or classColored(r.name, r.classId), right = right }
+            table.insert(r.ongoing and rows or later, row)
         end
     end
-    return rows
+    for _, row in ipairs(later) do table.insert(rows, row) end
+    return rows, ongoing
 end
 ns.requestRows = requestRows
 
@@ -113,12 +122,12 @@ end
 
 --- Everything Guildie has to say about this item, as rows (no header).
 local function rowsFor(tooltip, itemID, data)
-    local rows = requestRows(itemID)
+    local rows, ongoing = requestRows(itemID)
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
     local binding = ns.upgrades and ns.upgrades.binding(ns.upgrades.tooltipLines(tooltip, data))
     local bound = binding ~= nil
     if not bound then
-        for _, row in ipairs(reagentRows(itemID)) do table.insert(rows, row) end
+        for _, row in ipairs(reagentRows(itemID, ongoing)) do table.insert(rows, row) end
     end
     local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)
     if ok and upgrades then

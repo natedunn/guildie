@@ -3,21 +3,31 @@ import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { ClassText } from "@/components/class-name";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
-import { RequestButton, RequestRow, type RequestView } from "@/components/requests";
+import { type ExistingRequest, RequestButton, RequestRow, type RequestView, useNow } from "@/components/requests";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { shortDate, timeLeft } from "@/lib/format";
 
 // Guild requests: members ask for items and crafts, guildmates claim them,
-// the requester marks them done (rules: convex/shared/requests.ts). Members
-// only, even in a public guild. The view lives in the URL (?view=mine).
+// the requester marks them done (rules: convex/shared/requests.ts). Items can
+// also be asked for as ongoing ("send me any you have"): their own tab, never
+// claimed. Members only, even in a public guild. The tab and the filter live
+// in the URL (?type=ongoing&view=mine), independent of each other.
 
+type Type = "fixed" | "ongoing";
 type View = "open" | "mine" | "help";
-type Search = { view?: View };
+type Search = { type?: "ongoing"; view?: View };
 
 export const Route = createFileRoute("/g/$region/$slug/requests")({
-	validateSearch: (search: Record<string, unknown>): Search =>
-		search.view === "mine" || search.view === "help" ? { view: search.view } : {},
+	validateSearch: (search: Record<string, unknown>): Search => ({
+		...(search.type === "ongoing" ? { type: "ongoing" as const } : {}),
+		...(search.view === "mine" || search.view === "help" ? { view: search.view } : {}),
+	}),
 	loader: async ({ context, params }) => {
 		await context.queryClient.ensureQueryData(
 			convexQuery(api.requests.list, { region: params.region as Region, slug: params.slug }),
@@ -34,6 +44,15 @@ const VIEWS: { key: View; label: string }[] = [
 
 const isActive = (r: RequestView) => r.status === "open" || r.status === "claimed";
 
+const asExisting = (r: RequestView): ExistingRequest => ({
+	requestId: r._id,
+	status: r.status,
+	ongoing: r.ongoing,
+	quantity: r.quantity,
+	until: r.until,
+	note: r.note,
+});
+
 function RequestsPage() {
 	const params = Route.useParams();
 	const search = Route.useSearch();
@@ -42,15 +61,32 @@ function RequestsPage() {
 		convexQuery(api.requests.list, { region: params.region as Region, slug: params.slug }),
 	);
 	const view = search.view ?? "open";
+	const type: Type = search.type ?? "fixed";
 	const lists = useMemo(() => {
 		const all = data?.member ? data.requests : [];
+		const fixed = all.filter((r) => !r.ongoing);
+		// Ongoing: active ones only (stopped and ended ones just go away).
+		const ongoing = all.filter((r) => r.ongoing && isActive(r));
 		return {
-			open: all.filter(isActive),
-			mine: all.filter((r) => r.mine),
-			// Only full requests covered by the viewer’s latest inventory scans.
-			help: all.filter((r) => r.canHelp),
+			fixed: {
+				open: fixed.filter(isActive),
+				mine: fixed.filter((r) => r.mine),
+				// Only full requests covered by the viewer’s latest inventory scans.
+				help: fixed.filter((r) => r.canHelp),
+			},
+			ongoing: {
+				open: ongoing,
+				mine: ongoing.filter((r) => r.mine),
+				// Someone else wants it and the viewer's bags or bank have some.
+				help: ongoing.filter((r) => r.canHelp),
+			},
 		};
 	}, [data]);
+	// Ongoing lists show one row per item (everyone who wants it together), so count items.
+	const count = (t: Type, v: View) =>
+		t === "ongoing" && v !== "mine" ? new Set(lists.ongoing[v].map((r) => r.item?.itemId)).size : lists[t][v].length;
+	const go = (next: Search) =>
+		navigate({ search: (prev) => ({ ...prev, ...next }), replace: true, resetScroll: false });
 
 	if (!data) return null;
 	if (!data.member) {
@@ -64,16 +100,18 @@ function RequestsPage() {
 			</Empty>
 		);
 	}
-	const stale = lists.mine.filter((r) => r.stale).length;
-	const shown = lists[view];
+	const stale = lists.fixed.mine.filter((r) => r.stale).length;
+	const shown = lists[type][view];
+	const guild = { region: params.region as Region, slug: params.slug };
 	return (
 		<div className="max-w-3xl space-y-4 pb-12">
 			<p className="text-[13px] text-muted-foreground">
-				Ask the guild for reagents or a craft. Whoever claims it trades or mails it; you mark it done. Open requests
-				also show on item tooltips in game (with the Guildie app).
+				Ask the guild for a fixed amount of something, or a craft: whoever claims it trades or mails it, and you mark it
+				done. Or ask for an item as ongoing, and guildmates send any they have. Requests also show on item tooltips in
+				game (with the Guildie app).
 			</p>
 
-			<NewRequest guild={{ region: params.region as Region, slug: params.slug }} characters={data.characters} />
+			<NewRequest guild={guild} characters={data.characters} ongoing={type === "ongoing"} />
 
 			{stale > 0 && (
 				<div className="surface-card flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 text-[13px]">
@@ -81,7 +119,7 @@ function RequestsPage() {
 						{stale === 1 ? "1 of your requests is" : `${stale} of your requests are`} over a week old. Still need{" "}
 						{stale === 1 ? "it" : "them"}? Requests close by themselves after 30 days without activity.
 					</span>
-					{view !== "mine" && (
+					{(view !== "mine" || type !== "fixed") && (
 						<Link to="." search={{ view: "mine" }} className="pill">
 							Review
 						</Link>
@@ -89,42 +127,62 @@ function RequestsPage() {
 				</div>
 			)}
 
-			<div className="flex flex-wrap gap-1" role="group" aria-label="Show">
-				{VIEWS.map((v) => (
-					<button
-						key={v.key}
-						type="button"
-						className="chip"
-						data-active={view === v.key}
-						aria-pressed={view === v.key}
-						onClick={() =>
-							navigate({
-								search: (prev) => ({ ...prev, view: v.key === "open" ? undefined : v.key }),
-								replace: true,
-								resetScroll: false,
-							})
-						}
-					>
-						{v.label} <span className="num text-xs text-muted-foreground">{lists[v.key].length}</span>
-					</button>
-				))}
+			{/* Fixed amount / Ongoing on the left, the filter on the right (under them on phones). */}
+			<div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:border-b sm:border-border">
+				<Tabs value={type} onValueChange={(v) => go({ type: v === "ongoing" ? "ongoing" : undefined })}>
+					<TabsList className="max-sm:w-full sm:border-b-0">
+						<TabsTrigger value="fixed">
+							Fixed amount <span className="num text-xs text-muted-foreground">{lists.fixed.open.length}</span>
+						</TabsTrigger>
+						<TabsTrigger value="ongoing">
+							Ongoing <span className="num text-xs text-muted-foreground">{count("ongoing", "open")}</span>
+						</TabsTrigger>
+					</TabsList>
+				</Tabs>
+				<div className="flex flex-wrap gap-1 sm:pb-1.5" role="group" aria-label="Show">
+					{VIEWS.map((v) => (
+						<button
+							key={v.key}
+							type="button"
+							className="chip"
+							data-active={view === v.key}
+							aria-pressed={view === v.key}
+							onClick={() => go({ view: v.key === "open" ? undefined : v.key })}
+						>
+							{v.label} <span className="num text-xs text-muted-foreground">{count(type, v.key)}</span>
+						</button>
+					))}
+				</div>
 			</div>
 
 			{view === "help" && (
 				<p className="text-xs text-muted-foreground">
-					Requests covered by your characters’ last synced bags and banks. Crafts also require a known recipe and all
-					materials.
+					{type === "ongoing"
+						? "Things guildmates want that your characters’ last synced bags and banks have some of."
+						: "Requests covered by your characters’ last synced bags and banks. Crafts also require a known recipe and all materials."}
 				</p>
 			)}
 
 			{shown.length === 0 ? (
 				<Empty>
-					{view === "mine"
-						? "You haven't asked for anything lately."
-						: view === "help"
-							? "No matching requests right now."
-							: "No open requests. Search above to ask the guild for something."}
+					{type === "ongoing"
+						? view === "mine"
+							? "You have no ongoing requests. Search above and pick Ongoing to keep asking for something."
+							: view === "help"
+								? "Nothing anyone wants is in your bags or bank right now."
+								: "No ongoing requests. Search above to ask the guild for any of something they have."
+						: view === "mine"
+							? "You haven't asked for anything lately."
+							: view === "help"
+								? "No matching requests right now."
+								: "No open requests. Search above to ask the guild for something."}
 				</Empty>
+			) : type === "ongoing" ? (
+				view === "mine" ? (
+					<MyOngoing requests={shown} guild={guild} characters={data.characters} />
+				) : (
+					<OngoingList requests={shown} />
+				)
 			) : (
 				<ul className="surface-card divide-y divide-border [&>li]:px-3.5">
 					{shown.map((r) => (
@@ -133,6 +191,149 @@ function RequestsPage() {
 				</ul>
 			)}
 		</div>
+	);
+}
+
+/** Item and icon, hover for the tooltip. */
+function ItemCell({ r, sub }: { r: RequestView; sub: ReactNode }) {
+	const item = r.item;
+	return (
+		<span className="flex min-w-0 flex-1 items-center gap-2.5">
+			{item ? (
+				<ItemHover item={item} className="shrink-0">
+					<ItemIcon icon={item.icon} quality={item.quality} size={28} className="block" />
+				</ItemHover>
+			) : (
+				<ItemIcon size={28} empty className="block" />
+			)}
+			<span className="min-w-0">
+				<span className="block truncate" style={{ color: QUALITY_COLORS[item?.quality ?? "COMMON"] }}>
+					{item?.name ?? "Item"}
+				</span>
+				<span className="block truncate text-xs text-muted-foreground">{sub}</span>
+			</span>
+		</span>
+	);
+}
+
+/**
+ * Ongoing requests, one row per item with everyone who wants it (several
+ * tailors after Silk is the usual case). "I can help" adds how many you have.
+ */
+function OngoingList({ requests }: { requests: RequestView[] }) {
+	useNow();
+	const groups = useMemo(() => {
+		const byItem = new Map<number, RequestView[]>();
+		for (const r of requests) {
+			const key = r.item?.itemId ?? 0;
+			byItem.set(key, [...(byItem.get(key) ?? []), r]);
+		}
+		return [...byItem.values()].sort((a, b) => b.length - a.length || b[0].createdAt - a[0].createdAt);
+	}, [requests]);
+	return (
+		<ul className="surface-card divide-y divide-border">
+			{groups.map((rows) => {
+				const have = rows.find((r) => r.have)?.have;
+				return (
+					<li key={rows[0]._id} className="flex items-center gap-3 px-3.5 py-2 text-[13px]">
+						<ItemCell
+							r={rows[0]}
+							sub={
+								<>
+									{rows.map((r, i) => (
+										<span key={r._id}>
+											{i > 0 && ", "}
+											{r.mine ? (
+												<span className="text-foreground">You</span>
+											) : (
+												<ClassText classId={r.requester.classId}>{r.requester.name}</ClassText>
+											)}
+										</span>
+									))}
+									{rows.length === 1 && !rows[0].mine ? " wants it" : " want it"}
+									{rows.length === 1 && ` · ${timeLeft(rows[0].until)}`}
+									{rows.length === 1 && rows[0].note && ` · “${rows[0].note}”`}
+								</>
+							}
+						/>
+						{have ? (
+							<span className="shrink-0 text-xs">
+								You have <span className="num">{have}</span>
+							</span>
+						) : null}
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+/** The viewer's own ongoing requests: when each ends, change or stop it. */
+function MyOngoing({
+	requests,
+	guild,
+	characters,
+}: {
+	requests: RequestView[];
+	guild: { region: Region; slug: string };
+	characters: { slug: string; name: string; classId: number }[];
+}) {
+	useNow();
+	return (
+		<ul className="surface-card divide-y divide-border">
+			{requests.map((r) => (
+				<li key={r._id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-2 text-[13px]">
+					<ItemCell
+						r={r}
+						sub={
+							<>
+								<span title={r.until ? `Ends ${shortDate(r.until)}` : undefined}>{timeLeft(r.until)}</span>
+								{r.note && ` · “${r.note}”`}
+							</>
+						}
+					/>
+					{r.item && (
+						<RequestButton
+							guild={guild}
+							characters={characters}
+							size="xs"
+							label="Change"
+							existing={asExisting(r)}
+							target={{
+								kind: "item",
+								itemId: r.item.itemId,
+								name: r.item.name,
+								quality: r.item.quality,
+								icon: r.item.icon,
+							}}
+						/>
+					)}
+					<StopButton request={r} />
+				</li>
+			))}
+		</ul>
+	);
+}
+
+function StopButton({ request }: { request: RequestView }) {
+	const act = useMutation(api.requests.act);
+	const [busy, setBusy] = useState(false);
+	return (
+		<Button
+			size="xs"
+			variant="ghost"
+			disabled={busy}
+			onClick={async () => {
+				setBusy(true);
+				try {
+					await act({ requestId: request._id, action: "cancel" });
+				} finally {
+					setBusy(false);
+				}
+			}}
+		>
+			Stop
+		</Button>
 	);
 }
 
@@ -147,9 +348,12 @@ function Empty({ children }: { children: ReactNode }) {
 function NewRequest({
 	guild,
 	characters,
+	ongoing,
 }: {
 	guild: { region: Region; slug: string };
 	characters: { slug: string; name: string; classId: number }[];
+	/** The page is on Ongoing: new item requests open on that tab. */
+	ongoing: boolean;
 }) {
 	const [q, setQ] = useState("");
 	const [debounced, setDebounced] = useState("");
@@ -201,6 +405,14 @@ function NewRequest({
 											]
 												.filter(Boolean)
 												.join(" · ")}
+											{item.mine && (
+												<span className="text-foreground">
+													{" · "}
+													{item.mine.ongoing
+														? `you want this, ongoing until ${shortDate(item.mine.until ?? 0)}`
+														: `you asked for ${item.mine.quantity}`}
+												</span>
+											)}
 										</span>
 									</span>
 								</ItemHover>
@@ -211,6 +423,8 @@ function NewRequest({
 										<RequestButton
 											guild={guild}
 											characters={characters}
+											ongoing={ongoing}
+											existing={item.mine}
 											target={{
 												kind: "item",
 												itemId: item.itemId,
@@ -218,7 +432,7 @@ function NewRequest({
 												quality: item.quality,
 												icon: item.icon,
 											}}
-											label="Request item"
+											label={item.mine ? "Change request" : "Request item"}
 										/>
 										{item.craft && (
 											<RequestButton

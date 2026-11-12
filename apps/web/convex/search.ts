@@ -317,6 +317,7 @@ async function searchRequests(ctx: QueryCtx, q: string, guilds: Doc<"guilds">[])
 				quality: item?.quality,
 				icon: item?.icon,
 				quantity: r.quantity,
+				ongoing: !!r.ongoing,
 				status: r.status,
 				character: r.character,
 				guild: { region: guild.region, slug: guild.slug, name: guild.name },
