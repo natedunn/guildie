@@ -132,13 +132,9 @@ function RootComponent() {
  */
 function OnboardingShell() {
 	return (
-		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
+		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
 			<div className="app-sidebar-drag hidden h-10 flex-none desktop:block" />
-			<main
-				id="content"
-				data-scroll-restoration-id="content"
-				className="min-h-0 flex-1 overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)]"
-			>
+			<main id="content" data-scroll-restoration-id="content" className="min-h-0 flex-1 overflow-y-auto bg-background">
 				<Outlet />
 			</main>
 		</div>
