@@ -22,10 +22,14 @@ local function json(value)
     table.sort(parts)
     return "{" .. table.concat(parts, ",") .. "}"
 end
+local function publicValue(value)
+    if type(issecretvalue) == "function" and issecretvalue(value) then return nil end
+    return value
+end
 local function read(fn, ...)
     if type(fn) ~= "function" then return nil end
     local ok, value = pcall(fn, ...)
-    if ok then return value end
+    if ok then return publicValue(value) end
 end
 local panel = CreateFrame("Frame", nil, UIParent)
 panel:SetFrameStrata("TOOLTIP")
@@ -54,7 +58,7 @@ local function liveState()
     local x, y
     if position and position.GetXY then
         local ok, px, py = pcall(position.GetXY, position)
-        if ok then x, y = px, py end
+        if ok then x, y = publicValue(px), publicValue(py) end
     end
     return json({version = 1, capturedAt = read(GetServerTime), guid = read(UnitGUID, "player"),
         health = read(UnitHealth, "player"), maxHealth = read(UnitHealthMax, "player"),

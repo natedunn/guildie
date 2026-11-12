@@ -17,7 +17,7 @@ you specify, and emits decoded JSON to stdout; it does not send data over the ne
   guild identities and private inventory; treat output accordingly.
 - `live`: player GUID, capture time, health/max health, power/type/max power,
   XP/max XP, zone/subzone, map/normalized position, combat and dead/ghost status.
-  Unsupported APIs omit fields. This version doesn't collect other players' data.
+  Unavailable APIs and protected values are omitted. This version doesn't collect other players' data.
 
 This is transport groundwork, not support for every possible future field. New
 live fields can be added to `liveState`; new persisted fields follow Guildie's
@@ -34,8 +34,9 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
    .venv/bin/python -m pip install -r requirements.txt
    ```
 
-3. Play windowed, type `/guildiepixels on`, and leave the 256×64 strip at the
-   top-left of the game's content visible. Start capture with the screen coordinates
+3. Type `/guildiepixels on` and leave the strip at the top-left of the game's
+   content visible. Fullscreen and windowed modes can both work. Start capture
+   with the physical screen coordinates
    of that strip (not the window border):
 
    ```sh

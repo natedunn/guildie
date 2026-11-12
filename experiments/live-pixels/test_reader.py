@@ -35,6 +35,44 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             assembler.feed(b'S|x|1|999999|x')
 
+    def test_live_export_omits_protected_values(self):
+        addon = Path(__file__).parent / "GuildieLivePixels"
+        script = """
+dofile(arg[0])
+local frame = {}
+local noop = function() end
+setmetatable(frame, {__index = function() return noop end})
+frame.SetScript = function(_, _, update) frame.update = update end
+frame.CreateTexture = function() return {SetSize = noop, SetPoint = noop, SetColorTexture = noop} end
+CreateFrame = function() return frame end
+UIParent = {GetEffectiveScale = function() return 1 end}
+SlashCmdList = {}
+local secret = {}
+issecretvalue = function(value) return value == secret end
+UnitHealth = function() return secret end
+UnitGUID = function() return "test-guid" end
+C_Map = {
+    GetBestMapForUnit = function() return 42 end,
+    GetPlayerMapPosition = function() return {GetXY = function() return secret, 0.5 end} end,
+}
+local encode = GuildiePixelProtocol.encode
+GuildiePixelProtocol.encode = function(packet)
+    if packet:sub(1, 1) == "L" then
+        for _, value in ipairs(encode(packet)) do io.write(value, " ") end
+    end
+    return encode(packet)
+end
+dofile(arg[1])
+for _ = 1, 3 do frame:update(0.11) end
+"""
+        output = subprocess.check_output([
+            "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),
+        ])
+        result = Assembler().feed(decode(map(int, output.split())))
+        self.assertEqual(result, {"channel": "live", "data": {
+            "version": 1, "guid": "test-guid", "mapId": 42, "y": 0.5,
+        }})
+
 
 if __name__ == "__main__":
     unittest.main()
