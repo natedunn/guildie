@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.23
+
 ### Improvements
 
 - **Guildie:** Downloading the Windows app first shows a short beta notice, including what to do if Windows says "Windows protected your PC".
