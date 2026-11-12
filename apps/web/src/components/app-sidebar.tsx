@@ -22,13 +22,13 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AddonNotice } from "@/components/addon-notice";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { GuildieMark } from "@/components/mark";
 import { OMNI_SEARCH_EVENT, SearchButton, SearchIconButton } from "@/components/omni-search";
 import { SyncButton } from "@/components/sync-button";
 import { UpdateReady } from "@/components/update-ready";
 import { UpdatedNotice } from "@/components/whats-new";
 import { useCurrentGuild } from "@/lib/breadcrumbs";
 import { usePageTitle } from "@/lib/page-title";
-import { GuildieMark } from "@/components/mark";
 import { cn } from "@/lib/utils";
 
 // Navigation. A fixed sidebar from md up; below that a top bar whose menu
