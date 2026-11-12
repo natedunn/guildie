@@ -40,16 +40,16 @@ normal capture/schema workflow. No UI, upload endpoint or presence feature uses 
    of that strip (not the window border):
 
    ```sh
-   .venv/bin/python reader.py --left 0 --top 0 --cell 4
+   .venv/bin/python reader.py --left 0 --top 0 --cell 2
    ```
 
    Replace coordinates and cell size for your screen. `--cell` is the measured
    physical pixel width of each square; display scaling can change it. macOS
    requires Screen Recording permission for the terminal/Python host. The reader
    can capture anything covering that rectangle, so keep it unobstructed.
-   Use `/guildiepixels on large` for 8-unit cells instead of the default 4.
-   At 125% Windows scaling, the compact square is expected to be 80×80 physical
-   pixels with `--cell 5`; measure rather than assuming. `on compact` is an alias
+   Use `/guildiepixels on large` for 8-unit cells instead of the default 1.6.
+   At 125% Windows scaling, the default square was verified at 32×32 physical
+   pixels with `--cell 2`; remeasure on other displays. `on compact` is an alias
    for `on`. The reader defaults to 16 columns; `--columns 32` supports old strips.
 
    `/guildiepixels edit` pauses export and shows a static dark square with a
@@ -95,11 +95,11 @@ python3 -m unittest discover -s experiments/live-pixels -p 'test_*.py'
 
 Run from the repository root; requires LuaJIT. Tests exercise the actual Lua encoder
 against the Python decoder, checksum rejection, split UTF-8, out-of-order chunks,
-duplicate suppression, interleaved streams and size bounds. Live game rendering and
-OS screen capture still need manual verification on Windows/macOS.
+duplicate suppression, interleaved streams and size bounds. See the Windows results below; macOS still needs live rendering/capture validation.
 
-Square layout and dragging are covered by stubbed Lua/Python tests. Live rendering,
-position persistence and decoding after a drag still need in-game validation.
+Square layout and dragging are covered by stubbed Lua/Python tests. Dragging and
+decoding at the new position were tested in game; persistence across a further
+login/reload has not been independently verified.
 Colors remain unchanged: custom tints or transparency are not supported by this decoder.
 
 ## Smaller cells and interrupted visibility
@@ -107,9 +107,10 @@ Colors remain unchanged: custom tints or transparency are not supported by this 
 `/guildiepixels on <size>` accepts a cell size from 1 to 8 addon units.
 At the measured 125% scaling on the test PC, try `on 3.2` (64×64 physical
 pixels, reader `--cell 4`), then `on 2.4` (48×48, `--cell 3`), then
-`on 1.6` (32×32, `--cell 2`). These are candidates, not verified minimums.
+`on 1.6` (32×32, `--cell 2`, now the default). The intermediate sizes
+were not tested in game; 32×32 passed the uninterrupted test below.
 Use whole physical pixels and remeasure after changing display/UI scaling.
-`on` restores the tested 80×80 square on that PC. Smaller cells retain the
+`on 4` restores the tested 80×80 square on that PC. Smaller cells retain the
 same packet capacity but have less tolerance for capture alignment and rendering.
 
 The panel is a child of UIParent: hiding that parent hides the panel and pauses
@@ -121,3 +122,35 @@ or long interruptions can prevent completion. Live updates missed during an
 interruption are not replayed. There is no acknowledgement or automatic retry
 request, and no current user-facing disconnected/stale indicator. Hiding is
 respected; this experiment does not force itself over cinematic/dialogue UI.
+
+## Windows handoff: November 12, 2026
+
+- WoW Forever in the user's normal fullscreen/borderless mode, 2560×1440,
+  Windows display scaling 125%. No windowed-mode requirement.
+- Default addon cell size is now 1.6 addon units, measured as 2 physical pixels
+  on this PC: 16×16 cells = 32×32 physical pixels. This does not automatically
+  guarantee 32×32 on macOS/Retina or other scaling configurations. Calibrate
+  there; the reader's `--cell` always means physical captured pixels.
+- Uninterrupted small-square test: 60.3 seconds, 1,808 valid sampled frames,
+  zero rejected frames, 100 complete live records and one complete snapshot.
+  These are sampled frames (including duplicates), not unique packets or a
+  guarantee that every transmitted update was captured.
+- Earlier test while the user opened Dialogue UI: 90 live records and two
+  complete snapshots; 335/2,000 samples rejected. We did not timestamp UI
+  visibility, so attribution to Dialogue UI is plausible, not proven.
+- Previously verified 80×80 after dragging: 38 live records, one snapshot.
+  Snapshot schema and stored character count matched between the 80×80 and
+  32×32 tests. Contents can change with gameplay; this was not byte-for-byte
+  equivalence or verification of every field's accuracy/freshness.
+- Protected API values are omitted rather than compared/serialized, fixing
+  the observed repeating secret-number Lua error. Earlier live testing
+  confirmed position and bag-content changes. Zone changes, bank opening and
+  profession-window refresh still need focused testing.
+- Four focused tests pass using LuaJIT 2.1 through local Python/lupa bindings:
+  encoder/decoder interoperability, corruption rejection, assembly, layouts,
+  protected-value omission and edit/position behavior. The test suite normally
+  invokes a LuaJIT CLI. No full monorepo suite or formal FPS benchmark was run.
+- Experimental addon and local reader only. No server upload, production desktop
+  changes, inbound transport, private output committed, or gameplay automation.
+- Reader stopped after tests. Capture coordinates are machine-specific and must
+  be recalibrated after dragging; automatic relocation is not implemented.

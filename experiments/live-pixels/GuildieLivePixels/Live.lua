@@ -40,7 +40,8 @@ panel:SetClampedToScreen(true)
 panel:EnableMouse(false)
 panel:RegisterForDrag("LeftButton")
 local editing = false
-local cellSize = 4
+local DEFAULT_CELL_SIZE = 1.6
+local cellSize = DEFAULT_CELL_SIZE
 local function place(x, y)
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
@@ -158,7 +159,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     if command == "on" or command == "on compact" or command == "on large" or validSize then
         snapshot, live = nil, nil
         elapsed = 0
-        layout(validSize and requestedSize or (command == "on large" and 8 or 4))
+        layout(validSize and requestedSize or (command == "on large" and 8 or DEFAULT_CELL_SIZE))
         panel:Show()
         print("Guildie pixels: export enabled. Recalibrate the reader after moving or resizing.")
     elseif command == "edit" then

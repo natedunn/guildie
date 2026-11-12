@@ -63,7 +63,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--left", type=int, required=True)
     parser.add_argument("--top", type=int, required=True)
-    parser.add_argument("--cell", type=int, default=8,
+    parser.add_argument("--cell", type=int, default=2,
                         help="Actual captured pixels per cell, including display scaling")
     parser.add_argument("--columns", type=int, choices=(16, 32), default=16,
                         help="16 for square; 32 for older strip addons")

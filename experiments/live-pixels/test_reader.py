@@ -9,7 +9,7 @@ from reader import Assembler, decode, sample_values
 class ProtocolTests(unittest.TestCase):
     def test_square_and_legacy_sampling(self):
         for columns in (16, 32):
-            for cell in (4, 5, 8, 10):
+            for cell in (2, 3, 4, 5, 8, 10):
                 class Shot:
                     def pixel(self, x, y):
                         assert x % cell == cell // 2 and y % cell == cell // 2
@@ -59,7 +59,7 @@ frame.SetScript = function(_, event, callback) frame.scripts[event] = callback e
 frame.CreateTexture = function()
     return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = noop}
 end
-local expectedSize = 64
+local expectedSize = 25.6
 frame.SetSize = function(_, width, height) assert(width == expectedSize and height == expectedSize) end
 CreateFrame = function() return frame end
 print = noop
@@ -98,7 +98,8 @@ expectedSize = 38.4
 SlashCmdList.GUILDIELIVEPIXELS("on 2.4")
 expectedSize = 25.6
 SlashCmdList.GUILDIELIVEPIXELS("on 1.6")
-expectedSize = 64
+expectedSize = 25.6
+SlashCmdList.GUILDIELIVEPIXELS("on")
 SlashCmdList.GUILDIELIVEPIXELS("on compact")
 for _ = 1, 3 do frame.scripts.OnUpdate(frame, 0.11) end
 """
