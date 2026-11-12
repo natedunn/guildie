@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.20
+
 ### New
 
 - **Guildie:** A new home page for visitors who aren't signed in: a full-width tour of what Guildie does (the roster, gear upgrades, crafting and requests, dungeons, the addon's tooltips, the Windows app), with sign-in with Battle.net in one click. Guild search is gone for now.
