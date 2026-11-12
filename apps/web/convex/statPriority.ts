@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { type MutationCtx, mutation } from "./_generated/server";
+import { preferencesOf, updatePreferences } from "./preferences";
 import { vRegion, vTypeChoice } from "./schema";
 import { CLASS_RULES } from "./shared/proficiencies";
 import { steepnessOf, validStats, validTiers } from "./shared/statPriority";
@@ -67,9 +68,9 @@ export const dismissItem = mutation({
 				.collect()
 		).find((c) => c.userId === userId);
 		if (!claim) throw new ConvexError("Only the player who claimed this character can change it.");
-		const list = (claim.dismissedItems ?? []).filter((id) => id !== itemId);
+		const list = ((await preferencesOf(ctx, claim)).dismissedItems ?? []).filter((id) => id !== itemId);
 		if (removed) list.push(itemId);
-		await ctx.db.patch(claim._id, { dismissedItems: list.slice(-MAX_DISMISSED) });
+		await updatePreferences(ctx, claim, { dismissedItems: list.length ? list.slice(-MAX_DISMISSED) : undefined });
 	},
 });
 
@@ -110,7 +111,7 @@ export async function setStatPriority(
 		const token = classId !== undefined ? CLASS_TOKENS[classId] : undefined;
 		if (!token || !SPECS[token]?.[choice.tree]) throw new ConvexError("No such talent tree.");
 	}
-	await ctx.db.patch(claim._id, { statPriority: choice ?? undefined });
+	await updatePreferences(ctx, claim, { statPriority: choice ?? undefined });
 }
 
 /** `setGear`, for a given player (the site, or an AI app acting for them: convex/mcp.ts). */
@@ -149,7 +150,7 @@ export async function setGearPreference(
 	const a = clean("armor", armor);
 	const w = clean("weapon", weapon);
 	const gearPreference = { ...(a ? { armor: a } : {}), ...(w ? { weapon: w } : {}) };
-	await ctx.db.patch(claim._id, {
+	await updatePreferences(ctx, claim, {
 		gearPreference: Object.keys(gearPreference).length ? gearPreference : undefined,
 	});
 }

@@ -9,6 +9,7 @@ import { exchangeToken } from "./blizzard";
 import { fetchAccountCharacters } from "./claimRegions";
 import { setOwner } from "./guilds";
 import { allowedRedirectOrigins } from "./origins";
+import { moveLegacy } from "./preferences";
 import { vRegion } from "./schema";
 import { FLAVORS, REGIONS, type Region } from "./shared/wow";
 import { discoverGuilds } from "./sync";
@@ -132,8 +133,11 @@ const vOwned = v.object({
 });
 
 /**
- * Replace the account's claims in each region that answered: the list is the
- * truth there. Regions that failed aren't passed, so their claims stay.
+ * Make the account's claims in each region that answered match the list:
+ * Battle.net is the truth there. Regions that failed aren't passed, so their
+ * claims stay. A claim the player already has is updated in place, and the
+ * player's preferences for a character (characterPreferences) are never
+ * touched here: they outlive the claim, so a re-claim finds them again.
  */
 export const save = internalMutation({
 	args: { userId: v.id("users"), regions: v.array(v.object({ region: vRegion, characters: v.array(vOwned) })) },
@@ -143,18 +147,35 @@ export const save = internalMutation({
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
 		const answered = new Set(regions.map((r) => r.region));
-		for (const row of existing) if (answered.has(row.region)) await ctx.db.delete(row._id);
+		const kept = new Set<Id<"ownedCharacters">>();
 		const now = Date.now();
 		let inGuilds = 0;
 		for (const { region, characters } of regions) {
 			for (const c of characters) {
-				// A character can only be claimed by one person at a time: the latest proof wins.
 				const previous = await ctx.db
 					.query("ownedCharacters")
 					.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", c.slug))
 					.collect();
-				for (const row of previous) await ctx.db.delete(row._id);
-				await ctx.db.insert("ownedCharacters", { ...c, userId, flavor: "forever", region, claimedAt: now });
+				const own = previous.find((row) => row.userId === userId && !kept.has(row._id));
+				// A character can only be claimed by one person at a time: the latest proof wins.
+				for (const row of previous) {
+					if (row === own || kept.has(row._id)) continue;
+					await moveLegacy(ctx, row);
+					await ctx.db.delete(row._id);
+				}
+				const fields = {
+					name: c.name,
+					blizzardId: c.blizzardId,
+					level: c.level,
+					classId: c.classId,
+					claimedAt: now,
+				};
+				if (own) {
+					await ctx.db.patch(own._id, fields);
+					kept.add(own._id);
+				} else {
+					kept.add(await ctx.db.insert("ownedCharacters", { ...c, userId, flavor: "forever", region, claimedAt: now }));
+				}
 				const rows = await ctx.db
 					.query("characters")
 					.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", c.slug))
@@ -165,6 +186,12 @@ export const save = internalMutation({
 				// The guild master's player owns the guild.
 				if (member.rank === 0) await setOwner(ctx, member.guildId, userId);
 			}
+		}
+		// Characters no longer on the account (in a region that answered).
+		for (const row of existing) {
+			if (!answered.has(row.region) || kept.has(row._id)) continue;
+			await moveLegacy(ctx, row);
+			await ctx.db.delete(row._id);
 		}
 		return inGuilds;
 	},

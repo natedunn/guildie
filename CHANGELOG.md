@@ -25,6 +25,11 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 - **Guildie, App:** The Guildie icon is gold now: the sidebar, the browser tab, the installed web app and the Windows app.
 - **App:** The sidebar and title bar keep the site's warm dark color instead of letting the Windows wallpaper tint them.
 
+### Fixes
+
+- **Guildie, Addon:** Signing in no longer erases your characters' stat priority, gear preferences and removed suggestions. They now stay with you, even if a character leaves your account and comes back. Settings lost before this fix have to be set again.
+- **App:** If the app can't read its settings file for a moment, it no longer starts over and forgets your WoW folder and sign-in.
+
 ## 0.3.23
 
 ### Improvements
