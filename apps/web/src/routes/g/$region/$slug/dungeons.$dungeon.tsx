@@ -271,7 +271,7 @@ function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
 					if (shown[i]) {
 						return (
 							<li key={`${s.id}-${i}`} className="flex items-start gap-2.5 py-0.5">
-								<span className="num mt-0.5 grid size-4 flex-none place-items-center rounded-full border border-border text-[9px] text-muted-foreground">
+								<span className="num mt-0.5 grid size-4 flex-none place-items-center rounded-full border border-border text-[9px] text-foreground/85">
 									{s.step}
 								</span>
 								<div className="min-w-0 flex-1">
