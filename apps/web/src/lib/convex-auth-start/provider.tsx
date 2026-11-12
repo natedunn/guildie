@@ -1,4 +1,4 @@
-import { AuthClient, defaultStorage } from "@convex-dev/auth/browser";
+import { AuthClient, JWT_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY, type TokenStorage } from "@convex-dev/auth/browser";
 import { oauth } from "@convex-dev/auth/methods/oauth/react";
 import { useRouter } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
@@ -15,6 +15,39 @@ async function postAuth(route: string): Promise<AuthSessionResponse> {
 		body: "{}",
 	});
 	return (await res.json().catch(() => ({ tokens: null }))) as AuthSessionResponse;
+}
+
+const isSessionKey = (key: string) => key.startsWith(JWT_STORAGE_KEY) || key.startsWith(REFRESH_TOKEN_STORAGE_KEY);
+
+/**
+ * localStorage, except the session's tokens, which stay in this page's memory.
+ * The httpOnly cookies are the session: each page gets its access token from
+ * the server render or a refresh. With the token in localStorage (the
+ * default), a page that started with no cookie session ran on a token left by
+ * an earlier page and was signed out at its first refresh, and a page dying
+ * mid-refresh (the sign-in page leaving for the claim hop) could sign other
+ * pages out through the shared copy. The OAuth flow's own state (what
+ * Battle.net's return needs) still goes to localStorage.
+ */
+function pageStorage(): TokenStorage {
+	const memory = new Map<string, string>();
+	let local: Storage | null = null;
+	try {
+		local = window.localStorage;
+		// Earlier builds kept the access token there.
+		for (const key of Object.keys(local)) if (isSessionKey(key)) local.removeItem(key);
+	} catch {}
+	return {
+		getItem: (key) => (isSessionKey(key) ? (memory.get(key) ?? null) : (local?.getItem(key) ?? null)),
+		setItem: (key, value) => {
+			if (isSessionKey(key)) memory.set(key, value);
+			else local?.setItem(key, value);
+		},
+		removeItem: (key) => {
+			if (isSessionKey(key)) memory.delete(key);
+			else local?.removeItem(key);
+		},
+	};
 }
 
 export function ConvexAuthStartProvider({
@@ -55,7 +88,7 @@ export function ConvexAuthStartProvider({
 					await postAuth("/auth/signout");
 				},
 			},
-			storage: defaultStorage(),
+			storage: pageStorage(),
 			storageNamespace: client.url,
 			initialAccessToken: initialToken,
 			ambientSignIns: {

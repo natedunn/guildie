@@ -12,7 +12,14 @@ export function getRouter() {
 
 	// Created per router (i.e. per SSR request) so server-side auth never leaks
 	// between requests.
-	const convex = new ConvexReactClient(convexUrl, { unsavedChangesWarning: false });
+	const convex = new ConvexReactClient(convexUrl, {
+		unsavedChangesWarning: false,
+		// Keep the token the page starts with (fresh from the server render or a
+		// sign-in) until near its expiry, rather than refreshing it at once. That
+		// refresh used to be in flight when /sign-in left for the claim hop, which
+		// cut it off and could leave the next page signed out.
+		initialAuthTokenReuse: true,
+	});
 	const convexQueryClient = new ConvexQueryClient(convex);
 	const queryClient = new QueryClient({
 		defaultOptions: {
