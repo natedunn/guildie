@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.22
+
 ### Improvements
 
 - **Guildie, App:** The browser tab icon, the app's icon and link previews (Discord, iMessage and the like) match the new look.
