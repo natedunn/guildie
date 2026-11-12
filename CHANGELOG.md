@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **App:** Signed out, the app opens the sign-in card again (with its title bar), not the website's landing page.
+
 ## 0.3.20
 
 ### New

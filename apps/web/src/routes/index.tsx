@@ -14,10 +14,12 @@ import { Input } from "@/components/ui/input";
 // No home page for signed-in players: "/" opens your guild (the sidebar
 // switches between guilds). It shows a page only to signed-out visitors (what
 // Guildie is, and sign in), and to players whose guild Guildie hasn't found
-// yet (characters under level 10, or not logged out since joining).
+// yet (characters under level 10, or not logged out since joining). The
+// Windows app has no landing page: signed out, it opens the sign-in card.
 export const Route = createFileRoute("/")({
 	loader: async ({ context }) => {
 		const viewer = await context.queryClient.ensureQueryData(convexQuery(api.users.viewer, {}));
+		if (!viewer && context.desktop) throw redirect({ to: "/sign-in", replace: true });
 		const first = viewer?.guilds[0];
 		if (first)
 			throw redirect({ to: "/g/$region/$slug", params: { region: first.region, slug: first.slug }, replace: true });
