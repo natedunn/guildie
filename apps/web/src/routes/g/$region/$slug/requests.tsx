@@ -76,13 +76,13 @@ function RequestsPage() {
 			<NewRequest guild={{ region: params.region as Region, slug: params.slug }} characters={data.characters} />
 
 			{stale > 0 && (
-				<div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border px-3 py-2 text-[13px]">
+				<div className="surface-card flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 text-[13px]">
 					<span className="flex-1">
 						{stale === 1 ? "1 of your requests is" : `${stale} of your requests are`} over a week old. Still need{" "}
 						{stale === 1 ? "it" : "them"}? Requests close by themselves after 30 days without activity.
 					</span>
 					{view !== "mine" && (
-						<Link to="." search={{ view: "mine" }} className="text-xs underline underline-offset-2">
+						<Link to="." search={{ view: "mine" }} className="pill">
 							Review
 						</Link>
 					)}
@@ -119,7 +119,7 @@ function RequestsPage() {
 							: "No open requests. Search above to ask the guild for something."}
 				</Empty>
 			) : (
-				<ul className="divide-y divide-border border-y border-border">
+				<ul className="surface-card divide-y divide-border [&>li]:px-3.5">
 					{shown.map((r) => (
 						<RequestRow key={r._id} request={r} />
 					))}
@@ -130,7 +130,7 @@ function RequestsPage() {
 }
 
 function Empty({ children }: { children: ReactNode }) {
-	return <p className="py-10 text-sm text-muted-foreground">{children}</p>;
+	return <p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">{children}</p>;
 }
 
 /**
@@ -173,7 +173,7 @@ function NewRequest({
 				(shown.length === 0 ? (
 					!isFetching && <p className="mt-2 text-[13px] text-muted-foreground">No item by that name on Guildie yet.</p>
 				) : (
-					<ul className="mt-2 divide-y divide-border rounded-md border border-border">
+					<ul className="surface-card mt-2 divide-y divide-border">
 						{shown.map((item) => (
 							<li key={item.itemId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-[13px]">
 								<ItemHover

@@ -1,3 +1,5 @@
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { desktop } from "@/lib/desktop";
@@ -15,7 +17,7 @@ export function WhatsNew({ upTo }: { upTo?: string }) {
 		return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Couldn't load the release notes right now.</p>;
 	const shown = data.filter((r) => !upTo || compareVersions(r.version, upTo) <= 0).slice(0, 6);
 	return (
-		<div className="mt-3 space-y-6">
+		<div className="surface-card mt-3 divide-y divide-border">
 			{shown.map((r) => (
 				<Release key={r.version} release={r} current={r.version === upTo} />
 			))}
@@ -25,14 +27,14 @@ export function WhatsNew({ upTo }: { upTo?: string }) {
 
 function Release({ release, current }: { release: ReleaseNotes; current: boolean }) {
 	return (
-		<article className="text-[0.8125rem]">
-			<h3 className="flex items-baseline gap-2">
+		<article className="px-4 py-3.5 text-[0.8125rem]">
+			<h3 className="flex items-center gap-2">
 				<span className="num font-semibold">{release.version}</span>
 				<span className="text-xs text-muted-foreground">{formatDate(release.date)}</span>
-				{current && <span className="text-xs text-muted-foreground">· this version</span>}
+				{current && <span className="pill ml-auto px-2 py-0">This version</span>}
 			</h3>
 			{release.sections.map((s) => (
-				<div key={s.title} className="mt-2">
+				<div key={s.title} className="mt-2.5">
 					<p className="text-xs font-medium text-muted-foreground">{s.title}</p>
 					<ul className="mt-1 list-disc space-y-0.5 pl-5">
 						{s.items.map((item) => (
@@ -73,7 +75,7 @@ export function UpdatedNotice() {
 	}, []);
 	if (!state?.show) return null;
 	return (
-		<div className="mx-0.5 mb-2 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-[0.8125rem]">
+		<div className="surface-card mx-0.5 mb-2 flex items-center gap-2 px-3 py-2 text-[0.8125rem]">
 			<Link to="/settings/app" hash="whats-new" className="min-w-0 flex-1" onClick={() => markSeen(state.version)}>
 				<span className="block font-medium">Updated to {state.version}</span>
 				<span className="block text-xs text-muted-foreground underline-offset-2 hover:underline">See what's new</span>
@@ -81,10 +83,10 @@ export function UpdatedNotice() {
 			<button
 				type="button"
 				aria-label="Dismiss"
-				className="grid size-6 place-items-center rounded text-muted-foreground hover:bg-hover hover:text-foreground"
+				className="grid size-6 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground pointer-coarse:size-9"
 				onClick={() => markSeen(state.version)}
 			>
-				×
+				<HugeiconsIcon icon={Cancel01Icon} size={13} strokeWidth={1.75} />
 			</button>
 		</div>
 	);

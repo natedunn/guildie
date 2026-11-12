@@ -9,6 +9,7 @@ import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { Page, PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { ago } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 // Personal → Inventory: every bag and bank of your claimed characters, as
 // the addon last read them (bags at the last /reload or logout, the bank as
@@ -115,7 +116,7 @@ function InventoryPage() {
 						</div>
 
 						{/* When each character's bags and bank were last read in game. */}
-						<ul className="divide-y divide-border rounded-md border border-border text-[0.8125rem]">
+						<ul className="surface-card divide-y divide-border text-[0.8125rem]">
 							{listed.map((c) => (
 								<li key={c.key} className="flex items-center gap-2.5 px-3 py-2">
 									<CharacterAvatar url={c.avatarUrl} size={24} className="rounded-full" />
@@ -126,32 +127,36 @@ function InventoryPage() {
 									>
 										<ClassText classId={c.classId}>{c.name}</ClassText>
 									</Link>
-									<span className="ml-auto flex min-w-0 flex-wrap justify-end gap-x-3 text-right text-xs text-muted-foreground">
-										<span>{c.bags ? `Bags read ${ago(c.bags.capturedAt)}` : "No bags read yet"}</span>
-										<span>{c.bank ? `Bank read ${ago(c.bank.capturedAt)}` : "No bank read yet"}</span>
+									<span className="ml-auto flex min-w-0 flex-wrap justify-end gap-1.5">
+										<span className={cn("pill px-2 py-0.5", c.bags && "text-foreground/85")}>
+											{c.bags ? `Bags read ${ago(c.bags.capturedAt)}` : "No bags read yet"}
+										</span>
+										<span className={cn("pill px-2 py-0.5", c.bank && "text-foreground/85")}>
+											{c.bank ? `Bank read ${ago(c.bank.capturedAt)}` : "No bank read yet"}
+										</span>
 									</span>
 								</li>
 							))}
 						</ul>
 
 						{!anyRead ? (
-							<p className="text-[0.8125rem] text-muted-foreground">
+							<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground text-balance">
 								Nothing read yet. With the Guildie app running, log in to WoW and /reload; open your bank once to add
 								it.
 							</p>
 						) : shown.length === 0 ? (
-							<p className="text-[0.8125rem] text-muted-foreground">
+							<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">
 								{q.trim() ? `No ${q.trim()} in ${selected ? `${selected.name}'s` : "your"} bags or banks.` : "Empty."}
 							</p>
 						) : (
-							<ul>
+							<ul className="surface-card card-clip">
 								{shown.map((item) => {
 									const name = item.name ?? `Item ${item.itemId}`;
 									return (
-										<li key={item.itemId} className="border-b border-border">
+										<li key={item.itemId} className="border-b border-border last:border-b-0">
 											<ItemHover
 												item={{ itemId: item.itemId, name, quality: item.quality, icon: item.icon }}
-												className="flex items-center gap-2.5 py-1.5 text-[0.8125rem]"
+												className="flex items-center gap-2.5 px-3 py-1.5 text-[0.8125rem] transition-colors hover:bg-[var(--row-hover)]"
 											>
 												<ItemIcon icon={item.icon} quality={item.quality} size={28} />
 												<span className="min-w-0 flex-1">

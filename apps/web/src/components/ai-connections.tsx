@@ -18,16 +18,16 @@ export function AiConnections() {
 	const [copied, setCopied] = useState(false);
 	return (
 		<section className="mt-10">
-			<SectionTitle>
-				AI apps <span className="font-normal text-muted-foreground">· Experimental</span>
+			<SectionTitle className="flex items-center gap-2">
+				AI apps <span className="pill px-2 py-0 font-normal">Experimental</span>
 			</SectionTitle>
-			<p className="mt-1 text-muted-foreground">
+			<p className="mt-1 text-[0.8125rem] text-muted-foreground">
 				Ask Claude, ChatGPT or another AI app about your guild: who can craft something, what someone's wearing, what's
 				open in requests, what's in your bank. It reads what you see on Guildie. If you allow it when connecting, it can
 				also set your characters' stat priority and gear preferences, and nothing else.
 			</p>
 			<div className="mt-3 flex items-center gap-2">
-				<code className="num flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-border px-3 text-[0.8125rem] select-all">
+				<code className="num flex h-8 min-w-0 flex-1 items-center truncate rounded-md border border-border bg-well px-3 text-[0.8125rem] select-all pointer-coarse:h-10">
 					{MCP_URL}
 				</code>
 				<Button
@@ -53,9 +53,9 @@ export function AiConnections() {
 				<li>Then sign in with Guildie when it asks, and confirm on guildie.club.</li>
 			</ul>
 			{connections && connections.length > 0 && (
-				<ul className="mt-4 divide-y divide-border border-y border-border">
+				<ul className="surface-card mt-4 divide-y divide-border text-[0.8125rem]">
 					{connections.map((c) => (
-						<li key={c._id} className="flex h-9 items-center justify-between gap-4">
+						<li key={c._id} className="flex min-h-10 items-center justify-between gap-4 py-1.5 pr-1.5 pl-3.5">
 							<span className="truncate">
 								{c.client}
 								{c.redirectHost && <span className="text-muted-foreground"> · {c.redirectHost}</span>}

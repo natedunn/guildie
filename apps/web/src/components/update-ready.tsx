@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { desktop, useDesktopStatus } from "@/lib/desktop";
 
 // Bottom of the sidebar, in the desktop app: once an app update has
@@ -11,22 +12,22 @@ export function UpdateReady() {
 	const app = desktop();
 	if (!status?.updateReady || !app?.restartToUpdate) return null;
 	return (
-		<div className="mx-0.5 mb-2 rounded-md border border-border bg-[var(--selected)] px-3 py-2.5 text-[0.8125rem]">
+		<div className="surface-card mx-0.5 mb-2 px-3 py-2.5 text-[0.8125rem]">
 			<p className="font-medium">Update ready</p>
 			<p className="mt-0.5 text-xs text-muted-foreground">
 				Guildie {status.updateReady} is downloaded. Restart to use it.
 			</p>
-			<button
-				type="button"
+			<Button
+				size="sm"
 				disabled={restarting}
 				onClick={() => {
 					setRestarting(true);
 					void app.restartToUpdate?.();
 				}}
-				className="mt-2 h-7 w-full rounded-md bg-primary text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
+				className="mt-2 w-full text-xs"
 			>
 				{restarting ? "Restarting…" : "Restart Guildie"}
-			</button>
+			</Button>
 		</div>
 	);
 }

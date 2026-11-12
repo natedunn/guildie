@@ -28,39 +28,41 @@ function Account() {
 		<div className="max-w-3xl pb-12">
 			<section>
 				<SectionTitle>Your characters</SectionTitle>
-				<p className="mt-1 text-muted-foreground">
+				<p className="mt-1 text-[0.8125rem] text-muted-foreground">
 					Read from your Battle.net account each time you sign in, in every region. It proves which guild members are
 					yours, so guildmates can find you and, later, so we can notify you.
 				</p>
 				{viewer.characters.length > 0 && (
-					<Table className="mt-3">
-						<TableHeader>
-							<TableRow>
-								<TableHead>Name</TableHead>
-								<TableHead>Class</TableHead>
-								<TableHead className="text-right">Level</TableHead>
-								<TableHead className="text-right">Region</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{viewer.characters.map((c) => (
-								<TableRow key={c._id}>
-									<TableCell>
-										<Link
-											to="/c/$region/$slug"
-											params={{ region: c.region, slug: c.slug }}
-											className="font-medium hover:underline underline-offset-4"
-										>
-											<ClassText classId={c.classId}>{c.name}</ClassText>
-										</Link>
-									</TableCell>
-									<TableCell className="text-muted-foreground">{c.classId ? className(c.classId) : ""}</TableCell>
-									<TableCell className="num text-right">{c.level ?? ""}</TableCell>
-									<TableCell className="text-right text-muted-foreground">{c.region.toUpperCase()}</TableCell>
+					<div className="surface-card mt-3 overflow-hidden">
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>Name</TableHead>
+									<TableHead>Class</TableHead>
+									<TableHead className="text-right">Level</TableHead>
+									<TableHead className="text-right">Region</TableHead>
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{viewer.characters.map((c) => (
+									<TableRow key={c._id}>
+										<TableCell>
+											<Link
+												to="/c/$region/$slug"
+												params={{ region: c.region, slug: c.slug }}
+												className="font-medium hover:underline underline-offset-4"
+											>
+												<ClassText classId={c.classId}>{c.name}</ClassText>
+											</Link>
+										</TableCell>
+										<TableCell className="text-muted-foreground">{c.classId ? className(c.classId) : ""}</TableCell>
+										<TableCell className="num text-right">{c.level ?? ""}</TableCell>
+										<TableCell className="text-right text-muted-foreground">{c.region.toUpperCase()}</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
 				)}
 				<ClaimCharacters />
 			</section>
@@ -72,9 +74,9 @@ function Account() {
 
 			<AiConnections />
 
-			<section className="mt-10 border-t border-border pt-6">
+			<section className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6">
 				<SignOutButton />
-				<p className="mt-6 flex gap-4 text-xs text-muted-foreground">
+				<p className="flex gap-4 text-xs text-muted-foreground">
 					<Link to="/data" className="hover:text-foreground">
 						Where the data comes from
 					</Link>
@@ -132,7 +134,7 @@ function ClaimCharacters() {
 function BattletagSetting({ hidden }: { hidden: boolean }) {
 	const setHide = useMutation(api.users.setHideBattletag);
 	return (
-		<label className="mt-2 flex items-start gap-3 text-[0.8125rem]">
+		<label className="surface-card mt-3 flex items-start gap-3 px-3.5 py-3 text-[0.8125rem]">
 			<Switch className="mt-0.5" checked={hidden} onCheckedChange={(hide) => void setHide({ hide })} />
 			<span>
 				Hide my BattleTag from guildmates

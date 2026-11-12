@@ -39,13 +39,21 @@ Monorepo (pnpm workspaces):
     scrolls by itself; the page never scrolls as a whole. Phones get a top
     bar instead of the sidebar. In the desktop app (`html[data-desktop]`)
     the sidebar and title bar sit on the window's own translucent material.
-  - Color: neutral greys only (surfaces, hairline borders at ~8% white).
-    Color with meaning comes from class colors (`ClassText`), item quality
-    (`.q-*`) and in-game tooltip colors. No gradients, glows, emoji,
-    textures or decorative badges.
+  - Look: light on dark, from the landing page. Warm near-black greys;
+    cards (`.surface-card`) with a hairline lit at the top; page titles tight
+    and fading to grey (`.heading-display`, `.text-fade`); a faint world map
+    and legendary-orange glow only at the top of a page or hero
+    (`.pane-backdrop`, `.map-backdrop`, `.glow`), never behind data; frosted
+    bars over the pane.
+  - Color: warm greys plus one UI accent, amber `--highlight`
+    (focus, active tab/nav, checked switch), used thin or faint and only on
+    chrome, never on item text (legendary is #ff8000 there). Color with
+    meaning comes from class colors (`ClassText`), item quality (`.q-*`) and
+    in-game tooltip colors. No emoji, textures or decorative badges.
   - Type: one sans family, 13-14px UI text, `.num` for tabular numbers.
     Headings are weight, not size or color.
-  - Shapes: 6px radius, 1px borders, no shadows except popovers/tooltips.
+  - Shapes: 6px radius on controls, 8px on cards, 1px borders, no shadows
+    except popovers/tooltips.
   - Game art is the decoration: item and talent icons (Blizzard render URLs)
     and character renders. Item tooltips mimic the game's (`ItemHover`,
     `ItemTooltipBody` in `apps/web/src/components/item.tsx`).

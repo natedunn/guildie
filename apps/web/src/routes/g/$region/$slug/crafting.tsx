@@ -63,6 +63,8 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 const PAGE = 150;
 /** Crafters shown per recipe before "+N more". */
 const CRAFTERS = 4;
+/** Nothing to list (members only, no recipes, no matches): a quiet card. */
+const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
 
 function CraftingPage() {
 	const params = Route.useParams();
@@ -164,13 +166,11 @@ function CraftingPage() {
 	useEffect(() => setLimit(PAGE), [deferred, profession, view]);
 
 	if (!data) {
-		return <p className="py-10 text-sm text-muted-foreground">This guild's crafting is for members only.</p>;
+		return <p className={EMPTY}>This guild's crafting is for members only.</p>;
 	}
 	if (data.length === 0) {
 		return (
-			<p className="py-10 text-sm text-muted-foreground">
-				No known recipes yet. They appear once members' professions have synced from Blizzard.
-			</p>
+			<p className={EMPTY}>No known recipes yet. They appear once members' professions have synced from Blizzard.</p>
 		);
 	}
 
@@ -255,12 +255,12 @@ function CraftingPage() {
 						: "Checking what the guild can make for you..."}
 				</p>
 			) : showCraft && canCraft && asChar.length === 0 ? (
-				<p className="py-10 text-center text-sm text-muted-foreground">
+				<p className={EMPTY}>
 					None of {char?.name ?? "your character"}'s recipes beats what anyone in the guild wears right now.
 				</p>
 			) : showCraft ? (
 				results.length === 0 ? (
-					<p className="py-10 text-center text-sm text-muted-foreground">Nothing matches "{deferred.trim()}".</p>
+					<p className={EMPTY}>Nothing matches "{deferred.trim()}".</p>
 				) : (
 					<div>
 						<div
@@ -285,7 +285,7 @@ function CraftingPage() {
 					</div>
 				)
 			) : showUpgrades && upgrades && forChar.length === 0 ? (
-				<p className="py-10 text-center text-sm text-muted-foreground">
+				<p className={EMPTY}>
 					{upgrades.noGear.some((c) => c.slug === char?.slug)
 						? `Nothing to compare with until we've read ${char?.name}'s gear.`
 						: `Nothing the guild can craft beats what ${char?.name} wears right now.`}
@@ -297,7 +297,7 @@ function CraftingPage() {
 				</p>
 			) : showUpgrades ? (
 				results.length === 0 ? (
-					<p className="py-10 text-center text-sm text-muted-foreground">No upgrades match "{deferred.trim()}".</p>
+					<p className={EMPTY}>No upgrades match "{deferred.trim()}".</p>
 				) : (
 					<div>
 						{/* Columns on a wide pane; stacked rows on a narrow one (phones). */}
@@ -335,7 +335,7 @@ function CraftingPage() {
 					</div>
 				)
 			) : results.length === 0 ? (
-				<div className="py-10 text-center text-sm text-muted-foreground">
+				<div className={EMPTY}>
 					{deferred.trim() ? <>Nobody in the guild has a recipe matching "{deferred.trim()}".</> : "Nothing here."}
 					<div className="mt-1">Try "bag" or "Mageweave".</div>
 				</div>
@@ -529,39 +529,42 @@ function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: str
 	const [expanded, setExpanded] = useState(false);
 	const shown = expanded ? recipe.crafters : recipe.crafters.slice(0, CRAFTERS);
 	const hidden = recipe.crafters.length - shown.length;
+	// Names wrap in their own box; Request stays on the right, beside them.
 	return (
-		<div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm">
-			{shown.map((c) => (
-				<Link
-					key={c.slug}
-					to="/c/$region/$slug/professions"
-					params={{ region, slug: c.slug }}
-					search={{ profession: recipe.profession }}
-					className="whitespace-nowrap hover:underline"
-				>
-					<ClassText classId={c.classId}>{c.name}</ClassText>
-					{c.skill !== undefined ? <span className="num ml-1 text-xs text-muted-foreground">{c.skill}</span> : null}
-				</Link>
-			))}
-			{hidden > 0 ? (
-				<button
-					type="button"
-					onClick={() => setExpanded(true)}
-					className="text-xs whitespace-nowrap text-muted-foreground hover:text-foreground"
-				>
-					+{hidden} more
-				</button>
-			) : null}
+		<div className="flex items-center gap-3 text-sm">
+			<div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+				{shown.map((c) => (
+					<Link
+						key={c.slug}
+						to="/c/$region/$slug/professions"
+						params={{ region, slug: c.slug }}
+						search={{ profession: recipe.profession }}
+						className="whitespace-nowrap hover:underline"
+					>
+						<ClassText classId={c.classId}>{c.name}</ClassText>
+						{c.skill !== undefined ? <span className="num ml-1 text-xs text-muted-foreground">{c.skill}</span> : null}
+					</Link>
+				))}
+				{hidden > 0 ? (
+					<button
+						type="button"
+						onClick={() => setExpanded(true)}
+						className="text-xs whitespace-nowrap text-muted-foreground hover:text-foreground"
+					>
+						+{hidden} more
+					</button>
+				) : null}
+			</div>
 			{recipe.item?.untradeable ? (
 				// Binds to whoever crafts it: nothing to request.
-				<span className="ml-auto text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>
+				<span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>
 			) : member && recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug)) ? (
 				<RequestButton
 					guild={member.guild}
 					characters={member.characters}
 					size="sm"
 					label="Request"
-					className="ml-auto"
+					className="flex-none"
 					target={{
 						kind: "craft",
 						recipeId: recipe.recipeId,

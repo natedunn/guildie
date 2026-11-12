@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { type ConvexQueryClient, convexQuery } from "@convex-dev/react-query";
-import type { QueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery } from "@tanstack/react-query";
 import { createRootRouteWithContext, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router";
 import { type ConvexReactClient, useConvexAuth } from "convex/react";
 import { type ReactNode, useEffect, useRef } from "react";
@@ -13,6 +13,7 @@ import { getAuthToken } from "@/lib/convex-auth-start/functions";
 import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
 import { readDesktopInfo } from "@/lib/desktop";
 import { defaultShareMeta } from "@/lib/share";
+import { useRouteShell } from "@/lib/shell";
 import appCss from "@/styles/app.css?url";
 
 export type RouterContext = {
@@ -87,24 +88,72 @@ function RootDocument({ children }: { children: ReactNode }) {
 
 function RootComponent() {
 	const { convex, token } = Route.useRouteContext();
+	// Pages that don't use the app shell (lib/shell.ts): the sign-in flow's
+	// card, and the landing page for signed-out visitors. The root loader has
+	// the viewer, so this is decided on the server too.
+	const routeShell = useRouteShell();
+	const { data: viewer, isSuccess } = useQuery(convexQuery(api.users.viewer, {}));
+	const shell = routeShell === "landing" ? (isSuccess && !viewer ? "landing" : undefined) : routeShell;
 	return (
 		<ConvexAuthStartProvider client={convex} initialToken={token}>
 			<TooltipProvider>
 				<AuthSync />
 				<DesktopBridge />
-				<div className="app-shell">
-					<AppSidebar />
-					<div className="app-main">
-						<AppTitleBar />
-						<AppTopBar />
-						<main id="content" data-scroll-restoration-id="content" className="app-content px-4 sm:px-6">
-							<Outlet />
-						</main>
-						<ItemSheet />
+				{shell === "onboarding" ? (
+					<OnboardingShell />
+				) : shell === "landing" ? (
+					<LandingShell />
+				) : (
+					<div className="app-shell">
+						<AppSidebar />
+						<div className="app-main">
+							<AppTitleBar />
+							<AppTopBar />
+							<main id="content" data-scroll-restoration-id="content" className="app-content px-4 sm:px-6">
+								{/* The faint map and glow at the top of every page (app.css). */}
+								<div aria-hidden className="pane-backdrop" />
+								<Outlet />
+							</main>
+							<ItemSheet />
+						</div>
 					</div>
-				</div>
+				)}
 			</TooltipProvider>
 		</ConvexAuthStartProvider>
+	);
+}
+
+/**
+ * The sign-in flow's routes: just the page (the onboarding card), filling the
+ * window. In the desktop app a strip along the top still drags the window and
+ * leaves room for Windows' minimize / maximize / close.
+ */
+function OnboardingShell() {
+	return (
+		<div className="flex h-dvh flex-col pt-[env(safe-area-inset-top)]">
+			<div className="app-sidebar-drag hidden h-10 flex-none desktop:block" />
+			<main
+				id="content"
+				data-scroll-restoration-id="content"
+				className="min-h-0 flex-1 overflow-y-auto bg-background pb-[env(safe-area-inset-bottom)]"
+			>
+				<Outlet />
+			</main>
+		</div>
+	);
+}
+
+/**
+ * The landing page (components/landing): full width, and the window scrolls
+ * rather than a pane (`.landing-shell` in styles/app.css), so phones get their
+ * usual page scrolling. Its own nav and footer; in the desktop app the nav is
+ * the title bar.
+ */
+function LandingShell() {
+	return (
+		<main id="content" className="landing-shell">
+			<Outlet />
+		</main>
 	);
 }
 

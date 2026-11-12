@@ -4,15 +4,15 @@ import { convexQuery } from "@convex-dev/react-query";
 import {
 	Activity01Icon,
 	AnvilIcon,
-	Backpack01Icon,
 	Cancel01Icon,
 	Castle01Icon,
 	InboxIcon,
-	KnightShieldIcon,
 	Login03Icon,
 	Menu01Icon,
+	MoneyBag01Icon,
 	ScrollTextIcon,
 	Settings02Icon,
+	Shield01Icon,
 	UserGroupIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -22,6 +22,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AddonNotice } from "@/components/addon-notice";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { SyncButton } from "@/components/sync-button";
 import { UpdateReady } from "@/components/update-ready";
 import { UpdatedNotice } from "@/components/whats-new";
 import { useCurrentGuild } from "@/lib/breadcrumbs";
@@ -76,6 +77,8 @@ function SidebarNav() {
 	// Dungeons (who's on which dungeon quest) is for the guild's members.
 	const isMember = (g: { region: string; slug: string }) =>
 		!!viewer?.guilds.some((m) => m.region === g.region && m.slug === g.slug);
+	// The sync row's guild: the one you're looking at, else your first.
+	const syncGuild = viewer ? (current ?? viewer.guilds[0]) : undefined;
 	const characters = [...(viewer?.characters ?? [])].sort(
 		(a, b) => (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name),
 	);
@@ -116,7 +119,7 @@ function SidebarNav() {
 											Crafting
 										</NavLink>
 										<NavLink to="/g/$region/$slug/gear" params={{ region: g.region, slug: g.slug }} className="pl-3">
-											<HugeiconsIcon icon={KnightShieldIcon} size={15} strokeWidth={1.75} />
+											<HugeiconsIcon icon={Shield01Icon} size={15} strokeWidth={1.75} />
 											Gear
 										</NavLink>
 										{isMember(g) && (
@@ -154,7 +157,7 @@ function SidebarNav() {
 				{viewer && (
 					<NavSection title="Personal">
 						<NavLink to="/inventory">
-							<HugeiconsIcon icon={Backpack01Icon} size={15} strokeWidth={1.75} />
+							<HugeiconsIcon icon={MoneyBag01Icon} size={15} strokeWidth={1.75} />
 							Inventory
 						</NavLink>
 						<NavLink to="/quests">
@@ -192,7 +195,7 @@ function SidebarNav() {
 						to="/g/$region/$slug/requests"
 						params={{ region: g.region, slug: g.slug }}
 						search={{ view: "mine" }}
-						className="mx-0.5 mb-2 block rounded-md border border-border px-3 py-2 text-[0.8125rem] hover:bg-hover"
+						className="surface-card mx-0.5 mb-2 block px-3 py-2 text-[0.8125rem]"
 					>
 						<span className="block font-medium">
 							{g.stale === 1 ? "1 request is" : `${g.stale} requests are`} over a week old
@@ -205,6 +208,10 @@ function SidebarNav() {
 				<UpdateReady />
 				<AddonNotice />
 				<UpdatedNotice />
+				{/* Keyed by guild: a failed click's message belongs to the guild it was for. */}
+				{syncGuild && (
+					<SyncButton key={`${syncGuild.region}/${syncGuild.slug}`} region={syncGuild.region} slug={syncGuild.slug} />
+				)}
 				{viewer ? (
 					<NavLink to="/settings">
 						<HugeiconsIcon icon={Settings02Icon} size={15} strokeWidth={1.75} />
@@ -243,11 +250,11 @@ function NavLink({ className, children, ...props }: LinkProps & { className?: st
 	);
 }
 
-/** Phones: a top bar with the page title, and the sidebar in a sheet. */
+/** Phones: a frosted top bar over the pane (app.css) with the page title, and the sidebar in a sheet. */
 export function AppTopBar() {
 	const title = usePageTitle();
 	return (
-		<div className="app-topbar flex h-12 flex-none items-center gap-2 border-b border-border bg-chrome px-2 md:hidden">
+		<div className="app-topbar flex h-12 flex-none items-center gap-2 border-b border-border px-2 md:hidden">
 			<NavSheet />
 			<span className="truncate font-medium">{title}</span>
 		</div>

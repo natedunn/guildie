@@ -15,6 +15,17 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** A new home page for visitors who aren't signed in: a full-width tour of what Guildie does (the roster, gear upgrades, crafting and requests, dungeons, the addon's tooltips, the Windows app), with sign-in with Battle.net in one click. Guild search is gone for now.
+- **Guildie:** The guild roster has a Gear tab: what each member can wear and wield at their level, the armor, weapons and stats they prefer, and whether the player set those or they follow their talents.
+
+### Improvements
+
+- **Guildie, App:** Signing in is one card that shows each step (signing in, reading your characters, finding and syncing your guild) and takes you to your guild, or explains what to do if it can't find one.
+- **Guildie:** The sync button moved to the bottom of the sidebar, so every page shows when your guild last synced; tooltips have a cleaner look; Feed's filters are tabs like Crafting's; new Inventory and Gear icons.
+- **Guildie, App:** A new look across the whole site, matching the new home page: cards lit from above, a faint map of Azeroth at the top of each page, warm amber for the tab, page and field you're on, and a frosted bar over the page as you scroll.
+
 ### Fixes
 
 - **Guildie:** Deadmines lists The Unsent Letter and Scarlet Monastery lists Vorrel's Revenge, dungeon quests Blizzard doesn't mark as such; Shaper's Terrace's Digestible Research is shown as starting in the dungeon.

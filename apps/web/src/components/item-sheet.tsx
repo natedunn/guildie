@@ -10,6 +10,8 @@ import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
 import { RequestButton, RequestRow } from "@/components/requests";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
 // The item panel: click any item and it slides in from the right over the
@@ -84,7 +86,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					{item?.kind && <p className="mt-0.5 text-xs text-muted-foreground">{item.kind}</p>}
 				</div>
 				<Dialog.Close
-					className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground pointer-coarse:size-10 hover:bg-accent hover:text-foreground"
+					className="grid size-8 flex-none place-items-center rounded-md text-muted-foreground pointer-coarse:size-10 hover:bg-hover hover:text-foreground"
 					aria-label="Close"
 				>
 					<HugeiconsIcon icon={Cancel01Icon} size={16} strokeWidth={1.75} />
@@ -101,7 +103,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 				{member && (
 					<Section title="Requests">
 						{requests && requests.requests.length > 0 && (
-							<ul className="divide-y divide-border rounded-md border border-border px-3">
+							<ul className="surface-card divide-y divide-border px-3">
 								{requests.requests.map((r) => (
 									<RequestRow key={r._id} request={r} compact />
 								))}
@@ -137,7 +139,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 				{data && data.craftedBy.length > 0 && (
 					<Section title="Made by">
 						{data.craftedBy.map((r) => (
-							<div key={r.recipeId} className="space-y-2 rounded-md border border-border p-3">
+							<div key={r.recipeId} className="surface-card space-y-2 p-3">
 								<div className="flex items-baseline justify-between gap-3 text-[13px]">
 									<span className="font-medium">{r.name}</span>
 									<span className="text-xs text-muted-foreground">{r.profession}</span>
@@ -203,7 +205,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 
 				{data && data.upgrades.length > 0 && (
 					<Section title="Upgrade for">
-						<div className="divide-y divide-border rounded-md border border-border">
+						<div className="surface-card divide-y divide-border">
 							{data.upgrades.map((u) => (
 								<div key={`${u.region}:${u.slug}`} className="space-y-0.5 px-3 py-2 text-[13px]">
 									<div className="flex items-baseline gap-2">
@@ -219,7 +221,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 										</span>
 										<span
 											title={VERDICT_HINTS[u.kind]}
-											className={u.kind === "maybe" ? "ml-auto text-xs text-muted-foreground" : "ml-auto text-xs"}
+											className={cn("pill ml-auto flex-none px-2 py-0", u.kind !== "maybe" && "text-foreground")}
 										>
 											{verdictLabel(u.kind, u.at)}
 										</span>
@@ -237,7 +239,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 
 				{data && data.usedIn.length > 0 && (
 					<Section title="Used in">
-						<div className="divide-y divide-border rounded-md border border-border">
+						<div className="surface-card divide-y divide-border">
 							{data.usedIn.map((r) => (
 								<div key={r.recipeId} className="flex items-center gap-2.5 px-3 py-1.5 text-[13px]">
 									{r.item ? (
@@ -271,7 +273,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					href={wowheadItemUrl(itemId)}
 					target="_blank"
 					rel="noreferrer"
-					className="flex h-8 items-center justify-center gap-2 rounded-md border border-border text-[13px] hover:bg-accent"
+					className={cn(buttonVariants({ variant: "outline" }), "w-full gap-2")}
 				>
 					Open on Wowhead
 					<HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.75} />
@@ -284,7 +286,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 function Section({ title, children }: { title: string; children: ReactNode }) {
 	return (
 		<section className="space-y-2">
-			<h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+			<h3 className="text-[0.8125rem] font-semibold">{title}</h3>
 			{children}
 		</section>
 	);

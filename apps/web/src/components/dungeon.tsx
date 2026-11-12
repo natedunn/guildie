@@ -90,7 +90,7 @@ export function ViewAs({
 			</Combobox.Trigger>
 			<Combobox.Portal>
 				<Combobox.Positioner align="end" sideOffset={4} className="isolate z-50 outline-none">
-					<Combobox.Popup className="w-60 overflow-hidden rounded-md border border-border-strong bg-popover text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.45)] outline-none">
+					<Combobox.Popup className="w-60 overflow-hidden rounded-md border border-border-strong bg-popover bg-(image:--card-sheen) text-popover-foreground shadow-(--popover-shadow) outline-none">
 						<Combobox.Input
 							placeholder="Search the guild"
 							className="h-8 w-full border-b border-border bg-transparent px-2.5 text-[0.8125rem] outline-none placeholder:text-muted-foreground"
@@ -146,7 +146,7 @@ export function DungeonArt({ src, className }: { src: string; className?: string
 
 export function MembersOnly() {
 	return (
-		<p className="pb-12 text-[0.8125rem] text-muted-foreground">
+		<p className="surface-card mb-12 max-w-xl px-4 py-6 text-[0.8125rem] text-muted-foreground">
 			Only the guild's members see who's ready for which dungeon.{" "}
 			<Link to="/settings" className="text-foreground underline underline-offset-4">
 				Claim your characters

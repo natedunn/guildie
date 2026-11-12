@@ -64,24 +64,28 @@ function ProfessionsPage() {
 				<nav className="flex flex-col gap-px self-start" aria-label="Professions">
 					{professions.map((p, i) => (
 						<div key={p.id}>
-							{i === firstSecondary && i > 0 ? <div className="my-2 border-t border-border" /> : null}
+							{i === firstSecondary && i > 0 ? <div className="mx-2.5 my-2 border-t border-border" /> : null}
 							<Link
 								from={Route.fullPath}
 								search={{ profession: p.name }}
 								replace
 								resetScroll={false}
 								className={cn(
-									"block rounded-md px-2.5 py-2 transition-colors hover:bg-accent/60",
-									p.id === selected.id && "bg-accent",
+									"block rounded-md px-2.5 py-2 transition-colors hover:bg-hover",
+									// Like the sidebar's active row: warm light from the left, a lit edge.
+									p.id === selected.id &&
+										"bg-[linear-gradient(90deg,rgb(255_176_96/0.11),rgb(255_176_96/0.035))] shadow-[inset_0_0_0_1px_rgb(255_200_140/0.07)] hover:bg-transparent",
 								)}
 							>
 								<div className="flex items-baseline justify-between gap-2 text-sm">
-									<span className={cn(p.id === selected.id ? "text-foreground" : "text-foreground/85")}>{p.name}</span>
+									<span className={cn(p.id === selected.id ? "font-medium text-foreground" : "text-foreground/85")}>
+										{p.name}
+									</span>
 									<span className="num text-xs text-muted-foreground">
 										{p.skill ?? "?"} / {p.maxSkill ?? "?"}
 									</span>
 								</div>
-								<SkillBar skill={p.skill} max={p.maxSkill} />
+								<SkillBar skill={p.skill} max={p.maxSkill} active={p.id === selected.id} />
 							</Link>
 						</div>
 					))}
@@ -94,11 +98,14 @@ function ProfessionsPage() {
 
 type Profession = NonNullable<FunctionReturnType<typeof api.crafting.characterProfessions>>[number];
 
-function SkillBar({ skill, max }: { skill?: number; max?: number }) {
+function SkillBar({ skill, max, active }: { skill?: number; max?: number; active?: boolean }) {
 	const pct = skill && max ? Math.min(100, (skill / max) * 100) : 0;
 	return (
-		<div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-muted">
-			<div className="h-full rounded-full bg-foreground/45" style={{ width: `${pct}%` }} />
+		<div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-well">
+			<div
+				className={cn("h-full rounded-full", active ? "bg-highlight/70" : "bg-foreground/35")}
+				style={{ width: `${pct}%` }}
+			/>
 		</div>
 	);
 }
@@ -116,8 +123,8 @@ function RecipeList({ profession }: { profession: Profession }) {
 
 	return (
 		<section className="min-w-0">
-			<div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-				<h2 className="text-base font-semibold">
+			<div className="flex flex-wrap items-center justify-between gap-3 pb-3">
+				<h2 className="text-sm font-semibold">
 					{profession.name}{" "}
 					<span className="num text-sm font-normal text-muted-foreground">
 						{deferred ? `${recipes.length} of ${total}` : total} {total === 1 ? "recipe" : "recipes"}
@@ -137,23 +144,25 @@ function RecipeList({ profession }: { profession: Profession }) {
 			{total === 0 && profession.recipesSource.kind === "blizzard" && profession.source.kind === "addon" ? (
 				// Learned or seen in game since Blizzard's profile: its recipes come
 				// from the game too, once its window has been open.
-				<p className="py-6 text-sm text-muted-foreground">
+				<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground text-balance">
 					No recipes from the game yet. They're sent once {profession.name}'s window has been open in game.
 				</p>
 			) : total === 0 ? (
-				<p className="py-6 text-sm text-muted-foreground">
+				<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground text-balance">
 					Blizzard reports {profession.skill ? `skill ${profession.skill} in ${profession.name}` : profession.name} but
 					no known recipes.
 					{profession.secondary ? "" : " Some professions (gathering ones especially) have none to list."}
 				</p>
 			) : recipes.length === 0 ? (
-				<p className="py-6 text-sm text-muted-foreground">No recipes match "{deferred}".</p>
+				<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">
+					No recipes match "{deferred}".
+				</p>
 			) : (
-				<ul>
+				<ul className="surface-card card-clip">
 					{recipes.map((r) => (
 						<li
 							key={r.recipeId}
-							className="flex items-center justify-between gap-4 border-b border-border/60 py-1.5 last:border-b-0"
+							className="flex items-center justify-between gap-4 border-b border-border px-3 py-1.5 transition-colors last:border-b-0 hover:bg-[var(--row-hover)]"
 						>
 							<RecipeItem recipe={r} className="flex-1" />
 							<Reagents reagents={r.reagents} className="justify-end" />
@@ -171,5 +180,9 @@ function RecipeList({ profession }: { profession: Profession }) {
 }
 
 function Empty({ children }: { children: ReactNode }) {
-	return <p className="py-10 text-sm text-muted-foreground">{children}</p>;
+	return (
+		<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground text-balance">
+			{children}
+		</p>
+	);
 }

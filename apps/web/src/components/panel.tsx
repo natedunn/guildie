@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // A small titled box for a page's side facts (the character page's stats to
-// look for, talents, what they can use): surface fill, hairline border.
+// look for, talents, what they can use): a card (.surface-card, app.css).
 
-export const PANEL = "rounded-md border border-border bg-surface p-3.5";
+export const PANEL = "surface-card p-3.5";
 
 export function Panel({
 	title,

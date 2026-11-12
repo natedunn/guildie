@@ -21,7 +21,11 @@ function TalentsPage() {
 	const source = sourceNote(talentSource);
 
 	if (!talentLayouts.length && !trees.length) {
-		return <p className="text-sm text-muted-foreground">No points spent yet.</p>;
+		return (
+			<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">
+				No talent points spent yet.
+			</p>
+		);
 	}
 	return (
 		<div className="@container w-full">

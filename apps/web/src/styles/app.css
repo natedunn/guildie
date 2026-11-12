@@ -18,6 +18,8 @@
 	--color-selected: var(--selected);
 	--color-tooltip: var(--tooltip);
 	--color-tooltip-border: var(--tooltip-border);
+	--color-highlight: var(--highlight);
+	--color-glow: var(--glow);
 	--color-well: var(--well);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
@@ -61,7 +63,9 @@
 
 /* Dark greys with a slight warm cast (brown in the surfaces, a little gold in
    what's selected), a nod to the game. Color that means something (class,
-   item quality, the game's tooltip lines) comes from the game. */
+   item quality, the game's tooltip lines) comes from the game. The one accent
+   is the UI's own light: a warm amber (--highlight) for focus, the active tab
+   or nav row, and a legendary-orange glow (--glow) at the top of a page. */
 :root {
 	/* Sidebar and title bar. The desktop app paints its window buttons on
 	   this (apps/desktop/src/window.ts TITLEBAR), or on Mica instead. */
@@ -97,7 +101,31 @@
 	--border: rgb(255 235 200 / 0.085);
 	--border-strong: rgb(255 235 200 / 0.15);
 	--input: rgb(255 235 200 / 0.11);
-	--ring: rgb(240 205 140 / 0.45);
+	--ring: rgb(255 176 96 / 0.5);
+	/* The accent, for chrome only (never item text: legendary is #ff8000 there).
+	   Use it thin or faint: a 2px underline, a focus ring, an icon, /10 fills. */
+	--highlight: rgb(255 176 96);
+	/* The glow's color (.glow, .pane-backdrop): only blurred, only at the top of a page. */
+	--glow: #ff8000;
+	/* Cards (.surface-card): a hairline that catches light at the top and fades
+	   down the sides, over a faint warm fill. */
+	--hairline: linear-gradient(
+		180deg,
+		rgb(255 240 215 / 0.2),
+		rgb(255 240 215 / 0.07) 35%,
+		rgb(255 240 215 / 0.05) 100%
+	);
+	--card-sheen: linear-gradient(180deg, rgb(255 240 215 / 0.04), rgb(255 240 215 / 0.012) 60%);
+	--card-fill: var(--surface);
+	--card-radius: 8px;
+	/* Menus, popovers and plain tooltips: a lit top edge and a drop shadow. */
+	--popover-shadow: inset 0 1px 0 rgb(255 240 215 / 0.07), 0 8px 24px rgb(0 0 0 / 0.45);
+	/* Table rows under the pointer. */
+	--row-hover: rgb(255 214 160 / 0.045);
+	/* What the frosted bar over the content pane covers (.app-titlebar,
+	   .app-topbar); the pane pads its top by it. Sticky things keep top: 0,
+	   which already stops under the bar (sticky respects the pane's padding). */
+	--pane-inset: 0px;
 	--chart-1: var(--foreground);
 	--chart-2: var(--muted-foreground);
 	--chart-3: var(--muted-foreground);
@@ -113,6 +141,20 @@
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
 	color-scheme: dark;
+	/* Native checkboxes, radios and ranges. */
+	accent-color: var(--highlight);
+}
+
+/* The web's frosted bars float over the pane (.app-titlebar, .app-topbar):
+   the phone top bar, then the breadcrumbs from md up. The desktop app's title
+   bar sits above the pane instead. */
+html:not([data-desktop="true"]) {
+	--pane-inset: 3rem;
+}
+@media (min-width: 48rem) {
+	html:not([data-desktop="true"]) {
+		--pane-inset: 40px;
+	}
 }
 
 /* Windows draws the app in Segoe; the site keeps Inter elsewhere. */
@@ -147,7 +189,7 @@ html[data-desktop="true"] {
 		letter-spacing: -0.01em;
 	}
 	::selection {
-		background: rgb(255 255 255 / 0.18);
+		background: rgb(255 176 96 / 0.24);
 	}
 	a {
 		text-decoration-color: rgb(255 255 255 / 0.35);
@@ -172,6 +214,7 @@ html[data-desktop="true"] {
 	select:focus-visible {
 		outline: none;
 		border-color: var(--ring);
+		box-shadow: 0 0 0 3px rgb(255 176 96 / 0.12);
 	}
 	.num {
 		font-variant-numeric: tabular-nums;
@@ -285,9 +328,12 @@ select:not([multiple]) {
 		flex-direction: column;
 		padding-bottom: env(safe-area-inset-bottom);
 		background-color: var(--chrome);
+		/* A little light falling on the top of the sidebar. */
+		background-image: linear-gradient(180deg, rgb(255 240 215 / 0.025), transparent 18rem);
 		border-right: 1px solid var(--border);
 	}
 	.app-main {
+		position: relative;
 		display: flex;
 		min-width: 0;
 		flex: 1;
@@ -295,26 +341,78 @@ select:not([multiple]) {
 	}
 	.app-content {
 		position: relative;
+		/* .pane-backdrop sits behind the page (z-index -1) but over this fill. */
+		isolation: isolate;
 		min-height: 0;
 		flex: 1;
 		overflow-y: auto;
 		overscroll-behavior: contain;
+		/* The page starts under the frosted bar and scrolls beneath it. */
+		padding-top: var(--pane-inset);
+		scroll-padding-top: var(--pane-inset);
 		/* Scrolls under the home indicator, but the last line clears it. */
 		padding-bottom: env(safe-area-inset-bottom);
 		background-color: var(--background);
 		scrollbar-color: rgb(255 255 255 / 0.16) transparent;
 		scrollbar-width: thin;
 	}
-	/* The web gets the title bar's breadcrumbs on wide screens (phones have the
-	   top bar); the desktop app's version is below. */
+	/* The top of every page: a faint world map and a legendary glow behind the
+	   page header, fading out before the page's data starts (__root.tsx puts it
+	   first in the pane; it scrolls away with the page). */
+	.pane-backdrop {
+		position: absolute;
+		inset-inline: 0;
+		top: 0;
+		z-index: -1;
+		height: 20rem;
+		pointer-events: none;
+	}
+	.pane-backdrop::before,
+	.pane-backdrop::after {
+		content: "";
+		position: absolute;
+		inset: 0;
+	}
+	.pane-backdrop::before {
+		background-image: url("/landing/azeroth.jpg");
+		background-size: max(1100px, 100%) auto;
+		background-position: center -3rem;
+		background-repeat: no-repeat;
+		filter: grayscale(1) sepia(0.6) contrast(1.15) brightness(0.9);
+		opacity: 0.06;
+		mask-image: linear-gradient(to bottom, #000 0%, transparent 80%);
+	}
+	.pane-backdrop::after {
+		background: radial-gradient(ellipse 60% 70% at 50% 0%, rgb(255 128 0 / 0.07), transparent 70%);
+	}
+
+	/* Frosted glass: what scrolls under it blurs (the landing's nav, the pane's
+	   title bar and top bar). */
+	.frosted {
+		background-color: rgb(19 17 14 / 0.72);
+		backdrop-filter: blur(14px) saturate(140%);
+		-webkit-backdrop-filter: blur(14px) saturate(140%);
+	}
+
+	/* The web's bars float over the top of the pane, frosted, and the page
+	   scrolls under them: the breadcrumbs from md up, the top bar on phones.
+	   The desktop app's title bar is the window's (below). */
 	.app-titlebar {
 		display: none;
+	}
+	html:not([data-desktop="true"]) :is(.app-titlebar, .app-topbar) {
+		position: absolute;
+		inset-inline: 0;
+		top: 0;
+		z-index: 20;
+		background-color: rgb(26 24 21 / 0.7);
+		backdrop-filter: blur(14px) saturate(140%);
+		-webkit-backdrop-filter: blur(14px) saturate(140%);
 	}
 	@media (min-width: 48rem) {
 		html:not([data-desktop="true"]) .app-titlebar {
 			display: flex;
 			height: 40px;
-			flex: none;
 			align-items: center;
 			padding-inline: 1rem;
 			border-bottom: 1px solid var(--border);
@@ -348,14 +446,20 @@ select:not([multiple]) {
 	.nav-item > svg {
 		flex: none;
 	}
+	/* The page you're on: warm light from the left, a lit edge, an amber icon. */
+	.nav-item[data-status="active"] {
+		background-color: transparent;
+		background-image: linear-gradient(90deg, rgb(255 176 96 / 0.11), rgb(255 176 96 / 0.035));
+		box-shadow: inset 0 0 0 1px rgb(255 200 140 / 0.07);
+		color: var(--foreground);
+	}
+	.nav-item[data-status="active"] > svg {
+		color: color-mix(in oklab, var(--highlight) 85%, var(--foreground));
+	}
 	/* Segoe UI (the app's font) sits its letters high in the line box, so a
 	   box-centered icon reads low next to them there: lift it to the letters. */
 	html[data-desktop="true"] .nav-item > svg {
 		translate: 0 -1px;
-	}
-	.nav-item[data-status="active"] {
-		background-color: var(--selected);
-		color: var(--foreground);
 	}
 
 	/* ---- The Windows app ---- */
@@ -409,13 +513,23 @@ select:not([multiple]) {
 	}
 	html[data-material="mica"] :is(.app-sidebar, .app-titlebar) {
 		background-color: transparent;
+		background-image: none;
 	}
 
 	/* ---- Tooltips and popovers ---- */
 
-	/* The game's tooltip: navy-black, a thin light-grey edge. Plain tooltips and
-	   item tooltips (components/item.tsx) both. */
-	[data-slot="tooltip-content"],
+	/* Plain tooltips: a popover (the menus' surface, edge and shadow). */
+	[data-slot="tooltip-content"]:not(.item-tooltip) {
+		color: var(--popover-foreground);
+		background-color: var(--popover);
+		background-image: var(--card-sheen);
+		border: 1px solid var(--border-strong);
+		border-radius: var(--radius);
+		box-shadow: var(--popover-shadow);
+	}
+
+	/* Item and talent tooltips (components/item.tsx, talent-tree.tsx): the
+	   game's, navy-black with a thin light-grey edge. */
 	.item-tooltip {
 		color: #fff;
 		background-color: var(--tooltip);
@@ -429,20 +543,21 @@ select:not([multiple]) {
 	/* ---- Tables: hairlines, quiet heads, a fill under the pointer ---- */
 
 	[data-slot="table"] thead tr {
-		border-bottom: 1px solid var(--border);
+		border-bottom: 1px solid var(--border-strong);
 	}
 	[data-slot="table"] th {
 		color: var(--muted-foreground);
 		font-weight: 500;
 	}
 	[data-slot="table"] tbody tr {
-		border-color: rgb(255 255 255 / 0.05);
+		border-color: rgb(255 240 215 / 0.05);
 	}
 	[data-slot="table"] tbody tr:hover {
-		background-color: var(--hover);
+		background-color: var(--row-hover);
 	}
 	.table-sticky thead th {
 		position: sticky;
+		/* Under the frosted bar: a sticky box keeps to the pane's padding (--pane-inset). */
 		top: 0;
 		z-index: 1;
 		background-color: var(--background);
@@ -469,8 +584,32 @@ select:not([multiple]) {
 		color: var(--foreground);
 	}
 	.chip[data-active="true"] {
-		border-color: var(--border-strong);
+		border-color: rgb(255 176 96 / 0.28);
 		background-color: var(--selected);
+		color: var(--foreground);
+	}
+
+	/* A small rounded label: "Free and open source | Built for WoW: Forever",
+	   a status, a count. Not for decoration; say something. */
+	.pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		border: 1px solid rgb(255 255 255 / 0.1);
+		border-radius: 9999px;
+		background-color: rgb(255 255 255 / 0.03);
+		padding: 0.25rem 0.75rem;
+		font-size: 0.75rem;
+		line-height: 1rem;
+		color: var(--muted-foreground);
+	}
+	:is(a, button).pill {
+		transition:
+			border-color 0.15s,
+			color 0.15s;
+	}
+	:is(a, button).pill:hover {
+		border-color: rgb(255 255 255 / 0.2);
 		color: var(--foreground);
 	}
 
@@ -483,5 +622,251 @@ select:not([multiple]) {
 			height: 2.25rem;
 			padding-inline: 0.625rem;
 		}
+	}
+}
+
+/* ---- The look: light on dark (started on the landing page, used app-wide) ----
+   Warm near-black surfaces lit from above. Cards have a hairline that catches
+   the light at the top; big headings are tight and fade from white to grey;
+   the top of a page has a faint world map and a legendary glow behind it.
+   Glows, maps and grids only at the top of a page or a hero, never behind
+   data. The amber accent is chrome; it never colors item text. */
+@layer components {
+	/* A card: hairline lit at the top, faint warm fill. Replaces
+	   `rounded-md border border-border bg-surface`, same box (a transparent
+	   1px border holds the place the hairline draws in). */
+	.surface-card {
+		position: relative;
+		border: var(--card-border-width, 1px) solid transparent;
+		border-radius: var(--card-radius);
+		background-color: var(--card-fill);
+		background-image: var(--card-sheen);
+	}
+	/* Clipping a card's content (a table, full-bleed art): overflow: clip
+	   out to the border box, so the hairline drawn in the border survives and
+	   no scroll box is made (sticky headers keep working). `overflow-hidden`
+	   on a card means this too. */
+	.surface-card.overflow-hidden,
+	.card-clip {
+		overflow: clip;
+		overflow-clip-margin: var(--card-border-width, 1px);
+	}
+	/* Link and button cards light up a little under the pointer. */
+	:is(a, button).surface-card {
+		transition: background-color 0.15s;
+	}
+	:is(a, button).surface-card:hover {
+		background-color: color-mix(in oklab, var(--card-fill), rgb(255 240 215) 3%);
+	}
+	/* Just the lit hairline, on something with its own fill and no border of
+	   its own (the landing's hero frame). */
+	.hairline {
+		position: relative;
+	}
+	.surface-card::before,
+	.hairline::before {
+		content: "";
+		position: absolute;
+		inset: calc(var(--card-border-width, 1px) * -1);
+		z-index: 2;
+		border-radius: inherit;
+		padding: 1px;
+		background: var(--hairline);
+		-webkit-mask:
+			linear-gradient(#000 0 0) content-box,
+			linear-gradient(#000 0 0);
+		-webkit-mask-composite: xor;
+		mask-composite: exclude;
+		pointer-events: none;
+	}
+	.hairline::before {
+		inset: 0;
+	}
+	/* A streak of amber light along a featured box's top edge (the hero shot).
+	   An empty child of a .surface-card / .hairline box. Once per screen at most. */
+	.streak {
+		position: absolute;
+		inset-inline: 12%;
+		top: 0;
+		z-index: 3;
+		height: 1px;
+		background: linear-gradient(90deg, transparent, rgb(255 176 96 / 0.85), transparent);
+		pointer-events: none;
+	}
+
+	/* Display headings: tight, balanced. Hero and section titles; PageHeader's
+	   title takes the look at its own size. */
+	.heading-display {
+		font-weight: 600;
+		letter-spacing: -0.035em;
+		line-height: 1.04;
+		text-wrap: balance;
+	}
+	/* Text that fades from white to the muted grey, top to bottom. Headings
+	   only; colored children (ClassText) keep their color. */
+	.text-fade {
+		background-image: linear-gradient(180deg, #fbf8f3 20%, rgb(238 233 225 / 0.62) 100%);
+		-webkit-background-clip: text;
+		background-clip: text;
+		color: transparent;
+	}
+
+	/* The old world map of Azeroth, barely there: no color of its own (warmed
+	   toward the glow), fading out to the sides and down. An absolutely placed
+	   empty box behind a hero (the landing, the sign-in card). Tune it with
+	   --map-size, --map-y, --map-opacity. */
+	.map-backdrop {
+		background-image: url("/landing/azeroth.jpg");
+		background-size: var(--map-size, min(1500px, 125%)) auto;
+		background-position: center var(--map-y, 1.5rem);
+		background-repeat: no-repeat;
+		filter: grayscale(1) sepia(0.6) contrast(1.15) brightness(0.9);
+		opacity: var(--map-opacity, 0.11);
+		mask-image:
+			radial-gradient(ellipse 52% 62% at 50% 34%, #000 30%, transparent 80%),
+			linear-gradient(to bottom, #000 45%, transparent 100%);
+		mask-composite: intersect;
+		-webkit-mask-composite: source-in;
+	}
+
+	/* Faint lines, fading out from the top center. Heroes only. */
+	.grid-lines {
+		background-image:
+			linear-gradient(to right, rgb(255 240 215 / 0.05) 1px, transparent 1px),
+			linear-gradient(to bottom, rgb(255 240 215 / 0.05) 1px, transparent 1px);
+		background-size: 72px 72px;
+		background-position: center top;
+		mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 0%, transparent 75%);
+	}
+	/* A soft glow in the game's legendary orange, warmer amber at its edge.
+	   An absolutely placed empty box behind a hero's visual; never behind data. */
+	.glow {
+		background:
+			radial-gradient(closest-side, rgb(255 128 0 / 0.34), transparent),
+			radial-gradient(closest-side at 72% 62%, rgb(255 176 64 / 0.18), transparent);
+		filter: blur(40px);
+	}
+	/* Something that fades into the page at its bottom edge. */
+	.fade-bottom {
+		mask-image: linear-gradient(to bottom, #000 62%, transparent 98%);
+	}
+}
+
+/* ---- The landing page (components/landing): "/" for signed-out visitors ----
+   A marketing page, not the app: the window scrolls rather than a pane. It
+   uses the look above at full strength (bigger radius, see-through cards). */
+@layer components {
+	html:has(.landing-shell),
+	html:has(.landing-shell) body {
+		height: auto;
+		overflow-x: clip;
+		overflow-y: auto;
+		overscroll-behavior: auto;
+	}
+	.landing-shell {
+		--card-radius: 12px;
+		--card-fill: rgb(26 24 21 / 0.6);
+		--card-border-width: 0px;
+		display: block;
+		min-height: 100dvh;
+		overflow-x: clip;
+		background-color: var(--chrome);
+		padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+		scrollbar-color: rgb(255 255 255 / 0.16) transparent;
+	}
+	.landing-shell :is(section[id], [data-anchor]) {
+		scroll-margin-top: 4.5rem;
+	}
+
+	/* The sticky nav (.frosted). In the desktop app it's also the title bar:
+	   it drags the window and leaves room for minimize / maximize / close. */
+	.landing-nav {
+		padding-top: env(safe-area-inset-top);
+	}
+	html[data-desktop="true"] .landing-nav {
+		-webkit-app-region: drag;
+		app-region: drag;
+		padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+	}
+	html[data-desktop="true"] .landing-nav :is(a, button) {
+		-webkit-app-region: no-drag;
+		app-region: no-drag;
+	}
+
+	/* The framed hero shot (with .hairline): the pane's fill, a deep shadow. */
+	.landing-frame {
+		border-radius: 12px;
+		background-color: var(--background);
+		box-shadow:
+			0 0 0 1px rgb(0 0 0 / 0.55),
+			0 40px 100px -30px rgb(0 0 0 / 0.85);
+	}
+
+	/* The hero shot leans back a little on wide screens. */
+	.landing-tilt {
+		perspective: 2400px;
+	}
+	.landing-tilt > * {
+		transform-origin: 50% 0;
+	}
+	@media (min-width: 64rem) {
+		.landing-tilt > * {
+			transform: rotateX(14deg) scale(0.98);
+		}
+	}
+
+	/* Motion: the hero comes in on load, sections as they scroll into view
+	   (scroll-driven, no script; browsers without it just show them). */
+	@media (prefers-reduced-motion: no-preference) {
+		.landing-enter {
+			animation: landing-enter 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+			animation-delay: var(--delay, 0ms);
+		}
+		@media (min-width: 64rem) {
+			.landing-tilt > .landing-enter {
+				animation-name: landing-tilt-in;
+				animation-duration: 1.4s;
+			}
+		}
+		@supports (animation-timeline: view()) {
+			.landing-reveal {
+				animation: landing-reveal linear both;
+				animation-timeline: view();
+				animation-range: entry 0% entry 45%;
+			}
+		}
+	}
+}
+
+@keyframes landing-enter {
+	from {
+		opacity: 0;
+		translate: 0 18px;
+		filter: blur(4px);
+	}
+	to {
+		opacity: 1;
+		translate: 0 0;
+		filter: blur(0);
+	}
+}
+@keyframes landing-tilt-in {
+	from {
+		opacity: 0;
+		transform: rotateX(28deg) scale(0.94);
+	}
+	to {
+		opacity: 1;
+		transform: rotateX(14deg) scale(0.98);
+	}
+}
+@keyframes landing-reveal {
+	from {
+		opacity: 0;
+		translate: 0 28px;
+	}
+	to {
+		opacity: 1;
+		translate: 0 0;
 	}
 }

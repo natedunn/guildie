@@ -53,8 +53,8 @@ function DataNotes() {
 	return (
 		<Page width="medium">
 			<PageHeader title="Where the data comes from" description="Everything here is for WoW: Forever." />
-			<Notes title="Sources" rows={SOURCES} />
-			<Notes title="What we can't know (yet)" rows={GAPS} className="mt-8" />
+			<Notes title="Sources" rows={SOURCES} className="mt-2" />
+			<Notes title="What we can't know (yet)" rows={GAPS} className="mt-10" />
 		</Page>
 	);
 }
@@ -63,9 +63,9 @@ function Notes({ title, rows, className }: { title: string; rows: string[][]; cl
 	return (
 		<section className={className}>
 			<SectionTitle>{title}</SectionTitle>
-			<dl className="mt-2 border-t border-border">
+			<dl className="surface-card mt-3 divide-y divide-border text-[0.8125rem]">
 				{rows.map(([name, text]) => (
-					<div key={name} className="grid gap-x-6 gap-y-0.5 border-b border-border py-2 sm:grid-cols-[13rem_1fr]">
+					<div key={name} className="grid gap-x-6 gap-y-0.5 px-3.5 py-2.5 sm:grid-cols-[13rem_1fr]">
 						<dt className="font-medium">{name}</dt>
 						<dd className="text-muted-foreground">{text}</dd>
 					</div>

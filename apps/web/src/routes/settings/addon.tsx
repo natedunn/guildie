@@ -31,8 +31,10 @@ function AddonPage() {
 
 function GetTheApp() {
 	return (
-		<div className="max-w-xl text-[0.8125rem]">
-			<p className="text-muted-foreground">
+		<section className="surface-card max-w-xl p-5 text-[0.8125rem]">
+			<span aria-hidden className="streak" />
+			<SectionTitle>The Guildie addon</SectionTitle>
+			<p className="mt-1 text-muted-foreground">
 				The Guildie addon shows who in your guild might want an item, right in its tooltip, and keeps your character
 				current on Guildie as you play. It works through the Guildie app for Windows, which installs the addon, keeps it
 				up to date and moves its data.
@@ -40,21 +42,22 @@ function GetTheApp() {
 			<Button className="mt-4" render={<Link to="/settings/app" />}>
 				Get the Guildie app
 			</Button>
-		</div>
+		</section>
 	);
 }
 
 function UpdateTheApp() {
 	return (
-		<div className="max-w-xl text-[0.8125rem]">
-			<p className="text-muted-foreground">
+		<section className="surface-card max-w-xl p-5 text-[0.8125rem]">
+			<SectionTitle>Update the Guildie app</SectionTitle>
+			<p className="mt-1 text-muted-foreground">
 				This version of the Guildie app can't manage the addon from here yet. Install the latest version once; it keeps
 				itself up to date from then on.
 			</p>
 			<Button className="mt-4" render={<a href={RELEASES} target="_blank" rel="noreferrer" />}>
 				Get the latest Guildie app
 			</Button>
-		</div>
+		</section>
 	);
 }
 
@@ -256,7 +259,7 @@ function UninstallButton({
 			<Dialog.Trigger render={<Button variant="outline" disabled={disabled} />}>Uninstall…</Dialog.Trigger>
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
-				<Dialog.Popup className="fixed top-1/2 left-1/2 z-50 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-md border border-border bg-background p-5 shadow-2xl">
+				<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-background p-5 shadow-[var(--popover-shadow)]">
 					<Dialog.Title className="text-[15px] font-semibold">Uninstall the Guildie addon?</Dialog.Title>
 					<Dialog.Description className="mt-2 text-[0.8125rem] text-muted-foreground">
 						Removes the addon from World of Warcraft: Forever. The app won't put it back until you choose Install.
@@ -290,12 +293,12 @@ function UninstallButton({
 }
 
 export function Rows({ children }: { children: ReactNode }) {
-	return <dl className="mt-2 divide-y divide-border rounded-md border border-border text-[0.8125rem]">{children}</dl>;
+	return <dl className="surface-card mt-2 divide-y divide-border text-[0.8125rem]">{children}</dl>;
 }
 
 export function Row({ label, children }: { label: string; children: ReactNode }) {
 	return (
-		<div className="grid grid-cols-[10rem_1fr] gap-3 px-3 py-2">
+		<div className="grid grid-cols-[7.5rem_1fr] gap-3 px-3.5 py-2.5 sm:grid-cols-[10rem_1fr]">
 			<dt className="text-muted-foreground">{label}</dt>
 			<dd className="min-w-0">{children}</dd>
 		</div>

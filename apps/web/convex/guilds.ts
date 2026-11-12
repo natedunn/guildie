@@ -146,6 +146,8 @@ export const get = query({
 				claimed: claimed[i] !== null,
 				battletag: claimed[i] ? tags.get(claimed[i].userId) : undefined,
 				statPriority: statPriority(c.classId, profiles[i].talentTrees, claimed[i]?.statPriority),
+				// The armor and weapon types the player chose, if any (the roster's Gear view).
+				gearPreference: claimed[i]?.gearPreference,
 			})),
 		};
 	},
@@ -278,6 +280,25 @@ export const requestSync = mutation({
 			return;
 		await ctx.db.patch(guildId, { syncRequestedAt: now });
 		await ctx.scheduler.runAfter(0, internal.sync.syncGuild, { guildId });
+	},
+});
+
+/** The sidebar's sync row: when a guild last synced, a sync in flight, the last error. */
+export const syncStatus = query({
+	args: { region: vRegion, slug: v.string() },
+	handler: async (ctx, { region, slug }) => {
+		const guild = await ctx.db
+			.query("guilds")
+			.withIndex("by_key", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.unique();
+		if (!guild || !(await access(ctx, guild)).canView) return null;
+		return {
+			_id: guild._id,
+			name: guild.name,
+			syncedAt: guild.rosterSyncedAt,
+			requestedAt: guild.syncRequestedAt,
+			lastSyncError: guild.lastSyncError,
+		};
 	},
 });
 

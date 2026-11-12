@@ -64,8 +64,11 @@ function Figure({ character }: { character: Character }) {
 	const [failed, setFailed] = useState(false);
 	const render = !failed && character.renderUrl;
 	return (
-		// Only on wide panes: on narrow ones the slots need the room more.
-		<div className="relative hidden overflow-hidden rounded-md border border-border bg-muted/40 @2xl:block">
+		// Only on wide panes: on narrow ones the slots need the room more. The
+		// page's featured card: lit frame, amber streak along the top. Clipped
+		// with clip-path, not overflow-hidden, which would cut off the hairline.
+		<div className="surface-card hidden card-clip @2xl:block">
+			<span aria-hidden className="streak" />
 			{render ? (
 				// main-raw is 1600x1200 with the figure in roughly the middle 55%
 				// of its height, a little below center. Scale it so the figure
@@ -81,7 +84,7 @@ function Figure({ character }: { character: Character }) {
 				<img
 					src={character.avatarUrl}
 					alt=""
-					className="absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-border opacity-80"
+					className="absolute top-1/2 left-1/2 size-20 -translate-x-1/2 -translate-y-1/2 rounded-md border border-white/10 opacity-80"
 				/>
 			) : null}
 		</div>
@@ -101,8 +104,8 @@ function Slot({ slot, item, align }: { slot: string; item?: Item; align: Align }
 	if (!item) {
 		return (
 			<div className={layout}>
-				<ItemIcon empty size={ICON} />
-				<span className="truncate text-xs text-muted-foreground/60">{SLOT_LABELS[slot] ?? slot}</span>
+				<ItemIcon empty size={ICON} className="border-dashed border-white/[0.09] bg-white/[0.015]" />
+				<span className="truncate text-xs text-muted-foreground/55">{SLOT_LABELS[slot] ?? slot}</span>
 			</div>
 		);
 	}
