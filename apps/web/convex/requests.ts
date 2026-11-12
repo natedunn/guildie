@@ -11,6 +11,7 @@ import { untradeable } from "./shared/itemInfo";
 import {
 	ACTIVE,
 	type Action,
+	canHelpFromInventory,
 	check,
 	EXPIRE_MS,
 	isStale,
@@ -198,6 +199,7 @@ async function view(
 		lastActivityAt: r.lastActivityAt,
 		closedAt: r.closedAt,
 		stale: isStale(r, now),
+		canHelp: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
 		canClaim:
 			active &&
 			r.status === "open" &&
@@ -296,17 +298,18 @@ export const sidebar = query({
 				.first();
 			if (row?.inRoster) byGuild.set(row.guildId, [...(byGuild.get(row.guildId) ?? []), row]);
 		}
+		const scans = await scansOf(ctx, userId);
 		const guilds = [];
 		for (const [guildId, characters] of byGuild) {
 			const guild = await ctx.db.get(guildId);
 			if (!guild) continue;
 			const known = new Set([...(await knownRecipes(ctx, characters)).values()].flatMap((s) => [...s]));
-			const canHelp = (await activeIn(ctx, guildId)).filter(
-				(r) =>
-					r.status === "open" &&
-					r.userId !== userId &&
-					(r.kind === "item" || (r.recipeId !== undefined && known.has(r.recipeId))),
-			).length;
+			let canHelp = 0;
+			for (const r of await activeIn(ctx, guildId)) {
+				if (r.status !== "open" || r.userId === userId) continue;
+				const recipe = r.recipeId !== undefined ? await recipeRow(ctx, r.recipeId) : null;
+				if (canHelpFromInventory(r, false, known, scans, recipe?.reagents)) canHelp++;
+			}
 			const stale = mine.filter((r) => r.guildId === guildId && isStale(r, now)).length;
 			guilds.push({ region: guild.region, slug: guild.slug, name: guild.name, canHelp, stale });
 		}

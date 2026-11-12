@@ -5,6 +5,7 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useMemo, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { ViewAs } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { Page, PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -57,8 +58,8 @@ function InventoryPage() {
 	if (!data) return null;
 	const pick = (slug?: string) =>
 		navigate({ search: (prev) => ({ ...prev, character: slug }), replace: true, resetScroll: false });
-	const anyRead = characters.some((c) => c.bags || c.bank);
 	const listed = selected ? [selected] : characters;
+	const anyRead = listed.some((c) => c.bags || c.bank);
 	// One character: "Bags 37 · Bank 20" without the name.
 	const single = selected ?? (characters.length === 1 ? characters[0] : undefined);
 
@@ -88,31 +89,15 @@ function InventoryPage() {
 								autoComplete="off"
 								className="max-w-sm"
 							/>
-							{characters.length > 1 && (
-								<div className="flex flex-wrap gap-1" role="group" aria-label="Character">
-									<button
-										type="button"
-										className="chip"
-										data-active={!selected}
-										aria-pressed={!selected}
-										onClick={() => pick(undefined)}
-									>
-										All
-									</button>
-									{characters.map((c) => (
-										<button
-											key={c.key}
-											type="button"
-											className="chip"
-											data-active={selected?.key === c.key}
-											aria-pressed={selected?.key === c.key}
-											onClick={() => pick(selected?.key === c.key ? undefined : c.slug)}
-										>
-											<ClassText classId={c.classId}>{c.name}</ClassText>
-										</button>
-									))}
-								</div>
-							)}
+							<ViewAs
+								label="Character"
+								placeholder="Search your characters"
+								combinedLabel="All characters"
+								align="start"
+								people={characters.map((c) => ({ ...c, key: c.slug, mine: false }))}
+								value={selected?.slug}
+								onChange={(slug) => pick(slug === "__all__" ? undefined : slug)}
+							/>
 						</div>
 
 						{/* When each character's bags and bank were last read in game. */}
