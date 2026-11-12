@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Wordmark } from "@/components/app-sidebar";
 import { SignInButton } from "@/components/sign-in-button";
 import { Button } from "@/components/ui/button";
-import { RELEASES, useInDesktopApp } from "@/lib/desktop";
+import { useInDesktopApp } from "@/lib/desktop";
 import { REPO } from "./primitives";
 
 // The landing page's own nav and footer (it has no sidebar).
@@ -64,11 +64,7 @@ export function LandingFooter() {
 				<FooterColumn title="Product">
 					<FooterLink href="#features">Features</FooterLink>
 					<FooterLink href="#addon">In-game addon</FooterLink>
-					{!inApp && (
-						<FooterLink href={RELEASES} external>
-							Windows app
-						</FooterLink>
-					)}
+					{!inApp && <FooterLink href="#app">Windows app</FooterLink>}
 					<FooterLink href="#ai">AI apps</FooterLink>
 				</FooterColumn>
 				<FooterColumn title="Open source">

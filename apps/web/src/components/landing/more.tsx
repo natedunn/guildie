@@ -14,10 +14,11 @@ import {
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
+import { DownloadAppButton } from "@/components/download-app";
 import { ItemIcon } from "@/components/item";
 import { SignInButton } from "@/components/sign-in-button";
 import { Button } from "@/components/ui/button";
-import { RELEASES, useInDesktopApp } from "@/lib/desktop";
+import { useInDesktopApp } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 import { AppMock } from "./app-mock";
 import { Card, Eyebrow, icon, Name, REPO, Section, SectionHead } from "./primitives";
@@ -52,15 +53,10 @@ export function WindowsAppSection() {
 							<p className="text-[0.8125rem] text-muted-foreground">You're in it. Sign in to connect it.</p>
 						) : (
 							<>
-								<Button
-									size="lg"
-									className="h-10 w-full"
-									nativeButton={false}
-									render={<a href={RELEASES} target="_blank" rel="noreferrer" />}
-								>
+								<DownloadAppButton size="lg" className="h-10 w-full">
 									<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-									Download Guildie-Setup.exe
-								</Button>
+									Guildie for Windows
+								</DownloadAppButton>
 								<p className="mt-3 text-center text-xs text-muted-foreground">Free, from GitHub Releases</p>
 							</>
 						)}
@@ -162,9 +158,9 @@ export function AiSection() {
 export function BentoSection() {
 	return (
 		<Section className="pt-28 sm:pt-36">
-			<SectionHead eyebrow="And more" title="The rest of the guild, too">
-				The small things that save a whisper: what happened while you were out, what you have on which alt, and who's on
-				the same quest.
+			<SectionHead eyebrow="And more" title="All the little things">
+				The small stuff that saves a whisper: what happened while you were out, what you have on which alt, who's on the
+				same quest, and more.
 			</SectionHead>
 			<div className="landing-reveal mt-14 grid gap-4 md:grid-cols-6">
 				<Tile
@@ -440,16 +436,10 @@ export function ClosingSection() {
 			<div className="landing-reveal mt-9 flex flex-wrap items-start justify-center gap-3 [&>span]:items-center [&>span]:text-center">
 				<SignInButton className="h-10 px-5" />
 				{!inApp && (
-					<Button
-						size="lg"
-						variant="outline"
-						className="h-10 bg-white/[0.02] px-5"
-						nativeButton={false}
-						render={<a href={RELEASES} target="_blank" rel="noreferrer" />}
-					>
+					<DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5">
 						<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
 						Get the Windows app
-					</Button>
+					</DownloadAppButton>
 				)}
 			</div>
 		</section>

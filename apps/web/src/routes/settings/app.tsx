@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { DownloadAppButton } from "@/components/download-app";
 import { HelperTokens } from "@/components/helper-tokens";
 import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { WhatsNew } from "@/components/whats-new";
-import { desktop, RELEASES, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
+import { desktop, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
 import { ago } from "@/lib/format";
 import { markSeen } from "@/lib/release-notes";
 import { Row, Rows } from "./addon";
@@ -121,9 +122,7 @@ function GetTheApp() {
 				Guildie in its own window, plus the Guildie addon: it installs the addon in World of Warcraft, keeps it up to
 				date, and keeps your character current on Guildie as you play. It updates itself.
 			</p>
-			<Button className="mt-4" render={<a href={RELEASES} target="_blank" rel="noreferrer" />}>
-				Get Guildie for Windows
-			</Button>
+			<DownloadAppButton className="mt-4">Get Guildie for Windows</DownloadAppButton>
 			<p className="mt-3 text-muted-foreground">
 				Download <span className="text-foreground">Guildie-Setup.exe</span> from the latest release and run it. Windows
 				may warn that it's from an unknown publisher: choose More info, then Run anyway.

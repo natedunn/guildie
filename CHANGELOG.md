@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** Downloading the Windows app first shows a short beta notice, including what to do if Windows says "Windows protected your PC".
+
+### Fixes
+
+- **Guildie:** Big headings no longer cut off the bottom of letters like g and y, and the home page's copy is tidier.
+
 ## 0.3.22
 
 ### Improvements

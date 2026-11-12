@@ -723,6 +723,10 @@ select:not([multiple]) {
 	/* Text that fades from white to the muted grey, top to bottom. Headings
 	   only; colored children (ClassText) keep their color. */
 	.text-fade {
+		/* Room for descenders (g, y): the clipped background stops at the
+		   box, and display headings set their line height tighter than that. */
+		padding-bottom: 0.12em;
+		margin-bottom: -0.12em;
 		background-image: linear-gradient(180deg, #fbf8f3 20%, rgb(238 233 225 / 0.62) 100%);
 		-webkit-background-clip: text;
 		background-clip: text;
