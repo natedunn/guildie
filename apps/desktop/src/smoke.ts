@@ -86,12 +86,21 @@ export async function runSmokeTest(
 		const shell = await page<Record<string, string | boolean>>(`(async () => ({
 			userAgent: navigator.userAgent,
 			serverRendered: /<html[^>]*data-desktop="true"/.test(await fetch(location.href).then((r) => r.text())),
-			titlebar: String(document.querySelector(".app-titlebar") && getComputedStyle(document.querySelector(".app-titlebar")).display),
+			// The app shell's title bar, or the sign-in card's drag strip (signed out).
+			titlebar: [".app-titlebar", ".app-sidebar-drag"]
+				.map((s) => document.querySelector(s))
+				.filter(Boolean)
+				.map((el) => getComputedStyle(el).display)
+				.join(","),
 			pageScrolls: getComputedStyle(document.body).overflow !== "hidden",
 		}))()`);
 		check("user agent says GuildieDesktop", String(shell.userAgent).includes(" GuildieDesktop/"), shell.userAgent);
 		check("server renders the app layout", shell.serverRendered === true);
-		check("title bar shown, page doesn't scroll", shell.titlebar === "flex" && shell.pageScrolls === false, shell);
+		check(
+			"title bar shown, page doesn't scroll",
+			/\b(flex|block)\b/.test(String(shell.titlebar)) && shell.pageScrolls === false,
+			shell,
+		);
 		check(
 			"no Node or Electron in the page",
 			security.require === "undefined" && security.electron === "false" && security.ipc === "undefined",
