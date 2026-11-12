@@ -18,6 +18,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Guildie, Addon:** Gear suggestions for guildmates who can use an item a few levels from now say "Maybe, at lvl 24" on the site and "maybe (lvl 24)" in tooltips, instead of "at 24".
+- **Guildie:** Simpler Dungeons pages. The Dungeons page is a grid of cards with each dungeon's level range and how many guildmates are level and quest ready, a search, and "View as" any guildmate to see which dungeons they've completed. A dungeon's page lists the whole roster with a column each for level, quests picked up and quests turned in (the level check is now the dungeon's own level), and its quests: only your guild's side, class quests marked, chains listed whole, colored by level and ticked for whoever you're viewing as, with links to Wowhead's guide and maps.
 
 ## 0.3.18
 

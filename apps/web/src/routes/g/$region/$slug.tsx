@@ -5,7 +5,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { RefreshIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, Outlet, useMatch } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useEffect, useState } from "react";
@@ -44,6 +44,7 @@ export const Route = createFileRoute("/g/$region/$slug")({
 
 function GuildLayout() {
 	const params = Route.useParams();
+	const dungeonPage = useMatch({ from: "/g/$region/$slug/dungeons/$dungeon", shouldThrow: false });
 	const { data } = useSuspenseQuery(
 		convexQuery(api.guilds.get, { region: params.region as Region, slug: params.slug }),
 	);
@@ -65,6 +66,8 @@ function GuildLayout() {
 		);
 	}
 	const { guild } = data;
+	// A dungeon's page has its own header (dungeons.$dungeon.tsx).
+	if (dungeonPage) return <Outlet />;
 	const faction = guild.faction && guild.faction[0] + guild.faction.slice(1).toLowerCase();
 	return (
 		<div className="flex min-h-full flex-col">

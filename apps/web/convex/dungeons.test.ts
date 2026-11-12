@@ -1,64 +1,138 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { DUNGEON_QUEST_FACTS } from "./shared/dungeonQuests.ts";
 import {
 	DUNGEONS,
 	dungeonOfKillStatistic,
+	forSide,
+	memberStatus,
 	milestoneLevel,
-	minLevelFor,
+	questChains,
 	questDetails,
-	questsFor,
-	readiness,
+	questGroups,
+	withFacts,
 } from "./shared/dungeons.ts";
 
 const deadmines = { level: 16 };
 const quests = [
-	{ id: 1 },
-	{ id: 2 },
-	{ id: 3, classes: [9] }, // Warlock only
-	{ id: 4, faction: "horde" as const },
+	{ id: 1, title: "Kill the boss" },
+	{ id: 2, title: "Collect things" },
+	{ id: 3, title: "Warlock thing", classes: [9] },
+	{ id: 4, title: "Horde thing", faction: "horde" as const },
+	// A chain: 5 is picked up outside, 6 inside after 5, 7 after 6.
+	{ id: 5, title: "Chain start", after: 100 },
+	{ id: 6, title: "Chain middle", after: 5 },
+	{ id: 7, title: "Chain end", after: 6 },
+	// Listed twice by Blizzard.
+	{ id: 8, title: "Collect things" },
 ];
-const member = (over: Partial<Parameters<typeof readiness>[2]> = {}) => ({
+const member = (over: Partial<Parameters<typeof memberStatus>[2]> = {}) => ({
 	level: 16,
 	classId: 1,
-	side: "alliance" as const,
 	inProgress: new Set<number>(),
 	completed: new Set<number>(),
 	...over,
 });
+const groups = questGroups(forSide(quests, "alliance"));
 
 test("every dungeon has quest areas and a level", () => {
 	for (const d of DUNGEONS) {
 		assert.ok(d.areas.length > 0, `${d.key}: quest areas`);
 		assert.ok(d.level > 0, `${d.key}: level`);
 	}
-	assert.equal(minLevelFor(deadmines), 14);
 });
 
-test("their quests: class and side", () => {
+test("quest groups: side, duplicates, chains", () => {
 	assert.deepEqual(
-		questsFor(quests, { classId: 1, side: "alliance" }).map((q) => q.id),
-		[1, 2],
+		groups.map((g) => [g.title, g.depth]),
+		[
+			["Chain start", 0],
+			["Chain middle", 1],
+			["Chain end", 2],
+			["Collect things", 0],
+			["Kill the boss", 0],
+			["Warlock thing", 0],
+		],
 	);
-	assert.deepEqual(
-		questsFor(quests, { classId: 9, side: "horde" }).map((q) => q.id),
-		[1, 2, 3, 4],
-	);
+	assert.deepEqual(groups.find((g) => g.title === "Collect things")?.ids, [2, 8]);
+	assert.equal(groups[0].after, 100);
+	assert.equal(groups[1].after, undefined);
+	// A class chain's later steps are that class's.
+	const classChain = questGroups([
+		{ id: 1, title: "Compendium", classes: [1] },
+		{ id: 2, title: "Forging", after: 1 },
+	]);
+	assert.deepEqual(classChain[1].classes, [1]);
+	// A loop doesn't hang or nest forever.
+	const loop = questGroups([
+		{ id: 1, title: "A", after: 2 },
+		{ id: 2, title: "B", after: 1 },
+	]);
+	assert.equal(loop.length, 2);
 });
 
-test("readiness", () => {
-	assert.equal(readiness(deadmines, quests, member({ level: 13 })).status, "under");
-	assert.equal(readiness(deadmines, quests, member({ level: 14 })).status, "partial");
-	assert.equal(readiness(deadmines, quests, member({ inProgress: new Set([1]) })).status, "partial");
-	const ready = readiness(deadmines, quests, member({ inProgress: new Set([1]), completed: new Set([2]) }));
-	assert.equal(ready.status, "ready");
-	assert.deepEqual([ready.done, ready.inLog, ready.missing], [[2], [1], []]);
-	assert.equal(readiness(deadmines, quests, member({ level: 10, completed: new Set([1, 2]) })).status, "completed");
-	// A Warlock's class quest counts for them.
-	assert.equal(readiness(deadmines, quests, member({ classId: 9, completed: new Set([1, 2]) })).status, "partial");
-	// No quests for them: ready at the level, never "completed".
-	assert.equal(readiness(deadmines, [], member()).status, "ready");
-	// Turned-in quests unknown: only the level and the log count.
-	assert.equal(readiness(deadmines, quests, member({ completed: undefined })).status, "partial");
+test("member status", () => {
+	// Level: strict.
+	assert.equal(memberStatus(deadmines, groups, member({ level: 15 })).levelReady, false);
+	assert.equal(memberStatus(deadmines, groups, member()).levelReady, true);
+	// To pick up: 1, 2 (or 8), 5; not the chain's later steps, not the Warlock's quest.
+	const none = memberStatus(deadmines, groups, member());
+	assert.deepEqual([none.toPickUp, none.pickedUp, none.questReady], [3, 0, false]);
+	const ready = memberStatus(deadmines, groups, member({ inProgress: new Set([1, 8]), completed: new Set([5]) }));
+	assert.deepEqual([ready.pickedUp, ready.questReady, ready.questsCompleted], [3, true, false]);
+	// Completed: every quest of theirs, chain steps included.
+	const all = new Set([1, 2, 5, 6, 7]);
+	assert.equal(memberStatus(deadmines, groups, member({ completed: all })).questsCompleted, true);
+	assert.equal(memberStatus(deadmines, groups, member({ classId: 9, completed: all })).questsCompleted, false);
+	// Turned-in quests unknown.
+	assert.equal(memberStatus(deadmines, groups, member({ completed: undefined })).questsCompleted, undefined);
+	// No quests for them: never ready or completed.
+	const empty = memberStatus(deadmines, [], member());
+	assert.deepEqual([empty.questReady, empty.questsCompleted], [false, false]);
+});
+
+test("whole chains", () => {
+	// Ragefire Chasm, Horde (rows in title order): Hidden Enemies is step 3 of 5; the Satchel pair a chain of 2.
+	const rfc = questGroups(
+		[
+			{ id: 5722, title: "Searching for the Lost Satchel" },
+			{ id: 5724, title: "Returning the Lost Satchel", after: 5722 },
+			{ id: 5728, title: "Hidden Enemies", after: 5727 },
+			{ id: 5761, title: "Slaying the Beast" },
+		].map((q) => withFacts(q) ?? q),
+	);
+	const chains = questChains(rfc, "horde", () => undefined);
+	assert.deepEqual(
+		chains.map((c) => c.map((s) => [s.id, s.depth, !!s.group])),
+		[
+			[
+				[5726, 0, false],
+				[5727, 1, false],
+				[5728, 2, true],
+				[5729, 3, false],
+				[5730, 4, false],
+			],
+			[
+				[5722, 0, true],
+				[5724, 1, true],
+			],
+		],
+	);
+	// Another side's steps aren't in it.
+	assert.deepEqual(questChains(rfc, "alliance", (id) => (id > 5725 ? "horde" : undefined))[1]?.length, undefined);
+});
+
+test("hand-kept quest facts", () => {
+	for (const [id, f] of Object.entries(DUNGEON_QUEST_FACTS)) {
+		assert.ok(![f.after].flat().includes(Number(id)), `${id}: after itself`);
+	}
+	assert.equal(withFacts({ id: 2868, title: "<TXT> The Shriveled Heart" }), undefined);
+	assert.deepEqual(withFacts({ id: 166, title: "The Defias Brotherhood" }), {
+		id: 166,
+		title: "The Defias Brotherhood",
+		faction: "alliance",
+		after: 155,
+	});
 });
 
 test("quest details from Blizzard's data", () => {
@@ -73,6 +147,11 @@ test("quest details from Blizzard's data", () => {
 		{ classes: [9], faction: "alliance", rewardItems: [6898, 15109] },
 	);
 	assert.deepEqual(questDetails({ rewards: { reputations: [{ reward: { id: 72 } }, { reward: { id: 76 } }] } }), {});
+	// Blizzard's stated side wins over reputations.
+	assert.deepEqual(
+		questDetails({ requirements: { faction: { type: "HORDE" } }, rewards: { reputations: [{ reward: { id: 72 } }] } }),
+		{ faction: "horde" },
+	);
 });
 
 test("first clears from Blizzard's boss-kill statistics", () => {
