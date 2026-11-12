@@ -31,6 +31,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
+- **Guildie:** Signing in on a phone no longer lands you on your guild looking signed out, without your characters.
 - **Guildie, Addon:** Signing in no longer erases your characters' stat priority, gear preferences and removed suggestions. They now stay with you, even if a character leaves your account and comes back. Settings lost before this fix have to be set again.
 - **App:** If the app can't read its settings file for a moment, it no longer starts over and forgets your WoW folder and sign-in.
 - **Guildie, Addon:** The Feed shows what happened each day, without times it couldn't get right (Blizzard tells us hours late), and groups alike events into one row: everyone who cleared a dungeon, turned in its quests or reached a level that day, and a character's level-ups that day in one.
