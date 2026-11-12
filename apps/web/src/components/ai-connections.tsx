@@ -17,7 +17,7 @@ export function AiConnections() {
 	const disconnect = useMutation(api.mcp.disconnect);
 	const [copied, setCopied] = useState(false);
 	return (
-		<section className="mt-10">
+		<section id="ai-apps" className="mt-10 scroll-mt-4">
 			<SectionTitle className="flex items-center gap-2">
 				AI apps <span className="pill px-2 py-0 font-normal">Experimental</span>
 			</SectionTitle>

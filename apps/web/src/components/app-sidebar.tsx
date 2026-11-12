@@ -22,6 +22,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { AddonNotice } from "@/components/addon-notice";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { OMNI_SEARCH_EVENT, SearchButton, SearchIconButton } from "@/components/omni-search";
 import { SyncButton } from "@/components/sync-button";
 import { UpdateReady } from "@/components/update-ready";
 import { UpdatedNotice } from "@/components/whats-new";
@@ -84,7 +85,10 @@ function SidebarNav() {
 	);
 	return (
 		<nav className="flex min-h-0 flex-1 flex-col text-[0.8125rem]">
-			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-2 pt-2 pb-4">
+			<div className="flex-none px-2 pt-2">
+				<SearchButton />
+			</div>
+			<div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-2 pt-3 pb-4">
 				{guilds.length > 0 && (
 					<NavSection title="Guilds">
 						<div className="space-y-4">
@@ -256,7 +260,8 @@ export function AppTopBar() {
 	return (
 		<div className="app-topbar flex h-12 flex-none items-center gap-2 border-b border-border px-2 md:hidden">
 			<NavSheet />
-			<span className="truncate font-medium">{title}</span>
+			<span className="min-w-0 flex-1 truncate font-medium">{title}</span>
+			<SearchIconButton />
 		</div>
 	);
 }
@@ -266,6 +271,12 @@ export function NavSheet({ className }: { className?: string }) {
 	const [open, setOpen] = useState(false);
 	const href = useRouterState({ select: (s) => s.location.href });
 	useEffect(() => setOpen(false), [href]);
+	// Search opens over everything; the menu it was opened from gets out of the way.
+	useEffect(() => {
+		const close = () => setOpen(false);
+		window.addEventListener(OMNI_SEARCH_EVENT, close);
+		return () => window.removeEventListener(OMNI_SEARCH_EVENT, close);
+	}, []);
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
 			<Dialog.Trigger

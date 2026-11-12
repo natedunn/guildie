@@ -368,7 +368,9 @@ export default defineSchema({
 	})
 		.index("by_recipeId", ["recipeId"])
 		.index("by_craftedItemId", ["craftedItemId"])
-		.index("by_professionId", ["professionId"]),
+		.index("by_professionId", ["professionId"])
+		// Omni search (search.ts).
+		.searchIndex("search_name", { searchField: "name" }),
 
 	/**
 	 * Forever items we show: equipped gear, crafted items and reagents. Name,
@@ -383,11 +385,19 @@ export default defineSchema({
 		/** "Bag", "Cloth", "Two-Hand"...: item subclass, for search. */
 		kind: v.optional(v.string()),
 		tooltip: v.array(vTooltipLine),
+		/**
+		 * What it does, from the tooltip ("Use:", "Equip:", set, flavor
+		 * text), for omni search (shared/search.ts `itemDescription`).
+		 * Optional: items saved before it get it from `items.backfillDescriptions`.
+		 */
+		description: v.optional(v.string()),
 		syncedAt: v.number(),
 	})
 		.index("by_itemId", ["itemId"])
 		// Requests → "what do you need?" search.
-		.searchIndex("search_name", { searchField: "name" }),
+		.searchIndex("search_name", { searchField: "name" })
+		// Omni search (search.ts).
+		.searchIndex("search_description", { searchField: "description" }),
 
 	/**
 	 * Forever's quests that characters have in progress: title, type
@@ -412,7 +422,10 @@ export default defineSchema({
 		rewardItems: v.optional(v.array(v.number())),
 		partial: v.optional(v.boolean()),
 		syncedAt: v.number(),
-	}).index("by_questId", ["questId"]),
+	})
+		.index("by_questId", ["questId"])
+		// Omni search (search.ts).
+		.searchIndex("search_title", { searchField: "title" }),
 
 	/**
 	 * A guild's feed (feed.ts): level-ups, first dungeon clears, dungeon

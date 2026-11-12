@@ -188,7 +188,7 @@ function ManageAddon() {
 				{error && <p className="mt-3 text-[0.8125rem] text-destructive">{error}</p>}
 			</section>
 
-			<section className="mt-10">
+			<section id="wow" className="mt-10 scroll-mt-4">
 				<SectionTitle>World of Warcraft</SectionTitle>
 				<Rows>
 					<Row label="Folder">
@@ -209,7 +209,7 @@ function ManageAddon() {
 				</Button>
 			</section>
 
-			<section className="mt-10">
+			<section id="sync" className="mt-10 scroll-mt-4">
 				<SectionTitle>Sync</SectionTitle>
 				<Rows>
 					<Row label="Signed in as">
