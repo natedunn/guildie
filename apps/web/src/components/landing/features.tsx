@@ -188,8 +188,7 @@ export function GearSection() {
 		<Section className="pt-28 sm:pt-36">
 			<SectionHead eyebrow="Gear and upgrades" color="#0070dd" title="Know who an item is for">
 				Every item shows which guildmates it would be an upgrade for, by their stat priority and what they wear now.
-				Players can set their own priority and preferred armor. A best guess, not a sim, and it's the same on the site
-				and in game.
+				Players can set their own priority and preferred armor.
 			</SectionHead>
 			<Card className="landing-reveal mt-14">
 				<div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">

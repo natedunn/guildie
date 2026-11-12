@@ -1,9 +1,9 @@
 import { ArrowRight01Icon, Download04Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
+import { DownloadAppButton } from "@/components/download-app";
 import { SignInButton } from "@/components/sign-in-button";
-import { Button } from "@/components/ui/button";
-import { RELEASES, useInDesktopApp } from "@/lib/desktop";
+import { useInDesktopApp } from "@/lib/desktop";
 import { AppMock } from "./app-mock";
 import { GameTooltip, GLOVES } from "./primitives";
 
@@ -48,16 +48,10 @@ export function Hero() {
 				>
 					<SignInButton className="h-10 px-5" />
 					{!inApp && (
-						<Button
-							size="lg"
-							variant="outline"
-							className="h-10 bg-white/[0.02] px-5"
-							nativeButton={false}
-							render={<a href={RELEASES} target="_blank" rel="noreferrer" />}
-						>
+						<DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5">
 							<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
 							Get the Windows app
-						</Button>
+						</DownloadAppButton>
 					)}
 				</div>
 			</div>
