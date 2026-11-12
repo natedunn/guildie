@@ -21,9 +21,12 @@ here too.
 
 2.0 changed the auth components' schemas, so `convex deploy` fails (and
 deploys nothing) while a deployment still has beta-era rows:
-`Schema validation failed in component "auth"`. Clear these first, then deploy
-right away (a sign-in in between writes a beta-era row again; if the deploy
-fails on one, clear and retry):
+`Schema validation failed in component "auth"`. Back it up first
+(`npx convex export --deployment <name> --path <file>.zip`). Name the
+deployment: in a worktree, `--prod` reaches the local backend that
+`.env.local` points at. Clear these, then deploy right away (a sign-in in
+between writes a beta-era row again; if the deploy fails on one, clear and
+retry):
 
 ```sh
 : > empty.jsonl
