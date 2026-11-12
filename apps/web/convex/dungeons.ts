@@ -35,6 +35,7 @@ import { QUEST_LEVELS } from "./shared/questLevels";
 // ---- Each dungeon's quests (weekly) ------------------------------------------------
 
 type AreaQuests = { quests?: { id: number }[] };
+type QuestRowInput = (typeof internal.quests.save)["_args"]["quests"][number];
 type Quest = {
 	title?: string;
 	type?: { name?: string };
@@ -71,23 +72,20 @@ export const syncDungeon = internalAction({
 		if (!dungeon) return;
 		const token = await appToken(ctx, "us");
 		const common = { token, flavor: "forever" as const, region: "us" as const, namespace: "static" as const };
-		const ids = new Set<number>();
+		const areaIds = new Set<number>();
 		for (const area of dungeon.areas) {
 			const res = await blizzardGet<AreaQuests>({ ...common, path: `/data/wow/quest/area/${area}` });
 			if (!res.ok) continue;
-			for (const q of res.data.quests ?? []) ids.add(q.id);
+			for (const q of res.data.quests ?? []) areaIds.add(q.id);
 		}
-		const rows = [];
-		// The rest of their chains, for titles and sides.
-		const others = chainIds([...ids]).filter((id) => !ids.has(id));
-		for (const questId of [...ids, ...others]) {
-			const dungeonQuest = ids.has(questId);
+		const fetched = new Map<number, QuestRowInput>();
+		const lookUp = async (questId: number) => {
 			try {
 				const res = await blizzardGet<Quest>({ ...common, path: `/data/wow/quest/${questId}` });
-				if (!res.ok || (dungeonQuest && res.data.type?.name !== "Dungeon")) continue;
+				if (!res.ok) return;
 				const r = res.data.requirements;
 				const minLevel = typeof r?.level === "number" ? r.level : (r?.level?.min ?? r?.min_character_level);
-				rows.push({
+				fetched.set(questId, {
 					questId,
 					title: res.data.title ?? `Quest ${questId}`,
 					type: res.data.type?.name,
@@ -98,12 +96,19 @@ export const syncDungeon = internalAction({
 			} catch (e) {
 				console.warn(`dungeons: ${key}: quest ${questId}: ${(e as Error).message}`);
 			}
-		}
-		await ctx.runMutation(internal.quests.save, { quests: rows });
-		await ctx.runMutation(internal.dungeons.saveQuests, {
-			key,
-			questIds: rows.filter((r) => ids.has(r.questId)).map((r) => r.questId),
+		};
+		// The area's quests; the ones Blizzard types "Dungeon" are the dungeon's.
+		for (const questId of areaIds) await lookUp(questId);
+		const dungeonIds = [...fetched.values()].filter((q) => q.type === "Dungeon").map((q) => q.questId);
+		// The rest of their chains, for titles and sides: some steps are in the
+		// area without being typed "Dungeon" (Unending Torment's later steps).
+		const steps = chainIds(dungeonIds).filter((id) => !dungeonIds.includes(id));
+		for (const questId of steps) if (!fetched.has(questId)) await lookUp(questId);
+		const keep = new Set([...dungeonIds, ...steps]);
+		await ctx.runMutation(internal.quests.save, {
+			quests: [...fetched.values()].filter((q) => keep.has(q.questId)),
 		});
+		await ctx.runMutation(internal.dungeons.saveQuests, { key, questIds: dungeonIds });
 	},
 });
 

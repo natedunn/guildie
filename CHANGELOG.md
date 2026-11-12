@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** Dungeon quest chains show every step's name, instead of "Quest 97289" for steps Blizzard doesn't list as dungeon quests.
+
 ## 0.3.19
 
 ### Improvements
