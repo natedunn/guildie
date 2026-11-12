@@ -73,6 +73,10 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 		enabled: !!where,
 	});
 	const member = where && requests ? { guild: where, characters: requests.characters } : undefined;
+	// The viewer's own item request for it (one per item): the button changes that one.
+	const mine = requests?.requests.find(
+		(r) => r.mine && r.kind === "item" && (r.status === "open" || r.status === "claimed"),
+	);
 	return (
 		<>
 			<div className="flex flex-none items-start gap-3 border-b border-border p-4">
@@ -119,6 +123,16 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 								<RequestButton
 									guild={member.guild}
 									characters={member.characters}
+									existing={
+										mine && {
+											requestId: mine._id,
+											status: mine.status,
+											ongoing: mine.ongoing,
+											quantity: mine.quantity,
+											until: mine.until,
+											note: mine.note,
+										}
+									}
 									target={{
 										kind: "item",
 										itemId,

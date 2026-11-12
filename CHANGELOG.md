@@ -15,12 +15,19 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie, Addon:** Ask the guild for an item as an ongoing request ("send me any you have") for 2 weeks, 1 month or 3 months, next to the fixed-amount requests. Ongoing requests have their own tab on Requests, where "I can help" shows what's in your bags that someone wants, and lead the item's tooltip in game as "wants all you have".
+
 ### Improvements
 
 - **Guildie, App:** Signing out now ends that session right away, on every page and window that used it. Everyone is signed out once by this update; sign in again.
 
 ### Fixes
 
+- **Guildie:** Let phone pages scroll behind the browser’s floating controls instead of stopping above an empty bottom area.
+
+- **Guildie:** Members-only pages (Requests, Feed and others) no longer flash "only for members" or redraw the whole page while loading when you're signed in.
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
 
 ## 0.3.25

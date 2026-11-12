@@ -111,7 +111,9 @@ export async function noteQuests(ctx: MutationCtx, c: Character, newlyCompleted:
 export async function noteRequest(
 	ctx: MutationCtx,
 	kind: "request" | "claim" | "fulfilled",
-	r: Pick<Doc<"requests">, "guildId" | "character" | "kind" | "itemId" | "quantity"> & { _id: Id<"requests"> },
+	r: Pick<Doc<"requests">, "guildId" | "character" | "kind" | "itemId" | "quantity" | "ongoing"> & {
+		_id: Id<"requests">;
+	},
 	other?: Doc<"requests">["character"],
 ) {
 	await ctx.db.insert("feedEvents", {
@@ -122,7 +124,7 @@ export async function noteRequest(
 		requestId: r._id,
 		requestKind: r.kind,
 		itemId: r.itemId,
-		quantity: r.quantity,
+		...(r.ongoing ? { ongoing: true } : { quantity: r.quantity }),
 		...(other ? { other } : {}),
 	});
 }
@@ -216,6 +218,7 @@ export const list = query({
 					quests: e.questIds?.map((id) => quests.get(id) ?? `Quest ${id}`),
 					requestKind: e.requestKind,
 					quantity: e.quantity,
+					ongoing: e.ongoing,
 					item:
 						e.itemId !== undefined
 							? {

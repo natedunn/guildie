@@ -436,9 +436,12 @@ export const requests = internalQuery({
 			const what = item?.name ?? recipe?.name ?? (r.itemId !== undefined ? `item ${r.itemId}` : "something");
 			lines.push(
 				[
-					`- ${r.character.name}${r.userId === userId ? " (you)" : ""} wants ${r.quantity}× ${what}`,
+					`- ${r.character.name}${r.userId === userId ? " (you)" : ""} wants `,
+					r.ongoing
+						? `any ${what} anyone has (ongoing, until ${new Date(r.until ?? now).toISOString().slice(0, 10)}; no claim, just send it)`
+						: `${r.quantity}× ${what}`,
 					r.kind === "craft" ? ` crafted${recipe ? ` (${recipe.profession})` : ""}` : "",
-					r.claim ? `; ${r.claim.character.name} is on it${r.claim.sentAt ? ", sent" : ""}` : "; open",
+					r.ongoing ? "" : r.claim ? `; ${r.claim.character.name} is on it${r.claim.sentAt ? ", sent" : ""}` : "; open",
 					r.kind === "craft" && r.mats ? (r.mats.state === "missing" ? "; needs mats" : "; has mats") : "",
 					`; ${ago(r.createdAt, now)}`,
 					r.note ? `; note: "${r.note}"` : "",
@@ -476,7 +479,9 @@ export const activity = internalQuery({
 						: e.kind === "quests"
 							? `${who} turned in ${e.questIds?.length ?? 0} ${dungeon} quests`
 							: e.kind === "request"
-								? `${who} asked for ${e.quantity ?? 1}× ${item}`
+								? e.ongoing
+									? `${who} is collecting ${item} (ongoing request)`
+									: `${who} asked for ${e.quantity ?? 1}× ${item}`
 								: e.kind === "claim"
 									? `${e.other?.name ?? "Someone"} took ${who}'s request for ${item}`
 									: `${e.other?.name ?? "Someone"} got ${who} ${item}`;

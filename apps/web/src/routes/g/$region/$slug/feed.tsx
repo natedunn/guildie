@@ -316,7 +316,11 @@ function EventRow({ row }: { row: Row }) {
 			break;
 		}
 		case "request":
-			text = (
+			text = e.ongoing ? (
+				<>
+					{person(e.character)} is collecting {item}
+				</>
+			) : (
 				<>
 					{person(e.character)} {crafted ? "wants" : "requested"} {item}
 					{crafted && " crafted"}

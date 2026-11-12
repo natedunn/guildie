@@ -353,9 +353,20 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   knows the recipe (merged professions, so the addon's recipe reads count).
 - **Lifecycle:** open → claimed → done (the requester; the claimant can mark
   it sent first) or cancelled (the requester). The claimant, or the
-  requester, can release a claim (back to open). 10 open per player per
+  requester, can release a claim (back to open). 15 open per player per
   guild, quantity 1-1000, note up to 140 characters.
-- **Stale:** no activity for 7 days shows as stale, with "Still need it?" on
+- **Fixed amount or ongoing:** an item can instead be asked for as ongoing
+  ("send me any you have"): no quantity (stored as 0), nobody claims it,
+  guildmates just send it. It's up for 2 weeks, 1 month or 3 months (no
+  open-ended ones), then the daily cron closes it as expired; so does a
+  requester with no character left in the guild. 20 ongoing per player per
+  guild, apart from the 15. One active item request per item, of either
+  kind: the page offers "Change request" instead, which switches kinds while
+  nobody has claimed it (`requests.update`). The Requests page has a tab
+  each (`?type=ongoing`) with the same Open / Mine / I can help filter;
+  "I can help" on Ongoing is anything in your bags or bank someone wants.
+  The feed says "Todd is collecting Silk Cloth".
+- **Stale:** (fixed amounts) no activity for 7 days shows as stale, with "Still need it?" on
   the Requests page, in the sidebar and in the addon window. 30 days: the
   daily cron (`expire stale requests`) closes it as expired.
 - **Mats for crafts:** sending the reagents is on the requester. The addon
@@ -368,9 +379,11 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   and when bags and bank were last read; nobody else ever sees the counts.
   Claimed requests keep their mats state (the mats may be in the mail).
 - **In game:** `requests` in the guild data, by item id: `{ kind, quantity,
-  name, classId, claimedBy? }`, at most 5 per item and 300 items. The
-  tooltip has a row per request: "Todd | requesting 20, claimed by Miller",
-  "Brenna | wants it crafted (2)". `myRequests` `{ open, stale }` feeds the
+  name, classId, claimedBy? }`, or `{ kind, ongoing = true, name, classId }`
+  (no quantity), ongoing first, at most 5 per item and 300 items. The
+  tooltip has a row per request: "Todd | wants all you have" (ongoing, and
+  then no "might want" row for Todd), "Miller | requesting 20, claimed by
+  Brenna", "Brenna | wants it crafted (2)". `myRequests` `{ open, stale }` feeds the
   window's "Your requests: 2 open (1 stale)". Enchants (no item) aren't on
   tooltips.
 

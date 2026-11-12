@@ -19,6 +19,12 @@ export function getRouter() {
 		// refresh used to be in flight when /sign-in left for the claim hop, which
 		// cut it off and could leave the next page signed out.
 		initialAuthTokenReuse: true,
+		// In the browser, hold queries until auth is settled. Otherwise the
+		// cache the server rendered with (signed in) gets the socket's first,
+		// signed-out answers before React hydrates ("only for members" instead
+		// of the page: a hydration mismatch). Signed-out visitors are let
+		// through by the auth provider (convex-auth-start/provider.tsx).
+		expectAuth: typeof window !== "undefined",
 	});
 	const convexQueryClient = new ConvexQueryClient(convex);
 	const queryClient = new QueryClient({
@@ -36,7 +42,8 @@ export function getRouter() {
 		context: { convex, queryClient, convexQueryClient, token: null },
 		defaultPreload: "intent",
 		scrollRestoration: true,
-		// The page never scrolls; the content pane does (__root.tsx).
+		// Restore the content pane on desktop; the window also restores normally
+		// when phone browsers use document scrolling.
 		scrollToTopSelectors: ["#content"],
 		defaultErrorComponent: ErrorPage,
 		defaultNotFoundComponent: NotFoundPage,
