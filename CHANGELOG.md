@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie, App:** Search everything with Ctrl+K (⌘K on a Mac), "/" or Search at the top of the sidebar: your guild's members, items by name or by what they do ("restores mana", "10 slot bag", flavor text) with how many you have in your bags and bank, recipes and who can craft them, quests, dungeons ("sfk" and "brd" work), open requests, other public guilds, every page and setting. It can also sync your roster, hide your BattleTag and sign you out.
+
 ### Improvements
 
 - **Guildie:** A dungeon's quests say under their name whether they start inside, end inside or (in a chain) are done inside, and the roster's ticks are plain checkmarks.

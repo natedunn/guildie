@@ -8,6 +8,7 @@ import { AppSidebar, AppTopBar } from "@/components/app-sidebar";
 import { AppTitleBar } from "@/components/app-titlebar";
 import { DesktopBridge } from "@/components/desktop-bridge";
 import { ItemSheet } from "@/components/item-sheet";
+import { OmniSearch } from "@/components/omni-search";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAuthToken } from "@/lib/convex-auth-start/functions";
 import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
@@ -116,6 +117,7 @@ function RootComponent() {
 							</main>
 							<ItemSheet />
 						</div>
+						<OmniSearch />
 					</div>
 				)}
 			</TooltipProvider>

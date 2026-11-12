@@ -32,7 +32,7 @@ function AppSettings() {
 				<SectionTitle>What's new</SectionTitle>
 				<WhatsNew upTo={inApp ? desktop()?.version : undefined} />
 			</section>
-			<section className="mt-10">
+			<section id="computers" className="mt-10 scroll-mt-4">
 				<SectionTitle>Connected computers</SectionTitle>
 				<HelperTokens />
 			</section>

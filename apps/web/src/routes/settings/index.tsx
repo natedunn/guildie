@@ -26,7 +26,7 @@ function Account() {
 	if (!viewer) return null;
 	return (
 		<div className="max-w-3xl pb-12">
-			<section>
+			<section id="characters" className="scroll-mt-4">
 				<SectionTitle>Your characters</SectionTitle>
 				<p className="mt-1 text-[0.8125rem] text-muted-foreground">
 					Read from your Battle.net account each time you sign in, in every region. It proves which guild members are
@@ -67,14 +67,17 @@ function Account() {
 				<ClaimCharacters />
 			</section>
 
-			<section className="mt-10">
+			<section id="privacy" className="mt-10 scroll-mt-4">
 				<SectionTitle>Privacy</SectionTitle>
 				<BattletagSetting hidden={!!viewer.hideBattletag} />
 			</section>
 
 			<AiConnections />
 
-			<section className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6">
+			<section
+				id="sign-out"
+				className="mt-10 flex scroll-mt-4 flex-wrap items-center justify-between gap-4 border-t border-border pt-6"
+			>
 				<SignOutButton />
 				<p className="flex gap-4 text-xs text-muted-foreground">
 					<Link to="/data" className="hover:text-foreground">

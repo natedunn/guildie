@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
 import type { vTooltipLine } from "./schema";
+import { itemDescription } from "./shared/search";
 
 // Forever items we show (equipped gear, crafted items, reagents): name,
 // quality, icon and an in-game style tooltip, from Blizzard's static data.
@@ -267,8 +268,27 @@ export const save = internalMutation({
 				.query("items")
 				.withIndex("by_itemId", (q) => q.eq("itemId", item.itemId))
 				.unique();
-			if (existing) await ctx.db.replace(existing._id, { ...item, syncedAt: now });
-			else await ctx.db.insert("items", { ...item, syncedAt: now });
+			const row = { ...item, description: itemDescription(item.tooltip), syncedAt: now };
+			if (existing) await ctx.db.replace(existing._id, row);
+			else await ctx.db.insert("items", row);
 		}
+	},
+});
+
+/**
+ * One-time: give items saved before descriptions existed theirs (omni
+ * search). Run once per deployment, then it can go:
+ * `npx convex run items:backfillDescriptions` (add `--prod` for production).
+ */
+export const backfillDescriptions = internalMutation({
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
+	handler: async (ctx, { cursor }): Promise<void> => {
+		const page = await ctx.db.query("items").paginate({ cursor: cursor ?? null, numItems: 200 });
+		for (const row of page.page) {
+			const description = itemDescription(row.tooltip);
+			if (description !== row.description) await ctx.db.patch(row._id, { description });
+		}
+		if (!page.isDone)
+			await ctx.scheduler.runAfter(0, internal.items.backfillDescriptions, { cursor: page.continueCursor });
 	},
 });
