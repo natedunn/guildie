@@ -519,6 +519,17 @@
 			"weaponPrefs": [5, 8, 2],
 			"weaponStrict": true
 		},
+		"Picky": {
+			"name": "Picky",
+			"classId": 11,
+			"level": 30,
+			"spec": "DRUID:1",
+			"seen": 2000000,
+			"slots": {
+				"10": 8
+			},
+			"dismissed": [6001]
+		},
 		"Bowman": {
 			"name": "Bowman",
 			"classId": 3,
@@ -985,6 +996,27 @@
 				"at": null,
 				"second": false,
 				"against": [1]
+			}
+		},
+		{
+			"name": "removed by the player: never suggested",
+			"item": "leatherAgiGloves",
+			"member": "Picky",
+			"itemId": 6001,
+			"expect": null
+		},
+		{
+			"name": "removed something else: still an upgrade",
+			"item": "leatherAgiGloves",
+			"member": "Picky",
+			"itemId": 6002,
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.42500000000000004,
+				"spec": "DRUID:1",
+				"at": null,
+				"second": false,
+				"against": [10]
 			}
 		}
 	],

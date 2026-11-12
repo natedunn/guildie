@@ -214,6 +214,12 @@ export default defineSchema({
 				weapon: v.optional(vTypeChoice),
 			}),
 		),
+		/**
+		 * Items (ids) the player removed from this character's gear
+		 * suggestions ("Remove" on Upgrades for me): never suggested for it
+		 * again, on the site or in anyone's addon tooltips.
+		 */
+		dismissedItems: v.optional(v.array(v.number())),
 	})
 		.index("by_user", ["userId"])
 		.index("by_slug", ["flavor", "region", "slug"]),

@@ -233,6 +233,8 @@ local KIND_RANK = { upgrade = 0, tradeoff = 1, maybe = 2 }
 
 --- { kind = "upgrade"|"tradeoff"|"maybe", gain, spec, at?, second?, against } or nil.
 function U.judge(item, m, rules, itemID)
+    -- Removed by the player on the site (optional: older GuildieData.lua files lack it).
+    if itemID and contains(m.dismissed, itemID) then return nil end
     local at = U.usableAt(item, m, rules, itemID)
     if not at or excluded(item, m) then return nil end
     local later = at > m.level and at or nil

@@ -191,6 +191,16 @@ const members: Record<string, any> = {
 		weaponPrefs: [5, 8, 2],
 		weaponStrict: true,
 	},
+	// Removed an item from their suggestions on the site.
+	Picky: {
+		name: "Picky",
+		classId: 11,
+		level: 30,
+		spec: "DRUID:1",
+		seen: SEEN,
+		slots: { 10: 8 },
+		dismissed: [6001],
+	},
 	Bowman: {
 		name: "Bowman",
 		classId: 3,
@@ -247,6 +257,8 @@ const judgeCases: [string, string, string, number?][] = [
 	["ring vs the weaker ring: its Strength is given up", "agiRingPlain", "Sturdy"],
 	["spell power counts as spell damage: an upgrade", "clothIntHead", "Sparky"],
 	["no priority stats known: an upgrade as before", "clothIntHead", "Frosty"],
+	["removed by the player: never suggested", "leatherAgiGloves", "Picky", 6001],
+	["removed something else: still an upgrade", "leatherAgiGloves", "Picky", 6002],
 ];
 const cases = judgeCases.map(([name, item, member, itemId]) => ({
 	name,

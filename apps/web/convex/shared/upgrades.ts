@@ -104,6 +104,8 @@ export type UpgradeMember = {
 	weaponPref?: number;
 	weaponPrefs?: number[];
 	weaponStrict?: true;
+	/** Item ids the player removed from their suggestions ("Remove" on Upgrades for me): never suggested for them. */
+	dismissed?: number[];
 };
 
 /** A player's armor and weapon type preference, as members carry it. */
@@ -657,6 +659,7 @@ function loses(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, ag
 
 /** Upgrade, trade-off, maybe, or nothing, for one guildmate. */
 export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: number): Verdict | undefined {
+	if (itemId !== undefined && m.dismissed?.includes(itemId)) return undefined;
 	const at = usableAt(item, m, rules, itemId);
 	if (at === undefined || excluded(item, m)) return undefined;
 	const later = at > m.level ? at : undefined;
@@ -829,6 +832,8 @@ export function upgradeMember(
 		statPriority?: StatChoice;
 		/** The player's preferred armor and weapon types, if any (gearPrefs). */
 		gearPreference?: GearChoice;
+		/** Item ids the player removed from their suggestions. */
+		dismissed?: number[];
 	},
 	rules: Rules,
 ): UpgradeMember | undefined {
@@ -854,6 +859,7 @@ export function upgradeMember(
 		...(main?.info?.invType === "2HWEAPON" ? { th: true } : {}),
 		...(worn.length ? { worn } : {}),
 		...(Object.keys(keys).length ? { keys } : {}),
+		...(c.dismissed?.length ? { dismissed: c.dismissed } : {}),
 	};
 }
 

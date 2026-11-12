@@ -1,10 +1,12 @@
 import { api } from "@convex/_generated/api";
+import type { VerdictKind } from "@convex/shared/upgrades";
 import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
 import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import {
@@ -16,6 +18,7 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
+import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -24,6 +27,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
@@ -52,9 +56,17 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		return out;
 	},
 	loader: async ({ context, params }) => {
-		await context.queryClient.ensureQueryData(
-			convexQuery(api.crafting.guildCrafting, { region: params.region as Region, slug: params.slug }),
-		);
+		const args = { region: params.region as Region, slug: params.slug };
+		const qc = context.queryClient;
+		// The upgrade views are the slow part: start them now, not awaited, so
+		// they're on their way while the page renders. Membership (cheap) is
+		// awaited: the tabs show with the page.
+		void qc.prefetchQuery(convexQuery(api.crafting.upgradesForMe, args));
+		void qc.prefetchQuery(convexQuery(api.crafting.upgradesICanCraft, args));
+		await Promise.all([
+			qc.ensureQueryData(convexQuery(api.crafting.guildCrafting, args)),
+			qc.ensureQueryData(convexQuery(api.requests.me, args)),
+		]);
 	},
 	component: CraftingPage,
 });
@@ -109,7 +121,9 @@ function CraftingPage() {
 	}, []);
 
 	// Members can request a craft from a row.
-	const { data: me } = useQuery(convexQuery(api.requests.me, { region: params.region as Region, slug: params.slug }));
+	const { data: me } = useSuspenseQuery(
+		convexQuery(api.requests.me, { region: params.region as Region, slug: params.slug }),
+	);
 	const member = me
 		? { guild: { region: params.region as Region, slug: params.slug }, characters: me.characters }
 		: undefined;
@@ -121,8 +135,9 @@ function CraftingPage() {
 	const { data: canCraft } = useQuery(
 		convexQuery(api.crafting.upgradesICanCraft, { region: params.region as Region, slug: params.slug }),
 	);
-	const showUpgrades = view === "upgrades" && upgrades !== null;
-	const showCraft = view === "craft" && canCraft !== null;
+	const showUpgrades = view === "upgrades" && !!me;
+	const showCraft = view === "craft" && !!me;
+	const [showRemoved, setShowRemoved] = useState(false);
 	// The upgrade views are about one of the viewer's characters at a time.
 	const characters = upgrades?.characters ?? [];
 	const char = characters.find((c) => c.slug === search.char) ?? characters[0];
@@ -136,15 +151,14 @@ function CraftingPage() {
 				.sort((a, b) => b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name)),
 		[upgrades, char],
 	);
+	// Items the player removed from this character's suggestions: hidden unless "Show removed".
+	const kept = useMemo(() => forChar.filter((h) => !h.for[0].removed), [forChar]);
+	const removedCount = forChar.length - kept.length;
 	const asChar = useMemo(
 		() => (canCraft?.hits ?? []).filter((h) => h.crafters.some((c) => c.slug === char?.slug)),
 		[canCraft, char],
 	);
-	const source: (GuildRecipe & { for?: UpgradeHit["for"] } & Partial<Pick<CraftHit, "requested">>)[] = showUpgrades
-		? forChar
-		: showCraft
-			? asChar
-			: (data ?? []);
+	const source: Row[] = showUpgrades ? (showRemoved ? forChar : kept) : showCraft ? asChar : (data ?? []);
 
 	const index = useMemo(() => buildIndex(source), [source]);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
@@ -165,6 +179,25 @@ function CraftingPage() {
 
 	useEffect(() => setLimit(PAGE), [deferred, profession, view]);
 
+	// Remove (or put back) an item for the character in view: gone from the
+	// list at once (optimistic), then from the item panel and, after the
+	// app's next refresh, the addon's tooltips.
+	const dismiss = useMutation(api.statPriority.dismissItem).withOptimisticUpdate((store, args) => {
+		const key = { region: args.region, slug: params.slug };
+		const current = store.getQuery(api.crafting.upgradesForMe, key);
+		if (!current) return;
+		store.setQuery(api.crafting.upgradesForMe, key, {
+			...current,
+			hits: current.hits.map((h) =>
+				h.item?.itemId === args.itemId
+					? { ...h, for: h.for.map((f) => (f.slug === args.slug ? { ...f, removed: args.removed } : f)) }
+					: h,
+			),
+		});
+	});
+	const onDismiss = (itemId: number, removed: boolean) =>
+		char && void dismiss({ region: params.region as Region, slug: char.slug, itemId, removed });
+
 	if (!data) {
 		return <p className={EMPTY}>This guild's crafting is for members only.</p>;
 	}
@@ -180,32 +213,39 @@ function CraftingPage() {
 		navigate({ search: (prev) => ({ ...prev, char: slug }), replace: true, resetScroll: false });
 	const setView = (v?: View) =>
 		navigate({ search: (prev) => ({ ...prev, view: v, profession: undefined }), replace: true, resetScroll: false });
-	const loading = (showUpgrades && upgrades === undefined) || (showCraft && canCraft === undefined);
+	const loading = (showUpgrades && !upgrades) || (showCraft && !canCraft);
 
 	return (
 		// A container, so the row layout follows the content pane's width rather than the viewport.
 		<div className="@container w-full space-y-4 pb-6">
 			<div className="space-y-3">
-				{upgrades ? (
+				{me ? (
 					<PageTabs>
 						<PageTabButton active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
 							All recipes
 						</PageTabButton>
-						<PageTabButton active={showUpgrades} onClick={() => setView("upgrades")} count={forChar.length}>
+						<PageTabButton
+							active={showUpgrades}
+							onClick={() => setView("upgrades")}
+							count={upgrades ? kept.length : undefined}
+						>
 							{/* Short labels where the three don't fit on one line (phones). */}
 							<span className="@max-md:hidden">Upgrades for me</span>
 							<span className="@md:hidden">For me</span>
 						</PageTabButton>
-						{canCraft ? (
-							<PageTabButton active={showCraft} onClick={() => setView("craft")} count={asChar.length}>
-								<span className="@max-md:hidden">Upgrades I can craft</span>
-								<span className="@md:hidden">I can craft</span>
-							</PageTabButton>
-						) : null}
+						<PageTabButton
+							active={showCraft}
+							onClick={() => setView("craft")}
+							count={canCraft ? asChar.length : undefined}
+						>
+							<span className="@max-md:hidden">Upgrades I can craft</span>
+							<span className="@md:hidden">I can craft</span>
+						</PageTabButton>
 					</PageTabs>
 				) : null}
-				{/* One row: whose upgrades (upgrade views), the search, the profession. Wraps on phones. */}
-				<div className="flex flex-wrap gap-2">
+				{/* One row: whose upgrades (upgrade views), the search, the profession, and
+				    (Upgrades for me) Show removed on the right. Wraps on phones. */}
+				<div className="flex flex-wrap items-center gap-2">
 					{(showUpgrades || showCraft) && char ? (
 						<CharacterPicker
 							label={showCraft ? "Crafting as" : "For"}
@@ -230,7 +270,11 @@ function CraftingPage() {
 									: "Who can make... (bag, Mageweave, 8 slot bag)"
 						}
 						aria-label="Search recipes the guild can craft"
-						className="h-10 min-w-0 flex-1 basis-64 text-[15px]"
+						// Phones: a row of its own, under the picker and the profession.
+						className={cn(
+							"h-10 min-w-0 flex-1 basis-64 text-[15px] @max-md:order-last @max-md:basis-full",
+							(showUpgrades || showCraft) && "@3xl:max-w-80",
+						)}
 					/>
 					<select
 						aria-label="Profession"
@@ -245,6 +289,13 @@ function CraftingPage() {
 							</option>
 						))}
 					</select>
+					{showUpgrades && upgrades ? (
+						<label className="ml-auto flex h-10 cursor-pointer @max-md:order-last items-center gap-2 pl-2 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground">
+							<Switch checked={showRemoved} onCheckedChange={setShowRemoved} />
+							Show removed
+							{removedCount ? <span className="num text-xs">{removedCount}</span> : null}
+						</label>
+					) : null}
 				</div>
 			</div>
 
@@ -254,7 +305,7 @@ function CraftingPage() {
 						? "Checking your recipes against the guild's gear..."
 						: "Checking what the guild can make for you..."}
 				</p>
-			) : showCraft && canCraft && asChar.length === 0 ? (
+			) : showCraft && asChar.length === 0 ? (
 				<p className={EMPTY}>
 					None of {char?.name ?? "your character"}'s recipes beats what anyone in the guild wears right now.
 				</p>
@@ -262,33 +313,36 @@ function CraftingPage() {
 				results.length === 0 ? (
 					<p className={EMPTY}>Nothing matches "{deferred.trim()}".</p>
 				) : (
-					<div>
-						<div
-							className={cn(
-								UPGRADE_GRID,
-								"hidden border-b border-border pb-1.5 text-xs text-muted-foreground @2xl:grid",
-							)}
-						>
-							<span>Item</span>
-							<span>For</span>
-							<span>You craft it as</span>
-						</div>
-						<ul>
-							{results.slice(0, limit).map((r) => (
-								<UpgradeRow key={r.recipeId} recipe={r} region={params.region} guildSlug={params.slug} giving />
-							))}
-						</ul>
+					<div className="space-y-3">
+						{groupRows(results.slice(0, limit)).map(({ group, rows }) => (
+							<GroupCard key={group.kind} title={group.title} hint={group.others} count={rows.length}>
+								{rows.map((r) => (
+									<CraftRow
+										key={r.recipeId}
+										recipe={r}
+										region={params.region}
+										guildSlug={params.slug}
+										kind={group.kind}
+									/>
+								))}
+							</GroupCard>
+						))}
 						{results.length > limit ? (
 							<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
 						) : null}
 						<Footnote region={params.region} characters={me?.characters} />
 					</div>
 				)
-			) : showUpgrades && upgrades && forChar.length === 0 ? (
+			) : showUpgrades && upgrades && source.length === 0 ? (
 				<p className={EMPTY}>
 					{upgrades.noGear.some((c) => c.slug === char?.slug)
 						? `Nothing to compare with until we've read ${char?.name}'s gear.`
 						: `Nothing the guild can craft beats what ${char?.name} wears right now.`}
+					{removedCount ? (
+						<span className="mt-1 block text-xs">
+							{removedCount} removed; "Show removed" puts {removedCount === 1 ? "it" : "them"} back in view.
+						</span>
+					) : null}
 					{upgrades.strict.some((c) => c.slug === char?.slug) ? (
 						<span className="mt-1 block text-xs">
 							"Only these" in {char?.name}'s Preferences leaves other armor or weapon types out.
@@ -299,35 +353,20 @@ function CraftingPage() {
 				results.length === 0 ? (
 					<p className={EMPTY}>No upgrades match "{deferred.trim()}".</p>
 				) : (
-					<div>
-						{/* Columns on a wide pane; stacked rows on a narrow one (phones). */}
-						<div
-							className={cn(
-								UPGRADE_GRID,
-								"hidden border-b border-border pb-1.5 text-xs text-muted-foreground @2xl:grid",
-							)}
-						>
-							<span>Item</span>
-							<span>For</span>
-							<span>Crafters</span>
-						</div>
-						{KIND_GROUPS.map((g) => {
-							const rows = results.slice(0, limit).filter((r) => r.for?.[0]?.kind === g.kind);
-							if (rows.length === 0) return null;
-							return (
-								<section key={g.kind}>
-									<h3 className="mt-3 flex items-baseline gap-2 border-b border-border pb-1.5 text-[0.8125rem] font-semibold">
-										{g.title}
-										<span className="text-xs font-normal text-muted-foreground">{g.hint}</span>
-									</h3>
-									<ul>
-										{rows.map((r) => (
-											<UpgradeRow key={r.recipeId} recipe={r} region={params.region} member={member} />
-										))}
-									</ul>
-								</section>
-							);
-						})}
+					<div className="space-y-3">
+						{groupRows(results.slice(0, limit)).map(({ group, rows }) => (
+							<GroupCard key={group.kind} title={group.title} hint={group.hint} count={rows.length}>
+								{rows.map((r) => (
+									<UpgradeRow
+										key={r.recipeId}
+										recipe={r}
+										region={params.region}
+										member={member}
+										onDismiss={onDismiss}
+									/>
+								))}
+							</GroupCard>
+						))}
 						{results.length > limit ? (
 							<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
 						) : null}
@@ -373,6 +412,8 @@ type Member = {
 type UpgradeHit = NonNullable<FunctionReturnType<typeof api.crafting.upgradesForMe>>["hits"][number];
 type CraftHit = NonNullable<FunctionReturnType<typeof api.crafting.upgradesICanCraft>>["hits"][number];
 type Help = UpgradeHit["for"][number] & { mine?: boolean };
+/** A row of any view: a recipe, plus who it helps (upgrade views) and who asked for it (Upgrades I can craft). */
+type Row = GuildRecipe & { for?: Help[] } & Partial<Pick<CraftHit, "requested">>;
 
 /** Guildmates listed per row of "Upgrades I can craft" before "+N more". */
 const RECIPIENTS = 3;
@@ -381,7 +422,7 @@ const RECIPIENTS = 3;
 function Footnote({ region, characters }: { region: string; characters?: { slug: string; name: string }[] }) {
 	const first = characters?.[0];
 	return (
-		<p className="mt-3 text-xs text-muted-foreground">
+		<p className="px-1 text-xs text-muted-foreground">
 			A best guess from stat weights, what each character wears, their stat priority and gear types, not a sim.
 			{first ? (
 				<>
@@ -397,25 +438,84 @@ function Footnote({ region, characters }: { region: string; characters?: { slug:
 	);
 }
 
-/** "Upgrades for me" in groups, by each row's best verdict. */
-const KIND_GROUPS = [
-	{ kind: "upgrade", title: "Upgrades", hint: "More of your stats, nothing lost" },
+type GroupKind = VerdictKind | "removed";
+
+/**
+ * The upgrade views in cards, by each row's best verdict (`hint`: about the
+ * viewer, Upgrades for me; `others`: about whoever it's for, Upgrades I can
+ * craft), and the items the player removed (Show removed).
+ */
+const GROUPS: { kind: GroupKind; title: string; hint: string; others: string }[] = [
+	{
+		kind: "upgrade",
+		title: "Upgrades",
+		hint: "More of your stats, nothing lost",
+		others: VERDICT_HINTS.upgrade,
+	},
 	{
 		kind: "tradeoff",
 		title: "Trade-offs",
 		hint: "Give up some of one stat for more of another; worth it at your steepness",
+		others: VERDICT_HINTS.tradeoff,
 	},
-	{ kind: "maybe", title: "Maybe", hint: "Small gains, your second spec, or a few levels from now" },
-] as const;
+	{
+		kind: "maybe",
+		title: "Maybe",
+		hint: "Small gains, your second spec, or a few levels from now",
+		others: VERDICT_HINTS.maybe,
+	},
+	{
+		kind: "removed",
+		title: "Removed",
+		hint: "Never suggested for this character, here or in the game's tooltips",
+		others: "",
+	},
+];
 
-const UPGRADE_GRID = "grid grid-cols-1 gap-x-4 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.4fr)_minmax(0,1fr)]";
+function groupRows(rows: Row[]) {
+	const kindOf = (r: Row): GroupKind | undefined => (r.for?.[0]?.removed ? "removed" : r.for?.[0]?.kind);
+	return GROUPS.map((group) => ({ group, rows: rows.filter((r) => kindOf(r) === group.kind) })).filter(
+		(g) => g.rows.length > 0,
+	);
+}
+
+/** One group of an upgrade view: a card with its title, how many, what it means, and the rows. */
+function GroupCard({
+	title,
+	hint,
+	count,
+	children,
+}: {
+	title: string;
+	hint: string;
+	count: number;
+	children: ReactNode;
+}) {
+	return (
+		<section className="surface-card overflow-hidden">
+			<header className="flex min-w-0 items-baseline gap-2 border-b border-border/60 px-4 py-2.5">
+				<h3 className="text-[0.8125rem] font-semibold">{title}</h3>
+				<span className="num text-xs text-muted-foreground">{count}</span>
+				<span className="ml-1 truncate text-xs text-muted-foreground @max-md:hidden">{hint}</span>
+			</header>
+			<ul className="divide-y divide-border/60">{children}</ul>
+		</section>
+	);
+}
+
+/** A row in a group card: stacked on a narrow pane (phones), columns on a wide one. */
+const ROW = "grid grid-cols-1 gap-x-5 gap-y-2 px-4 py-3";
+/** Upgrades for me: item, why, crafters, Request and Remove. */
+const FOR_ME_COLS = "items-center @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_auto]";
+/** Upgrades I can craft: item, who it's for and why, your crafter and who asked. */
+const CRAFT_COLS = "items-start @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.9fr)]";
 
 function ShowAll({ count, onClick }: { count: number; onClick: () => void }) {
 	return (
 		<button
 			type="button"
 			onClick={onClick}
-			className="mt-2 w-full rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+			className="w-full rounded-md py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 		>
 			Show all {count}
 		</button>
@@ -427,59 +527,114 @@ function ResultRow({ recipe, region, member }: { recipe: GuildRecipe; region: st
 		<li className="grid grid-cols-[minmax(0,1.3fr)_7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-1 border-b border-border/60 py-1.5 last:border-b-0">
 			<RecipeItem recipe={recipe} />
 			<span className="truncate text-sm text-muted-foreground">{recipe.profession}</span>
-			<Crafters recipe={recipe} region={region} member={member} />
+			<div className="flex items-center gap-3">
+				<CrafterNames recipe={recipe} region={region} className="flex-1" />
+				<CraftRequest recipe={recipe} member={member} />
+			</div>
 		</li>
 	);
 }
 
+/** The item and, under its name, the profession that makes it. */
+function ItemCell({ recipe }: { recipe: GuildRecipe }) {
+	return (
+		<div className="min-w-0">
+			<RecipeItem recipe={recipe} />
+			<div className="mt-0.5 pl-[38px] text-xs text-muted-foreground">{recipe.profession}</div>
+		</div>
+	);
+}
+
 /**
- * An upgrade: the item, who it helps and why, and who can make it: anyone
- * in the guild, with Request (Upgrades for me), or `giving`: the viewer's
- * own characters, with the guild's open requests for it (Upgrades I can craft).
+ * Upgrades for me: the item, why it's better for the character in view (the
+ * picker says who; the card says what kind), who can make it, Request, and
+ * Remove (or Restore, under Show removed).
  */
 function UpgradeRow({
 	recipe,
 	region,
 	member,
-	giving,
-	guildSlug,
+	onDismiss,
 }: {
-	recipe: GuildRecipe & { for?: Help[] } & Partial<Pick<CraftHit, "requested">>;
+	recipe: Row;
 	region: string;
 	member?: Member;
-	giving?: boolean;
-	/** For the link to the guild's Requests page (`giving`). */
-	guildSlug?: string;
+	onDismiss: (itemId: number, removed: boolean) => void;
+}) {
+	const h = recipe.for?.[0];
+	const itemId = recipe.item?.itemId;
+	return (
+		<li className={cn(ROW, FOR_ME_COLS)}>
+			<ItemCell recipe={recipe} />
+			<div className="min-w-0 text-[13px]">
+				<p>{h?.why}</p>
+				<p className="truncate text-xs text-muted-foreground">
+					{h?.spec}
+					{h?.at ? ` · from level ${h.at}` : null}
+				</p>
+			</div>
+			<CrafterNames recipe={recipe} region={region} />
+			<div className="flex items-center gap-1.5 @2xl:justify-end">
+				<CraftRequest recipe={recipe} member={member} />
+				{h && itemId !== undefined ? (
+					<Button
+						variant="ghost"
+						size="sm"
+						className="text-muted-foreground"
+						title={
+							h.removed
+								? "Suggest this for this character again"
+								: "Never suggest this for this character again, here or in the game's tooltips"
+						}
+						onClick={() => onDismiss(itemId, !h.removed)}
+					>
+						{h.removed ? "Restore" : "Remove"}
+					</Button>
+				) : null}
+			</div>
+		</li>
+	);
+}
+
+/**
+ * Upgrades I can craft: the item, who in the guild it helps and why (their
+ * verdict when it isn't the card's), the viewer's characters who know it,
+ * and the guild's open requests for it.
+ */
+function CraftRow({
+	recipe,
+	region,
+	guildSlug,
+	kind,
+}: {
+	recipe: Row;
+	region: string;
+	guildSlug: string;
+	/** The card it's in. */
+	kind: GroupKind;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	const all = recipe.for ?? [];
-	const shown = giving && !expanded ? all.slice(0, RECIPIENTS) : all;
+	const shown = expanded ? all : all.slice(0, RECIPIENTS);
 	const hidden = all.length - shown.length;
 	return (
-		<li
-			className={cn(
-				UPGRADE_GRID,
-				"items-start gap-y-2 border-b border-border/60 py-2.5 last:border-b-0 @2xl:gap-y-1 @2xl:py-2",
-			)}
-		>
-			<div className="min-w-0">
-				<RecipeItem recipe={recipe} />
-				<div className="mt-0.5 pl-[38px] text-xs text-muted-foreground">{recipe.profession}</div>
-			</div>
-			<div className="min-w-0 space-y-1 text-[13px]">
+		<li className={cn(ROW, CRAFT_COLS)}>
+			<ItemCell recipe={recipe} />
+			<div className="min-w-0 space-y-1.5 text-[13px]">
 				{shown.map((h) => (
 					<div key={h.slug} className="min-w-0">
-						<div className="flex items-baseline gap-2">
+						<div className="flex min-w-0 items-baseline gap-2">
 							<Link to="/c/$region/$slug" params={{ region, slug: h.slug }} className="font-medium hover:underline">
 								<ClassText classId={h.classId}>{h.name}</ClassText>
 							</Link>
 							{h.mine ? <span className="text-xs text-muted-foreground">you</span> : null}
-							<span className="truncate text-xs text-muted-foreground">{h.spec}</span>
-							<span
-								title={VERDICT_HINTS[h.kind]}
-								className={cn("ml-auto shrink-0 text-xs", h.kind === "maybe" && "text-muted-foreground")}
-							>
-								{verdictLabel(h.kind, h.at)}
+							<span className="truncate text-xs text-muted-foreground">
+								{h.spec}
+								{h.kind !== kind ? (
+									<span title={VERDICT_HINTS[h.kind]}> · {verdictLabel(h.kind, h.at)}</span>
+								) : h.at ? (
+									` · from level ${h.at}`
+								) : null}
 							</span>
 						</div>
 						<p className="text-xs text-muted-foreground">{h.why}</p>
@@ -495,88 +650,83 @@ function UpgradeRow({
 					</button>
 				) : null}
 			</div>
-			{giving ? (
-				<div className="min-w-0 space-y-0.5 text-sm">
-					<Crafters recipe={recipe} region={region} />
-					{recipe.requested?.length ? (
-						<Link
-							to="/g/$region/$slug/requests"
-							params={{ region, slug: guildSlug ?? "" }}
-							className="block text-xs text-muted-foreground hover:text-foreground"
-						>
-							Requested by{" "}
-							{recipe.requested.map((r, i) => (
-								<span key={`${r.name}-${i}`}>
-									{i > 0 ? ", " : null}
-									<ClassText classId={r.classId}>{r.name}</ClassText>
-								</span>
-							))}
-						</Link>
-					) : null}
-				</div>
-			) : (
-				<Crafters recipe={recipe} region={region} member={member} />
-			)}
+			<div className="min-w-0 space-y-0.5 text-sm">
+				<CrafterNames recipe={recipe} region={region} />
+				{recipe.requested?.length ? (
+					<Link
+						to="/g/$region/$slug/requests"
+						params={{ region, slug: guildSlug }}
+						className="block text-xs text-muted-foreground hover:text-foreground"
+					>
+						Requested by{" "}
+						{recipe.requested.map((r, i) => (
+							<span key={`${r.name}-${i}`}>
+								{i > 0 ? ", " : null}
+								<ClassText classId={r.classId}>{r.name}</ClassText>
+							</span>
+						))}
+					</Link>
+				) : null}
+			</div>
 		</li>
 	);
 }
 
-/**
- * Who knows the recipe (highest skill first, a few until "+N more"), and
- * Request for members, unless the item binds to its crafter.
- */
-function Crafters({ recipe, region, member }: { recipe: GuildRecipe; region: string; member?: Member }) {
+/** Who knows the recipe, highest skill first, a few until "+N more". */
+function CrafterNames({ recipe, region, className }: { recipe: GuildRecipe; region: string; className?: string }) {
 	const [expanded, setExpanded] = useState(false);
 	const shown = expanded ? recipe.crafters : recipe.crafters.slice(0, CRAFTERS);
 	const hidden = recipe.crafters.length - shown.length;
-	// Names wrap in their own box; Request stays on the right, beside them.
 	return (
-		<div className="flex items-center gap-3 text-sm">
-			<div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-				{shown.map((c) => (
-					<Link
-						key={c.slug}
-						to="/c/$region/$slug/professions"
-						params={{ region, slug: c.slug }}
-						search={{ profession: recipe.profession }}
-						className="whitespace-nowrap hover:underline"
-					>
-						<ClassText classId={c.classId}>{c.name}</ClassText>
-						{c.skill !== undefined ? <span className="num ml-1 text-xs text-muted-foreground">{c.skill}</span> : null}
-					</Link>
-				))}
-				{hidden > 0 ? (
-					<button
-						type="button"
-						onClick={() => setExpanded(true)}
-						className="text-xs whitespace-nowrap text-muted-foreground hover:text-foreground"
-					>
-						+{hidden} more
-					</button>
-				) : null}
-			</div>
-			{recipe.item?.untradeable ? (
-				// Binds to whoever crafts it: nothing to request.
-				<span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>
-			) : member && recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug)) ? (
-				<RequestButton
-					guild={member.guild}
-					characters={member.characters}
-					size="sm"
-					label="Request"
-					className="flex-none"
-					target={{
-						kind: "craft",
-						recipeId: recipe.recipeId,
-						name: recipe.item?.name ?? recipe.name,
-						itemId: recipe.item?.itemId,
-						quality: recipe.item?.quality,
-						icon: recipe.item?.icon,
-						crafters: recipe.crafters,
-					}}
-				/>
+		<div className={cn("flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm", className)}>
+			{shown.map((c) => (
+				<Link
+					key={c.slug}
+					to="/c/$region/$slug/professions"
+					params={{ region, slug: c.slug }}
+					search={{ profession: recipe.profession }}
+					className="whitespace-nowrap hover:underline"
+				>
+					<ClassText classId={c.classId}>{c.name}</ClassText>
+					{c.skill !== undefined ? <span className="num ml-1 text-xs text-muted-foreground">{c.skill}</span> : null}
+				</Link>
+			))}
+			{hidden > 0 ? (
+				<button
+					type="button"
+					onClick={() => setExpanded(true)}
+					className="text-xs whitespace-nowrap text-muted-foreground hover:text-foreground"
+				>
+					+{hidden} more
+				</button>
 			) : null}
 		</div>
+	);
+}
+
+/** Request for members (when someone else knows it), or why not: the item binds to its crafter. */
+function CraftRequest({ recipe, member }: { recipe: GuildRecipe; member?: Member }) {
+	if (recipe.item?.untradeable) {
+		return <span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>;
+	}
+	if (!member || !recipe.crafters.some((c) => !member.characters.some((m) => m.slug === c.slug))) return null;
+	return (
+		<RequestButton
+			guild={member.guild}
+			characters={member.characters}
+			size="sm"
+			label="Request"
+			className="flex-none"
+			target={{
+				kind: "craft",
+				recipeId: recipe.recipeId,
+				name: recipe.item?.name ?? recipe.name,
+				itemId: recipe.item?.itemId,
+				quality: recipe.item?.quality,
+				icon: recipe.item?.icon,
+				crafters: recipe.crafters,
+			}}
+		/>
 	);
 }
 

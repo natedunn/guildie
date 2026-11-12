@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const web = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CHROME = "#13110e"; // --chrome in src/styles/app.css
+const GLOW = "#ff8000"; // --glow: a faint legendary light behind the gold mark
 const mark = readFileSync(path.join(web, "icons/mark.svg"), "utf8").replace(/^<svg[^>]*>|<\/svg>\s*$/g, "");
 
 // name, size, corner radius (share of the size), mark size (share of the size)
@@ -28,7 +29,9 @@ function svg(size, radius, markSize) {
 	const m = size * markSize;
 	const at = (size - m) / 2;
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+<defs><radialGradient id="glow" cx="${size / 2}" cy="${size * 0.28}" r="${size * 0.53}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="${GLOW}" stop-opacity="0.22"/><stop offset="1" stop-color="${GLOW}" stop-opacity="0"/></radialGradient></defs>
 <rect width="${size}" height="${size}" rx="${size * radius}" fill="${CHROME}"/>
+<rect width="${size}" height="${size}" rx="${size * radius}" fill="url(#glow)"/>
 <svg x="${at}" y="${at}" width="${m}" height="${m}" viewBox="0 0 32 32">${mark}</svg>
 </svg>`;
 }
@@ -46,11 +49,16 @@ function loadPlaywright() {
 const { chromium } = loadPlaywright();
 const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined });
 for (const [name, size, radius, markSize] of ICONS) {
-	const page = await browser.newPage({ viewport: { width: size, height: size } });
+	// A roomy page, clipped to the icon: Chrome draws some small viewports wrong (192 came out tiled).
+	const page = await browser.newPage({ viewport: { width: 640, height: 640 } });
 	await page.setContent(
 		`<style>html,body{margin:0;background:transparent}svg{display:block}</style>${svg(size, radius, markSize)}`,
 	);
-	await page.screenshot({ path: path.join(web, "public/icons", name), omitBackground: true });
+	await page.screenshot({
+		path: path.join(web, "public/icons", name),
+		omitBackground: true,
+		clip: { x: 0, y: 0, width: size, height: size },
+	});
 	await page.close();
 	console.log(`public/icons/${name}`);
 }

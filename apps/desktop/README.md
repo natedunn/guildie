@@ -194,9 +194,10 @@ the content; the sidebar runs to the top on the left. The preload still marks
 `data-desktop` too, for pages served before that.
 
 The title bar: the window buttons are drawn over the top right, 40px tall
-(`TITLEBAR`), on `#111113` (the site's `--chrome`), or transparent over Mica
-on Windows 11 (build 22000+; `hasMica`), where the site makes its sidebar and
-title bar transparent and keeps the content pane solid. Windows 10 and macOS
+(`TITLEBAR`), on `#13110e` (the site's `--chrome`), or transparent over Mica
+on Windows 11 (build 22000+; `hasMica`), where the site tints its sidebar and
+title bar with its chrome color at 90% (so the wallpaper only shifts the warm
+near-black a little) and keeps the content pane solid. Windows 10 and macOS
 get the solid color. The site keeps the buttons' strip clear with
 `env(titlebar-area-x)` / `env(titlebar-area-width)` and marks its title bar
 `-webkit-app-region: drag` (links and buttons `no-drag`). For sites from
