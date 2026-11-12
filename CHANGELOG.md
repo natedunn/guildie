@@ -21,6 +21,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
+- **Guildie:** Let phone pages scroll behind the browser’s floating controls instead of stopping above an empty bottom area.
+
 - **Guildie:** Members-only pages (Requests, Feed and others) no longer flash "only for members" or redraw the whole page while loading when you're signed in.
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
 
