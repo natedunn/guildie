@@ -1224,9 +1224,14 @@ function useRemoteResults(data: ServerResults | undefined, context: Context): Re
 				group: "requests",
 				title: r.quantity > 1 ? `${r.name} ×${r.quantity}` : r.name,
 				quality: r.quality,
-				subtitle: `${r.character.name} asked${r.status === "claimed" ? " · Claimed" : " · Open"}${context.memberGuilds.length > 1 ? ` · ${r.guild.name}` : ""}`,
+				subtitle: `${r.character.name} asked${r.ongoing ? " · Ongoing" : r.status === "claimed" ? " · Claimed" : " · Open"}${context.memberGuilds.length > 1 ? ` · ${r.guild.name}` : ""}`,
 				visual: { kind: "item", icon: r.icon, quality: r.quality },
-				nav: { kind: "route", to: "/g/$region/$slug/requests", params: { region: r.guild.region, slug: r.guild.slug } },
+				nav: {
+					kind: "route",
+					to: "/g/$region/$slug/requests",
+					params: { region: r.guild.region, slug: r.guild.slug },
+					...(r.ongoing ? { search: { type: "ongoing" } } : {}),
+				},
 				score: 40 + rank(i) / 10,
 			});
 		});

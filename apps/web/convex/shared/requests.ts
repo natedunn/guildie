@@ -1,12 +1,17 @@
 // Guild requests: a member asks for an item (reagents and the like) or for a
 // craft; a guildmate claims it, makes the trade or mail happen, and the
-// requester marks it done. These are the rules, kept free of Convex imports
+// requester marks it done. An item can instead be asked for as ongoing ("send
+// me any Silk Cloth you have"): no quantity and no claims, up for 2 weeks to
+// 3 months, then it ends by itself. One active item request per item, of
+// either kind. These are the rules, kept free of Convex imports
 // so the site, the backend and `node --test` share them (requests.test.ts).
 // The handlers are in convex/requests.ts.
 
 export const REQUEST_LIMITS = {
-	/** Open (or claimed) requests per player per guild. */
-	open: 10,
+	/** Open (or claimed) fixed-amount requests per player per guild. */
+	open: 15,
+	/** Ongoing requests per player per guild, counted apart. */
+	ongoing: 20,
 	quantity: 1000,
 	note: 140,
 } as const;
@@ -16,6 +21,17 @@ const DAY_MS = 86_400_000;
 export const STALE_MS = 7 * DAY_MS;
 /** No activity this long: closed as expired by the daily cron. */
 export const EXPIRE_MS = 30 * DAY_MS;
+
+/** How long an ongoing request stays up: 2 weeks, 1 month or 3 months (the most). */
+export const ONGOING_DAYS = [14, 30, 90] as const;
+export type OngoingDays = (typeof ONGOING_DAYS)[number];
+export const DEFAULT_ONGOING_DAYS: OngoingDays = 30;
+
+/** When an ongoing request asked for `days` now ends. Throws the player-facing message. */
+export function ongoingUntil(days: number, now: number) {
+	if (!(ONGOING_DAYS as readonly number[]).includes(days)) throw new RangeError("Pick 2 weeks, 1 month or 3 months.");
+	return now + days * DAY_MS;
+}
 
 export type RequestKind = "item" | "craft";
 export type RequestStatus = "open" | "claimed" | "done" | "cancelled" | "expired";
@@ -33,6 +49,9 @@ export const isActive = (status: RequestStatus) => status === "open" || status =
 export type RequestLike = {
 	kind: RequestKind;
 	status: RequestStatus;
+	/** Ongoing: "send me any you have", never claimed, ends at `until`. */
+	ongoing?: boolean;
+	until?: number;
 	requester: string;
 	claim?: { userId: string; sentAt?: number };
 	lastActivityAt: number;
@@ -65,6 +84,8 @@ export function check(action: Action, req: RequestLike, actor: Actor): Verdict {
 	const mine = req.requester === actor.userId;
 	const claimant = req.claim?.userId === actor.userId;
 	if (!isActive(req.status)) return no("This request is closed.");
+	// Ongoing: nobody claims it; the requester only stops it (or changes it, canChange).
+	if (req.ongoing && action !== "cancel") return no("Ongoing requests aren't claimed. Send any you have.");
 	switch (action) {
 		case "claim":
 			if (mine) return no("That's your own request.");
@@ -108,24 +129,51 @@ export function nextStatus(action: Action, status: RequestStatus): RequestStatus
 	}
 }
 
-export const isStale = (req: Pick<RequestLike, "status" | "lastActivityAt">, now: number) =>
-	isActive(req.status) && now - req.lastActivityAt >= STALE_MS;
+type Timed = Pick<RequestLike, "status" | "lastActivityAt" | "ongoing" | "until">;
 
-export const shouldExpire = (req: Pick<RequestLike, "status" | "lastActivityAt">, now: number) =>
-	isActive(req.status) && now - req.lastActivityAt >= EXPIRE_MS;
+/** Fixed-amount requests go quiet; ongoing ones have an end date instead. */
+export const isStale = (req: Timed, now: number) =>
+	isActive(req.status) && !req.ongoing && now - req.lastActivityAt >= STALE_MS;
 
-/** A new request's quantity and note, checked and tidied. Throws the player-facing message. */
-export function validateNew(input: { quantity: number; note?: string; openCount: number }) {
-	if (input.openCount >= REQUEST_LIMITS.open)
-		throw new RangeError(
-			`You have ${REQUEST_LIMITS.open} open requests in this guild. Close one (or mark it done) first.`,
-		);
-	if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > REQUEST_LIMITS.quantity)
-		throw new RangeError(`Quantity is 1 to ${REQUEST_LIMITS.quantity}.`);
+export const shouldExpire = (req: Timed, now: number) =>
+	isActive(req.status) &&
+	(req.ongoing ? req.until !== undefined && now >= req.until : now - req.lastActivityAt >= EXPIRE_MS);
+
+/**
+ * A new (or changed) request's quantity and note, checked and tidied.
+ * `openCount`: the player's other active requests of the same kind in this
+ * guild. Ongoing requests have no quantity (stored as 0). Throws the
+ * player-facing message.
+ */
+export function validateNew(input: { ongoing?: boolean; quantity: number; note?: string; openCount: number }) {
+	if (input.ongoing) {
+		if (input.openCount >= REQUEST_LIMITS.ongoing)
+			throw new RangeError(`You have ${REQUEST_LIMITS.ongoing} ongoing requests in this guild. Stop one first.`);
+	} else {
+		if (input.openCount >= REQUEST_LIMITS.open)
+			throw new RangeError(
+				`You have ${REQUEST_LIMITS.open} open requests in this guild. Close one (or mark it done) first.`,
+			);
+		if (!Number.isInteger(input.quantity) || input.quantity < 1 || input.quantity > REQUEST_LIMITS.quantity)
+			throw new RangeError(`Quantity is 1 to ${REQUEST_LIMITS.quantity}.`);
+	}
 	const note = input.note?.replace(/\s+/g, " ").trim() || undefined;
 	if (note && note.length > REQUEST_LIMITS.note)
 		throw new RangeError(`Keep the note under ${REQUEST_LIMITS.note} characters.`);
-	return { quantity: input.quantity, note };
+	return { quantity: input.ongoing ? 0 : input.quantity, note };
+}
+
+/**
+ * May `userId` change this request (switch between fixed amount and ongoing,
+ * the quantity, how long, the note)? Their own item requests, until someone
+ * claims one: nobody's claim gets pulled out from under them.
+ */
+export function canChange(req: RequestLike, userId: string): Verdict {
+	if (req.requester !== userId) return no("Only the requester can do that.");
+	if (!isActive(req.status)) return no("This request is closed.");
+	if (req.kind !== "item") return no("Craft requests can't be changed. Cancel it and ask again.");
+	if (req.status !== "open") return no("Someone already claimed it. Mark it done, or release the claim, first.");
+	return yes;
 }
 
 // ---- Mats from the Guildie app's inventory scan --------------------------------
@@ -202,15 +250,26 @@ export function matsLabel(state: MatsState | undefined) {
 	return "Mats not confirmed";
 }
 
-/** Full requests the viewer can fill using their own latest inventory scans. */
+/**
+ * Full requests the viewer can fill using their own latest inventory scans.
+ * Ongoing ones: any at all (they want whatever you have).
+ */
 export function canHelpFromInventory(
-	request: { kind: "item" | "craft"; status: string; quantity: number; itemId?: number; recipeId?: number },
+	request: {
+		kind: "item" | "craft";
+		status: string;
+		quantity: number;
+		itemId?: number;
+		recipeId?: number;
+		ongoing?: boolean;
+	},
 	mine: boolean,
 	known: Set<number>,
 	scans: InventoryScan[],
 	reagents?: { itemId: number; name: string; quantity: number }[],
 ) {
 	if (mine || request.status !== "open") return false;
+	if (request.ongoing) return request.itemId !== undefined && (sumInventory(scans).counts.get(request.itemId) ?? 0) > 0;
 	if (request.kind === "item") {
 		return request.itemId !== undefined && (sumInventory(scans).counts.get(request.itemId) ?? 0) >= request.quantity;
 	}

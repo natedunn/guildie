@@ -15,6 +15,10 @@ It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
   It keeps the access token in page memory, not localStorage (`pageStorage`),
   and the Convex client reuses the page's first token (`initialAuthTokenReuse`
   in `router.tsx`): see the comments there for the mobile sign-in bug both fix.
+  The browser's Convex client also holds queries until auth is settled
+  (`expectAuth`), so the server-rendered data isn't replaced by signed-out
+  answers before hydration; `ResumeWhenSignedOut` lets them through for
+  signed-out visitors.
 - Routes: `apps/web/src/routes/auth/{signin,refresh,signout}.ts`.
 
 Workaround: `AuthProvider`/`useAuth` aren't in the package's exports map, so
