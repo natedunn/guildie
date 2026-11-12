@@ -110,7 +110,7 @@ These need a maintainer's say before you change them (CODEOWNERS enforces
 review):
 
 - **Sign-in and auth:** `apps/web/convex/auth*`, `apps/web/src/lib/convex-auth-start`,
-  `apps/gateway`, `patches/` (the patched Convex Auth beta).
+  `apps/gateway`, `patches/` (the Convex Auth patch).
 - **The desktop app's bridge, updater and window code:**
   `apps/desktop/src/{preload,main,updater,window-border}.ts`. The bridge is a
   security boundary between the website and the player's computer.

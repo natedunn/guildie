@@ -6,8 +6,6 @@ import { v } from "convex/values";
 
 const app = defineApp({
 	env: {
-		AUTH_PRIVATE_KEY: v.string(),
-		AUTH_JWKS: v.string(),
 		// One Blizzard API client serves sign-in, character claiming and the
 		// roster sync. See docs/blizzard-setup.md.
 		AUTH_BATTLENET_CLIENT_ID: v.string(),
@@ -19,13 +17,8 @@ const app = defineApp({
 	},
 });
 
-app.use(auth, {
-	httpPrefix: "/auth",
-	env: {
-		AUTH_PRIVATE_KEY: app.env.AUTH_PRIVATE_KEY,
-		AUTH_JWKS: app.env.AUTH_JWKS,
-	},
-});
+// The deployment serves the session JWKS itself, so the core has no HTTP routes.
+app.use(auth);
 // Battle.net has no built-in Convex Auth method, so it runs on the generic
 // OAuth component. Callback: <CONVEX_SITE_URL>/oauth/battlenet/callback, or
 // the gateway's (docs/auth-environments.md).

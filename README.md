@@ -41,7 +41,7 @@ replaces it.
 
 - [TanStack Start](https://tanstack.com/start) (React, SSR)
 - [Convex](https://convex.dev) for the database, sync jobs and auth
-- [Convex Auth v2](https://auth-v2.previews.convex.dev) (beta, patched) with Battle.net sign-in
+- [Convex Auth v2](https://auth-v2.previews.convex.dev) (2.0, patched) with Battle.net sign-in
 - Cloudflare Workers, with a preview per branch
 - [shadcn/ui](https://ui.shadcn.com) on [Base UI](https://base-ui.com), Tailwind v4
 - Electron for the Windows app, Lua 5.1 for the addon

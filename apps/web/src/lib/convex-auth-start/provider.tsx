@@ -1,10 +1,11 @@
+import { api } from "@convex/_generated/api";
 import { AuthClient, JWT_STORAGE_KEY, REFRESH_TOKEN_STORAGE_KEY, type TokenStorage } from "@convex-dev/auth/browser";
 import { oauth } from "@convex-dev/auth/methods/oauth/react";
 import { useRouter } from "@tanstack/react-router";
 import { ConvexHttpClient } from "convex/browser";
 import { ConvexProviderWithAuth, type ConvexReactClient } from "convex/react";
 import { type ReactNode, useState } from "react";
-import { AuthProvider, type AuthSignInApi, useAuth } from "#convex-auth-react-internal";
+import { AuthProvider, type AuthSignInApi, SessionWatcher, useAuth } from "#convex-auth-react-internal";
 
 type AuthSessionResponse = { tokens: { accessToken: string } | null };
 
@@ -108,6 +109,8 @@ export function ConvexAuthStartProvider({
 	return (
 		<AuthProvider authClient={authClient} signInApi={signInApi}>
 			<ConvexProviderWithAuth client={client} useAuth={useAuth}>
+				{/* Signs this page out as soon as its session ends elsewhere. */}
+				<SessionWatcher isAuthenticated={api.auth.isAuthenticated} />
 				{children}
 			</ConvexProviderWithAuth>
 		</AuthProvider>

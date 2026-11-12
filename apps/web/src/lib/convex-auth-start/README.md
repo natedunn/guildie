@@ -1,6 +1,6 @@
 # convex-auth-start
 
-A stopgap TanStack Start adapter for Convex Auth v2 (`@convex-dev/auth@beta`),
+A stopgap TanStack Start adapter for Convex Auth v2 (`@convex-dev/auth@2`),
 which only ships a Next.js adapter today (get-convex/convex-auth#350).
 
 It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
@@ -15,9 +15,11 @@ It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
   It keeps the access token in page memory, not localStorage (`pageStorage`),
   and the Convex client reuses the page's first token (`initialAuthTokenReuse`
   in `router.tsx`): see the comments there for the mobile sign-in bug both fix.
+  `SessionWatcher` signs the page out as soon as its session is revoked or
+  signed out elsewhere (sessions are stateful since 2.0).
 - Routes: `apps/web/src/routes/auth/{signin,refresh,signout}.ts`.
 
-Workaround: `AuthProvider`/`useAuth` aren't in the package's exports map, so
+Workaround: `AuthProvider`/`useAuth`/`SessionWatcher` aren't in the package's exports map, so
 `tsconfig.json` maps `#convex-auth-react-internal` to
 `@convex-dev/auth/dist/react/client.js`. It must be that exact file because the
 method hooks (`useSignInWithGithub`, …) read the same React context.
