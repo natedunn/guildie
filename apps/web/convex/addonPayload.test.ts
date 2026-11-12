@@ -68,6 +68,16 @@ test("version 1 still parses", () => {
 	assert.deepEqual(r.character.recipes, []);
 });
 
+test("when the level was reached (levelAt), optional", () => {
+	const r = parseCharacter({ ...v1, levelAt: T - 600 }, NOW);
+	assert.ok(r.ok);
+	assert.equal(r.character.levelAt, (T - 600) * 1000);
+	const none = parseCharacter(v1, NOW);
+	assert.ok(none.ok);
+	assert.equal(none.character.levelAt, undefined);
+	assert.equal(parseCharacter({ ...v1, levelAt: NOW / 1000 + 3600 }, NOW).ok, false);
+});
+
 test("version 2: gear, professions, recipes", () => {
 	const r = parseCharacter(v2, NOW);
 	assert.ok(r.ok, !r.ok ? r.error : "");

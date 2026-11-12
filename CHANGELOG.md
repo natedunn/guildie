@@ -23,12 +23,18 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 - **Guildie:** Upgrades for me and Upgrades I can craft are grouped into cards (Upgrades, Trade-offs, Maybe) with cleaner rows, and the Crafting tabs show with the page instead of a moment later.
 - **Guildie, App:** The Guildie icon is gold now: the sidebar, the browser tab, the installed web app and the Windows app.
+- **Guildie, App:** Settings → App shows the latest three releases, with every release a click away on its own page.
+- **Guildie:** Quests shows one character at a time, picked with a searchable menu, with "Group by zone" as a switch and quest levels in brackets in the quest log's colors, like a dungeon's quests.
+- **Guildie:** Upgrade reasons color stats gained in green and lost in red, as the game does; crafted items line up with their profession under the name.
+- **Guildie:** The bar over the top of the page blurs what scrolls under it in more browsers, and stays nearly solid where blur isn't available.
 - **App:** The sidebar and title bar keep the site's warm dark color instead of letting the Windows wallpaper tint them.
 
 ### Fixes
 
 - **Guildie, Addon:** Signing in no longer erases your characters' stat priority, gear preferences and removed suggestions. They now stay with you, even if a character leaves your account and comes back. Settings lost before this fix have to be set again.
 - **App:** If the app can't read its settings file for a moment, it no longer starts over and forgets your WoW folder and sign-in.
+- **Guildie, Addon:** The Feed shows what happened each day, without times it couldn't get right (Blizzard tells us hours late), and groups alike events into one row: everyone who cleared a dungeon, turned in its quests or reached a level that day, and a character's level-ups that day in one.
+- **Guildie:** Crafting shows a loading message while it loads, and retries a hiccup by itself instead of flashing an error.
 
 ## 0.3.23
 

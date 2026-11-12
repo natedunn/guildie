@@ -7,15 +7,18 @@ import type { FunctionReturnType } from "convex/server";
 import { Fragment, useMemo } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
+import { DoneMark, ViewAs } from "@/components/dungeon";
 import { Page, PageHeader, SectionTitle } from "@/components/page-header";
+import { Switch } from "@/components/ui/switch";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-// Personal → Quests: your characters' quest logs, by character or by zone,
-// and on each quest the guildmates who have it too ("Also on it"), to group
-// up with. From Blizzard (as of each character's last logout) or, with the
-// Guildie addon, the game's quest log as of the last /reload or logout.
-// Dungeon quests across a guild: its Dungeons page.
+// Personal → Quests: one of your characters' quest log at a time (?character=,
+// default your highest), as a list or grouped by zone (?view=zone), and on
+// each quest the guildmates who have it too ("Also on it"), to group up with.
+// From Blizzard (as of each character's last logout) or, with the Guildie
+// addon, the game's quest log as of the last /reload or logout. Dungeon
+// quests across a guild: its Dungeons page.
 
 type Search = { view?: "zone"; character?: string };
 
@@ -43,8 +46,9 @@ function QuestsPage() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const characters = data?.characters ?? [];
-	const selected = characters.find((c) => c.slug === search.character);
-	const listed = selected ? [selected] : characters;
+	// Highest level first (quests.mine sorts them).
+	const c = characters.find((x) => x.slug === search.character) ?? characters[0];
+	const byZone = search.view === "zone";
 	const set = (patch: Search) =>
 		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true, resetScroll: false });
 	if (!data) return null;
@@ -72,7 +76,7 @@ function QuestsPage() {
 				}
 			/>
 			<Page width="medium" className="space-y-6">
-				{characters.length === 0 ? (
+				{!c ? (
 					<p className="text-[0.8125rem] text-muted-foreground">
 						No characters yet.{" "}
 						<Link to="/settings" className="text-foreground underline underline-offset-4">
@@ -82,54 +86,57 @@ function QuestsPage() {
 					</p>
 				) : (
 					<>
-						<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-							<div className="flex gap-1" role="group" aria-label="Group by">
-								<button
-									type="button"
-									className="chip"
-									data-active={search.view !== "zone"}
-									aria-pressed={search.view !== "zone"}
-									onClick={() => set({ view: undefined })}
-								>
-									By character
-								</button>
-								<button
-									type="button"
-									className="chip"
-									data-active={search.view === "zone"}
-									aria-pressed={search.view === "zone"}
-									onClick={() => set({ view: "zone" })}
-								>
-									By zone
-								</button>
-							</div>
-							{characters.length > 1 && (
-								<div className="flex flex-wrap gap-1" role="group" aria-label="Character">
-									<button
-										type="button"
-										className="chip"
-										data-active={!selected}
-										aria-pressed={!selected}
-										onClick={() => set({ character: undefined })}
-									>
-										All
-									</button>
-									{characters.map((c) => (
-										<button
-											key={c.key}
-											type="button"
-											className="chip"
-											data-active={selected?.key === c.key}
-											aria-pressed={selected?.key === c.key}
-											onClick={() => set({ character: selected?.key === c.key ? undefined : c.slug })}
-										>
-											<ClassText classId={c.classId}>{c.name}</ClassText>
-										</button>
-									))}
+						<section>
+							<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+								<div className="flex min-w-0 flex-1 items-center gap-2.5">
+									<CharacterAvatar url={c.avatarUrl} size={32} className="rounded-full" />
+									<div className="min-w-0">
+										<SectionTitle className="truncate">
+											<Link
+												to="/c/$region/$slug"
+												params={{ region: c.region, slug: c.slug }}
+												className="underline-offset-4 hover:underline"
+											>
+												<ClassText classId={c.classId}>{c.name}</ClassText>
+											</Link>
+											<span className="num font-normal text-muted-foreground"> {c.level}</span>
+										</SectionTitle>
+										<p className="truncate text-xs text-muted-foreground">
+											{c.quests ? `${c.quests.length} ${c.quests.length === 1 ? "quest" : "quests"} · ` : ""}
+											{sourceLine(c)}
+										</p>
+									</div>
 								</div>
-							)}
-						</div>
-						{search.view === "zone" ? <ByZone characters={listed} /> : <ByCharacter characters={listed} />}
+								<div className="flex items-center gap-3">
+									{(c.quests?.length ?? 0) > 0 && (
+										<label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+											<Switch
+												size="sm"
+												checked={byZone}
+												onCheckedChange={(on) => set({ view: on ? "zone" : undefined })}
+											/>
+											Group by zone
+										</label>
+									)}
+									{characters.length > 1 && (
+										<ViewAs
+											label="Character"
+											placeholder="Search your characters"
+											people={characters.map((x) => ({ ...x, key: x.slug, mine: false }))}
+											value={c.slug}
+											onChange={(slug) => set({ character: slug })}
+										/>
+									)}
+								</div>
+							</div>
+							{c.quests && c.quests.length > 0 ? (
+								<QuestList quests={c.quests} level={c.level} byZone={byZone} />
+							) : c.quests ? (
+								<p className="surface-card mt-3 px-5 py-6 text-center text-[0.8125rem] text-muted-foreground">
+									No quests.
+								</p>
+							) : null}
+						</section>
 						<p className="text-xs text-muted-foreground">
 							Blizzard updates a character's quests when they log out. With the Guildie app running, the addon sends
 							your quest log (with progress) on every /reload and logout. Your progress is only shown to you; guildmates
@@ -149,82 +156,36 @@ function sourceLine(c: Character) {
 	return `From Blizzard, as of the last logout ${c.source.at ? ago(c.source.at) : ""}`.trim();
 }
 
-function ByCharacter({ characters }: { characters: Character[] }) {
-	return (
-		<div className="space-y-8">
-			{characters.map((c) => (
-				<section key={c.key}>
-					<div className="flex items-center gap-2.5">
-						<CharacterAvatar url={c.avatarUrl} size={28} className="rounded-full" />
-						<div className="min-w-0 flex-1">
-							<SectionTitle className="truncate">
-								<Link
-									to="/c/$region/$slug"
-									params={{ region: c.region, slug: c.slug }}
-									className="hover:underline underline-offset-4"
-								>
-									<ClassText classId={c.classId}>{c.name}</ClassText>
-								</Link>
-								<span className="num font-normal text-muted-foreground"> {c.level}</span>
-							</SectionTitle>
-							<p className="truncate text-xs text-muted-foreground">
-								{c.quests ? `${c.quests.length} ${c.quests.length === 1 ? "quest" : "quests"} · ` : ""}
-								{sourceLine(c)}
-							</p>
-						</div>
-					</div>
-					{c.quests && c.quests.length > 0 && (
-						<ul className="surface-card mt-2.5 card-clip">
-							{c.quests.map((q) => (
-								<QuestRow key={q.id} quest={q} level={c.level} />
-							))}
-						</ul>
-					)}
-					{c.quests?.length === 0 && (
-						<p className="surface-card px-5 mt-2.5 py-6 text-center text-[0.8125rem] text-muted-foreground">
-							No quests.
-						</p>
-					)}
-				</section>
-			))}
-		</div>
-	);
-}
-
-function ByZone({ characters }: { characters: Character[] }) {
+/** The quests in one card, in log order or under their zones' headings. */
+function QuestList({ quests, level, byZone }: { quests: Quest[]; level: number; byZone: boolean }) {
 	const zones = useMemo(() => {
-		const byZone = new Map<string, { quest: Quest; holders: Character[] }[]>();
-		for (const c of characters) {
-			for (const q of c.quests ?? []) {
-				const area = q.area ?? "Other";
-				const list = byZone.get(area) ?? [];
-				const entry = list.find((e) => e.quest.id === q.id);
-				if (entry) entry.holders.push(c);
-				else list.push({ quest: q, holders: [c] });
-				byZone.set(area, list);
-			}
+		if (!byZone) return null;
+		const map = new Map<string, Quest[]>();
+		for (const q of quests) {
+			const area = q.area ?? "Other";
+			map.set(area, [...(map.get(area) ?? []), q]);
 		}
-		return [...byZone.entries()].sort(([a], [b]) => (a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b)));
-	}, [characters]);
-	if (!zones.length)
-		return <p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">No quests.</p>;
-	const several = characters.length > 1;
+		return [...map.entries()].sort(([a], [b]) => (a === "Other" ? 1 : b === "Other" ? -1 : a.localeCompare(b)));
+	}, [quests, byZone]);
+	if (!zones) {
+		return (
+			<ul className="surface-card mt-3 divide-y divide-border">
+				{quests.map((q) => (
+					<QuestRow key={q.id} quest={q} level={level} />
+				))}
+			</ul>
+		);
+	}
 	return (
-		<div className="space-y-6">
-			{zones.map(([area, entries]) => (
+		<div className="mt-3 space-y-5">
+			{zones.map(([area, list]) => (
 				<section key={area}>
-					<SectionTitle>
-						{area} <span className="num font-normal text-muted-foreground">{entries.length}</span>
-					</SectionTitle>
-					<ul className="surface-card mt-2.5 card-clip">
-						{entries.map(({ quest, holders }) => (
-							<QuestRow
-								key={quest.id}
-								quest={quest}
-								level={Math.max(...holders.map((h) => h.level))}
-								holders={several ? holders : undefined}
-								hideArea
-							/>
+					<h3 className="px-1 text-xs font-medium text-muted-foreground">
+						{area} <span className="num font-normal">{list.length}</span>
+					</h3>
+					<ul className="surface-card mt-1.5 divide-y divide-border">
+						{list.map((q) => (
+							<QuestRow key={q.id} quest={q} level={level} hideArea />
 						))}
 					</ul>
 				</section>
@@ -233,87 +194,81 @@ function ByZone({ characters }: { characters: Character[] }) {
 	);
 }
 
+/**
+ * One quest, like a dungeon's quest list: its level in brackets in the color
+ * the game's quest log gives it, the title (to Wowhead), its state on the
+ * right; under it the zone and kind, objectives, and guildmates on it too.
+ */
 function QuestRow({
 	quest: q,
 	level,
-	holders,
 	hideArea,
 }: {
 	quest: Quest;
 	/** The character's level, for the game's level colors. */
 	level: number;
-	/** By zone: which of your characters have it. */
-	holders?: Character[];
 	hideArea?: boolean;
 }) {
 	const meta = [hideArea ? undefined : q.area, q.type].filter(Boolean).join(" · ");
-	const state = q.failed ? "Failed" : q.complete ? "Complete" : undefined;
+	const objectives = !q.complete && q.objectives?.length ? q.objectives : undefined;
 	return (
-		<li className="border-b border-border px-3 py-2 text-[0.8125rem] last:border-b-0">
-			<div className="flex items-baseline gap-2">
-				{q.level !== undefined && (
-					<span className={cn("num w-6 flex-none text-right text-xs", `qd-${questDifficulty(q.level, level)}`)}>
-						{q.level}
-					</span>
-				)}
+		<li className="px-3 py-2">
+			<div className="flex items-center gap-2">
+				<span
+					className={cn(
+						"num w-8 flex-none text-right text-xs",
+						q.level !== undefined ? `qd-${questDifficulty(q.level, level)}` : "text-muted-foreground",
+					)}
+				>
+					{q.level !== undefined ? `[${q.level}]` : ""}
+				</span>
 				<a
 					href={wowheadQuestUrl(q.id)}
 					target="_blank"
 					rel="noreferrer"
-					className="min-w-0 flex-1 hover:underline underline-offset-4"
 					title="Open on Wowhead"
+					className="min-w-0 flex-1 truncate text-[0.8125rem] underline-offset-4 hover:underline"
 				>
 					{q.title}
 				</a>
-				{state && (
-					<span className={cn("pill flex-none self-center px-2 py-0", !q.failed && "text-foreground")}>{state}</span>
-				)}
+				{q.failed ? (
+					<span className="flex-none text-xs text-muted-foreground/70">Failed</span>
+				) : q.complete ? (
+					<DoneMark label="Complete: ready to turn in" />
+				) : null}
 			</div>
-			<div className={cn("mt-0.5 space-y-0.5 text-xs text-muted-foreground", q.level !== undefined && "pl-8")}>
-				{(meta || holders) && (
-					<p>
-						{holders && (
-							<>
-								{holders.map((h, i) => (
-									<Fragment key={h.key}>
-										{i > 0 && ", "}
-										<ClassText classId={h.classId}>{h.name}</ClassText>
-									</Fragment>
-								))}
-								{meta && " · "}
-							</>
-						)}
-						{meta}
-					</p>
-				)}
-				{!q.complete && q.objectives && q.objectives.length > 0 && (
-					<ul>
-						{q.objectives.map((o) => (
-							<li key={o.text} className={cn(o.done && "line-through decoration-muted-foreground/50")}>
-								{o.text}
-							</li>
-						))}
-					</ul>
-				)}
-				{q.others.length > 0 && (
-					<p>
-						Also on it:{" "}
-						{q.others.map((o, i) => (
-							<Fragment key={o.key}>
-								{i > 0 && ", "}
-								<Link
-									to="/c/$region/$slug"
-									params={{ region: o.region, slug: o.slug }}
-									className="hover:underline underline-offset-4"
-								>
-									<ClassText classId={o.classId}>{o.name}</ClassText>
-								</Link>
-								<span className="num"> {o.level}</span>
-							</Fragment>
-						))}
-					</p>
-				)}
-			</div>
+			{(meta || objectives || q.others.length > 0) && (
+				<div className="mt-0.5 space-y-0.5 pl-10 text-xs text-muted-foreground">
+					{meta && <p className="text-[10px] font-medium tracking-wider uppercase">{meta}</p>}
+					{objectives && (
+						<ul>
+							{objectives.map((o) => (
+								<li key={o.text} className={cn(o.done && "line-through decoration-muted-foreground/50")}>
+									{o.text}
+								</li>
+							))}
+						</ul>
+					)}
+					{q.others.length > 0 && (
+						<p>
+							Also on it:{" "}
+							{q.others.map((o, i) => (
+								<Fragment key={o.key}>
+									{i > 0 && ", "}
+									<Link
+										to="/c/$region/$slug"
+										params={{ region: o.region, slug: o.slug }}
+										className="underline-offset-4 hover:underline"
+									>
+										<ClassText classId={o.classId}>{o.name}</ClassText>
+									</Link>
+									<span className="num"> {o.level}</span>
+								</Fragment>
+							))}
+						</p>
+					)}
+				</div>
+			)}
 		</li>
 	);
 }

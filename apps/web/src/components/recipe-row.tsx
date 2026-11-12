@@ -24,7 +24,18 @@ export function compareProfessions(a: string, b: string) {
  * "Enchant ..."). Enchants and items the item sync hasn't reached yet have no
  * item: the recipe name stands in, next to an empty icon slot.
  */
-export function RecipeItem({ recipe, size = 28, className }: { recipe: Recipe; size?: number; className?: string }) {
+export function RecipeItem({
+	recipe,
+	size = 28,
+	detail,
+	className,
+}: {
+	recipe: Recipe;
+	size?: number;
+	/** A second line under the name (after the recipe's own name when it differs), e.g. the profession. */
+	detail?: string;
+	className?: string;
+}) {
 	const { item } = recipe;
 	const showRecipeName = item && item.name.toLowerCase() !== recipe.name.toLowerCase();
 	return (
@@ -44,7 +55,11 @@ export function RecipeItem({ recipe, size = 28, className }: { recipe: Recipe; s
 				) : (
 					<div className="truncate">{recipe.name}</div>
 				)}
-				{showRecipeName ? <div className="truncate text-xs text-muted-foreground">{recipe.name}</div> : null}
+				{showRecipeName || detail ? (
+					<div className="mt-0.5 truncate text-xs text-muted-foreground">
+						{[showRecipeName ? recipe.name : undefined, detail].filter(Boolean).join(" · ")}
+					</div>
+				) : null}
 			</div>
 		</div>
 	);

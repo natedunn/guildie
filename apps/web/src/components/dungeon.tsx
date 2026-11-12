@@ -57,14 +57,25 @@ export function DoneMark({
 	);
 }
 
+/**
+ * Pick a character, with a search: "View as" on the Dungeons pages, the
+ * character on Quests (`label`, `placeholder`; `align` the menu to the
+ * trigger's start or end).
+ */
 export function ViewAs({
 	people,
 	value,
 	onChange,
+	label: title = "View as",
+	placeholder = "Search the guild",
+	align = "end",
 }: {
 	people: Viewable[];
 	value: string | undefined;
 	onChange: (key: string) => void;
+	label?: string;
+	placeholder?: string;
+	align?: "start" | "end";
 }) {
 	const byKey = new Map(people.map((p) => [p.key, p]));
 	const keys = [...people].sort((a, b) => Number(b.mine) - Number(a.mine) || b.level - a.level).map((p) => p.key);
@@ -78,7 +89,7 @@ export function ViewAs({
 			autoHighlight
 		>
 			<Combobox.Trigger className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground">
-				View as{" "}
+				{title}{" "}
 				<span className="font-medium">
 					{value && byKey.get(value) ? (
 						<ClassText classId={byKey.get(value)?.classId ?? 0}>{label(value)}</ClassText>
@@ -89,10 +100,10 @@ export function ViewAs({
 				<HugeiconsIcon icon={ArrowDown01Icon} size={12} strokeWidth={2} />
 			</Combobox.Trigger>
 			<Combobox.Portal>
-				<Combobox.Positioner align="end" sideOffset={4} className="isolate z-50 outline-none">
+				<Combobox.Positioner align={align} sideOffset={4} className="isolate z-50 outline-none">
 					<Combobox.Popup className="w-60 overflow-hidden rounded-md border border-border-strong bg-popover bg-(image:--card-sheen) text-popover-foreground shadow-(--popover-shadow) outline-none">
 						<Combobox.Input
-							placeholder="Search the guild"
+							placeholder={placeholder}
 							className="h-8 w-full border-b border-border bg-transparent px-2.5 text-[0.8125rem] outline-none placeholder:text-muted-foreground"
 						/>
 						<Combobox.Empty className="px-2.5 py-2 text-xs text-muted-foreground empty:hidden">

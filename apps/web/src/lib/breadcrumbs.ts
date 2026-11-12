@@ -15,7 +15,7 @@ export type Crumb = {
 				to: "/g/$region/$slug" | "/c/$region/$slug" | "/g/$region/$slug/dungeons";
 				params: { region: string; slug: string };
 		  }
-		| { to: "/settings"; params?: undefined };
+		| { to: "/settings" | "/settings/app"; params?: undefined };
 };
 
 type Match = { routeId: string; params: Record<string, string>; loaderData?: unknown };
@@ -62,6 +62,8 @@ function crumbsOf(matches: Match[]): Crumb[] | null {
 			crumbs.push({ label: DUNGEON_BY_KEY.get(m.params.dungeon)?.name ?? "Dungeon" });
 		} else if (m.routeId === "/settings") {
 			crumbs.push({ label: "Settings", link: { to: "/settings" } });
+		} else if (m.routeId === "/settings/app_/changelog") {
+			crumbs.push({ label: "App", link: { to: "/settings/app" } }, { label: "Releases" });
 		} else if (TAB_LABELS[m.routeId]) {
 			crumbs.push({ label: TAB_LABELS[m.routeId] });
 		}

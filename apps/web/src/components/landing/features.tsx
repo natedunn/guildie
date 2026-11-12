@@ -12,6 +12,7 @@ import { ClassText } from "@/components/class-name";
 import { DoneMark, DungeonArt } from "@/components/dungeon";
 import { ItemIcon, type ItemLike, ItemTooltipBody } from "@/components/item";
 import { TalentTree } from "@/components/talent-tree";
+import { UpgradeWhy } from "@/components/upgrade-why";
 import { cn } from "@/lib/utils";
 import { Card, CardLabel, GameTooltip, icon, member, Name, Section, SectionHead, SILK } from "./primitives";
 import { FERAL_LAYOUT, FERAL_TREE } from "./sample-talents";
@@ -231,7 +232,9 @@ export function GearSection() {
 											</span>
 											<span className={cn("ml-auto text-xs", u.quiet && "text-muted-foreground")}>{u.verdict}</span>
 										</div>
-										<p className="text-xs text-muted-foreground">{u.why}</p>
+										<p className="text-xs text-muted-foreground">
+											<UpgradeWhy text={u.why} />
+										</p>
 									</div>
 								);
 							})}

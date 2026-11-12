@@ -9,17 +9,35 @@ import { compareVersions } from "@/lib/versions";
 const formatDate = (iso: string) =>
 	new Date(iso).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 
-/** Release notes, newest first: up to `upTo` (the app's version) when given. */
-export function WhatsNew({ upTo }: { upTo?: string }) {
+/** The latest few releases' notes (up to `upTo`, the app's version, when given), and a link to them all. */
+export function WhatsNew({ upTo, count = 3 }: { upTo?: string; count?: number }) {
 	const { data, isPending, isError } = useReleaseNotes();
 	if (isPending) return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Loading…</p>;
-	if (isError || !data)
-		return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Couldn't load the release notes right now.</p>;
-	const shown = data.filter((r) => !upTo || compareVersions(r.version, upTo) <= 0).slice(0, 6);
+	if (isError || !data) return <NotesError />;
+	const shown = data.releases.filter((r) => !upTo || compareVersions(r.version, upTo) <= 0).slice(0, count);
+	return (
+		<>
+			<ReleaseList releases={shown} current={upTo} />
+			<Link
+				to="/settings/app/changelog"
+				className="mt-2 inline-block px-1 text-[0.8125rem] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+			>
+				All releases
+			</Link>
+		</>
+	);
+}
+
+export function NotesError() {
+	return <p className="mt-2 text-[0.8125rem] text-muted-foreground">Couldn't load the release notes right now.</p>;
+}
+
+/** Releases in one card, newest first; `current`: the app's version, marked. */
+export function ReleaseList({ releases, current }: { releases: ReleaseNotes[]; current?: string }) {
 	return (
 		<div className="surface-card mt-3 divide-y divide-border">
-			{shown.map((r) => (
-				<Release key={r.version} release={r} current={r.version === upTo} />
+			{releases.map((r) => (
+				<Release key={r.version} release={r} current={r.version === current} />
 			))}
 		</div>
 	);
