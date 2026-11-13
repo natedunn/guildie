@@ -83,6 +83,7 @@ visible = false -- the reader misses frames while another UI covers the square
 wow.fire("QUEST_TURNED_IN", 6981)
 wow.fire("QUEST_TURNED_IN", 3369)
 wow.fire("QUEST_TURNED_IN", 6981)
+ns.current().deliveries = {{id = "Player-test:1:1", requestId = "request1", kind = "mailReceived", other = "Sender-Last", itemId = 4306, quantity = 7, at = GetServerTime()}}
 for i = 1, 200 do panel.scripts.OnUpdate(panel, 0.1) end
 visible = true
 for i = 1, 400 do panel.scripts.OnUpdate(panel, 0.1) end
@@ -96,8 +97,9 @@ assert(#ns.current().completedQuestIds == 2, "transmitting does not delete confi
             if result and result["channel"] == "snapshot":
                 snapshots.append(result["data"])
         self.assertTrue(snapshots, "a complete snapshot arrives after the square is uncovered")
-        self.assertEqual(snapshots[-1]["version"], 5)
+        self.assertEqual(snapshots[-1]["version"], 6)
         self.assertEqual(snapshots[-1]["characters"][0]["completedQuestIds"], [3369, 6981])
+        self.assertEqual(snapshots[-1]["characters"][0]["deliveries"][0]["quantity"], 7)
 
     def test_live_export_omits_protected_values(self):
         addon = Path(__file__).resolve().parents[2] / "apps/addon/Guildie"

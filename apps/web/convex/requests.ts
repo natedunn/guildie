@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import type { Delivery } from "./addonPayload";
 import { noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
@@ -14,6 +15,8 @@ import {
 	canChange,
 	canHelpFromInventory,
 	check,
+	deliveryMatches,
+	deliveryProgress,
 	EXPIRE_MS,
 	isStale,
 	matsCheck,
@@ -200,6 +203,8 @@ async function view(
 		kind: r.kind,
 		status: r.status,
 		quantity: r.quantity,
+		receivedQuantity: r.receivedQuantity ?? 0,
+		sentQuantity: r.sentQuantity ?? 0,
 		ongoing,
 		until: r.until,
 		have,
@@ -717,6 +722,7 @@ export const closeOngoingOfLeavers = internalMutation({
 // ---- For the addon (GuildieData.lua) ------------------------------------------
 
 export type AddonRequest = {
+	requestId: string;
 	kind: "item" | "craft";
 	/** Left out for ongoing requests (older addons then show "requesting 1"). */
 	quantity?: number;
@@ -754,6 +760,7 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 		}
 		if (byItem[key].length >= ADDON_PER_ITEM) continue;
 		byItem[key].push({
+			requestId: r._id,
 			kind: r.kind,
 			...(r.ongoing ? { ongoing: true as const } : { quantity: r.quantity }),
 			name: r.character.name,
@@ -831,5 +838,58 @@ export const search = query({
 				mine: myRequest(myItemRequests.get(item.itemId)),
 			};
 		});
+	},
+});
+
+/** Called only after helper ingestion verifies ownership of the reporting character. */
+export async function recordDeliveries(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	character: Doc<"characters">,
+	events: Delivery[],
+) {
+	if (!character.inRoster || !character.guildId) return;
+	for (const event of events) {
+		const requestId = ctx.db.normalizeId("requests", event.requestId);
+		if (!requestId) continue;
+		const seen = await ctx.db
+			.query("requestDeliveryEvents")
+			.withIndex("by_character_event", (q) => q.eq("characterId", character._id).eq("eventId", event.id))
+			.unique();
+		if (seen) continue;
+		const r = await ctx.db.get(requestId);
+		if (
+			!r ||
+			!deliveryMatches(
+				r,
+				event,
+				{ userId, slug: character.slug, name: character.name, guildId: character.guildId },
+				Date.now(),
+			)
+		)
+			continue;
+		await ctx.db.insert("requestDeliveryEvents", {
+			characterId: character._id,
+			eventId: event.id,
+			requestId,
+			kind: event.kind,
+			quantity: event.quantity,
+			at: event.at,
+		});
+		const progress = deliveryProgress(r, event);
+		const patch: Partial<Doc<"requests">> = { ...progress, lastActivityAt: Math.max(r.lastActivityAt, event.at) };
+		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };
+		if (progress.status === "done") patch.closedAt = Date.now();
+		await ctx.db.patch(r._id, patch);
+		if (progress.status === "done") await noteRequest(ctx, "fulfilled", r, r.claim?.character);
+	}
+}
+
+/** Internal batches contain only payloads already validated and ownership-checked by helper.ingest. */
+export const applyDeliveries = internalMutation({
+	args: { userId: v.id("users"), characterId: v.id("characters"), events: v.array(v.any()) },
+	handler: async (ctx, { userId, characterId, events }): Promise<void> => {
+		const character = await ctx.db.get(characterId);
+		if (character) await recordDeliveries(ctx, userId, character, events);
 	},
 });

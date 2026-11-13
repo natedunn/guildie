@@ -141,3 +141,16 @@ IDs. A quest disappearing from the log, completing its objectives, or showing a
 reward window never counts as a confirmed turn-in. Repeated turn-ins record an
 ID once, not a count of repetitions. Forever's event/history APIs still need an
 in-game acceptance check; custom quest UI addons should not affect these events.
+
+### Request deliveries
+
+The addon observes successful mail collections and completed trades for cached
+item requests, and retains the records for live or reload/logout upload. It
+never performs those actions. Sender reports mark claimed requests sent;
+recipient reports advance received quantities and close fixed-amount requests.
+Crafts, enchants, COD, returns and uncertain matches keep manual completion.
+A request must be in the loaded GuildieData, including its request ID. Tracking
+retains at most 200 matching events per character for 30 days; it cannot recover
+transactions missed while the addon was disabled. Installing `Deliveries.lua`
+requires a full game restart. Forever event behavior remains pending the
+[acceptance checklist](../../docs/live-sync.md#request-delivery-acceptance-payload-6-not-yet-verified-in-forever).

@@ -127,3 +127,63 @@ Automated coverage drops pixel frames during turn-ins, then decodes a subsequent
 snapshot using the shipped Lua exporter and Python reader. It also covers event
 bursts, duplicate delivery, reload persistence, character isolation, history API
 failures and older payloads. This does not establish Forever API support.
+
+## Request delivery acceptance (payload 6; not yet verified in Forever)
+
+This builds on the retained quest backlog. Only ordinary **item** requests are
+tracked; crafted item requests, enchant services, COD, returned mail, and ambiguous
+matches retain the manual workflow. The receiver's report alone counts toward
+completion. A sender report only marks a claimed request sent and records a
+separate sent total. Ongoing requests record receipts without closing.
+
+The addon must have the request in its downloaded GuildieData before the action.
+It binds the event to that request ID and uses exact character names (including
+Forever surnames), never a first-name guess. Its existing limited tooltip request
+cache may omit a request; stale or missing data requires manual completion.
+The currently loaded cache only updates at reload/login. No mail text, subject,
+coins, or unrelated transactions are uploaded.
+
+Events retain a per-character ID through reloads. The server records consumed
+IDs atomically with progress, so repeat snapshots cannot count twice; receiver
+and sender reports update separate totals. Changed claims, closed requests,
+non-item requests, wrong characters/guilds, and events predating the request are
+ignored. Records are addon observations, not independently verified Blizzard
+receipts. A unique matching delivery is assumed to fulfill that request; the
+addon cannot infer whether the player intended it as an unrelated gift.
+
+The addon retains the most recent 200 matching records per character, for up to
+30 days (pruned when recording new transactions); the server ignores older ones.
+Long offline periods or more than 200 unsynced records can require manual
+completion. Reload/logout writes them to SavedVariables; live pixels carry the
+same records sooner. A crash before saving can lose unsynced records. Ingestion
+schedules bounded batches of 50, so completion may appear shortly after upload.
+The existing payload/live snapshot size limits still apply.
+
+PC test, using a matching backend/app and both players' updated addons:
+
+1. Fully restart WoW (new `Deliveries.lua` file). Create a 20-item request,
+   claim it on the sender, download guild data and reload both clients. Verify
+   exact first/surname identity with the default UI and the players' mail addons.
+2. Mail 7 items. Sync the sender: sent progress should show 7; request stays open.
+   Open the receiver's mailbox without collecting: received stays 0. Collect and
+   sync: received becomes 7/20. Repeat uploads/reloads: still 7/20.
+3. Trade the remaining 13. Both click accept, complete and sync: request closes
+   at 20/20. Upload both clients in both orders; sent reports never add receipts.
+4. Repeat with pixel export disabled and reload/logout uploads, and with the
+   square covered during delivery then uncovered. Stop/restart the companion.
+5. Cancel/decline a trade, change its offered items, fail mail collection with
+   full bags, send COD, return mail, and collect returned mail. None should count
+   as fulfillment. Test individual attachments and the default/custom open-all
+   actions. Overlapping/uncorrelated collection operations intentionally fail
+   closed and may need manual completion.
+6. Test multiple stacks, partial collections, another character, multiple
+   contributors to an ongoing request, a stale/missing request cache, and a
+   cancelled request followed by a new one for the same item. Old receipts must
+   never fulfill the new request. Craft/enchant requests retain manual controls.
+
+Capture requires `MAIL_SUCCESS` with an item ID plus the expected bag-count
+increase, or `UI_INFO_MESSAGE` matching `ERR_TRADE_COMPLETE` after both accepts.
+Confirm these actual event sequences on Forever before approving release; tests
+use API stubs and do not establish client support. Unknown/restricted APIs are
+caught and leave the manual controls available. Nothing clicks or accepts for
+the player, and no game memory or UI widget text is read.

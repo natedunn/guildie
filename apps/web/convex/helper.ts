@@ -127,7 +127,7 @@ const baseName = (item: { name: string; suffixId?: number }) =>
 
 /**
  * Called by the /api/helper/snapshot route with the helper's token and the
- * addon's characters (payload versions 1 to 4). Each character is checked
+ * addon's characters (payload versions 1 to 6). Each character is checked
  * (addonPayload.ts) and kept only if the token's owner claimed it. Each part
  * of the stored snapshot keeps whichever copy is newer, so an older upload
  * (another computer, say) never replaces newer data.
@@ -272,6 +272,16 @@ export const ingest = mutation({
 				const exact = c.levelAt !== undefined && c.level === top.level;
 				const at = Math.min(exact ? (c.levelAt as number) : top.capturedAt, now);
 				await noteLevel(ctx, character, top.level, { at, exact });
+			}
+			// Bound delivery transactions independently of a multi-character upload.
+			if (character && c.deliveries) {
+				for (let i = 0; i < c.deliveries.length; i += 50) {
+					await ctx.scheduler.runAfter(0, internal.requests.applyDeliveries, {
+						userId: row.userId,
+						characterId: character._id,
+						events: c.deliveries.slice(i, i + 50),
+					});
+				}
 			}
 			accepted.push(match.slug);
 			if (c.inventory && (await storeInventory(ctx, row.userId, key, c.inventory, now))) inventoryChanged = true;

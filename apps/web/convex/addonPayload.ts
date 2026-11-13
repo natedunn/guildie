@@ -4,10 +4,10 @@
 // and level), 2 (plus guild, XP, gear, professions and known recipes; from
 // addon 0.7.0 also weapon and armor skills), 3 (addon 0.8.0: plus bags and
 // the last bank read, for guild requests) and 4 (addon 0.10.0: plus the quest
-// log), and 5 (retained quest completion IDs) are all accepted. Kept free of
+// log), 5 (retained quest completion IDs), and 6 (request deliveries) are accepted. Kept free of
 // Convex and value imports so `node --test` can run it (addonPayload.test.ts).
 
-export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5] as const;
+export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5, 6] as const;
 
 export const LIMITS = {
 	characters: 50,
@@ -140,6 +140,17 @@ export type AddonCharacter = {
 	quests?: { capturedAt: number; list: QuestEntry[] };
 	/** Retained positive completion confirmations; absence is not a deletion. */
 	completedQuestIds?: number[];
+	deliveries?: Delivery[];
+};
+
+export type Delivery = {
+	id: string;
+	requestId: string;
+	kind: "mailSent" | "mailReceived" | "tradeSent" | "tradeReceived";
+	other: string;
+	itemId: number;
+	quantity: number;
+	at: number;
 };
 
 export type QuestEntry = {
@@ -452,6 +463,23 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
 			inventory: opt(c.inventory, (i) => inventory(i, now)),
 			quests: opt(c.quests, (q) => quests(q, now)),
+			deliveries: opt(c.deliveries, (events) =>
+				arr(events, "deliveries", 200).map((raw) => {
+					const e = obj(raw, "delivery");
+					const kind = str(e.kind, "delivery.kind", 20);
+					if (!["mailSent", "mailReceived", "tradeSent", "tradeReceived"].includes(kind))
+						fail("delivery.kind", "unknown kind");
+					return {
+						id: plain(e.id, "delivery.id", 160),
+						requestId: plain(e.requestId, "delivery.requestId", 64),
+						kind: kind as Delivery["kind"],
+						other: plain(e.other, "delivery.other", 120),
+						itemId: int(e.itemId, "delivery.itemId", 1, 10000000),
+						quantity: int(e.quantity, "delivery.quantity", 1, 100000),
+						at: time(e.at, "delivery.at", now),
+					};
+				}),
+			),
 			completedQuestIds: opt(c.completedQuestIds, (ids) =>
 				[
 					...new Set(

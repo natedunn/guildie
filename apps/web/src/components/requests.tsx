@@ -663,6 +663,18 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							</>
 						)}
 					</p>
+					{r.kind === "item" && (r.receivedQuantity > 0 || r.sentQuantity > 0) && (
+						<p className="text-[13px] text-muted-foreground">
+							{r.ongoing ? `${r.receivedQuantity} received` : `${r.receivedQuantity}/${r.quantity} received`}
+							{r.sentQuantity > 0 && ` · ${r.sentQuantity} sent (may already be received)`}
+						</p>
+					)}
+					{r.kind === "item" && active && r.mine && (
+						<p className="text-xs text-muted-foreground">
+							With the updated Guildie addon, confirmed collections and trades update this request after sync. Mark done
+							if a delivery was not tracked.
+						</p>
+					)}
 					{r.note && <p className="text-[13px]">“{r.note}”</p>}
 					<p className="text-[13px]">
 						{r.ongoing && active ? (
@@ -755,7 +767,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 					{r.mine && !r.ongoing && (
 						<>
 							<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("complete")}>
-								{r.claim?.sentAt ? "Got it, mark done" : "Mark done"}
+								Mark done
 							</Button>
 							{r.stale && (
 								<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("keep")}>

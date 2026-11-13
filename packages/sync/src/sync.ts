@@ -109,7 +109,8 @@ export class SyncEngine {
 	queuePixelSnapshot(value: unknown) {
 		if (!this.api.token || !value || typeof value !== "object") return false;
 		const { version, characters } = value as { version?: unknown; characters?: unknown };
-		if (![1, 2, 3, 4, 5].includes(version as number) || !Array.isArray(characters) || !characters.length) return false;
+		if (![1, 2, 3, 4, 5, 6].includes(version as number) || !Array.isArray(characters) || !characters.length)
+			return false;
 		const payload = JSON.stringify({ version, characters });
 		if (Buffer.byteLength(payload, "utf8") > 1024 * 1024) return false;
 		this.pixelSnapshot = payload !== this.pixelUploaded ? payload : undefined;
