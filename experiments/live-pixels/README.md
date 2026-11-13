@@ -258,3 +258,5 @@ Local verification covers Lua-to-Python framing, palettes and empty arrays; boun
 process output and lifecycle; and snapshot coalescing, throttling, retry and disconnect.
 The new desktop-to-server path still needs the Windows checklist above. Record only
 counts, timings and pass/fail results in this repository, never raw character records.
+
+See [Windows Edit Mode and upload pilot verification](WINDOWS-EDIT-MODE-TEST.md) for the November 12 test results at cfa3abe.
