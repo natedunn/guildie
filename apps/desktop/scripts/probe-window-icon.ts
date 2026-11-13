@@ -8,6 +8,7 @@ import { app } from "electron";
 import koffi from "koffi";
 import { createWindow } from "../src/window.ts";
 
+app.on("window-all-closed", () => {});
 app.setName("Guildie");
 app.setAppUserModelId("club.guildie.desktop");
 app.setPath("userData", mkdtempSync(join(tmpdir(), "guildie-icon-check-")));
@@ -59,7 +60,14 @@ async function main() {
 		console.error("Icon probe timed out");
 		app.exit(2);
 	}, 20000).unref();
-	const reference = load(0, join(__dirname, "assets", "guildie.ico"), 1, 32, 32, 0x10);
+	const reference = load(
+		0,
+		process.env.GUILDIE_ICON_REFERENCE || join(__dirname, "assets", "guildie.ico"),
+		1,
+		32,
+		32,
+		0x10,
+	);
 	const expected = pixels(reference);
 	destroy(reference);
 	let failures = 0;

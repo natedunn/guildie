@@ -77,6 +77,14 @@ jobs:
         working-directory: apps/desktop
         run: pnpm exec electron dist/icon-probe.cjs
 
+      - name: Package and check the icon inside ASAR
+        timeout-minutes: 2
+        run: |
+          node -e 'require("fs").writeFileSync("apps/desktop/dist/package.json", JSON.stringify({main:"icon-probe.cjs"}))'
+          node node_modules/.pnpm/@electron+asar@*/node_modules/@electron/asar/bin/asar.js pack apps/desktop/dist apps/desktop/icon-probe.asar
+          cd apps/desktop
+          GUILDIE_ICON_REFERENCE=assets/guildie.ico pnpm exec electron icon-probe.asar
+
   changelog:
     name: CHANGELOG entry
     if: github.event_name == 'pull_request'
