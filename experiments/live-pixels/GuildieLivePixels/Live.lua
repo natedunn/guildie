@@ -1,3 +1,5 @@
+-- The integrated Guildie addon owns export when installed.
+if GuildieLivePixelsIntegrated then return end
 local protocol = GuildiePixelProtocol
 local function json(value)
     local kind = type(value)

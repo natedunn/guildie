@@ -34,6 +34,7 @@ export type GuildieDesktop = {
 	restartToUpdate?(): Promise<void>;
 	/** Check for an app update now (app 0.3.5+). */
 	checkForUpdates?(): Promise<UpdateState>;
+	setLivePixels?(enabled: boolean): Promise<void>;
 };
 
 /** Where the app's self-update stands (apps/desktop/src/updater.ts). */
@@ -61,6 +62,9 @@ export type AddonInfo = {
 };
 
 export type DesktopStatus = {
+	livePixelsEnabled?: boolean;
+	livePixelsAvailable?: boolean;
+	livePixels?: "waiting" | "waiting-game" | "searching" | "calibrating" | "receiving" | "stale" | "stopped" | "failed";
 	connected: boolean;
 	account?: string;
 	wowFolder?: string;

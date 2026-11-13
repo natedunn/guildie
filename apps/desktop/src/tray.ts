@@ -6,6 +6,7 @@ import { Menu, nativeImage, Tray } from "electron";
 import type { Status } from "./connection.ts";
 
 export type TrayActions = {
+	setLivePixels: (enabled: boolean) => void;
 	open: () => void;
 	connect: () => void;
 	uploadNow: () => void;
@@ -66,6 +67,13 @@ export function createTray(actions: TrayActions) {
 				{ label: "Upload now", enabled: status.connected, click: actions.uploadNow },
 				{ label: "Choose World of Warcraft folder...", click: actions.chooseWow },
 				{ label: "Manage addon...", click: actions.manageAddon },
+				{
+					label: "Experimental live sync",
+					type: "checkbox",
+					checked: status.livePixelsEnabled === true,
+					enabled: status.livePixelsAvailable === true,
+					click: (item) => actions.setLivePixels(item.checked),
+				},
 				...(actions.startWithSystem
 					? [
 							{

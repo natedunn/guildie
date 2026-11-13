@@ -17,6 +17,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Guildie, App, Addon:** Add opt-in experimental sync without reloading, with in-game addon settings, an amber square movable in Edit Mode, and automatic capture discovery in the Windows app. Updating the addon requires a full WoW restart.
+
 - **Addon:** Move the experimental sync square in WoW's Edit Mode; export pauses while positioning it and resumes afterward if it was enabled.
 
 - **App, Addon:** Test syncing complete character snapshots without reloading WoW using the small amber pixel square; the opt-in desktop integration reports capture status and keeps normal saved-file sync available.

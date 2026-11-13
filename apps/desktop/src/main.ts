@@ -9,7 +9,7 @@
 //   --smoke-test       start hidden, check the window, bridge and sync engine, print, exit
 //   --user-data <dir>  keep settings somewhere else (tests)
 
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configDir, DEFAULT_API, loadConfig, makeLogger } from "@guildie/sync";
@@ -32,7 +32,7 @@ import {
 	uninstallAddon,
 } from "./addon.ts";
 import { Connection, type Status } from "./connection.ts";
-import { LivePixels, type PixelConfig } from "./live-pixels.ts";
+import { type CaptureConfig, LivePixels } from "./live-pixels.ts";
 import { allowsSelfSigned, isGuildieUrl, originOf } from "./origins.ts";
 import { settings } from "./settings.ts";
 import { runSmokeTest } from "./smoke.ts";
@@ -121,6 +121,9 @@ const startWithSystem =
 
 /** The sync status as the page sees it. */
 const publicStatus = ({
+	livePixels,
+	livePixelsEnabled,
+	livePixelsAvailable,
 	connected,
 	account,
 	lastUpload,
@@ -131,6 +134,9 @@ const publicStatus = ({
 	updateReady,
 	update,
 }: Status) => ({
+	livePixels,
+	livePixelsEnabled,
+	livePixelsAvailable,
 	connected,
 	account,
 	lastUpload,
@@ -164,7 +170,13 @@ app.whenReady().then(async () => {
 		if (helperWow) settings.wow = helperWow;
 	}
 
-	let pixelConfig: PixelConfig | undefined;
+	let pixelConfig: CaptureConfig | undefined;
+	const captureExecutable = app.isPackaged
+		? join(process.resourcesPath, "capture", "GuildieCapture.exe")
+		: join(__dirname, "..", "capture", "dist", "GuildieCapture", "GuildieCapture.exe");
+	if (!smokeTest && process.platform === "win32" && existsSync(captureExecutable)) {
+		pixelConfig = { executable: captureExecutable, auto: true };
+	}
 	const pixelConfigPath = flag("--live-pixels-config");
 	if (pixelConfigPath && !smokeTest) {
 		try {
@@ -326,6 +338,10 @@ app.whenReady().then(async () => {
 			if (!fromSite(event)) throw new Error("Not allowed from this page.");
 			return handler(...args);
 		};
+	ipcMain.handle(
+		"guildie:live-pixels",
+		pageOnly((enabled: unknown) => connection.setLivePixels(enabled)),
+	);
 	ipcMain.handle("guildie:addon-info", pageOnly(addonInfo));
 	ipcMain.handle(
 		"guildie:addon-install",
@@ -337,6 +353,7 @@ app.whenReady().then(async () => {
 	ipcMain.handle(
 		"guildie:addon-uninstall",
 		pageOnly((options: unknown) => {
+			connection.setLivePixels(false);
 			const savedData = !!(
 				options &&
 				typeof options === "object" &&
@@ -409,6 +426,7 @@ app.whenReady().then(async () => {
 		signIn();
 	});
 	const { update } = createTray({
+		setLivePixels: (enabled) => connection.setLivePixels(enabled),
 		open: () => showWindow(),
 		manageAddon: () => showWindow(`${origin}/addon`),
 		reinstallAddon: () => {

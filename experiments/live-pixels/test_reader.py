@@ -29,7 +29,7 @@ class ProtocolTests(unittest.TestCase):
             sample_values(Shot(), 2, theme="gray")
 
     def test_lua_encoder_python_decoder(self):
-        protocol = Path(__file__).parent / "GuildieLivePixels/Protocol.lua"
+        protocol = Path(__file__).resolve().parents[2] / "apps/addon/Guildie/PixelProtocol.lua"
         script = 'dofile(arg[0]); for _, v in ipairs(GuildiePixelProtocol.encode(io.read("*a"))) do io.write(v, " ") end'
         # UTF-8 may be split across packet boundaries; decode only after assembly.
         payload = json.dumps({"text": "é" * 300}, ensure_ascii=False).encode()
@@ -57,7 +57,7 @@ class ProtocolTests(unittest.TestCase):
             assembler.feed(b'S|x|1|999999|x')
 
     def test_live_export_omits_protected_values(self):
-        addon = Path(__file__).parent / "GuildieLivePixels"
+        addon = Path(__file__).resolve().parents[2] / "apps/addon/Guildie"
         script = r"""
 dofile(arg[0])
 local frame = {}
@@ -110,7 +110,7 @@ GuildiePixelProtocol.encode = function(packet)
     end
     return encode(packet)
 end
-dofile(arg[1])
+assert(loadfile(arg[1]))("Guildie", {})
 SlashCmdList.GUILDIELIVEPIXELS("edit")
 frame.scripts.OnUpdate(frame, 1) -- editing must not emit any packets
 frame.GetEffectiveScale = function() return 1 end
@@ -118,9 +118,9 @@ frame.GetLeft = function() return 23.4 end
 frame.GetTop = function() return 477.2 end
 UIParent.GetTop = function() return 500 end
 frame.scripts.OnDragStop()
-assert(GuildieLivePixelsDB.x == 23 and GuildieLivePixelsDB.y == -23)
+assert(GuildieDB.livePixels.x == 23 and GuildieDB.livePixels.y == -23)
 frame.SetPoint = function(_, _, _, _, x, y) assert(x == 23 and y == -23) end
-frame.scripts.OnEvent(frame, "ADDON_LOADED", "GuildieLivePixels")
+frame.scripts.OnEvent(frame, "ADDON_LOADED", "Guildie")
 SlashCmdList.GUILDIELIVEPIXELS("lock")
 expectedSize = 51.2
 SlashCmdList.GUILDIELIVEPIXELS("on 3.2")
@@ -153,7 +153,7 @@ assert(packetCount == before, "Edit Mode must pause all export")
 SlashCmdList.GUILDIELIVEPIXELS("off") -- settings cannot restart/alter export during Edit Mode
 frame.scripts.OnDragStart()
 hooks.OnHide() -- closing while dragging must save and release it
-assert(GuildieLivePixelsDB.x == 23 and GuildieLivePixelsDB.y == -23)
+assert(GuildieDB.livePixels.x == 23 and GuildieDB.livePixels.y == -23)
 assert(frame.shown and not frame.mouse, "previously enabled export must resume")
 frame.scripts.OnUpdate(frame, 0.11)
 assert(packetCount == before + 1)
@@ -164,7 +164,7 @@ hooks.OnHide()
 assert(not frame.shown and not frame.mouse, "Edit Mode must not enable disabled export")
 """
         output = subprocess.check_output([
-            "luajit", "-e", script, "--", str(addon / "Protocol.lua"), str(addon / "Live.lua"),
+            "luajit", "-e", script, "--", str(addon / "PixelProtocol.lua"), str(addon / "LivePixels.lua"),
         ])
         assembler = Assembler()
         records = [assembler.feed(decode(map(int, line.split()))) for line in output.splitlines()]

@@ -11,6 +11,9 @@
 GuildieData.lua
 Capture.lua
 Guildie.lua
+PixelProtocol.lua
+LivePixels.lua
+Settings.lua
 Status.lua
 UI.lua
 Upgrades.lua

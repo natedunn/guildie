@@ -77,7 +77,7 @@ export async function runSmokeTest(
 		check(
 			"bridge has exactly the agreed functions",
 			security.keys ===
-				"addon,checkForUpdates,chooseWowFolder,getState,getStatus,isDesktop,onStatus,restartToUpdate,setToken,signIn,signOut,uploadNow,version",
+				"addon,checkForUpdates,chooseWowFolder,getState,getStatus,isDesktop,onStatus,restartToUpdate,setLivePixels,setToken,signIn,signOut,uploadNow,version",
 			security.keys,
 		);
 		check('html[data-desktop="true"]', security.dataset === "true");
@@ -112,6 +112,13 @@ export async function runSmokeTest(
 		const rejects = async (code: string) =>
 			page<string>(`${code}.then(() => "resolved", (e) => "rejected: " + e.message)`);
 		const bad = await rejects('window.guildieDesktop.setToken("not-a-token")');
+		const badCapture = await rejects('window.guildieDesktop.setLivePixels("yes")');
+		check("capture rejects non-boolean input", badCapture.startsWith("rejected"));
+		await page("window.guildieDesktop.setLivePixels(false)");
+		check(
+			"capture can be disabled",
+			!(await page<{ livePixelsEnabled?: boolean }>("window.guildieDesktop.getStatus()")).livePixelsEnabled,
+		);
 		check("setToken rejects a malformed token", bad.startsWith("rejected"), bad);
 		const unknown = await rejects('window.guildieDesktop.setToken("gld_' + "x".repeat(32) + '")');
 		check("setToken rejects a token the site doesn't know", unknown.startsWith("rejected"), unknown);

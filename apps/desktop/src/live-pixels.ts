@@ -12,7 +12,16 @@ export type PixelConfig = {
 	cell: number;
 	theme: "amber" | "gray";
 };
-export type PixelStatus = "waiting" | "receiving" | "stale" | "stopped" | "failed";
+export type CaptureConfig = PixelConfig | { executable: string; auto: true };
+export type PixelStatus =
+	| "waiting"
+	| "waiting-game"
+	| "searching"
+	| "calibrating"
+	| "receiving"
+	| "stale"
+	| "stopped"
+	| "failed";
 
 export function parsePixelConfig(value: unknown): PixelConfig {
 	if (!value || typeof value !== "object") throw new Error("Invalid pixel config");
@@ -32,8 +41,8 @@ export function parsePixelConfig(value: unknown): PixelConfig {
 /** Bound buffered output even if a broken reader never sends a newline. */
 export class PixelLines {
 	private pending = "";
-	private readonly record: (channel: "snapshot" | "live", data: Record<string, unknown>) => void;
-	constructor(record: (channel: "snapshot" | "live", data: Record<string, unknown>) => void) {
+	private readonly record: (channel: "snapshot" | "live" | "status", data: Record<string, unknown>) => void;
+	constructor(record: (channel: "snapshot" | "live" | "status", data: Record<string, unknown>) => void) {
 		this.record = record;
 	}
 	feed(chunk: string) {
@@ -46,7 +55,7 @@ export class PixelLines {
 			const value = JSON.parse(line);
 			if (
 				!value ||
-				!["snapshot", "live"].includes(value.channel) ||
+				!["snapshot", "live", "status"].includes(value.channel) ||
 				!value.data ||
 				typeof value.data !== "object" ||
 				Array.isArray(value.data)
@@ -63,10 +72,10 @@ export class LivePixels {
 	private timer: NodeJS.Timeout | undefined;
 	private lastRecord = 0;
 	private state: PixelStatus | undefined;
-	private readonly config: PixelConfig;
+	private readonly config: CaptureConfig;
 	private readonly snapshot: (data: unknown) => void;
 	private readonly status: (state: PixelStatus) => void;
-	constructor(config: PixelConfig, snapshot: (data: unknown) => void, status: (state: PixelStatus) => void) {
+	constructor(config: CaptureConfig, snapshot: (data: unknown) => void, status: (state: PixelStatus) => void) {
 		this.config = config;
 		this.snapshot = snapshot;
 		this.status = status;
@@ -85,8 +94,10 @@ export class LivePixels {
 		this.lastRecord = 0;
 		this.setStatus("waiting");
 		const child = spawn(
-			c.python,
-			[c.reader, "--left", String(c.left), "--top", String(c.top), "--cell", String(c.cell), "--theme", c.theme],
+			"auto" in c ? c.executable : c.python,
+			"auto" in c
+				? ["--auto"]
+				: [c.reader, "--left", String(c.left), "--top", String(c.top), "--cell", String(c.cell), "--theme", c.theme],
 			{
 				windowsHide: true,
 				shell: false,
@@ -101,6 +112,12 @@ export class LivePixels {
 			this.setStatus("failed");
 		};
 		const lines = new PixelLines((channel, data) => {
+			if (channel === "status") {
+				if (!["waiting-game", "searching", "calibrating", "receiving"].includes(String(data.state)))
+					throw new Error("Invalid capture state");
+				this.setStatus(data.state as PixelStatus);
+				return;
+			}
 			this.lastRecord = Date.now();
 			this.setStatus("receiving");
 			if (channel === "snapshot") this.snapshot(data);
@@ -117,7 +134,8 @@ export class LivePixels {
 		child.on("error", fail);
 		child.on("exit", fail);
 		this.timer = setInterval(() => {
-			if (this.lastRecord && Date.now() - this.lastRecord > 10_000) this.setStatus("stale");
+			if (this.state === "receiving" && this.lastRecord && Date.now() - this.lastRecord > 10_000)
+				this.setStatus("stale");
 		}, 2_000);
 	}
 	stop() {

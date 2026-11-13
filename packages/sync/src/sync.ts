@@ -101,6 +101,11 @@ export class SyncEngine {
 	}
 
 	/** Complete snapshots only; character ownership and field validation remain server-side. */
+	clearPixelSnapshot() {
+		this.pixelSnapshot = undefined;
+		this.pixelUploaded = undefined;
+	}
+
 	queuePixelSnapshot(value: unknown) {
 		if (!this.api.token || !value || typeof value !== "object") return false;
 		const { version, characters } = value as { version?: unknown; characters?: unknown };

@@ -1,5 +1,12 @@
 # Guildie addon
 
+Experimental sync without reloading is configured under **Options → AddOns →
+Guildie**. Export starts off; enabling it is remembered across logins. Choose amber
+(default) or grayscale troubleshooting mode, small or large squares, and move it
+through Edit Mode. Enable capture separately in the Windows app. See
+[live sync](../../docs/live-sync.md) for setup and current limitations. New files
+in this update require a full game restart.
+
 Saves your character as the game sees it for the Guildie desktop app
 (`apps/desktop`) to upload to
 guildie.club, so the site shows it before Blizzard's profile catches up

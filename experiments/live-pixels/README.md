@@ -1,5 +1,11 @@
 # Live pixel export experiment
 
+**The current integration lives in the main addon and desktop app.** Follow
+[the live sync guide](../../docs/live-sync.md) for the bundled Windows helper,
+automatic calibration and in-game settings. The instructions below document the
+earlier manual pilot. The legacy reader entry point forwards to the current reader;
+disable the separate GuildieLivePixels addon when testing the integrated version.
+
 Manual, outbound-only prototype. Not bundled with Guildie or installed automatically.
 The standalone reader stays local; the opt-in desktop pilot below uploads complete
 snapshots through your signed-in Guildie connection. Blizzard approval of this transport is unconfirmed.

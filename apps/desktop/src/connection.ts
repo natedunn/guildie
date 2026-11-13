@@ -15,11 +15,13 @@ import {
 	SyncEngine,
 } from "@guildie/sync";
 import { net } from "electron";
-import { LivePixels, type PixelConfig, type PixelStatus } from "./live-pixels.ts";
+import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
 import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
 
 export type Status = {
+	livePixelsEnabled?: boolean;
+	livePixelsAvailable?: boolean;
 	livePixels?: PixelStatus;
 	connected: boolean;
 	account?: string;
@@ -67,15 +69,17 @@ export class Connection {
 	private lastRetry = 0;
 	private readonly pixels: LivePixels | undefined;
 	private pixelStatus: PixelStatus | undefined;
+	private pixelsEnabled = false;
 	private readonly listeners = new Set<(status: Status) => void>();
 	/** Notices for the user (shown as notifications by main). */
 	onNotice: (title: string, body: string) => void = () => {};
 	/** The WoW folder was chosen (main installs or updates the addon there). */
 	onWowFolder: (folder: string) => void = () => {};
 
-	constructor(origin: string, log: Log, pixelConfig?: PixelConfig) {
+	constructor(origin: string, log: Log, pixelConfig?: CaptureConfig) {
 		this.origin = origin;
 		this.log = log;
+		this.pixelsEnabled = !!pixelConfig && (!("auto" in pixelConfig) || settings.livePixelsEnabled(origin));
 		const saved = loadToken(origin);
 		// Electron's network stack: the system's proxy and certificates, and
 		// *.localhost's self-signed certificate (see main.ts).
@@ -107,6 +111,8 @@ export class Connection {
 
 	get status(): Status {
 		return {
+			livePixelsEnabled: this.pixelsEnabled,
+			livePixelsAvailable: !!this.pixels,
 			livePixels: this.pixelStatus,
 			connected: !!this.account,
 			account: this.account,
@@ -162,6 +168,17 @@ export class Connection {
 		this.sync.reset();
 	}
 
+	setLivePixels(enabled: unknown) {
+		if (typeof enabled !== "boolean") throw new Error("Expected a boolean");
+		if (enabled && !this.pixels) throw new Error("Live capture is unavailable in this build");
+		this.pixelsEnabled = enabled;
+		settings.setLivePixels(this.origin, enabled);
+		this.sync.clearPixelSnapshot();
+		this.pixels?.stop();
+		if (enabled && this.account) this.pixels?.start();
+		this.emit();
+	}
+
 	private async tick() {
 		// Which addon the game last ran changes when it saves (at /reload or logout).
 		const loaded = loadedAddonVersion(this.sync.wowFolder);
@@ -186,7 +203,7 @@ export class Connection {
 			return false;
 		}
 		this.account = me.battletag ?? this.account ?? "you";
-		this.pixels?.start();
+		if (this.pixelsEnabled) this.pixels?.start();
 		if (this.api.token) saveToken(this.origin, this.api.token, this.account);
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		if (!me.characters.length)
@@ -209,7 +226,7 @@ export class Connection {
 			this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
 		this.sync.reset();
 		this.pixels?.stop();
-		this.pixels?.start();
+		if (this.pixelsEnabled) this.pixels?.start();
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		this.emit();
 	}
