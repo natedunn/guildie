@@ -2,7 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, type QueryCtx, query } from "./_generated/server";
-import { catalogFor } from "./addonCatalog";
+import { catalogFor, foldersFor } from "./addonCatalog";
 import { access } from "./guilds";
 import { vAddonShare, vRegion } from "./schema";
 import { type AddonEntry, canSeeAddons, summarizeAddons } from "./shared/addons";
@@ -16,8 +16,12 @@ import { requireUserId } from "./users";
 
 /** Addons summed up, with what CurseForge says about them. */
 async function summarize(ctx: QueryCtx, people: { list: AddonEntry[] }[]) {
-	const ids = people.flatMap((p) => p.list.flatMap((a) => (a.curseId ? [a.curseId] : [])));
-	return summarizeAddons(people, await catalogFor(ctx, ids));
+	const folders = await foldersFor(
+		ctx,
+		people.flatMap((p) => p.list.filter((a) => !a.curseId).map((a) => a.name)),
+	);
+	const ids = [...people.flatMap((p) => p.list.flatMap((a) => (a.curseId ? [a.curseId] : []))), ...folders.values()];
+	return summarizeAddons(people, await catalogFor(ctx, ids), folders);
 }
 
 export async function addonRow(ctx: QueryCtx, userId: Id<"users">) {

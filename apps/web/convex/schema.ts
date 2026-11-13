@@ -793,4 +793,16 @@ export default defineSchema({
 		missing: v.optional(v.boolean()),
 		fetchedAt: v.number(),
 	}).index("by_curseId", ["curseId"]),
+
+	/**
+	 * Which CurseForge project an addon folder belongs to, from the folders in
+	 * the latest files of CurseForge's popular WoW projects (addonCatalog.ts
+	 * syncPopular, weekly). For addons whose .toc carries no project ID; an ID
+	 * in the .toc wins. `folder` is lowercase.
+	 */
+	addonFolders: defineTable({
+		folder: v.string(),
+		curseId: v.number(),
+		fetchedAt: v.number(),
+	}).index("by_folder", ["folder"]),
 });

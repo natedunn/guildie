@@ -28,4 +28,12 @@ crons.weekly(
 // CurseForge names, icons and links for the addons players run (addonCatalog.ts).
 crons.daily("refresh addon catalog", { hourUTC: 11, minuteUTC: 30 }, internal.addonCatalog.refresh, {});
 
+// Which CurseForge project each addon folder is, for addons without an ID in their .toc.
+crons.weekly(
+	"sync popular addons",
+	{ dayOfWeek: "wednesday", hourUTC: 11, minuteUTC: 15 },
+	internal.addonCatalog.syncPopular,
+	{},
+);
+
 export default crons;

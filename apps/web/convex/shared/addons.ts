@@ -66,6 +66,51 @@ export function catalogEntry(mod: CurseMod): CatalogInfo & { curseId: number; mi
 	};
 }
 
+/** A CurseForge project as its popular list gives it: the folders its latest files install. */
+export type CurseModFiles = CurseMod & {
+	slug?: string;
+	downloadCount?: number;
+	latestFiles?: { modules?: { name?: string }[] }[];
+};
+
+const loose = (text: string | undefined) => (text ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+/**
+ * Folder (lowercase) → CurseForge project, from the folders each project's
+ * latest files install. A folder several projects ship (forks, bundled
+ * libraries) goes to the project named like it, else the most downloaded.
+ */
+export function folderProjects(mods: CurseModFiles[]) {
+	const best = new Map<string, { id: number; named: boolean; downloads: number }>();
+	for (const mod of mods) {
+		if (mod.gameId !== undefined && mod.gameId !== WOW_GAME_ID) continue;
+		const folders = new Set(
+			(mod.latestFiles ?? []).flatMap((f) => (f.modules ?? []).map((m) => m.name?.trim() ?? "")).filter(Boolean),
+		);
+		for (const name of folders) {
+			if (name.length > 64) continue;
+			const folder = name.toLowerCase();
+			const named = loose(name) === loose(mod.name) || loose(name) === loose(mod.slug);
+			const downloads = mod.downloadCount ?? 0;
+			const current = best.get(folder);
+			if (!current || (named && !current.named) || (named === current.named && downloads > current.downloads)) {
+				best.set(folder, { id: mod.id, named, downloads });
+			}
+		}
+	}
+	return new Map([...best].map(([folder, { id }]) => [folder, id]));
+}
+
+/** A CurseForge name without its "(Bags)"-style tail. */
+const shortName = (name: string | undefined) => name?.replace(/\s*\([^)]*\)\s*$/, "") || undefined;
+
+/** Notes cut short in game (at 120 characters) end at a word, with an ellipsis. */
+export function tidyNotes(notes: string | undefined) {
+	if (!notes || notes.length < 120) return notes;
+	const cut = notes.slice(0, notes.lastIndexOf(" ") > 60 ? notes.lastIndexOf(" ") : notes.length);
+	return `${cut.replace(/[\s,;:(–-]+$/, "")}…`;
+}
+
 /** One person running an addon: their index in `people` and the version they have. */
 export type AddonUser = { person: number; version?: string };
 
@@ -90,7 +135,12 @@ export type AddonRow = {
  * person counts once, with the version of the addon's main folder (the one
  * with the shortest name). `people` keep their order.
  */
-export function summarizeAddons(people: { list: AddonEntry[] }[], catalog: Map<number, CatalogInfo> = new Map()) {
+export function summarizeAddons(
+	people: { list: AddonEntry[] }[],
+	catalog: Map<number, CatalogInfo> = new Map(),
+	/** Folder (lowercase) → project for folders whose .toc has no ID (addonFolders). */
+	folders: Map<string, number> = new Map(),
+) {
 	type Group = { key: string; curseId?: number; entries: Map<string, AddonEntry>; byPerson: Map<number, AddonEntry[]> };
 	// A folder's project from anyone who sent it (older addons don't).
 	const projectOf = new Map<string, number>();
@@ -100,15 +150,15 @@ export function summarizeAddons(people: { list: AddonEntry[] }[], catalog: Map<n
 	const groups = new Map<string, Group>();
 	people.forEach((person, i) => {
 		for (const sent of person.list) {
-			const curseId = sent.curseId ?? projectOf.get(sent.name.toLowerCase());
+			const folder = sent.name.toLowerCase();
+			const curseId = sent.curseId ?? projectOf.get(folder) ?? folders.get(folder);
 			const addon = curseId ? { ...sent, curseId } : sent;
-			const key = curseId ? `curse:${curseId}` : `name:${addon.name.toLowerCase()}`;
+			const key = curseId ? `curse:${curseId}` : `name:${folder}`;
 			let group = groups.get(key);
 			if (!group) {
 				group = { key, curseId: addon.curseId, entries: new Map(), byPerson: new Map() };
 				groups.set(key, group);
 			}
-			const folder = addon.name.toLowerCase();
 			const known = group.entries.get(folder);
 			group.entries.set(folder, {
 				...known,
@@ -134,9 +184,9 @@ export function summarizeAddons(people: { list: AddonEntry[] }[], catalog: Map<n
 			.sort((a, b) => a.person - b.person);
 		rows.push({
 			key: group.key,
-			title: main.title ?? info?.name ?? main.name,
+			title: main.title ?? shortName(info?.name) ?? main.name,
 			folders: entries.map((e) => e.name),
-			summary: info?.summary ?? entries.find((e) => e.notes)?.notes,
+			summary: info?.summary ?? tidyNotes(entries.find((e) => e.notes)?.notes),
 			logo: info?.logo,
 			url: info?.url,
 			categories: info?.categories ?? [],

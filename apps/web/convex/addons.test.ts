@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { canSeeAddons, catalogEntry, summarizeAddons } from "./shared/addons.ts";
+import { canSeeAddons, catalogEntry, folderProjects, summarizeAddons, tidyNotes } from "./shared/addons.ts";
 
 test("who sees a player's addons", () => {
 	const owner = { isOwner: true, isMember: false };
@@ -105,4 +105,71 @@ test("CurseForge projects: WoW only, links and logos only from CurseForge", () =
 	assert.equal(bad.url, undefined);
 	assert.equal(bad.logo, undefined);
 	assert.deepEqual(catalogEntry({ id: 2, gameId: 432 }), { curseId: 2, missing: true }, "not a WoW project");
+});
+
+test("folders → projects from CurseForge's popular list: the project named like the folder, else the most downloaded", () => {
+	const map = folderProjects([
+		{
+			id: 914482,
+			gameId: 1,
+			name: "Baganator (Bags)",
+			slug: "baganator",
+			downloadCount: 40,
+			latestFiles: [{ modules: [{ name: "Baganator" }] }, { modules: [{ name: "Baganator" }] }],
+		},
+		{
+			id: 326516,
+			gameId: 1,
+			name: "AtlasLootClassic",
+			downloadCount: 38,
+			latestFiles: [{ modules: [{ name: "AtlasLootClassic" }, { name: "AtlasLootClassic_Data" }] }],
+		},
+		{
+			id: 1422985,
+			gameId: 1,
+			name: "AtlasLoot Classic Forever",
+			downloadCount: 90,
+			latestFiles: [{ modules: [{ name: "AtlasLootClassic" }, { name: "AtlasLootClassic_Data" }] }],
+		},
+		{ id: 9, gameId: 432, name: "Minecraft", latestFiles: [{ modules: [{ name: "Questie" }] }] },
+	]);
+	assert.equal(map.get("baganator"), 914482, "slug matches the folder");
+	assert.equal(map.get("atlaslootclassic"), 326516, "named like the folder beats more downloads");
+	assert.equal(map.get("atlaslootclassic_data"), 1422985, "otherwise the most downloaded");
+	assert.equal(map.has("questie"), false, "WoW projects only");
+});
+
+test("addons without a .toc ID get their project from the folder map; a .toc ID wins", () => {
+	const rows = summarizeAddons(
+		[
+			{
+				list: [{ name: "Baganator" }, { name: "SpeedyAutoLoot", version: "1.4" }, { name: "Questie", curseId: 334372 }],
+			},
+		],
+		new Map([
+			[914482, { name: "Baganator (Bags)", summary: "Bags" }],
+			[295182, { name: "Speedy AutoLoot", summary: "Loot faster" }],
+			[334372, { name: "Questie" }],
+		]),
+		new Map([
+			["baganator", 914482],
+			["speedyautoloot", 295182],
+			["questie", 1],
+		]),
+	);
+	const byTitle = new Map(rows.map((r) => [r.title, r]));
+	assert.equal(byTitle.get("Baganator")?.summary, "Bags", "CurseForge's name without its (tail)");
+	assert.equal(byTitle.get("Speedy AutoLoot")?.users[0].version, "1.4");
+	assert.equal(byTitle.get("Questie")?.key, "curse:334372");
+});
+
+test("notes cut short in game end at a word", () => {
+	const cut =
+		"Sends your character (level, gear, weapon and armor skills, professions, recipes, talents, bags and bank, and your quest";
+	assert.equal(cut.length, 120);
+	assert.equal(
+		tidyNotes(cut),
+		"Sends your character (level, gear, weapon and armor skills, professions, recipes, talents, bags and bank, and your…",
+	);
+	assert.equal(tidyNotes("Short."), "Short.");
 });
