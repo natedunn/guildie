@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.27
+
 ### New
 
 - **Guildie, Addon:** See whether a recipe (pattern, plans, formula...) is worth sending someone: for each guildmate with the profession, whether they already know it, already have one, can learn it now, or need more skill first. It shows on the recipe's tooltip in game, in the item panel, under recipes in your Inventory, and on Crafting's new "Who can learn" tab. Guildmates see only the recipes you're holding for your own professions, nothing else in your bags.
