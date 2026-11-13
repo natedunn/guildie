@@ -253,6 +253,13 @@ doneEditing:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -8)
 doneEditing:SetSize(90, 24)
 doneEditing:SetText("Done")
 doneEditing:Hide()
+local cancelEditing = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+cancelEditing:SetPoint("LEFT", doneEditing, "RIGHT", 6, 0)
+cancelEditing:SetSize(90, 24)
+cancelEditing:SetText("Cancel")
+cancelEditing:Hide()
+-- Where the square was when Guildie's own move began (Cancel puts it back).
+local before
 local function beginEditing()
     editing = true
     layout(cellSize)
@@ -264,6 +271,7 @@ local function beginEditing()
     displayed = {}
     editLabel:Show()
     doneEditing:SetShown(not nativeEditing)
+    cancelEditing:SetShown(not nativeEditing)
     panel:EnableMouse(true)
     panel:Show()
 end
@@ -273,6 +281,8 @@ local function endEditing()
     editing = false
     editLabel:Hide()
     doneEditing:Hide()
+    cancelEditing:Hide()
+    before = nil
     panel:EnableMouse(false)
     displayed = {}
     snapshot, live = nil, nil
@@ -280,6 +290,19 @@ local function endEditing()
     if exportEnabled then panel:Show() else panel:Hide() end
 end
 doneEditing:SetScript("OnClick", endEditing)
+cancelEditing:SetScript("OnClick", function()
+    if dragging then panel:StopMovingOrSizing(); dragging = false end
+    if before then
+        local o = options()
+        o.corner, o.x, o.y = before.corner, before.x, before.y
+        restorePosition()
+    end
+    endEditing()
+end)
+-- Guildie never opens Blizzard's Edit Mode itself: entering it from addon
+-- code taints its setup (TargetUnit/FocusUnit get blocked and the UI is left
+-- half in Edit Mode). Moving the square from Guildie uses the square's own
+-- drag mode; players who open Edit Mode themselves can drag it there too.
 -- Follow the manager's visibility, as LibEditMode does, without touching
 -- Blizzard's protected system registrations. Retry when its load-on-demand UI loads.
 local hookedManager
@@ -381,13 +404,13 @@ ns.livePixels = {
         applyOptions()
         if ns.refreshSyncWarning then ns.refreshSyncWarning() end
     end,
+    -- Guildie's own move: drag the square, then Done (or Cancel). Never
+    -- Blizzard's Edit Mode (see above). Already in Edit Mode: it's draggable.
     position = function()
-        if read(InCombatLockdown) then return end
-        if EditModeManagerFrame and type(EditModeManagerFrame.EnterEditMode) == "function" then
-            EditModeManagerFrame:EnterEditMode()
-        else
-            beginEditing()
-        end
+        if read(InCombatLockdown) or editing then return end
+        local o = options()
+        before = { corner = o.corner, x = o.x, y = o.y }
+        beginEditing()
     end,
     corner = function(edge)
         if read(InCombatLockdown) then return end

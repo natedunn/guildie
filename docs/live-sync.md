@@ -14,8 +14,11 @@ In WoW, open the Guildie window (minimap button or `/guildie`) → **Settings**:
 - Choose the default amber palette or grayscale for troubleshooting.
 - Choose small or larger cells. The addon snaps to physical pixels when the
   client exposes screen dimensions; the intended sizes are 32×32 and 64×64.
-- Open Edit Mode to drag the square, or use Move to top left / Move to bottom left. Export pauses while
-  Edit Mode is open. Position is shared across layouts and saved on drag stop.
+- Move the square: Top left / Bottom left, or **Drag to move** (drag it, then Done or
+  Cancel). It also moves in the game's own Edit Mode when the player opens that.
+  Guildie never opens Edit Mode itself: entering it from addon code taints its
+  setup (blocked `TargetUnit`/`FocusUnit`, a half-entered Edit Mode). Export
+  pauses while moving. Position is shared across layouts and saved on drag stop.
 
 App capture defaults on unless previously disabled. Manage **Experimental sync without reloading** in Settings → Addon; there is no tray toggle. The in-game export still defaults off. After enabling or disabling it, `/reload` saves the choice; the app reads the newest Forever account save and only starts capture when that setting is enabled. Missing or unreadable saves leave capture stopped. With multiple WoW accounts, the most recently saved account determines this preference.
 Signing out stops the helper, and signing in resumes it if the setting is enabled.
@@ -69,7 +72,7 @@ The website shows the new controls only when the method exists. Use a site build
    still a maintainer step). Fully restart WoW because new Lua files were added.
 2. Confirm the Guildie page appears in WoW's addon settings and defaults to disabled.
    Toggle export, then `/reload` to start or stop app capture; change palette and size there without slash commands. Restart/reload
-   and verify preferences persist. Move/reset in Edit Mode, including near edges.
+   and verify preferences persist. Move/reset with Drag to move and in the game's Edit Mode, including near edges; no Guildie taint warnings.
 3. Launch the packaged app without Python installed or any pixel config/launch flag.
    Check capture in the updated app settings. Confirm automatic
    calibration on small and large squares, amber and grayscale, then move the

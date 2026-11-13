@@ -213,7 +213,7 @@ function S.liveProblem(health)
     if not health or not health.enabled then return nil end
     if health.error then return { title = "Live sync stopped", body = health.error } end
     if health.editing then
-        return { title = "Live sync paused", body = "Close Edit Mode to resume. The square doesn't send while you move it." }
+        return { title = "Live sync paused", body = "Click Done on the square (or close Edit Mode) to resume. It doesn't send while you move it." }
     end
     if not health.hasData then
         return { title = "Live sync waiting", body = "Nothing to send until your character has loaded. Reload if this doesn't clear." }

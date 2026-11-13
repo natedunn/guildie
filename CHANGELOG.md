@@ -17,6 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
+- **Addon:** Moving the live sync square no longer opens the game's Edit Mode, which WoW blocked ("Guildie has been blocked from an action...") and left half open. Use Drag to move in Guildie's settings (drag it, then Done or Cancel), or the game's Edit Mode from the game menu.
 - **Guildie, Addon:** Characters' professions show again. A failed read in game was replacing them with an empty list, and it also deleted the recipes the addon had read: open each profession window once after updating to read them again.
 - **Guildie:** When the game and Blizzard disagree, the newer one shows again, so playing without the Guildie app no longer leaves old gear, talents or quests on your page. An empty read from either side never hides the other's data.
 

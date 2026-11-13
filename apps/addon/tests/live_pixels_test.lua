@@ -120,9 +120,22 @@ GuildieDB.livePixels.corner, GuildieDB.livePixels.x, GuildieDB.livePixels.y = ni
 wow.fire("UI_SCALE_CHANGED")
 assert(GuildieDB.livePixels.x > 0 and GuildieDB.livePixels.y < 0, "unsafe saved position is clamped")
 GetPhysicalScreenSize = nil
--- Fallback editing must not silently disable the saved export setting.
-EditModeManagerFrame = nil
+-- Moving never opens Blizzard's Edit Mode (it taints its setup), and must
+-- not silently disable the saved export setting.
+local enteredEditMode = false
+EditModeManagerFrame = {EnterEditMode = function() enteredEditMode = true end}
 ns.livePixels.set("enabled", true)
+ns.livePixels.position()
+assert(not enteredEditMode, "Guildie must not call EditModeManagerFrame:EnterEditMode()")
+EditModeManagerFrame = nil
+-- Cancel puts the square back where it was.
+local savedX, savedY = GuildieDB.livePixels.x, GuildieDB.livePixels.y
+GuildieDB.livePixels.x, GuildieDB.livePixels.y = savedX + 40, savedY - 40
+for _, f in ipairs(wow.frames) do
+    if rawget(f, "_text") == "Cancel" and f.scripts.OnClick then f.scripts.OnClick() end
+end
+assert(GuildieDB.livePixels.x == savedX and GuildieDB.livePixels.y == savedY, "Cancel restores the position")
+assert(not ns.livePixels.health().editing)
 ns.livePixels.position()
 assert(ns.livePixels.get().enabled and ns.livePixels.health().editing)
 for _, f in ipairs(wow.frames) do

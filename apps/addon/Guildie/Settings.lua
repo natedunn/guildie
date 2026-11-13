@@ -101,9 +101,10 @@ function ns.buildSettingsRows(parent, width, changed)
 
     section("Live square", live)
     note("Keep the whole square on screen and uncovered. Bank and recipes still need their windows opened.", live)
+    note("Drag to move: drag the square, then Done. It also moves in the game's Edit Mode.", live)
     local group = CreateFrame("Frame", nil, parent)
     group:SetSize(width, 26)
-    for i, spec in ipairs({{"Top left", "top"}, {"Bottom left", "bottom"}, {"Move in Edit Mode", "edit"}}) do
+    for i, spec in ipairs({{"Top left", "top"}, {"Bottom left", "bottom"}, {"Drag to move", "edit"}}) do
         local button = CreateFrame("Button", nil, group, "UIPanelButtonTemplate")
         button:SetPoint("TOPLEFT", (i - 1) * 132, 0)
         button:SetSize(i == 3 and 150 or 124, 24)
