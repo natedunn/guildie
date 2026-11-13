@@ -213,3 +213,31 @@ test("loadedAddonVersion: what the game last ran, from the newest saved file", (
 	assert.equal(loadedAddonVersion(wow), "0.10.1");
 	assert.equal(loadedAddonVersion(mkdtempSync(join(tmpdir(), "guildie-empty-"))), undefined, "nothing saved");
 });
+
+test("capture follows the newest saved Forever preference and stops for missing or invalid saves", async () => {
+	const { savedLivePixelsEnabled } = await import("./watcher.ts");
+	const { rmSync } = await import("node:fs");
+	const { wow, file } = fakeWow();
+	try {
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true, ["theme"] = "amber" } }');
+		assert.equal(savedLivePixelsEnabled(wow), true);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = false } }');
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true');
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		const second = join(wow, "_forever_", "WTF", "Account", "ACCOUNT2", "SavedVariables", "Guildie.lua");
+		mkdirSync(join(second, ".."), { recursive: true });
+		writeFileSync(second, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true } }');
+		utimesSync(second, new Date(), new Date(Date.now() + 5000));
+		assert.equal(savedLivePixelsEnabled(wow), true);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = false } }');
+		utimesSync(file, new Date(), new Date(Date.now() + 10000));
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		rmSync(file);
+		rmSync(second);
+		assert.equal(savedLivePixelsEnabled(wow), false);
+	} finally {
+		rmSync(wow, { recursive: true, force: true });
+	}
+});

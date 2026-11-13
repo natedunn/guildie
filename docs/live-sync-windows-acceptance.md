@@ -71,3 +71,7 @@ Private capture records, account identifiers, inventory details, screenshots, to
 - Guildie-Setup-0.3.28.exe: `33EDC3A3459D5542B983FAA6B05A0283CB33394962B6318401DBE171113FD40D`
 - Guildie-0.3.28-win-x64.zip: `91EC06EBA9E0058F1C207A2AD24EAFDE9EE1835123688357FA86188991CD5F83`
 - LivePixels.lua: `7564A03B95335758779DC4C5B902411E0684ED73FBE2BACF2458B8972030B147`
+
+## Changes after this acceptance session
+
+PR follow-up consolidates addon preferences into General / Experimental sync tabs, redirects minimap clicks, adds top-left / bottom-left placement, and removes the tray toggle. App capture now defaults allowed unless previously disabled, but only starts after the newest Forever SavedVariables file says export is enabled. Enabling or disabling in-game requires `/reload` to notify the app. These UI and activation changes have automated coverage but have not yet been accepted in Windows; repeat enable/reload, disable/reload, minimap navigation, both corner positions, and Edit Mode checks.

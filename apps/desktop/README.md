@@ -217,7 +217,7 @@ releases to see one), and Start with Windows surviving an update.
 ## Experimental live pixel sync
 
 The current integration is documented in [live sync](../../docs/live-sync.md).
-Windows builds bundle a capture helper; the app's Settings → Addon and tray provide
+Windows builds bundle a capture helper; the app's Settings → Addon provides
 an opt-in switch. The addon has its own persistent settings under WoW's addon menu.
 The additive optional bridge method `setLivePixels(boolean)` controls capture;
 status adds `livePixelsAvailable`, `livePixelsEnabled` and `livePixels`. Every call
@@ -231,4 +231,4 @@ Development builds can start the separately installed pixel reader with
 verification checklist are in [the experiment guide](../../experiments/live-pixels/README.md#desktop-upload-pilot).
 The app owns capture for that run, uses its existing authenticated snapshot uploader,
 and shows capture state in the tray. This does not change the web bridge or enable
-capture in ordinary launches. The Python reader and experimental addon are not bundled.
+capture in ordinary launches. The legacy standalone experimental addon is not bundled; automatic capture uses the bundled helper.

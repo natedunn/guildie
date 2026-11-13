@@ -12,13 +12,7 @@ wow.fire("ADDON_LOADED", "Guildie")
 wow.fire("ADDON_LOADED", "Other")
 assert(registered == 1, "settings register once")
 assert(ns.livePixels.get().enabled ~= true, "disabled by default")
-local control
-for _, f in ipairs(wow.frames) do
-    for _, point in ipairs(f.points) do
-        -- Settings checkbox uses the short SetPoint overload in the stub.
-        if point[1] == "TOPLEFT" and point[2] == 16 and point[3] == -132 then control = f end
-    end
-end
+local control = GuildieSettingsPanel.syncEnabled
 assert(control, "in-game enable checkbox exists")
 control:SetChecked(true)
 control.scripts.OnClick(control)
@@ -78,3 +72,19 @@ wow.fire("UI_SCALE_CHANGED")
 assert(math.abs(pixelFrame:GetWidth() * ratio * 0.8 - 64) < 0.00001, "resizes after UI scale changes")
 GetPhysicalScreenSize = nil
 print("Live pixel physical sizing passed")
+
+ns.livePixels.set("enabled", true)
+ns.livePixels.corner("bottom")
+local bottomY = GuildieDB.livePixels.y
+assert(bottomY < -GuildieDB.livePixels.x, "bottom left sits below top left")
+ns.livePixels.corner("top")
+assert(GuildieDB.livePixels.y == -GuildieDB.livePixels.x, "top left uses inset")
+assert(GuildieDB.livePixels.enabled, "moving preserves export preference")
+local opened
+Settings.OpenToCategory = function(id) opened = id end
+Guildie_OnAddonCompartmentClick()
+assert(opened == 1, "addon compartment opens unified settings")
+ns.updateMinimapButton()
+opened = nil
+GuildieMinimapButton.scripts.OnClick()
+assert(opened == 1, "minimap opens unified settings")

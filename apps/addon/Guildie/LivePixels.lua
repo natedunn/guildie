@@ -329,6 +329,17 @@ ns.livePixels = {
             SlashCmdList.GUILDIELIVEPIXELS("edit")
         end
     end,
+    corner = function(edge)
+        if read(InCombatLockdown) then return end
+        local x, y = defaultPosition()
+        if edge == "bottom" then
+            local scale = read(panel.GetEffectiveScale, panel) or 1
+            local height = (read(UIParent.GetHeight, UIParent) or 0) * (read(UIParent.GetEffectiveScale, UIParent) or 1) / scale
+            y = -height + panel:GetHeight() + x
+        end
+        options().x, options().y = x, y
+        place(x, y)
+    end,
     reset = function()
         options().x, options().y = defaultPosition()
         place(options().x, options().y)

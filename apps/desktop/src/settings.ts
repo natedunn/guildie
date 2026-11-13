@@ -61,7 +61,8 @@ function save() {
 
 export const settings = {
 	livePixelsEnabled(origin: string) {
-		return load().livePixelsOrigins?.includes(origin) === true;
+		const origins = load().livePixelsOrigins;
+		return origins === undefined || origins.includes(origin);
 	},
 	setLivePixels(origin: string, enabled: boolean) {
 		const origins = new Set(load().livePixelsOrigins ?? []);

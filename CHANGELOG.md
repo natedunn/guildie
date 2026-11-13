@@ -17,7 +17,12 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
-- **Guildie, App, Addon:** Experimental sync without reloading (off by default). Enable it in the app and WoW's addon settings to sync through a small amber square, move it in Edit Mode, and let the app find it automatically. Updating the addon requires a full WoW restart.
+- **Guildie, App, Addon:** Experimental sync without reloading (enable it in WoW; app capture is on by default unless previously disabled). Enable it in WoW's addon settings and reload once to sync through a small amber square, move it in Edit Mode, and let the app find it automatically. Updating the addon requires a full WoW restart.
+
+### Improvements
+
+- **Addon:** Open unified General and Experimental sync settings from the minimap button. Move the sync square to either left corner or use Edit Mode, with guidance to keep it uncovered.
+- **App:** Capture follows the saved in-game setting after /reload. Manage the app override in Settings → Addon; the tray no longer has a separate toggle.
 
 ### Fixes
 

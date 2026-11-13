@@ -426,7 +426,6 @@ app.whenReady().then(async () => {
 		signIn();
 	});
 	const { update } = createTray({
-		setLivePixels: (enabled) => connection.setLivePixels(enabled),
 		open: () => showWindow(),
 		manageAddon: () => showWindow(`${origin}/addon`),
 		reinstallAddon: () => {

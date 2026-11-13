@@ -12,6 +12,7 @@ import {
 	type LastUpload,
 	type Log,
 	loadedAddonVersion,
+	savedLivePixelsEnabled,
 	SyncEngine,
 } from "@guildie/sync";
 import { net } from "electron";
@@ -70,6 +71,7 @@ export class Connection {
 	private readonly pixels: LivePixels | undefined;
 	private pixelStatus: PixelStatus | undefined;
 	private pixelsEnabled = false;
+	private readonly automaticPixels: boolean;
 	private readonly listeners = new Set<(status: Status) => void>();
 	/** Notices for the user (shown as notifications by main). */
 	onNotice: (title: string, body: string) => void = () => {};
@@ -77,6 +79,7 @@ export class Connection {
 	onWowFolder: (folder: string) => void = () => {};
 
 	constructor(origin: string, log: Log, pixelConfig?: CaptureConfig) {
+		this.automaticPixels = !!pixelConfig && "auto" in pixelConfig;
 		this.origin = origin;
 		this.log = log;
 		this.pixelsEnabled = !!pixelConfig && (!("auto" in pixelConfig) || settings.livePixelsEnabled(origin));
@@ -175,11 +178,22 @@ export class Connection {
 		settings.setLivePixels(this.origin, enabled);
 		this.sync.clearPixelSnapshot();
 		this.pixels?.stop();
-		if (enabled && this.account) this.pixels?.start();
+		this.updatePixelCapture();
 		this.emit();
 	}
 
+	private updatePixelCapture() {
+		if (!this.pixels) return;
+		const savedEnabled = !this.automaticPixels || savedLivePixelsEnabled(this.sync.wowFolder);
+		if (this.account && this.pixelsEnabled && savedEnabled) this.pixels.start();
+		else {
+			this.pixels.stop();
+			this.sync.clearPixelSnapshot();
+		}
+	}
+
 	private async tick() {
+		this.updatePixelCapture();
 		// Which addon the game last ran changes when it saves (at /reload or logout).
 		const loaded = loadedAddonVersion(this.sync.wowFolder);
 		if (loaded !== this.addonLoaded) {
@@ -203,7 +217,7 @@ export class Connection {
 			return false;
 		}
 		this.account = me.battletag ?? this.account ?? "you";
-		if (this.pixelsEnabled) this.pixels?.start();
+		this.updatePixelCapture();
 		if (this.api.token) saveToken(this.origin, this.api.token, this.account);
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		if (!me.characters.length)
@@ -226,7 +240,7 @@ export class Connection {
 			this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
 		this.sync.reset();
 		this.pixels?.stop();
-		if (this.pixelsEnabled) this.pixels?.start();
+		this.updatePixelCapture();
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		this.emit();
 	}
@@ -255,6 +269,7 @@ export class Connection {
 			throw new Error("That folder doesn't look like World of Warcraft (no _classic_ or _forever_ folder inside).");
 		settings.wow = folder;
 		this.sync.setWow(folder);
+		this.updatePixelCapture();
 		this.log(`WoW folder: ${folder}`);
 		this.onWowFolder(folder);
 		this.emit();

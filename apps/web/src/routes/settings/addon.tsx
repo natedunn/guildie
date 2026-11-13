@@ -138,14 +138,16 @@ function ManageAddon() {
 							<span>
 								Capture the Guildie sync square
 								<span className="mt-1 block text-muted-foreground">
-									While WoW is in the foreground, the app scans its window to find the square, then reads only the
-									square. Images stay in memory; complete character snapshots upload to your account.
+									Enabled by default, but capture only starts after WoW saves its enabled setting. While signed in and
+									WoW is in the foreground, the app finds and reads the square. Images stay in memory; complete
+									character snapshots upload to your account.
 								</span>
 							</span>
 						</label>
 						<p className="mt-3 text-muted-foreground">
 							In WoW, open Options → AddOns → Guildie to enable export and choose its size and appearance. Move it in
-							Edit Mode; the app finds it again automatically.
+							Edit Mode; the app finds it again automatically. Type /reload after enabling or disabling export so the
+							app can read your choice.
 						</p>
 						<p className="mt-3" role="status">
 							{!status?.livePixelsAvailable
@@ -161,7 +163,7 @@ function ManageAddon() {
 												calibrating: "Checking the square's alignment…",
 												receiving: "Receiving data. Complete snapshots upload automatically.",
 												stale: "No recent data. Keep the square visible.",
-												stopped: "Capture stopped.",
+												stopped: "Capture stopped. Enable experimental sync in WoW and /reload to start.",
 												failed: "Capture failed. Turn it off and on to retry.",
 											}[status.livePixels ?? "waiting"]}
 						</p>

@@ -13,15 +13,13 @@ In WoW, open **Options → AddOns → Guildie**:
 - Choose the default amber palette or grayscale for troubleshooting.
 - Choose small or larger cells. The addon snaps to physical pixels when the
   client exposes screen dimensions; the intended sizes are 32×32 and 64×64.
-- Open Edit Mode to drag the square, or reset its position. Export pauses while
+- Open Edit Mode to drag the square, or use Move to top left / Move to bottom left. Export pauses while
   Edit Mode is open. Position is shared across layouts and saved on drag stop.
 
-In the app, enable **Experimental sync without reloading** in Settings → Addon,
-or **Experimental live sync** in the tray. Capture consent is remembered per site.
+App capture defaults on unless previously disabled. Manage **Experimental sync without reloading** in Settings → Addon; there is no tray toggle. The in-game export still defaults off. After enabling or disabling it, `/reload` saves the choice; the app reads the newest Forever account save and only starts capture when that setting is enabled. Missing or unreadable saves leave capture stopped. With multiple WoW accounts, the most recently saved account determines this preference.
 Signing out stops the helper, and signing in resumes it if the setting is enabled.
 Turning the app setting off or quitting stops capture. Turning export off in WoW
-hides the square; the app continues looking while WoW is foreground until its own
-capture setting is disabled.
+hides the square immediately; `/reload` then tells the app to stop capture too. The app setting can stop capture immediately.
 
 The bundled helper monitors the original desktop process handle and exits if the
 app crashes or is force-closed, even when there are no new capture records.
@@ -61,8 +59,7 @@ The old `--live-pixels-config` flag remains for manual diagnostic captures only.
 
 The additive `setLivePixels(boolean)` desktop bridge method requires the same
 main-frame/site-origin checks as other addon actions. Older apps simply omit it.
-The website shows the new controls only when the method exists. Before deploying
-the website changes, the tray toggle can test the integration against guildie.club.
+The website shows the new controls only when the method exists. Use a site build with these controls when testing the updated desktop app.
 
 ## Windows acceptance checklist before release
 
@@ -70,10 +67,10 @@ the website changes, the tray toggle can test the integration against guildie.cl
    Guildie addon (use Reinstall in the development app; the release version bump is
    still a maintainer step). Fully restart WoW because new Lua files were added.
 2. Confirm the Guildie page appears in WoW's addon settings and defaults to disabled.
-   Toggle export, palette and size there, without slash commands. Restart/reload
+   Toggle export, then `/reload` to start or stop app capture; change palette and size there without slash commands. Restart/reload
    and verify preferences persist. Move/reset in Edit Mode, including near edges.
 3. Launch the packaged app without Python installed or any pixel config/launch flag.
-   Enable capture in the tray or updated website settings. Confirm automatic
+   Check capture in the updated app settings. Confirm automatic
    calibration on small and large squares, amber and grayscale, then move the
    square and verify recovery without entering coordinates. Try 100% and 125%
    Windows scaling; fractional scaling and HDR may need further tuning.
