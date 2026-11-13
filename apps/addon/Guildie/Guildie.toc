@@ -11,6 +11,7 @@
 GuildieData.lua
 Capture.lua
 Guildie.lua
+Deliveries.lua
 PixelProtocol.lua
 LivePixels.lua
 Settings.lua

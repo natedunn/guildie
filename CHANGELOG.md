@@ -17,6 +17,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Guildie, App, Addon:** Item requests track partial deliveries and finish automatically when the recipient’s addon confirms enough items collected from mail or received in trade. Sender mail reports mark claimed requests sent; manual completion remains available. Requires a full game restart after updating the addon.
+
 - **Guildie, App, Addon:** Remember confirmed quest turn-ins and sync them when the live square is visible again, or through normal reload/logout sync. Completed dungeon quest markers keep those confirmations even while Blizzard catches up.
 
 ### Improvements

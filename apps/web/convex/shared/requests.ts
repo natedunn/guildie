@@ -280,3 +280,66 @@ export function canHelpFromInventory(
 		matsCheck(reagents, request.quantity, scans).covered
 	);
 }
+
+/** Exact names only: never guess a Forever surname from a first name. */
+const deliveryName = (name: string) => name.trim().toLowerCase().replace(/ /g, "-");
+type DeliveryReport = { kind: string; other: string; itemId: number; quantity: number; at: number };
+type DeliveryRequest = {
+	kind: string;
+	itemId?: number;
+	status: string;
+	quantity: number;
+	ongoing?: boolean;
+	until?: number;
+	userId: string;
+	guildId: string;
+	character: { slug: string; name: string };
+	createdAt: number;
+	claim?: { userId: string; character: { name: string; slug: string }; claimedAt: number };
+	receivedQuantity?: number;
+	sentQuantity?: number;
+};
+export function deliveryMatches(
+	r: DeliveryRequest,
+	e: DeliveryReport,
+	reporter: { userId: string; slug: string; name: string; guildId: string },
+	now: number,
+) {
+	if (
+		r.kind !== "item" ||
+		r.itemId !== e.itemId ||
+		!["open", "claimed"].includes(r.status) ||
+		r.guildId !== reporter.guildId ||
+		e.at < r.createdAt ||
+		e.at > now + 600000 ||
+		now - e.at > 30 * DAY_MS ||
+		(r.ongoing && r.until !== undefined && (r.until <= now || e.at >= r.until))
+	)
+		return false;
+	if (e.kind.endsWith("Received")) {
+		return (
+			r.userId === reporter.userId &&
+			r.character.slug === reporter.slug &&
+			(!r.claim || (e.at >= r.claim.claimedAt && deliveryName(e.other) === deliveryName(r.claim.character.name)))
+		);
+	}
+	return (
+		!!r.claim &&
+		r.claim.userId === reporter.userId &&
+		r.claim.character.slug === reporter.slug &&
+		e.at >= r.claim.claimedAt &&
+		deliveryName(e.other) === deliveryName(r.character.name)
+	);
+}
+export function deliveryProgress(
+	r: Pick<DeliveryRequest, "status" | "quantity" | "ongoing" | "receivedQuantity" | "sentQuantity">,
+	e: Pick<DeliveryReport, "kind" | "quantity">,
+) {
+	const receivedQuantity = (r.receivedQuantity ?? 0) + (e.kind.endsWith("Received") ? e.quantity : 0);
+	const sentQuantity = (r.sentQuantity ?? 0) + (e.kind.endsWith("Sent") ? e.quantity : 0);
+	return {
+		receivedQuantity,
+		sentQuantity,
+		status: !r.ongoing && receivedQuantity >= r.quantity ? ("done" as const) : (r.status as RequestStatus),
+	};
+}

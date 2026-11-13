@@ -91,8 +91,8 @@ used); the account page lists them with Disconnect.
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
-  `{ "version": 5, "characters": [ ... ] }` (versions 1, talents and level
-  only, 2, without `inventory`, 3, without `quests`, and 4, without `completedQuestIds`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
+  `{ "version": 6, "characters": [ ... ] }` (versions 1, talents and level
+  only, 2, without `inventory`, 3, without `quests`, 4, without `completedQuestIds`, and 5, without `deliveries`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
   One upload per 5 s per token, at most 50 characters. A character, version 2:
 
   ```jsonc
@@ -541,3 +541,16 @@ Google/Apple" can't run in an embedded browser. Instead:
 4. The app opens `/desktop/session?code=…` in its window, which swaps the code
    for a normal session through the sign-in proxy (`auth:signInWithDesktopCode`)
    and goes on to the player's guild.
+
+### Request delivery records (payload 6)
+
+Optional character `deliveries` is an array of at most 200 records: `id`,
+`requestId`, `kind` (`mailSent`, `mailReceived`, `tradeSent`, `tradeReceived`),
+`other` (exact character name), `itemId`, `quantity`, and `at` (game time seconds).
+The app accepts v6 and earlier formats. Upload ownership checks precede bounded
+internal processing; optional request progress fields and the new
+`requestDeliveryEvents` table are additive, with no migration needed. Existing
+manual claim/sent/done controls remain supported. See the request delivery
+acceptance section in [live-sync.md](live-sync.md) for matching, retention,
+limitations, and release verification. Publish backend support before the new
+addon/app. Installing the new Lua file requires a full game restart.

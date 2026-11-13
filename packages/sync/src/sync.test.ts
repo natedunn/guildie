@@ -179,8 +179,25 @@ test("pixel snapshots coalesce, retry with throttling, deduplicate and reset on 
 	await engine.tick();
 	calls.length = 0;
 	const snapshot = (level: number) => ({
-		version: 5,
-		characters: [{ name: "Test", level, completedQuestIds: [6981] }],
+		version: 6,
+		characters: [
+			{
+				name: "Test",
+				level,
+				completedQuestIds: [6981],
+				deliveries: [
+					{
+						id: "Player:1:1",
+						requestId: "request1",
+						kind: "mailReceived",
+						other: "Sender-Last",
+						itemId: 4306,
+						quantity: 7,
+						at: 1794300000,
+					},
+				],
+			},
+		],
 	});
 	assert.equal(engine.queuePixelSnapshot({ health: 10 }), false);
 	assert.equal(engine.queuePixelSnapshot(snapshot(1)), true);

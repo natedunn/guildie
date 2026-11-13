@@ -600,6 +600,15 @@ export default defineSchema({
 	 * it, the requester marks it done. Only the guild's signed-in members see
 	 * them. Rules: convex/shared/requests.ts.
 	 */
+	requestDeliveryEvents: defineTable({
+		characterId: v.id("characters"),
+		eventId: v.string(),
+		requestId: v.id("requests"),
+		kind: v.string(),
+		quantity: v.number(),
+		at: v.number(),
+	}).index("by_character_event", ["characterId", "eventId"]),
+
 	requests: defineTable({
 		guildId: v.id("guilds"),
 		/** The requester, and the character they asked as. */
@@ -611,6 +620,8 @@ export default defineSchema({
 		recipeId: v.optional(v.number()),
 		/** 0 for ongoing requests (no amount). */
 		quantity: v.number(),
+		receivedQuantity: v.optional(v.number()),
+		sentQuantity: v.optional(v.number()),
 		note: v.optional(v.string()),
 		/**
 		 * Ongoing ("send me any you have"): items only, never claimed, closes

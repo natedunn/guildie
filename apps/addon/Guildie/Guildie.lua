@@ -13,8 +13,8 @@
 local ADDON, ns = ...
 -- The payload's format. 2 added guild, XP, gear, professions and recipes;
 -- 3 (0.8.0) bags and the last bank read; 4 (0.10.0) the quest log. The site
--- accepts all five. 5 (0.17.0) adds retained quest completion IDs.
-local VERSION = 5
+-- accepts all six. 5 adds retained quest completion IDs; 6 adds delivery receipts.
+local VERSION = 6
 
 GuildieDB = GuildieDB or {}
 
@@ -263,6 +263,8 @@ local function capture(reason, recipes)
         inventory = previous.inventory,
         quests = previous.quests,
         completedQuestIds = completedQuestIDs(previous.completedQuestIds),
+        deliveries = previous.deliveries,
+        deliverySequence = previous.deliverySequence,
     }
     -- When the level last went up (game time): the guild's feed shows it.
     if character.level and previous.level and character.level > previous.level then
