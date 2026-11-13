@@ -10,6 +10,7 @@ import { activeIn } from "./requests";
 import { DUNGEON_BY_KEY } from "./shared/dungeons";
 import { ago, capped, gearType, matches, quality, slotName, statKey } from "./shared/mcpText";
 import { CLASS_RULES, PROFICIENCY_TYPES } from "./shared/proficiencies";
+import { remainingQuantity } from "./shared/requests";
 import { PRIORITY_STATS, statPriority, TIER_PRESETS } from "./shared/statPriority";
 import { canPrefer, type GearChoice, typesOf } from "./shared/upgrades";
 import { CLASS_TOKENS, SPECS } from "./shared/weights";
@@ -439,7 +440,7 @@ export const requests = internalQuery({
 					`- ${r.character.name}${r.userId === userId ? " (you)" : ""} wants `,
 					r.ongoing
 						? `any ${what} anyone has (ongoing, until ${new Date(r.until ?? now).toISOString().slice(0, 10)}; no claim, just send it)`
-						: `${r.quantity}× ${what}`,
+						: `${remainingQuantity(r)}× ${what}`,
 					r.kind === "craft" ? ` crafted${recipe ? ` (${recipe.profession})` : ""}` : "",
 					r.ongoing ? "" : r.claim ? `; ${r.claim.character.name} is on it${r.claim.sentAt ? ", sent" : ""}` : "; open",
 					r.kind === "craft" && r.mats ? (r.mats.state === "missing" ? "; needs mats" : "; has mats") : "",

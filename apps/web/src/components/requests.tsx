@@ -1,7 +1,13 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { DEFAULT_ONGOING_DAYS, matsLabel, type OngoingDays, REQUEST_LIMITS } from "@convex/shared/requests";
+import {
+	DEFAULT_ONGOING_DAYS,
+	matsLabel,
+	type OngoingDays,
+	REQUEST_LIMITS,
+	remainingQuantity,
+} from "@convex/shared/requests";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
@@ -359,7 +365,7 @@ function ItemRequestForm({
 						</>
 					) : (
 						<div className="grid grid-cols-[6rem_1fr] gap-3">
-							<Field label="Quantity">
+							<Field label={existing ? "Total quantity" : "Quantity"}>
 								<Input
 									type="number"
 									min={1}
@@ -636,7 +642,10 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						{r.ongoing ? (
 							<span className="text-xs text-muted-foreground">Ongoing · {timeLeft(r.until)}</span>
 						) : (
-							<span className="num text-[13px] text-muted-foreground">×{r.quantity}</span>
+							<span className="num text-[13px] text-muted-foreground">
+								×{remainingQuantity(r)}
+								{r.kind === "item" ? " remaining" : ""}
+							</span>
 						)}
 						{r.kind === "craft" && (
 							<span className="text-xs text-muted-foreground">Craft · {r.recipe?.profession}</span>

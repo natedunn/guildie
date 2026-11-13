@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseCharacter } from "./addonPayload.ts";
-import { deliveryMatches, deliveryParticipants, deliveryProgress } from "./shared/requests.ts";
+import { deliveryMatches, deliveryParticipants, deliveryProgress, remainingQuantity } from "./shared/requests.ts";
 
 const now = 1794300000000;
 const request = {
@@ -115,4 +115,21 @@ test("reporter's observed name is optional for older payloads and validated when
 	assert.equal(parsed.character.deliveries?.[0].reporterName, "Original-Name");
 	for (const reporterName of ["", "|cffbad", "a".repeat(121)])
 		assert(!parseCharacter({ ...c, deliveries: [{ ...raw, reporterName }] }, now).ok);
+});
+
+test("only receipt quantities reduce the remainder, preserving the target and clamping overdelivery", () => {
+	for (const method of ["mail", "trade"]) {
+		let state = { ...request, ...deliveryProgress(request, { kind: `${method}Sent`, quantity: 7 }) };
+		assert.equal(remainingQuantity(state), 20);
+		state = { ...state, ...deliveryProgress(state, { kind: `${method}Received`, quantity: 7 }) };
+		assert.equal(remainingQuantity(state), 13);
+		assert.equal(state.quantity, 20);
+		state = { ...state, ...deliveryProgress(state, { kind: `${method}Sent`, quantity: 7 }) };
+		assert.equal(remainingQuantity(state), 13);
+		state = { ...state, ...deliveryProgress(state, { kind: `${method}Received`, quantity: 15 }) };
+		assert.equal(remainingQuantity(state), 0);
+		assert.equal(state.quantity, 20);
+		assert.equal(state.receivedQuantity, 22);
+		assert.equal(state.status, "done");
+	}
 });

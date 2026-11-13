@@ -250,6 +250,18 @@ export function matsLabel(state: MatsState | undefined) {
 	return "Mats not confirmed";
 }
 
+/** Fixed item requests count down as receipts arrive; the stored quantity stays the target. */
+export function remainingQuantity(request: {
+	kind: string;
+	quantity: number;
+	receivedQuantity?: number;
+	ongoing?: boolean;
+}) {
+	return request.kind === "item" && !request.ongoing
+		? Math.max(0, request.quantity - (request.receivedQuantity ?? 0))
+		: request.quantity;
+}
+
 /**
  * Full requests the viewer can fill using their own latest inventory scans.
  * Ongoing ones: any at all (they want whatever you have).
@@ -259,6 +271,7 @@ export function canHelpFromInventory(
 		kind: "item" | "craft";
 		status: string;
 		quantity: number;
+		receivedQuantity?: number;
 		itemId?: number;
 		recipeId?: number;
 		ongoing?: boolean;
@@ -271,7 +284,10 @@ export function canHelpFromInventory(
 	if (mine || request.status !== "open") return false;
 	if (request.ongoing) return request.itemId !== undefined && (sumInventory(scans).counts.get(request.itemId) ?? 0) > 0;
 	if (request.kind === "item") {
-		return request.itemId !== undefined && (sumInventory(scans).counts.get(request.itemId) ?? 0) >= request.quantity;
+		return (
+			request.itemId !== undefined &&
+			(sumInventory(scans).counts.get(request.itemId) ?? 0) >= remainingQuantity(request)
+		);
 	}
 	return (
 		request.recipeId !== undefined &&

@@ -14,6 +14,7 @@ C_Item = nil
 GuildieData = {}
 GuildieData.requests = {[4306] = {{requestId = "req1", kind = "item", name = "Receiver-Last", claimedBy = {name = "Sender-Last"}}}}
 wow.fire("PLAYER_ENTERING_WORLD")
+assert(ns.livePixels.get().enabled ~= true, "delivery capture works with live export disabled")
 local function count() return #(ns.current().deliveries or {}) end
 wow.fire("MAIL_SHOW")
 callbacks.TakeInboxItem(1, 1)
@@ -70,13 +71,48 @@ clock = 10; wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE); assert(count() =
 GuildieData.requests[4306][2] = GuildieData.requests[4306][1]
 wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 1, 1); wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
 assert(count() == 4)
+-- Live export and SavedVariables carry the same receipts, not separate deductions.
+GuildieData.requests[4306][2] = nil
+local originalId = ns.current().deliveries[1].id
+local frame
+for _, f in ipairs(wow.frames) do
+    if f.scripts.OnDragStop and f.scripts.OnUpdate and f.events.PLAYER_LOGIN then frame = f end
+end
+assert(frame, "live export frame exists")
+local encode, chunks, livePayload = GuildiePixelProtocol.encode, {}, nil
+GuildiePixelProtocol.encode = function(packet)
+    local channel, _, part, total, body = packet:match("^(%a)|([^|]+)|(%d+)|(%d+)|(.*)$")
+    if channel == "S" then
+        chunks[tonumber(part)] = body
+        if part == total then livePayload = wow.decode(table.concat(chunks)) end
+    end
+    return encode(packet)
+end
+ns.livePixels.set("enabled", true)
+for _ = 1, 1000 do
+    if livePayload then break end
+    frame.scripts.OnUpdate(frame, 0.1)
+end
+GuildiePixelProtocol.encode = encode
+assert(livePayload and #livePayload.characters[1].deliveries == 4, "live snapshots include retained receipts")
+assert(livePayload.characters[1].deliveries[1].id == originalId, "live export preserves receipt identity")
+ns.livePixels.set("enabled", false)
+assert(count() == 4, "switching transport neither consumes nor duplicates receipts")
 wow.fire("PLAYER_LOGOUT")
 local saved = GuildieDB
 local payload = wow.decode(saved.payload)
 assert(payload.version == 6 and #payload.characters[1].deliveries == 4)
+for i, receipt in ipairs(payload.characters[1].deliveries) do
+    local liveReceipt = livePayload.characters[1].deliveries[i]
+    for key, value in pairs(receipt) do
+        assert(liveReceipt[key] == value, "live and logout uploads carry identical receipt fields")
+    end
+end
 ns = wow.load({db = saved, guid = "Player-delivery", name = "Receiver-Last"})
 wow.fire("PLAYER_ENTERING_WORLD")
 assert(count() == 4, "retained across reload")
+assert(ns.current().deliveries[1].id == originalId, "reload preserves the deduplication key")
+assert(ns.livePixels.get().enabled ~= true, "reload/logout path stays available without live export")
 print("Delivery capture passed")
 
 -- More than one wire window survives until the server acknowledges each event.

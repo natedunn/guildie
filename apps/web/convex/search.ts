@@ -6,6 +6,7 @@ import { access, guildsOf, itemRow } from "./guilds";
 import { activeIn } from "./requests";
 import { vRegion } from "./schema";
 import { EXTRA_DUNGEON_QUESTS } from "./shared/dungeonQuests";
+import { remainingQuantity } from "./shared/requests";
 import { bestLine, hasAllWords, matchScore } from "./shared/search";
 
 // Omni search (⌘K): everything a player can see that lives in the database.
@@ -316,7 +317,7 @@ async function searchRequests(ctx: QueryCtx, q: string, guilds: Doc<"guilds">[])
 				name,
 				quality: item?.quality,
 				icon: item?.icon,
-				quantity: r.quantity,
+				quantity: remainingQuantity(r),
 				ongoing: !!r.ongoing,
 				status: r.status,
 				character: r.character,

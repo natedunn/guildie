@@ -15,6 +15,7 @@ import {
 	ongoingUntil,
 	REQUEST_LIMITS,
 	type RequestLike,
+	remainingQuantity,
 	rosterCharacters,
 	STALE_MS,
 	shouldExpire,
@@ -247,4 +248,16 @@ test("ongoing: you can help with any amount you have", () => {
 	assert.equal(canHelpFromInventory({ ...want, itemId: 2 }, false, new Set(), scans), false);
 	assert.equal(canHelpFromInventory(want, true, new Set(), scans), false, "your own");
 	assert.equal(canHelpFromInventory(want, false, new Set(), []), false, "no scan");
+});
+
+test("fixed item requests count down and help uses only the remainder", () => {
+	const request = { kind: "item" as const, status: "open", itemId: 4306, quantity: 20, receivedQuantity: 7 };
+	assert.equal(remainingQuantity(request), 13);
+	assert.equal(remainingQuantity({ ...request, receivedQuantity: 25 }), 0);
+	assert.equal(remainingQuantity({ ...request, receivedQuantity: undefined }), 20);
+	assert.equal(remainingQuantity({ ...request, kind: "craft" }), 20);
+	assert.equal(remainingQuantity({ ...request, ongoing: true, quantity: 0 }), 0);
+	const scans = [{ bags: { capturedAt: NOW, items: [{ id: 4306, count: 13 }] } }];
+	assert(canHelpFromInventory(request, false, new Set(), scans));
+	assert(!canHelpFromInventory({ ...request, receivedQuantity: 6 }, false, new Set(), scans));
 });
