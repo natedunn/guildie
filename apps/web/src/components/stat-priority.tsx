@@ -277,7 +277,7 @@ function HowWeightingWorks({ stats, tiers }: { stats: string[]; tiers: number[] 
 						<p>
 							Say an item gives 4 less {label(first)} and 8 more {label(last.s)}:{" "}
 							<span className="text-foreground">{worth ? "worth it" : "not worth it"}</span>. Items like that show as
-							trade-offs, never as plain upgrades.
+							possible upgrades, never as plain upgrades.
 						</p>
 					)}
 				</div>

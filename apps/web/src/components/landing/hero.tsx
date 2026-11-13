@@ -83,7 +83,7 @@ function HeroShot() {
 					lines={[
 						{ name: "Pip", note: "upgrade (Combat)" },
 						{ name: "Brisket", note: "upgrade (Feral)" },
-						{ name: "Miller", note: "maybe (lvl 22)" },
+						{ name: "Miller", note: "possible upgrade (lvl 22)" },
 					]}
 				/>
 			</div>

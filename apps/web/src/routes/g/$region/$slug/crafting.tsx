@@ -491,15 +491,9 @@ const GROUPS: { kind: GroupKind; title: string; hint: string; others: string }[]
 		others: VERDICT_HINTS.upgrade,
 	},
 	{
-		kind: "tradeoff",
-		title: "Trade-offs",
-		hint: "Give up some of one stat for more of another; worth it at your steepness",
-		others: VERDICT_HINTS.tradeoff,
-	},
-	{
 		kind: "maybe",
-		title: "Maybe",
-		hint: "Small gains, your second spec, a few levels from now, or an armor type you don't want",
+		title: "Possible upgrades",
+		hint: "Small gains, some of a stat you rank given up, your second spec, a few levels from now, or an armor type you don't want",
 		others: VERDICT_HINTS.maybe,
 	},
 	{

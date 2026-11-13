@@ -343,6 +343,41 @@ test("real weights: white and grey armor, armor types, a hunter's thrown weapons
 	]);
 	assert.equal(judge(helm, todd, r)?.kind, "upgrade");
 
+	// Keller's Girdle (cloth, +8 Int) over Scouting Belt of the Owl (leather,
+	// +3 Int +3 Spi) for Todd with his own Int-heavy priority: worth wearing,
+	// so a possible upgrade (cloth), not hidden by the off-type factor.
+	const owlBelt = worn("WAIST", 9, [
+		{ left: "Waist", right: "Leather" },
+		{ left: "45 Armor" },
+		{ left: "+3 Intellect" },
+		{ left: "+3 Spirit" },
+	]);
+	const intTodd = upgradeMember(
+		{
+			name: "Todd",
+			classId: 7,
+			level: 26,
+			seenMs: 0,
+			talentTrees: [{ name: "Enhancement", points: 17, talents: [] }],
+			equipment: [owlBelt],
+			gearPreference: { armor: { types: [2, 3], strict: false } },
+			statPriority: {
+				stats: ["STRENGTH", "ATTACK_POWER", "INTELLECT", "AGILITY", "CRIT_RATING", "STAMINA", "SPIRIT"],
+				tiers: [1, 1, 0.5, 0.25, 0.25, 0.1, 0.1],
+			},
+		},
+		r,
+	)!;
+	const keller = item([
+		{ left: "Waist", right: "Cloth" },
+		{ left: "23 Armor" },
+		{ left: "+3 Stamina" },
+		{ left: "+8 Intellect" },
+	]);
+	const kv = judge(keller, intTodd, r);
+	assert.equal(kv?.kind, "maybe");
+	assert.equal(kv?.off, 1);
+
 	// Hunters: thrown weapons only when they choose them.
 	const knife = item([{ left: "Thrown", right: "Thrown" }, { left: "(6.3 damage per second)" }]);
 	const hunter = member(3, 16, "Beast Mastery", []);

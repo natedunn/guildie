@@ -1022,11 +1022,11 @@
 			}
 		},
 		{
-			"name": "less armor than worn: a trade-off",
+			"name": "less armor than worn: a possible upgrade",
 			"item": "thinStrGloves",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "tradeoff",
+				"kind": "maybe",
 				"gain": 1.3200000000000003,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
@@ -1036,11 +1036,11 @@
 			}
 		},
 		{
-			"name": "gives up Strength for Agility: a trade-off",
+			"name": "gives up Strength for Agility: a possible upgrade",
 			"item": "mailAgiGloves",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "tradeoff",
+				"kind": "maybe",
 				"gain": 0.68,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
@@ -1054,7 +1054,7 @@
 			"item": "agiRingPlain",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "tradeoff",
+				"kind": "maybe",
 				"gain": 1.0333333333333332,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
@@ -1475,12 +1475,12 @@
 			"expect": ["Arrow:empty", "Cub:empty", "Miller:empty", "Sturdy:empty", "Rage:empty"]
 		},
 		{
-			"name": "mail gloves: trade-offs after upgrades",
+			"name": "mail gloves: possible upgrades after upgrades",
 			"item": "mailAgiGloves",
 			"now": 2003600,
 			"skip": [],
 			"max": 6,
-			"expect": ["Rage:upgrade", "Miller:upgrade", "Sturdy:tradeoff", "Arrow:maybe"]
+			"expect": ["Rage:upgrade", "Miller:upgrade", "Arrow:maybe", "Sturdy:maybe"]
 		}
 	]
 }

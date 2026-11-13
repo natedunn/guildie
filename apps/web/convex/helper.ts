@@ -621,7 +621,7 @@ export type GuildData = {
 		members: UpgradeMember[];
 		/**
 		 * The player's own characters (addon 0.19.0+; older addons ignore it):
-		 * the tooltip's "You | upgrade +35%" row for the character they're on.
+		 * the tooltip's "You | upgrade" row for the character they're on.
 		 */
 		mine: UpgradeMember[];
 	};

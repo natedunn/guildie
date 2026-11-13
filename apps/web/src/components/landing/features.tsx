@@ -174,11 +174,17 @@ const BREASTPLATE: ItemLike = {
 
 const UPGRADES = [
 	{ name: "Todd", spec: "Arms", verdict: "Upgrade", why: "+14 Strength, +6 Stamina over Rough Bronze Cuirass" },
-	{ name: "Corwin", spec: "Holy", verdict: "Trade-off", why: "+14 Strength, −5 Intellect over Guard's Chain Shirt" },
+	{
+		name: "Corwin",
+		spec: "Holy",
+		verdict: "Possible upgrade",
+		why: "+14 Strength, −5 Intellect over Guard's Chain Shirt",
+		quiet: true,
+	},
 	{
 		name: "Hollis",
 		spec: "Arms",
-		verdict: "Maybe, at lvl 24",
+		verdict: "Possible upgrade, at lvl 24",
 		why: "+14 Strength over Rough Copper Vest",
 		quiet: true,
 	},
@@ -578,8 +584,8 @@ export function AddonSection() {
 							className="md:justify-self-end"
 							lines={[
 								{ name: "Brisket", note: "upgrade (Feral)" },
-								{ name: "Pip", note: "trade-off (Agi/Str)" },
-								{ name: "Miller", note: "maybe (lvl 17)" },
+								{ name: "Pip", note: "possible upgrade (Agi/Str)" },
+								{ name: "Miller", note: "possible upgrade (lvl 17)" },
 							]}
 						/>
 						<GameTooltip

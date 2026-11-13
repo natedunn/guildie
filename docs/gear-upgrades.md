@@ -1,7 +1,7 @@
 # Gear upgrade suggestions
 
 How Guildie decides that an item is an upgrade for a guildmate: the
-"Brisket | upgrade (Feral)" and "Miller | maybe (lvl 24)" rows under Guildie
+"Brisket | upgrade (Feral)" and "Miller | possible upgrade (lvl 24)" rows under Guildie
 in the addon's item tooltips, and the "Upgrade for" list in the site's item panel.
 
 It's a best guess from stat weights and what each person wears, not a
@@ -24,8 +24,8 @@ same rules in Lua (`apps/addon/Guildie/Upgrades.lua`); shared test cases
    DPS.
 4. **Compared with what?** The same score for what they wear in that slot.
 5. **Verdict:** 15% better or more is an **Upgrade**; 3% to 15% is a
-   **Maybe**. Either way it has to add at least one point of their main stat.
-   Armor of a type they don't want is a **Maybe** at most, and plain armor
+   **Possible upgrade**. Either way it has to add at least one point of their main stat.
+   Armor of a type they don't want is a **Possible upgrade** at most, and plain armor
    (white and grey items, no stats) is only shown for an **Empty slot**.
    Bigger gains are listed first.
 
@@ -54,8 +54,8 @@ An item is out if:
   weapons, which turn off Auto Shot and their shots), or
 - it needs a level more than **3** above theirs.
 
-If they can use it within 3 levels, it can only be a **Maybe**, shown as
-"Maybe, at lvl 24".
+If they can use it within 3 levels, it can only be a **Possible upgrade**, shown as
+"Possible upgrade, at lvl 24".
 
 ### 3. Their spec
 
@@ -76,7 +76,7 @@ most people level with:
 | Druid   | Feral         |
 
 Another tree with 10 or more points is their second spec: an item that only
-suits it can be a **Maybe**, never an Upgrade.
+suits it can be a **Possible upgrade**, never an Upgrade.
 
 ### 4. The score
 
@@ -99,12 +99,12 @@ Two adjustments:
   the class can wear now, when they haven't listed armor types:
   - two or more types below the class's best (cloth on a Shaman or Hunter,
     leather on a Warrior already in mail): counts less the higher their
-    level (`offTypeFactors`), and is a **Maybe** at most, labeled with the
-    type ("maybe (Enhancement, cloth)"):
+    level (`offTypeFactors`), and is a **Possible upgrade** at most, labeled with the
+    type ("possible upgrade (Enhancement, cloth)"):
 
     | Level  | 1–19 | 20–39 | 40–49 | 50–59 | 60  |
     | ------ | ---- | ----- | ----- | ----- | --- |
-    | Counts | 70%  | 60%   | 50%   | 40%   | 30% |
+    | Counts | 90%  | 85%   | 75%   | 60%   | 50% |
 
   - one type below (leather on a level 45 Shaman, cloth on a Druid): from
     level **40**, counts **80%** (`preferBestFactor`).
@@ -142,13 +142,12 @@ over an empty slot.
 
 ### 6. The verdict and the order
 
-| Verdict        | When                                                                                                      |
-| -------------- | --------------------------------------------------------------------------------------------------------- |
-| **Upgrade**    | Gain of 15% or more, usable now, main spec, and none of their priority stats goes down                    |
-| **Trade-off**  | The same gain, but it has less of one of their priority stats than what it would replace                  |
-| **Maybe**      | Gain of 3% to 15%; or only their second spec; or usable within 3 levels; or an armor type they don't want |
-| **Empty slot** | Plain armor (no stats: white and grey items) for a slot they have nothing in                              |
-| Nothing        | Under 3%, or under 1 point; plain armor over anything they wear                                           |
+| Verdict              | When                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Upgrade**          | Gain of 15% or more, usable now, main spec, an armor type they want, and none of their priority stats goes down                                                         |
+| **Possible upgrade** | Anything else that gains 3% or more: a smaller gain, some of a priority stat given up, only their second spec, usable within 3 levels, or an armor type they don't want |
+| **Empty slot**       | Plain armor (no stats: white and grey items) for a slot they have nothing in                                                                                            |
+| Nothing              | Under 3%, or under 1 point; plain armor over anything they wear                                                                                                         |
 
 Plain armor only has armor, so whatever they wear in that slot almost always
 has stats it would lose; it's only worth wearing over nothing. Plain weapons
@@ -156,16 +155,18 @@ still compare by DPS: a white two-hander or throwing knife can really beat
 what someone holds.
 
 Priority stats are the spec's `stats` (a tree's three, or the first five of
-a player's own three to ten: `TRADEOFF_STATS`; the rest still count in the
-weights). A trade-off is only worth it by the weights: +8 Agility for
-−4 Strength wins for a Strength-first shaman at Balanced, not at Steep. To
-tell the two apart, members carry their priority stats on what they wear
+a player's own three to ten: `KEPT_STATS`; the rest still count in the
+weights). An item that gives some of one up is only worth it by the
+weights, and the weights are a best guess, so it's a Possible upgrade and
+the player decides: +8 Agility for −4 Strength is one for a Strength-first
+shaman at Balanced, and nothing at Steep. To check, members carry their priority stats on what they wear
 (`keys`, per slot; `keyValue` counts armor for Armor and spell power toward
 spell damage and healing). Unknown worn items count as none. Older addons
 and older guild data without `keys` or `stats` say Upgrade as before.
+(Addons from before 0.20.0 still call it a Trade-off.)
 
-The list puts every Upgrade before every Trade-off before every Maybe before
-every Empty slot, then
+The list puts every Upgrade before every Possible upgrade before every Empty
+slot, then
 sorts by gain (biggest first), then by name. The Crafting page's Upgrades
 for me groups them that way. The addon tooltip shows the top 3; the site's item
 panel shows the top 5, each with why ("+6 Agility, +4 Stamina over Embossed
@@ -199,7 +200,7 @@ leveling:
 Each spec also has a hand-written stat priority, first to third (`stats` in
 `SPECS`). The roster and character pages show it as "stats to look for".
 Each stat in it must have a weight in that spec (`statPriority.test.ts`).
-The weights decide the gain; the priority decides Upgrade or Trade-off.
+The weights decide the gain; the priority decides whether it's a plain Upgrade.
 
 A player who claimed a character can choose another tree's priority or their
 own three to ten instead (`convex/statPriority.ts`), and suggestions follow that
@@ -207,7 +208,7 @@ choice everywhere: the item panel, the Crafting page's upgrade views and the
 addon's tooltips (`specsFor` in `shared/upgrades.ts`):
 
 - **Another tree:** that tree's weights. The tree their talents put them in
-  becomes the second spec (maybes) if it has 10+ points.
+  becomes the second spec (possible upgrades) if it has 10+ points.
 - **Their own three to ten:** their talents' tree, bent by `customWeights`.
   Per plain stat point (Attack Power counts half), the first stat is worth as
   much as the spec's best stat and each next one its share of that, never
@@ -240,8 +241,8 @@ when there's more than one, and `armorStrict`/`weaponStrict` (`gearPrefs` in
 `shared/upgrades.ts`; types the class can't use are dropped):
 
 - **Prefer these:** armor of a type not on the list counts by their level
-  (`offTypeFactors`, the table above: 70% under 20 down to 30% at 60) and is
-  a **Maybe** at most; weapons of another type count `preferBestFactor`
+  (`offTypeFactors`, the table above: 90% under 20 down to 50% at 60) and is
+  a **Possible upgrade** at most; weapons of another type count `preferBestFactor`
   (0.8). Both for the items suggested and for what they wear. An armor
   preference replaces the class-based armor rule above.
 - **Order:** each step down the list counts `preferStep` (0.05) less: the

@@ -1,6 +1,6 @@
 -- Gear-upgrade suggestions on item tooltips: which guildmates the hovered
--- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)",
--- "Miller | maybe (lvl 24)").
+-- item might help (rows under Guildie: "Brisket | upgrade (Feral)", "Pip | possible upgrade (Str/Int/Agi)",
+-- "Miller | possible upgrade (lvl 24)").
 -- A best guess from stat weights, not a sim.
 --
 -- The rules, the weights and each guildmate (level, spec, scores of what they
@@ -113,7 +113,7 @@ local function sortedKeys(t)
 end
 
 --- score, stat part, raw stat total, and the armor subclass when it's body
---- armor of a type they don't want (a "maybe" at most), else nil (see
+--- armor of a type they don't want (a "possible upgrade" at most), else nil (see
 --- scoreItem in upgrades.ts).
 function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
     local stat, total = 0, 0
@@ -290,9 +290,9 @@ local function unchosen(item, m, cls)
     return not contains(chosen, item.subclass)
 end
 
-local KIND_RANK = { upgrade = 0, tradeoff = 1, maybe = 2, empty = 3 }
+local KIND_RANK = { upgrade = 0, maybe = 1, empty = 2 }
 
---- { kind = "upgrade"|"tradeoff"|"maybe"|"empty", gain, spec, at?, second?, against, off? } or nil.
+--- { kind = "upgrade"|"maybe"|"empty", gain, spec, at?, second?, against, off? } or nil.
 function U.judge(item, m, rules, itemID)
     -- Removed by the player on the site (optional: older GuildieData.lua files lack it).
     if itemID and contains(m.dismissed, itemID) then return nil end
@@ -308,10 +308,12 @@ function U.judge(item, m, rules, itemID)
     end
     local minGain = rules.minGain or 0
     if main and main.gain >= rules.maybe and main.net >= minGain then
+        -- Upgrade only when it's clear: anything else ("maybe") is a possible
+        -- upgrade the player decides, including giving up a priority stat.
         local kind = "maybe"
         if main.gain >= rules.upgrade and not later and main.off == nil then
             local spec = rules.specs[m.spec]
-            kind = loses(item, m, spec and spec.stats, main.against) and "tradeoff" or "upgrade"
+            if not loses(item, m, spec and spec.stats, main.against) then kind = "upgrade" end
         end
         return { kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later, off = main.off }
     end
@@ -327,7 +329,7 @@ function U.judge(item, m, rules, itemID)
     return nil
 end
 
---- Who the item would help, upgrades first, then trade-offs, then by gain: { { member, verdict }, ... }.
+--- Who the item would help, upgrades first, then possible upgrades, then by gain: { { member, verdict }, ... }.
 --- opts: now (seconds), skip (set of names), itemID, max.
 function U.suggest(item, members, rules, opts)
     local out = {}
@@ -552,10 +554,10 @@ function U.liveMember(m, rules, level, read)
 end
 
 local ARMOR_NAMES = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate" }
-local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe", empty = "empty slot" }
+local LABELS = { upgrade = "upgrade", maybe = "possible upgrade", empty = "empty slot" }
 
---- What the item is to you, as a row's right side: "upgrade +35%",
---- "trade-off +20%", "maybe +8% (cloth)", "empty slot", "not an upgrade",
+--- What the item is to you, as a row's right side: "upgrade",
+--- "possible upgrade (cloth)", "empty slot", "not an upgrade",
 --- "needs lvl 30", "can't use"; nil when you wear it.
 function U.forYou(item, itemID, m, rules)
     if itemID and contains(m.worn, itemID) then return nil end
@@ -571,8 +573,9 @@ function U.forYou(item, itemID, m, rules)
         end
         return "can't use"
     end
-    local text = LABELS[v.kind] or "maybe"
-    if v.kind ~= "empty" then text = text .. string.format(" +%d%%", math.floor(v.gain * 100 + 0.5)) end
+    local text = LABELS[v.kind] or "possible upgrade"
+    -- No percent: the weights are a best guess, not precise enough to quote;
+    -- the game's compare tooltip shows the actual stat changes.
     local notes = {}
     if v.second then
         local spec = rules.specs[v.spec]
@@ -617,7 +620,7 @@ local function upgradeData()
 end
 
 --- Your row, first under the Guildie header: { left = "You", right =
---- "upgrade +35%" }, for the character you're on (GuildieData.upgrades.mine,
+--- "upgrade" }, for the character you're on (GuildieData.upgrades.mine,
 --- addon 0.19.0), or nil. Also for items that can't be traded: it's yours.
 --- `color(name, classId)` colors a name.
 function U.mineRow(item, itemID, color)
@@ -652,8 +655,8 @@ end
 
 --- Rows under the tooltip's Guildie header, one per person, upgrades first:
 --- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Pip", right =
---- "trade-off (Str/Int/Agi)" }, { left = "Miller", right = "maybe (lvl 24)" },
---- { left = "Todd", right = "maybe (Enhancement, cloth)" }, { left = "Skurg",
+--- "possible upgrade (Str/Int/Agi)" }, { left = "Miller", right = "possible upgrade (lvl 24)" },
+--- { left = "Todd", right = "possible upgrade (Enhancement, cloth)" }, { left = "Skurg",
 --- right = "empty slot (Arms)" }, or nil. `color(name, classId)` colors a name.
 function U.lines(item, itemID, color)
     local data = upgradeData()
@@ -665,7 +668,7 @@ function U.lines(item, itemID, color)
     local now = (GetServerTime and GetServerTime()) or time()
     local picks = U.suggest(item, data.members, data.rules, { now = now, skip = skip, itemID = itemID, max = 3 })
     if #picks == 0 then return nil end
-    local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe", empty = "empty slot" }
+    local LABELS = { upgrade = "upgrade", maybe = "possible upgrade", empty = "empty slot" }
     local ARMOR_NAMES = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate" }
     local rows = {}
     for _, p in ipairs(picks) do
@@ -677,8 +680,8 @@ function U.lines(item, itemID, color)
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
         if v.off and ARMOR_NAMES[v.off] then table.insert(notes, ARMOR_NAMES[v.off]) end
         if v.at then table.insert(notes, "lvl " .. v.at) end
-        local right = (LABELS[v.kind] or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
-        -- Already in order (suggest): upgrades, trade-offs, maybes.
+        local right = (LABELS[v.kind] or "possible upgrade") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
+        -- Already in order (suggest): upgrades, then possible upgrades.
         table.insert(rows, { left = color(p.member.name, p.member.classId), right = right })
     end
     return rows
