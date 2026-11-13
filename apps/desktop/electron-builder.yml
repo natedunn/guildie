@@ -43,6 +43,9 @@ publish:
   releaseType: release
 win:
   extraResources:
+    # Explorer cannot load a taskbar group icon from inside app.asar.
+    - from: assets/guildie.ico
+      to: guildie.ico
     - from: capture/dist/GuildieCapture
       to: capture
       filter:

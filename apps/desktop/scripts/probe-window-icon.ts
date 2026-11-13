@@ -1,6 +1,7 @@
 // Runs in Electron on Windows. Compare the actual HWND icon with our ICO;
 // checking the executable's resources alone does not check the running window.
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -85,6 +86,24 @@ async function main() {
 		win.show();
 		await new Promise((resolve) => setTimeout(resolve, 300));
 		check("shown");
+		const properties = JSON.parse(
+			execFileSync(
+				"powershell.exe",
+				[
+					"-NoProfile",
+					"-ExecutionPolicy",
+					"Bypass",
+					"-File",
+					join(process.cwd(), "scripts", "probe-window-properties.ps1"),
+					"-WindowHandle",
+					String(hwnd),
+				],
+				{ encoding: "utf8" },
+			),
+		);
+		assert.equal(properties.appId, "club.guildie.desktop", "explicit taskbar app identity");
+		assert.equal(properties.icon, `${join(__dirname, "assets", "guildie.ico")},0`, "explicit taskbar group icon");
+		console.log("PASS Explorer taskbar group properties identify Guildie and its icon");
 		win.hide();
 		win.show();
 		check("shown again");

@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **App:** Give the Windows taskbar group an explicit Guildie icon, separate from the window and tray icons.
+
 ## 0.3.29
 
 ### New

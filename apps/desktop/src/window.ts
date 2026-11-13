@@ -5,7 +5,7 @@
 
 import { release } from "node:os";
 import { join } from "node:path";
-import { BrowserWindow, type Rectangle, screen, shell } from "electron";
+import { app, BrowserWindow, type Rectangle, screen, shell } from "electron";
 import { isExternalOpenable, staysInWindow } from "./origins.ts";
 import { type Bounds, settings } from "./settings.ts";
 
@@ -86,6 +86,18 @@ export function createWindow(url: string, options: { show: boolean; preload: str
 			spellcheck: true,
 		},
 	});
+	// Explorer's taskbar group has its own icon metadata, separate from WM_SETICON
+	// (the window icon above). Give it a real file: the shell cannot read ASAR paths.
+	if (process.platform === "win32") {
+		win.setAppDetails({
+			appId: "club.guildie.desktop",
+			appIconPath: app.isPackaged
+				? join(process.resourcesPath, "guildie.ico")
+				: join(__dirname, "assets", "guildie.ico"),
+			appIconIndex: 0,
+			relaunchDisplayName: "Guildie",
+		});
+	}
 	win.removeMenu();
 	if (saved?.maximized) win.maximize();
 	if (options.show) win.once("ready-to-show", () => win.show());
