@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** More addons on the Addons page get their CurseForge icon, description and categories, including Auctionator, Baganator, RareScanner and Dialogue UI, even when the addon itself doesn't say which CurseForge project it is. Descriptions that were cut off now end with "…".
+
 ## 0.3.34
 
 ### Improvements

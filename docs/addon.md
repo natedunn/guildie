@@ -179,7 +179,8 @@ What the site does with it (`helper:ingest`):
   in the upload goes to `playerAddons`, and only if the player shares it
   (below). Otherwise it's dropped. CurseForge project IDs in the list are
   looked up for an icon, summary, link and categories (`addonCatalog`,
-  convex/addonCatalog.ts).
+  convex/addonCatalog.ts); addons without one are matched by folder against
+  CurseForge's popular WoW projects (`addonFolders`, synced weekly).
 
 A character is accepted only if the token's owner claimed it: matched by
 Blizzard's character id (the hex number at the end of the in-game GUID), or by
