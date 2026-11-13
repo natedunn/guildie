@@ -373,8 +373,8 @@ end)
 test("addons: loaded ones only, plain titles, no Blizzard_; only the latest character carries them", function()
     local state = lich({
         addons = {
-            { name = "Questie", title = "|cff00ff00Questie|r", version = "9.1.0" },
-            { name = "Details", title = "|TInterface\\Icon:16|t Details! Damage Meter", version = "|cffffffffv1.2|r" },
+            { name = "Questie", title = "|cff00ff00Questie|r", version = "9.1.0", notes = "Quest helper", curse = "334372" },
+            { name = "Details", title = "|TInterface\\Icon:16|t Details! Damage Meter", version = "|cffffffffv1.2|r", curse = "@project-id@", notes = "|cffffd200Damage|r meter" },
             { name = "Bagnon", title = "Bagnon", loaded = false },
             { name = "Blizzard_Debug", title = "Debug" },
             { name = "Guildie", title = "Guildie" },
@@ -401,6 +401,10 @@ test("addons: loaded ones only, plain titles, no Blizzard_; only the latest char
     eq(addons.list[1].version, "v1.2", "version without color codes")
     eq(addons.list[2].name, "Guildie")
     eq(addons.list[3].title, "Questie", "color codes stripped")
+    eq(addons.list[3].curse, "334372", "CurseForge project ID")
+    eq(addons.list[3].notes, nil, "with a CurseForge project, its summary is used instead")
+    eq(addons.list[1].curse, nil, "an unfilled packager token isn't an ID")
+    eq(addons.list[1].notes, "Damage meter", "no project: the .toc's notes, without color codes")
     eq(byGuid["Player-4904-00000001"].addons, nil, "an older character's list is dropped")
 end)
 

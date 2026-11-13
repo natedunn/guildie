@@ -2,9 +2,10 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mutation, type QueryCtx, query } from "./_generated/server";
+import { catalogFor } from "./addonCatalog";
 import { access } from "./guilds";
 import { vAddonShare, vRegion } from "./schema";
-import { canSeeAddons, summarizeAddons } from "./shared/addons";
+import { type AddonEntry, canSeeAddons, summarizeAddons } from "./shared/addons";
 import { requireUserId } from "./users";
 
 // The addons players run in game (playerAddons in schema.ts). Opt in: the
@@ -12,6 +13,12 @@ import { requireUserId } from "./users";
 // shares it (helper.ts storeAddons). Shown on each of the player's characters
 // (Addons tab, guilds.character) and summed up per guild (the guild's Addons
 // page). "Guild" means members of the guild being looked at.
+
+/** Addons summed up, with what CurseForge says about them. */
+async function summarize(ctx: QueryCtx, people: { list: AddonEntry[] }[]) {
+	const ids = people.flatMap((p) => p.list.flatMap((a) => (a.curseId ? [a.curseId] : [])));
+	return summarizeAddons(people, await catalogFor(ctx, ids));
+}
 
 export async function addonRow(ctx: QueryCtx, userId: Id<"users">) {
 	return await ctx.db
@@ -35,11 +42,12 @@ export async function characterAddons(
 	const share = row?.share ?? "none";
 	if (!canSeeAddons(share, viewer)) return null;
 	if (!viewer.isOwner && !row?.list) return null;
+	const list = row?.list ?? [];
 	return {
 		share,
 		mine: viewer.isOwner,
 		capturedAt: row?.capturedAt,
-		list: row?.list ?? [],
+		addons: await summarize(ctx, [{ list }]),
 	};
 }
 
@@ -118,7 +126,7 @@ export const guild = query({
 			});
 		}
 		people.sort((a, b) => a.character.name.localeCompare(b.character.name));
-		const addons = summarizeAddons(people);
+		const addons = await summarize(ctx, people);
 		return {
 			isMember,
 			/** Whether the viewer shares theirs (to point them at the setting). */

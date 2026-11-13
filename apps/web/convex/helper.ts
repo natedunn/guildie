@@ -2,6 +2,7 @@ import { ConvexError, type Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalQuery, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import { anyUnknown } from "./addonCatalog";
 import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./addonPayload";
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
@@ -369,6 +370,9 @@ async function storeAddons(
 	if (!row || row.share === "none") return;
 	if (row.capturedAt !== undefined && row.capturedAt > addons.capturedAt) return;
 	await ctx.db.patch(row._id, { list: addons.list, capturedAt: addons.capturedAt, receivedAt: now });
+	// New CurseForge projects: look them up now rather than at the daily run.
+	const ids = addons.list.flatMap((a) => (a.curseId ? [a.curseId] : []));
+	if (await anyUnknown(ctx, ids)) await ctx.scheduler.runAfter(0, internal.addonCatalog.refresh, {});
 }
 
 /** The game's item quality numbers as Blizzard's API names them. */

@@ -153,8 +153,12 @@ export type AddonCharacter = {
 	deliveries?: Delivery[];
 };
 
-/** One addon running in game (payload 7): its folder name, title and version as the addon's .toc gives them. */
-export type AddonEntry = { name: string; title?: string; version?: string };
+/**
+ * One addon running in game (payload 7): its folder name, title and version
+ * as the addon's .toc gives them; from addon 0.20 also its description
+ * (`## Notes`) and CurseForge project ID (`## X-Curse-Project-ID`).
+ */
+export type AddonEntry = { name: string; title?: string; version?: string; notes?: string; curseId?: number };
 
 export type Delivery = {
 	id: string;
@@ -265,6 +269,14 @@ export function addonText(x: unknown, max: number) {
 	return text || undefined;
 }
 
+/** A CurseForge project ID from a .toc (text there; a positive integer or nothing). */
+export function curseProjectId(x: unknown) {
+	const text = typeof x === "number" ? String(x) : typeof x === "string" ? x.trim() : "";
+	if (!/^\d{1,9}$/.test(text)) return undefined;
+	const id = Number(text);
+	return id > 0 ? id : undefined;
+}
+
 function addons(x: unknown, now: number) {
 	const o = obj(x, "addons");
 	const seen = new Set<string>();
@@ -276,7 +288,15 @@ function addons(x: unknown, now: number) {
 		seen.add(name.toLowerCase());
 		const title = addonText(raw.title, 100);
 		const version = addonText(raw.version, 40);
-		list.push({ name, ...(title && title !== name ? { title } : {}), ...(version ? { version } : {}) });
+		const notes = addonText(raw.notes, 120);
+		const curseId = curseProjectId(raw.curse);
+		list.push({
+			name,
+			...(title && title !== name ? { title } : {}),
+			...(version ? { version } : {}),
+			...(notes ? { notes } : {}),
+			...(curseId ? { curseId } : {}),
+		});
 	}
 	list.sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name));
 	return { capturedAt: time(o.capturedAt, "addons.capturedAt", now), list };

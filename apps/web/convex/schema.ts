@@ -759,9 +759,38 @@ export default defineSchema({
 		/** Game time (ms) of the read, from the newest upload. */
 		capturedAt: v.optional(v.number()),
 		receivedAt: v.optional(v.number()),
-		/** Running addons only: folder name, the .toc title when it differs, version. */
+		/**
+		 * Running addons only: folder name, the .toc title when it differs,
+		 * version, and from addon 0.20 its description (`## Notes`) and
+		 * CurseForge project (`## X-Curse-Project-ID`).
+		 */
 		list: v.optional(
-			v.array(v.object({ name: v.string(), title: v.optional(v.string()), version: v.optional(v.string()) })),
+			v.array(
+				v.object({
+					name: v.string(),
+					title: v.optional(v.string()),
+					version: v.optional(v.string()),
+					notes: v.optional(v.string()),
+					curseId: v.optional(v.number()),
+				}),
+			),
 		),
 	}).index("by_user", ["userId"]),
+
+	/**
+	 * CurseForge projects of the addons players run (convex/addonCatalog.ts):
+	 * name, summary, logo, link and categories, looked up by the project ID an
+	 * addon's .toc carries. Public data, refreshed weekly. `missing` when
+	 * CurseForge doesn't have the ID (asked again after a while).
+	 */
+	addonCatalog: defineTable({
+		curseId: v.number(),
+		name: v.optional(v.string()),
+		summary: v.optional(v.string()),
+		logo: v.optional(v.string()),
+		url: v.optional(v.string()),
+		categories: v.optional(v.array(v.string())),
+		missing: v.optional(v.boolean()),
+		fetchedAt: v.number(),
+	}).index("by_curseId", ["curseId"]),
 });

@@ -21,6 +21,7 @@ Save the secrets in one password-manager item as you go.
 | Battle.net prod client ID + secret | secret | Part 2  | prod `AUTH_BATTLENET_CLIENT_ID`, `AUTH_BATTLENET_CLIENT_SECRET`                       |
 | Dev routing secret                 | secret | Part 3  | Worker `guildie-gateway-dev` `ROUTING_SECRET` **and** cloud dev `AUTH_GATEWAY_SECRET` |
 | Prod routing secret                | secret | Part 3  | Worker `guildie-gateway` `ROUTING_SECRET` **and** prod `AUTH_GATEWAY_SECRET`          |
+| CurseForge API key                 | secret | (any)   | cloud dev and prod `CURSEFORGE_API_KEY` (console.curseforge.com → API keys; optional) |
 | Prod deploy key                    | secret | Part 6  | build variable `CONVEX_DEPLOY_KEY` on the `main` trigger                              |
 | Preview deploy key                 | secret | Part 6  | build variable `CONVEX_DEPLOY_KEY` on the other-branches trigger                      |
 

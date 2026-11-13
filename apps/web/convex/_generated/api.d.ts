@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as addonCatalog from "../addonCatalog.js";
 import type * as addonPayload from "../addonPayload.js";
 import type * as addonView from "../addonView.js";
 import type * as addons from "../addons.js";
@@ -40,7 +41,6 @@ import type * as recipes from "../recipes.js";
 import type * as requests from "../requests.js";
 import type * as sample from "../sample.js";
 import type * as search from "../search.js";
-import type * as sources from "../sources.js";
 import type * as shared_addons from "../shared/addons.js";
 import type * as shared_dungeonQuests from "../shared/dungeonQuests.js";
 import type * as shared_dungeonResources from "../shared/dungeonResources.js";
@@ -59,6 +59,7 @@ import type * as shared_statPriority from "../shared/statPriority.js";
 import type * as shared_upgrades from "../shared/upgrades.js";
 import type * as shared_weights from "../shared/weights.js";
 import type * as shared_wow from "../shared/wow.js";
+import type * as sources from "../sources.js";
 import type * as statPriority from "../statPriority.js";
 import type * as sync from "../sync.js";
 import type * as talents from "../talents.js";
@@ -72,6 +73,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  addonCatalog: typeof addonCatalog;
   addonPayload: typeof addonPayload;
   addonView: typeof addonView;
   addons: typeof addons;
@@ -104,7 +106,6 @@ declare const fullApi: ApiFromModules<{
   requests: typeof requests;
   sample: typeof sample;
   search: typeof search;
-  sources: typeof sources;
   "shared/addons": typeof shared_addons;
   "shared/dungeonQuests": typeof shared_dungeonQuests;
   "shared/dungeonResources": typeof shared_dungeonResources;
@@ -123,6 +124,7 @@ declare const fullApi: ApiFromModules<{
   "shared/upgrades": typeof shared_upgrades;
   "shared/weights": typeof shared_weights;
   "shared/wow": typeof shared_wow;
+  sources: typeof sources;
   statPriority: typeof statPriority;
   sync: typeof sync;
   talents: typeof talents;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addonText, matchRecipes, parseCharacter } from "./addonPayload.ts";
+import { addonText, curseProjectId, matchRecipes, parseCharacter } from "./addonPayload.ts";
 
 const NOW = 1_794_300_000_000;
 const T = NOW / 1000 - 60;
@@ -399,4 +399,30 @@ test("payload 7: addons, cleaned rather than refused, deduplicated and sorted by
 		NOW,
 	);
 	assert.ok(!tooMany.ok);
+});
+
+test("payload 7 from addon 0.20: descriptions and CurseForge project IDs", () => {
+	const parsed = parseCharacter(
+		{
+			...v2,
+			addons: {
+				capturedAt: T,
+				list: [
+					{ name: "DBM-Core", title: "Deadly Boss Mods", notes: "|cffffd200Boss|r timers", curse: "3358" },
+					{ name: "Odd", curse: "12a" },
+					{ name: "Zero", curse: "0", notes: "   " },
+				],
+			},
+		},
+		NOW,
+	);
+	assert.ok(parsed.ok);
+	assert.deepEqual(parsed.character.addons?.list, [
+		{ name: "DBM-Core", title: "Deadly Boss Mods", notes: "Boss timers", curseId: 3358 },
+		{ name: "Odd" },
+		{ name: "Zero" },
+	]);
+	assert.equal(curseProjectId(" 42 "), 42);
+	assert.equal(curseProjectId(-1), undefined);
+	assert.equal(curseProjectId("1".repeat(12)), undefined);
 });

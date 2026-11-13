@@ -35,15 +35,15 @@ function AddonsPage() {
 					<AddonShareControl share={addons.share} className="mt-3" />
 				</section>
 			)}
-			{addons.list.length > 0 ? (
+			{addons.addons.length > 0 ? (
 				<>
 					<div className="mb-2 flex items-baseline justify-between gap-4">
 						<span className="text-sm font-semibold">
-							<span className="num">{addons.list.length}</span> addons
+							<span className="num">{addons.addons.length}</span> addons
 						</span>
 						{asOf && <span className="text-xs text-muted-foreground">From the game, {asOf}</span>}
 					</div>
-					<AddonList list={addons.list} />
+					<AddonList addons={addons.addons} />
 					<p className="mt-3 text-xs text-muted-foreground">
 						Account-wide: the same list shows on each of this player's characters.
 					</p>
