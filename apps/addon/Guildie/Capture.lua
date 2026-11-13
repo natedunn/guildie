@@ -565,10 +565,18 @@ function ns.readAddons()
         local name, title = info(i)
         if type(name) == "string" and not name:find("^Blizzard_") and loaded(i) then
             local version = meta and plainText(meta(i, "Version"), 40)
+            -- The CurseForge project the site looks up for an icon, summary
+            -- and link (addon 0.20+); without one, the .toc's own short
+            -- description. Kept short: live sync streams the whole payload.
+            local curse = meta and plainText(meta(i, "X-Curse-Project-ID"), 12)
+            curse = curse and curse:match("^%d+$") or nil
+            local notes = not curse and meta and plainText(meta(i, "Notes"), 120) or nil
             table.insert(list, {
                 name = plainText(name, 64),
                 title = plainText(title, 100),
                 version = version,
+                notes = notes,
+                curse = curse,
             })
             if #list >= MAX_ADDONS then break end
         end

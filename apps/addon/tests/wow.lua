@@ -131,14 +131,18 @@ function wow.reset(state)
         return f
     end
     _G.GetTime = function() return 0 end
-    -- state.addons: { { name, title, version, loaded = false }, ... } (the AddOns folder),
+    -- state.addons: { { name, title, version, notes, curse, loaded = false }, ... } (the AddOns folder),
     -- or false for a client without the list. Index 0 is never asked for.
     local function addonAt(i) return state.addons and state.addons[i] end
     _G.C_AddOns = {
         GetAddOnMetadata = function(which, field)
             if type(which) == "number" then
                 local a = addonAt(which)
-                return a and field == "Version" and a.version or nil
+                if not a then return nil end
+                if field == "Version" then return a.version end
+                if field == "Notes" then return a.notes end
+                if field == "X-Curse-Project-ID" then return a.curse end
+                return nil
             end
             if field == "Version" then return state.addonVersion or "0.10.1" end
         end,

@@ -129,7 +129,10 @@ used); the account page lists them with Disconnect.
     },
     "addons": {                               // version 7, on the character read last only
       "capturedAt": 1794336950,
-      "list": [ { "name": "Questie", "title": "Questie", "version": "9.1.0" } ]
+      "list": [ { "name": "Questie", "title": "Questie", "version": "9.1.0", "curse": "334372" },
+                { "name": "Auctionator", "version": "11.0.12", "notes": "Easier auction house" } ]
+                                              // curse (## X-Curse-Project-ID) and notes (## Notes,
+                                              // only without a curse ID, 120 chars): addon 0.20+
     }
   }
   ```
@@ -174,7 +177,9 @@ What the site does with it (`helper:ingest`):
   requests.
 - The addons running (`addons`, payload 7) are account-wide: the newest list
   in the upload goes to `playerAddons`, and only if the player shares it
-  (below). Otherwise it's dropped.
+  (below). Otherwise it's dropped. CurseForge project IDs in the list are
+  looked up for an icon, summary, link and categories (`addonCatalog`,
+  convex/addonCatalog.ts).
 
 A character is accepted only if the token's owner claimed it: matched by
 Blizzard's character id (the hex number at the end of the in-game GUID), or by
