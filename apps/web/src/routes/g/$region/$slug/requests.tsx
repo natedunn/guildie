@@ -4,7 +4,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { type ExistingRequest, RequestButton, RequestRow, type RequestView, useNow } from "@/components/requests";
@@ -62,8 +62,9 @@ function RequestsPage() {
 	);
 	const view = search.view ?? "open";
 	const type: Type = search.type ?? "fixed";
+	const requests = useStableOrder(data?.member ? data.requests : []);
 	const lists = useMemo(() => {
-		const all = data?.member ? data.requests : [];
+		const all = requests;
 		const fixed = all.filter((r) => !r.ongoing);
 		// Ongoing: active ones only (stopped and ended ones just go away).
 		const ongoing = all.filter((r) => r.ongoing && isActive(r));
@@ -81,7 +82,7 @@ function RequestsPage() {
 				help: ongoing.filter((r) => r.canHelp),
 			},
 		};
-	}, [data]);
+	}, [requests]);
 	// Ongoing lists show one row per item (everyone who wants it together), so count items.
 	const count = (t: Type, v: View) =>
 		t === "ongoing" && v !== "mine" ? new Set(lists.ongoing[v].map((r) => r.item?.itemId)).size : lists[t][v].length;
@@ -192,6 +193,22 @@ function RequestsPage() {
 			)}
 		</div>
 	);
+}
+
+/**
+ * The server's order (crafts you can make first, then latest activity) as it
+ * was when the page opened: claiming or updating a request leaves it where it
+ * is instead of jumping it to the top. Requests posted meanwhile go on top.
+ */
+function useStableOrder<T extends { _id: string }>(rows: T[]): T[] {
+	const rank = useRef(new Map<string, number>());
+	return useMemo(() => {
+		const seen = rank.current;
+		const fresh = rows.filter((r) => !seen.has(r._id));
+		const start = seen.size === 0 ? 0 : Math.min(0, ...seen.values()) - fresh.length;
+		for (const [i, r] of fresh.entries()) seen.set(r._id, start + i);
+		return [...rows].sort((a, b) => (seen.get(a._id) ?? 0) - (seen.get(b._id) ?? 0));
+	}, [rows]);
 }
 
 /** Item and icon, hover for the tooltip. */
