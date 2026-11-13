@@ -1,7 +1,8 @@
 -- Adds a Guildie block to item tooltips: guild requests for this item ("Todd
 -- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
--- whose known recipes use it (reagents), and
--- guildmates it might be a gear upgrade for (Upgrades.lua).
+-- whose known recipes use it (reagents), who could learn it (recipe items:
+-- patterns, plans, formulas), and guildmates it might be a gear upgrade
+-- for (Upgrades.lua).
 -- Suggestions, not certainties: knowing a recipe doesn't mean they're still
 -- making it. Data comes from GuildieData.lua, which the helper downloads.
 
@@ -63,6 +64,91 @@ local function reagentRows(itemID, skip)
     return rows
 end
 ns.reagentRows = reagentRows
+
+--- A list as a set, cached per list (GuildieData is replaced only on /reload).
+local sets = setmetatable({}, { __mode = "k" })
+local function asSet(list)
+    if type(list) ~= "table" then return {} end
+    local set = sets[list]
+    if not set then
+        set = {}
+        for _, v in ipairs(list) do set[v] = true end
+        sets[list] = set
+    end
+    return set
+end
+
+-- How many names a recipe row lists before "+N".
+local MAX_KNOWN = 3
+
+--- Is this recipe item worth sending someone? (GuildieData.recipes, addon
+--- 0.14.0; the same rule as apps/web/convex/shared/recipeStatus.ts.) For
+--- each guild character with the profession: can learn it now, later
+--- (skill too low), already has one unlearned, or knows it. Rows: one per
+--- character who could use it ("Brenna | can learn it", "Miller | at 125
+--- (has 90)", "Todd | has one already"), then "Known by Lich, Isai +2".
+--- Leaves out the character you're on: the game's own tooltip says.
+local function recipeRows(itemID)
+    local data = GuildieData and type(GuildieData.recipes) == "table" and GuildieData.recipes
+    local item = data and type(data.items) == "table" and data.items[itemID]
+    if type(item) ~= "table" then return {} end
+    local profession, need, recipeID = item[1], item[2] or 0, item[3]
+    local groups = { now = {}, later = {}, has = {}, knows = {} }
+    local me = UnitName and UnitName("player")
+    for _, c in ipairs(type(data.crafters) == "table" and data.crafters or {}) do
+        local skill = type(c.skills) == "table" and c.skills[profession]
+        if skill and c.name ~= me then
+            local state
+            if asSet(c.known)[recipeID] then
+                state = "knows"
+            elseif asSet(c.has)[itemID] then
+                state = "has"
+            elseif skill >= 0 and need > 0 and skill < need then
+                state = "later"
+            else
+                state = "now"
+            end
+            table.insert(groups[state], { name = c.name, classId = c.classId, skill = skill })
+        end
+    end
+    -- Closest to learning it first.
+    for _, list in pairs(groups) do
+        table.sort(list, function(a, b)
+            if a.skill ~= b.skill then return a.skill > b.skill end
+            return a.name < b.name
+        end)
+    end
+    local rows, extra = {}, 0
+    local function add(list, right)
+        for _, c in ipairs(list) do
+            if #rows < MAX_NAMES then
+                table.insert(rows, { left = classColored(c.name, c.classId), right = right(c) })
+            else
+                extra = extra + 1
+            end
+        end
+    end
+    add(groups.now, function() return "can learn it" end)
+    add(groups.later, function(c)
+        if c.skill >= 0 then return string.format("at %d (has %d)", need, c.skill) end
+        return "skill too low"
+    end)
+    add(groups.has, function() return "has one already" end)
+    if extra > 0 then table.insert(rows, { left = string.format("+%d more could use it", extra) }) end
+    local known = groups.knows
+    if #known > 0 then
+        local names = {}
+        for i = 1, math.min(#known, MAX_KNOWN) do
+            table.insert(names, classColored(known[i].name, known[i].classId))
+        end
+        local text = "Known by " .. table.concat(names, ", ")
+        if #known > MAX_KNOWN then text = text .. string.format(" +%d", #known - MAX_KNOWN) end
+        table.insert(rows, { left = text })
+    end
+    if #rows == 0 then table.insert(rows, { left = "No guildmates have " .. tostring(profession) }) end
+    return rows
+end
+ns.recipeRows = recipeRows
 
 --- One two-column row per open request for this item (GuildieData.requests,
 --- addon 0.8.0): { left = "Todd", right = "requesting 20, claimed by Miller" }.
@@ -127,6 +213,7 @@ local function rowsFor(tooltip, itemID, data)
     local binding = ns.upgrades and ns.upgrades.binding(ns.upgrades.tooltipLines(tooltip, data))
     local bound = binding ~= nil
     if not bound then
+        for _, row in ipairs(recipeRows(itemID)) do table.insert(rows, row) end
         for _, row in ipairs(reagentRows(itemID, ongoing)) do table.insert(rows, row) end
     end
     local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)

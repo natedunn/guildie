@@ -8,7 +8,9 @@ import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
+import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { PageTabButton, PageTabs } from "@/components/page-tabs";
+import { type Learner, LearnerSummary } from "@/components/recipe-learners";
 import {
 	buildIndex,
 	compareProfessions,
@@ -42,8 +44,11 @@ import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 //   recipes included) that would be an upgrade for the viewer's characters;
 // - "Upgrades I can craft" (?view=craft): the viewer's recipes that would be
 //   an upgrade for someone in the guild (their own other characters included).
+// And "Who can learn" (?view=learn): every recipe item (pattern, plans,
+// formula...) for the guild's professions, with who could learn it now or
+// later, who already has one and who knows it: is it worth sending someone?
 
-type View = "upgrades" | "craft";
+type View = "upgrades" | "craft" | "learn";
 /** `char`: which of the viewer's characters the upgrade views are about (slug; default their first). */
 type Search = { q?: string; profession?: string; view?: View; char?: string };
 
@@ -53,7 +58,7 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		// The router parses "?q=8" as a number; take it back as text.
 		if (typeof search.q === "string" || typeof search.q === "number") out.q = String(search.q);
 		if (typeof search.profession === "string") out.profession = search.profession;
-		if (search.view === "upgrades" || search.view === "craft") out.view = search.view;
+		if (search.view === "upgrades" || search.view === "craft" || search.view === "learn") out.view = search.view;
 		if (typeof search.char === "string") out.char = search.char;
 		return out;
 	},
@@ -145,6 +150,11 @@ function CraftingPage() {
 	);
 	const showUpgrades = view === "upgrades" && !!me;
 	const showCraft = view === "craft" && !!me;
+	const showLearn = view === "learn" && !!me;
+	const { data: learnData } = useQuery({
+		...convexQuery(api.crafting.guildRecipeItems, { region: params.region as Region, slug: params.slug }),
+		enabled: showLearn,
+	});
 	const [showRemoved, setShowRemoved] = useState(false);
 	// The upgrade views are about one of the viewer's characters at a time.
 	const characters = upgrades?.characters ?? [];
@@ -229,7 +239,11 @@ function CraftingPage() {
 			<div className="space-y-3">
 				{me ? (
 					<PageTabs>
-						<PageTabButton active={!showUpgrades && !showCraft} onClick={() => setView(undefined)} count={data.length}>
+						<PageTabButton
+							active={!showUpgrades && !showCraft && !showLearn}
+							onClick={() => setView(undefined)}
+							count={data.length}
+						>
 							All recipes
 						</PageTabButton>
 						<PageTabButton
@@ -249,11 +263,27 @@ function CraftingPage() {
 							<span className="@max-md:hidden">Upgrades I can craft</span>
 							<span className="@md:hidden">I can craft</span>
 						</PageTabButton>
+						<PageTabButton active={showLearn} onClick={() => setView("learn")}>
+							<span className="@max-md:hidden">Who can learn</span>
+							<span className="@md:hidden">Learn</span>
+						</PageTabButton>
 					</PageTabs>
 				) : null}
+				{showLearn ? (
+					<LearnView
+						data={learnData}
+						region={params.region}
+						query={query}
+						deferred={deferred}
+						setQuery={setQuery}
+						profession={profession}
+						setProfession={setProfession}
+					/>
+				) : null}
 				{/* One row: whose upgrades (upgrade views), the search, the profession, and
-				    (Upgrades for me) Show removed on the right. Wraps on phones. */}
-				<div className="flex flex-wrap items-center gap-2">
+				    (Upgrades for me) Show removed on the right. Wraps on phones. Who can
+				    learn has its own. */}
+				<div className={cn("flex flex-wrap items-center gap-2", showLearn && "hidden")}>
 					{(showUpgrades || showCraft) && char ? (
 						<CharacterPicker
 							label={showCraft ? "Crafting as" : "For"}
@@ -307,7 +337,7 @@ function CraftingPage() {
 				</div>
 			</div>
 
-			{loading ? (
+			{showLearn ? null : loading ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
 					{showCraft
 						? "Checking your recipes against the guild's gear..."
@@ -777,5 +807,146 @@ function CharacterPicker({
 				</DropdownMenuRadioGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
+	);
+}
+
+type LearnData = NonNullable<FunctionReturnType<typeof api.crafting.guildRecipeItems>>;
+
+/**
+ * Who can learn: recipe items for the guild's professions, searched by name,
+ * each with who could use it. "Only ones someone needs" (on by default)
+ * hides items everyone with the profession already knows or holds.
+ */
+function LearnView({
+	data,
+	region,
+	query,
+	deferred,
+	setQuery,
+	profession,
+	setProfession,
+}: {
+	data: LearnData | null | undefined;
+	region: string;
+	query: string;
+	deferred: string;
+	setQuery: (q: string) => void;
+	profession?: string;
+	setProfession: (p?: string) => void;
+}) {
+	const [neededOnly, setNeededOnly] = useState(true);
+	const [limit, setLimit] = useState(PAGE);
+	const rows = useMemo(() => {
+		if (!data) return [];
+		return data.items.map((item) => ({
+			...item,
+			learners: item.who.map((w): Learner => ({ ...data.characters[w.i], state: w.state, skill: w.skill })),
+			needed: item.who.some((w) => w.state === "now" || w.state === "later"),
+		}));
+	}, [data]);
+	const words = useMemo(() => queryWords(deferred), [deferred]);
+	const matches = useMemo(
+		() =>
+			rows.filter((r) => {
+				if (neededOnly && !r.needed) return false;
+				const text = `${r.name} ${r.profession}`.toLowerCase();
+				return words.every((w) => text.includes(w));
+			}),
+		[rows, words, neededOnly],
+	);
+	const counts = useMemo(() => {
+		const c = new Map<string, number>();
+		for (const r of matches) c.set(r.profession, (c.get(r.profession) ?? 0) + 1);
+		return c;
+	}, [matches]);
+	const professions = useMemo(() => [...new Set(rows.map((r) => r.profession))].sort(compareProfessions), [rows]);
+	const results = profession ? matches.filter((r) => r.profession === profession) : matches;
+	useEffect(() => setLimit(PAGE), [deferred, profession, neededOnly]);
+
+	return (
+		<>
+			<div className="flex flex-wrap items-center gap-2">
+				<Input
+					type="search"
+					value={query}
+					onChange={(e) => setQuery(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === "Escape") setQuery("");
+					}}
+					placeholder="Who can learn... (Pattern: Red Linen Robe, Mageweave)"
+					aria-label="Search recipe items"
+					className="h-10 min-w-0 flex-1 basis-64 text-[15px] @max-md:order-last @max-md:basis-full"
+				/>
+				<select
+					aria-label="Profession"
+					value={profession ?? ""}
+					onChange={(e) => setProfession(e.target.value || undefined)}
+					className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:flex-1"
+				>
+					<option value="">All professions ({matches.length})</option>
+					{professions.map((p) => (
+						<option key={p} value={p}>
+							{p} ({counts.get(p) ?? 0})
+						</option>
+					))}
+				</select>
+				<label
+					className="ml-auto flex h-10 cursor-pointer items-center gap-2 pl-2 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground"
+					title="Hide recipe items that everyone with the profession already knows or has"
+				>
+					<Switch checked={neededOnly} onCheckedChange={setNeededOnly} />
+					Only ones someone needs
+				</label>
+			</div>
+			{!data ? (
+				<p className="py-10 text-center text-sm text-muted-foreground">
+					{data === null ? "Members only." : "Checking the guild's professions..."}
+				</p>
+			) : rows.length === 0 ? (
+				<p className={EMPTY}>No recipe items for the guild's professions yet.</p>
+			) : results.length === 0 ? (
+				<p className={EMPTY}>
+					{deferred.trim() ? <>No recipe items match "{deferred.trim()}".</> : "Nobody needs any of these right now."}
+				</p>
+			) : (
+				<div>
+					<div className="overflow-x-auto">
+						<div className="min-w-[40rem]">
+							<div className="grid grid-cols-[minmax(0,1.1fr)_7.5rem_minmax(0,1.4fr)] gap-4 border-b border-border pb-1.5 text-xs text-muted-foreground">
+								<span>Recipe item</span>
+								<span>Needs</span>
+								<span>In the guild</span>
+							</div>
+							<ul>
+								{results.slice(0, limit).map((r) => (
+									<li
+										key={r.itemId}
+										className="grid grid-cols-[minmax(0,1.1fr)_7.5rem_minmax(0,1.4fr)] items-center gap-x-4 border-b border-border/60 py-1.5 text-sm last:border-b-0"
+									>
+										<ItemHover
+											item={{ itemId: r.itemId, name: r.name, quality: r.quality, icon: r.icon }}
+											className="flex min-w-0 items-center gap-2.5"
+										>
+											<ItemIcon icon={r.icon} quality={r.quality} size={28} className="block flex-none" />
+											<span className="truncate hover:underline" style={{ color: QUALITY_COLORS[r.quality] }}>
+												{r.name}
+											</span>
+										</ItemHover>
+										<span className="truncate text-muted-foreground">
+											{r.profession}
+											{r.skill ? <span className="num"> {r.skill}</span> : null}
+										</span>
+										<LearnerSummary who={r.learners} region={region} profession={r.profession} />
+									</li>
+								))}
+							</ul>
+						</div>
+					</div>
+					{results.length > limit ? (
+						<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
+					) : null}
+				</div>
+			)}
+		</>
 	);
 }

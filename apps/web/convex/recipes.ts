@@ -7,6 +7,7 @@ import { appToken, blizzardGet } from "./blizzard";
 // from Blizzard's static data (the same in every region, so read from US).
 // Synced weekly (crons.ts); about one request per recipe, in staggered
 // batches. Characters' known recipes come with their profiles (sync.ts).
+// The items that teach them (patterns, plans...): recipeItems.ts.
 
 const REFRESH_MS = 7 * 24 * 3600_000;
 const BATCH = 25;
@@ -71,6 +72,8 @@ export const syncCatalog = internalAction({
 		// reagents, and the talent tree layouts (the other weekly static data).
 		const afterBatches = Math.ceil(due.length / BATCH) * BATCH_STAGGER_MS + 60_000;
 		await ctx.scheduler.runAfter(afterBatches, internal.items.syncRecipeItems, {});
+		// Patterns, plans and formulas, matched to the recipes just saved.
+		await ctx.scheduler.runAfter(afterBatches, internal.recipeItems.syncCatalog, {});
 		await ctx.scheduler.runAfter(0, internal.talents.syncLayouts, {});
 		return { queued: due.length };
 	},
