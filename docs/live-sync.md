@@ -207,7 +207,9 @@ since that view was downloaded. The app remains the source for live receiver and
 upload health. Bank/recipe capture still requires opening the relevant windows.
 
 With pixel sync enabled, an in-game reminder keeps the unobstructed-square
-requirement visible. Warnings identify locally missing data, stopped/failed
+requirement visible. Its close button hides it across reloads and logins without
+stopping sync; Settings → Show on-screen sync warning restores it. Status always
+keeps the warning details available. Warnings identify locally missing data, stopped/failed
 export, Edit Mode pauses, unusually long snapshot cycles, and stale/unverified
 server comparisons. **The addon cannot detect external window occlusion, reader
 packet loss, or an app that has stopped.** There is no live acknowledgement

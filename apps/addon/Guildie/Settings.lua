@@ -88,6 +88,9 @@ function ns.buildSettingsRows(parent, width, changed)
     checkbox("Enable experimental pixel sync", "syncEnabled", function() return ns.livePixels.get().enabled == true end,
         function(on) ns.livePixels.set("enabled", on) end)
     label("Reload once after enabling or disabling so the app can read your choice. Keep the app running. Bank and recipe data still require opening their windows.")
+    checkbox("Show on-screen sync warning", "showSyncWarning", function() return ns.settings().showSyncWarning ~= false end,
+        function(on) ns.settings().showSyncWarning = on; ns.refreshSyncWarning() end)
+    label("Dismiss the on-screen warning with its close button. Sync details and warnings remain available on the Status tab.")
     checkbox("Larger square", "large", function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
         function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end)
     checkbox("Grayscale (troubleshooting)", "gray", function() return ns.livePixels.get().theme == "gray" end,
