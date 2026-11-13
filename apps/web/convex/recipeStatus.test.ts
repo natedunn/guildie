@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { craftedName, guildieRecipeId, rankFrom } from "./shared/recipeResearch.ts";
-import { addonRecipes, recipeCandidates, recipeState, taughtName, unlearnedHeld } from "./shared/recipeStatus.ts";
+import {
+	addonRecipes,
+	packAddonRecipes,
+	recipeCandidates,
+	recipeState,
+	taughtName,
+	unlearnedHeld,
+	unpackAddonRecipes,
+} from "./shared/recipeStatus.ts";
 
 // Pattern: Red Linen Robe (item 2598) teaches a Tailoring recipe at 25.
 const ROBE = { recipeIds: [2389], professionId: 197, skill: 25 };
@@ -123,4 +131,23 @@ test("research: rank and crafted name from the item's own text", () => {
 	assert.equal(craftedName(["Teaches you how to craft Earthweaver's Adaptive Plate."]), "Earthweaver's Adaptive Plate");
 	assert.equal(craftedName(["Teaches you how to sew a Red Linen Robe."]), "Red Linen Robe");
 	assert.ok(guildieRecipeId(251759) < 0);
+});
+
+// Convex rejects objects with more than 1,024 fields, and there are about
+// 1,800 recipe items: guild data for the app failed outright until `items`
+// traveled as pairs inside Convex.
+test("addon data fits in Convex: no object over 1,024 fields, unpacked as it was", () => {
+	const items = Array.from({ length: 2000 }, (_, i) => ({ itemId: 10_000 + i, profession: "Tailoring", ...ROBE }));
+	const out = addonRecipes(items, [
+		{ name: "Ada", classId: 8, professions: [{ name: "Tailoring", id: 197, skill: 80 }] },
+	]);
+	const packed = packAddonRecipes(out);
+	const widest = (v: unknown): number =>
+		Array.isArray(v)
+			? Math.max(0, ...v.map(widest))
+			: v && typeof v === "object"
+				? Math.max(Object.keys(v).length, ...Object.values(v).map(widest))
+				: 0;
+	assert.ok(widest(packed) <= 1024, `widest object: ${widest(packed)} fields`);
+	assert.deepEqual(unpackAddonRecipes(packed), out);
 });
