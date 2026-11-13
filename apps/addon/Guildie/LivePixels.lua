@@ -63,10 +63,15 @@ local function restorePosition()
 end
 panel:RegisterEvent("ADDON_LOADED")
 panel:RegisterEvent("PLAYER_LOGIN")
-panel:SetScript("OnEvent", function(_, _, name)
+pcall(panel.RegisterEvent, panel, "UI_SCALE_CHANGED")
+pcall(panel.RegisterEvent, panel, "DISPLAY_SIZE_CHANGED")
+panel:SetScript("OnEvent", function(_, event, name)
     if name == ADDON then
         restorePosition()
         if applyOptions then applyOptions() end
+    end
+    if applyOptions and (event == "PLAYER_LOGIN" or event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED") then
+        applyOptions()
     end
     if attachEditMode then attachEditMode() end
 end)
@@ -97,11 +102,15 @@ local function layout(size)
     local width = read(GetPhysicalScreenSize)
     local parentWidth = read(UIParent.GetWidth, UIParent)
     local parentScale = read(UIParent.GetEffectiveScale, UIParent)
+    -- UIParent may finish changing scale after this frame is created. Use the
+    -- current effective scale, not the assumption that our initial reciprocal
+    -- SetScale still cancels it out.
+    local panelScale = read(panel.GetEffectiveScale, panel) or 1
     local drawSize = size
     if width and parentWidth and parentWidth > 0 and parentScale and parentScale > 0 then
         local ratio = width / (parentWidth * parentScale)
-        if ratio >= 0.25 and ratio <= 4 then
-            drawSize = math.max(2, math.floor(size * 1.25 + 0.5)) / ratio
+        if ratio >= 0.25 and ratio <= 4 and panelScale > 0 then
+            drawSize = math.max(2, math.floor(size * 1.25 + 0.5)) / (ratio * panelScale)
         end
     end
     panel:SetSize(16 * drawSize, 16 * drawSize)

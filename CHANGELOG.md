@@ -22,6 +22,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Fixes
 
 - **App:** Use Guildie's Windows icon for the running app's taskbar button.
+- **Addon:** Keep experimental live-sync pixels aligned when the UI scale changes during login or display changes, so automatic capture can find the square.
 
 ## 0.3.28
 
