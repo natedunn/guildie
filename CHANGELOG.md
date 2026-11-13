@@ -19,6 +19,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 - **Addon:** Item tooltips now say whether an item is an upgrade for the character you're on ("You | upgrade +35%", "not an upgrade", "can't use"), scored against what you're wearing right now. It also shows on quest rewards and loot rolls.
 - **Addon:** Experimental: with the Dialogue UI addon installed, its quest window's item tooltips show the Guildie section too. Turn it off in Guildie's settings.
+- **Guildie, Addon:** Share the addons you run, if you want to. Choose No one (the default), Guild or Public under Settings → Account → Privacy or on your character's new Addons tab. Your guild gets an Addons page showing what members run, most used first. Only enabled addons are listed. Your list shows up after your next /reload or logout in game.
 
 ### Fixes
 

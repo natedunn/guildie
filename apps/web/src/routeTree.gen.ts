@@ -38,11 +38,13 @@ import { Route as GRegionSlugRouteImport } from './routes/g/$region/$slug'
 import { Route as SettingsAppChangelogRouteImport } from './routes/settings/app_.changelog'
 import { Route as ApiHelperPairPollRouteImport } from './routes/api/helper/pair/poll'
 import { Route as CRegionSlugIndexRouteImport } from './routes/c/$region/$slug/index'
+import { Route as CRegionSlugAddonsRouteImport } from './routes/c/$region/$slug/addons'
 import { Route as CRegionSlugInventoryRouteImport } from './routes/c/$region/$slug/inventory'
 import { Route as CRegionSlugPreferencesRouteImport } from './routes/c/$region/$slug/preferences'
 import { Route as CRegionSlugProfessionsRouteImport } from './routes/c/$region/$slug/professions'
 import { Route as CRegionSlugTalentsRouteImport } from './routes/c/$region/$slug/talents'
 import { Route as GRegionSlugIndexRouteImport } from './routes/g/$region/$slug/index'
+import { Route as GRegionSlugAddonsRouteImport } from './routes/g/$region/$slug/addons'
 import { Route as GRegionSlugCraftingRouteImport } from './routes/g/$region/$slug/crafting'
 import { Route as GRegionSlugFeedRouteImport } from './routes/g/$region/$slug/feed'
 import { Route as GRegionSlugGearRouteImport } from './routes/g/$region/$slug/gear'
@@ -195,6 +197,11 @@ const CRegionSlugIndexRoute = CRegionSlugIndexRouteImport.update({
   path: '/',
   getParentRoute: () => CRegionSlugRoute,
 } as any)
+const CRegionSlugAddonsRoute = CRegionSlugAddonsRouteImport.update({
+  id: '/addons',
+  path: '/addons',
+  getParentRoute: () => CRegionSlugRoute,
+} as any)
 const CRegionSlugInventoryRoute = CRegionSlugInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
@@ -218,6 +225,11 @@ const CRegionSlugTalentsRoute = CRegionSlugTalentsRouteImport.update({
 const GRegionSlugIndexRoute = GRegionSlugIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => GRegionSlugRoute,
+} as any)
+const GRegionSlugAddonsRoute = GRegionSlugAddonsRouteImport.update({
+  id: '/addons',
+  path: '/addons',
   getParentRoute: () => GRegionSlugRoute,
 } as any)
 const GRegionSlugCraftingRoute = GRegionSlugCraftingRouteImport.update({
@@ -282,10 +294,12 @@ export interface FileRoutesByFullPath {
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/settings/app/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/addons': typeof CRegionSlugAddonsRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
+  '/g/$region/$slug/addons': typeof GRegionSlugAddonsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
   '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
@@ -321,10 +335,12 @@ export interface FileRoutesByTo {
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
   '/settings/app/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/addons': typeof CRegionSlugAddonsRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
+  '/g/$region/$slug/addons': typeof GRegionSlugAddonsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
   '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
@@ -364,10 +380,12 @@ export interface FileRoutesById {
   '/g/$region/$slug': typeof GRegionSlugRouteWithChildren
   '/settings/app_/changelog': typeof SettingsAppChangelogRoute
   '/api/helper/pair/poll': typeof ApiHelperPairPollRoute
+  '/c/$region/$slug/addons': typeof CRegionSlugAddonsRoute
   '/c/$region/$slug/inventory': typeof CRegionSlugInventoryRoute
   '/c/$region/$slug/preferences': typeof CRegionSlugPreferencesRoute
   '/c/$region/$slug/professions': typeof CRegionSlugProfessionsRoute
   '/c/$region/$slug/talents': typeof CRegionSlugTalentsRoute
+  '/g/$region/$slug/addons': typeof GRegionSlugAddonsRoute
   '/g/$region/$slug/crafting': typeof GRegionSlugCraftingRoute
   '/g/$region/$slug/feed': typeof GRegionSlugFeedRoute
   '/g/$region/$slug/gear': typeof GRegionSlugGearRoute
@@ -408,10 +426,12 @@ export interface FileRouteTypes {
     | '/g/$region/$slug'
     | '/settings/app/changelog'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/addons'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
+    | '/g/$region/$slug/addons'
     | '/g/$region/$slug/crafting'
     | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
@@ -447,10 +467,12 @@ export interface FileRouteTypes {
     | '/api/helper/snapshot'
     | '/settings/app/changelog'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/addons'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
+    | '/g/$region/$slug/addons'
     | '/g/$region/$slug/crafting'
     | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
@@ -489,10 +511,12 @@ export interface FileRouteTypes {
     | '/g/$region/$slug'
     | '/settings/app_/changelog'
     | '/api/helper/pair/poll'
+    | '/c/$region/$slug/addons'
     | '/c/$region/$slug/inventory'
     | '/c/$region/$slug/preferences'
     | '/c/$region/$slug/professions'
     | '/c/$region/$slug/talents'
+    | '/g/$region/$slug/addons'
     | '/g/$region/$slug/crafting'
     | '/g/$region/$slug/feed'
     | '/g/$region/$slug/gear'
@@ -733,6 +757,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CRegionSlugIndexRouteImport
       parentRoute: typeof CRegionSlugRoute
     }
+    '/c/$region/$slug/addons': {
+      id: '/c/$region/$slug/addons'
+      path: '/addons'
+      fullPath: '/c/$region/$slug/addons'
+      preLoaderRoute: typeof CRegionSlugAddonsRouteImport
+      parentRoute: typeof CRegionSlugRoute
+    }
     '/c/$region/$slug/inventory': {
       id: '/c/$region/$slug/inventory'
       path: '/inventory'
@@ -766,6 +797,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/g/$region/$slug/'
       preLoaderRoute: typeof GRegionSlugIndexRouteImport
+      parentRoute: typeof GRegionSlugRoute
+    }
+    '/g/$region/$slug/addons': {
+      id: '/g/$region/$slug/addons'
+      path: '/addons'
+      fullPath: '/g/$region/$slug/addons'
+      preLoaderRoute: typeof GRegionSlugAddonsRouteImport
       parentRoute: typeof GRegionSlugRoute
     }
     '/g/$region/$slug/crafting': {
@@ -846,6 +884,7 @@ const ApiHelperPairRouteWithChildren = ApiHelperPairRoute._addFileChildren(
 )
 
 interface CRegionSlugRouteChildren {
+  CRegionSlugAddonsRoute: typeof CRegionSlugAddonsRoute
   CRegionSlugInventoryRoute: typeof CRegionSlugInventoryRoute
   CRegionSlugPreferencesRoute: typeof CRegionSlugPreferencesRoute
   CRegionSlugProfessionsRoute: typeof CRegionSlugProfessionsRoute
@@ -854,6 +893,7 @@ interface CRegionSlugRouteChildren {
 }
 
 const CRegionSlugRouteChildren: CRegionSlugRouteChildren = {
+  CRegionSlugAddonsRoute: CRegionSlugAddonsRoute,
   CRegionSlugInventoryRoute: CRegionSlugInventoryRoute,
   CRegionSlugPreferencesRoute: CRegionSlugPreferencesRoute,
   CRegionSlugProfessionsRoute: CRegionSlugProfessionsRoute,
@@ -866,6 +906,7 @@ const CRegionSlugRouteWithChildren = CRegionSlugRoute._addFileChildren(
 )
 
 interface GRegionSlugRouteChildren {
+  GRegionSlugAddonsRoute: typeof GRegionSlugAddonsRoute
   GRegionSlugCraftingRoute: typeof GRegionSlugCraftingRoute
   GRegionSlugFeedRoute: typeof GRegionSlugFeedRoute
   GRegionSlugGearRoute: typeof GRegionSlugGearRoute
@@ -876,6 +917,7 @@ interface GRegionSlugRouteChildren {
 }
 
 const GRegionSlugRouteChildren: GRegionSlugRouteChildren = {
+  GRegionSlugAddonsRoute: GRegionSlugAddonsRoute,
   GRegionSlugCraftingRoute: GRegionSlugCraftingRoute,
   GRegionSlugFeedRoute: GRegionSlugFeedRoute,
   GRegionSlugGearRoute: GRegionSlugGearRoute,

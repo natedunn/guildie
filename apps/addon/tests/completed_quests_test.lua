@@ -23,7 +23,7 @@ assert(table.concat(ns.current().completedQuestIds, ",") == "3369,6981", "burst 
 -- Logout cannot wait for the delayed callbacks.
 wow.fire("PLAYER_LOGOUT")
 local saved = GuildieDB
-assert(wow.decode(saved.payload).version == 6)
+assert(wow.decode(saved.payload).version == 7)
 assert(table.concat(wow.decode(saved.payload).characters[1].completedQuestIds, ",") == "3369,6981")
 for _, callback in ipairs(pending) do callback() end
 ns = wow.load({db = saved, guid = "Player-test", name = "Test", level = 26})

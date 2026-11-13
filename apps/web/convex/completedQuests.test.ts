@@ -8,7 +8,7 @@ const now = 1_794_300_000_000;
 const character = { guid: "Player-1", name: "Test", capturedAt: now / 1000, talents: [] };
 
 test("completion IDs validate, sort and deduplicate; old payloads remain compatible", () => {
-	assert.deepEqual(PAYLOAD_VERSIONS, [1, 2, 3, 4, 5, 6]);
+	assert.deepEqual(PAYLOAD_VERSIONS, [1, 2, 3, 4, 5, 6, 7]);
 	const parsed = parseCharacter({ ...character, completedQuestIds: [6981, 3369, 6981] }, now);
 	assert(parsed.ok);
 	assert.deepEqual(parsed.character.completedQuestIds, [3369, 6981]);

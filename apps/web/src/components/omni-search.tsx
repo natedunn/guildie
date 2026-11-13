@@ -716,6 +716,15 @@ function useLocalResults(typed: string) {
 				},
 				front,
 			);
+			add({
+				id: id("addons"),
+				group: "pages",
+				title: "Addons",
+				subtitle: sub,
+				visual: { kind: "icon", name: "puzzle" },
+				nav: route("/g/$region/$slug/addons", p),
+				keywords: ["addons", "mods", "ui", "who runs"],
+			});
 			if (member) {
 				add(
 					{

@@ -127,7 +127,7 @@ const baseName = (item: { name: string; suffixId?: number }) =>
 
 /**
  * Called by the /api/helper/snapshot route with the helper's token and the
- * addon's characters (payload versions 1 to 6). Each character is checked
+ * addon's characters (payload versions 1 to 7). Each character is checked
  * (addonPayload.ts) and kept only if the token's owner claimed it. Each part
  * of the stored snapshot keeps whichever copy is newer, so an older upload
  * (another computer, say) never replaces newer data.
@@ -149,6 +149,8 @@ export const ingest = mutation({
 			.collect();
 		const accepted: string[] = [];
 		let inventoryChanged = false;
+		// The addons running: account-wide, so the newest read in this upload.
+		let addons: AddonCharacter["addons"];
 		const unmatched: string[] = [];
 		const rejected: string[] = [];
 		// Each profession's catalog, read once per upload.
@@ -303,6 +305,7 @@ export const ingest = mutation({
 				}
 			}
 			accepted.push(match.slug);
+			if (c.addons && (!addons || c.addons.capturedAt > addons.capturedAt)) addons = c.addons;
 			if (c.inventory && (await storeInventory(ctx, row.userId, key, c.inventory, now))) inventoryChanged = true;
 
 			// Icons (and names, where Blizzard's item API has none) for gear we
@@ -344,9 +347,29 @@ export const ingest = mutation({
 		}
 		// A newer bag or bank read: re-check the player's open craft requests.
 		if (inventoryChanged) await refreshMats(ctx, row.userId);
+		if (addons) await storeAddons(ctx, row.userId, addons, now);
 		return { accepted, unmatched, rejected };
 	},
 });
+
+/**
+ * The addons running (payload 7), kept only while the player shares them
+ * (convex/addons.ts) and only when newer. Never touches their choice.
+ */
+async function storeAddons(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	addons: NonNullable<AddonCharacter["addons"]>,
+	now: number,
+) {
+	const row = await ctx.db
+		.query("playerAddons")
+		.withIndex("by_user", (q) => q.eq("userId", userId))
+		.unique();
+	if (!row || row.share === "none") return;
+	if (row.capturedAt !== undefined && row.capturedAt > addons.capturedAt) return;
+	await ctx.db.patch(row._id, { list: addons.list, capturedAt: addons.capturedAt, receivedAt: now });
+}
 
 /** The game's item quality numbers as Blizzard's API names them. */
 const QUALITY_TYPES = ["POOR", "COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "ARTIFACT", "HEIRLOOM"];

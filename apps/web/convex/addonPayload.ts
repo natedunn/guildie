@@ -4,10 +4,11 @@
 // and level), 2 (plus guild, XP, gear, professions and known recipes; from
 // addon 0.7.0 also weapon and armor skills), 3 (addon 0.8.0: plus bags and
 // the last bank read, for guild requests) and 4 (addon 0.10.0: plus the quest
-// log), 5 (retained quest completion IDs), and 6 (request deliveries) are accepted. Kept free of
+// log), 5 (retained quest completion IDs), 6 (request deliveries) and 7 (the
+// addons running) are accepted. Kept free of
 // Convex and value imports so `node --test` can run it (addonPayload.test.ts).
 
-export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5, 6] as const;
+export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 export const LIMITS = {
 	characters: 50,
@@ -25,6 +26,8 @@ export const LIMITS = {
 	quests: 60,
 	completedQuests: 20000,
 	objectives: 12,
+	/** Addons running (the addon sends at most 200). */
+	addons: 200,
 	name: 120,
 } as const;
 
@@ -140,10 +143,18 @@ export type AddonCharacter = {
 	inventory?: { bags?: InventoryPart; bank?: InventoryPart };
 	/** The quest log (payload 4, addon 0.10.0). Public like Blizzard's quest list, to guildmates. */
 	quests?: { capturedAt: number; list: QuestEntry[] };
+	/**
+	 * The addons running (payload 7), account-wide: only the character read
+	 * last carries a list. Kept only if the player shares it (convex/addons.ts).
+	 */
+	addons?: { capturedAt: number; list: AddonEntry[] };
 	/** Retained positive completion confirmations; absence is not a deletion. */
 	completedQuestIds?: number[];
 	deliveries?: Delivery[];
 };
+
+/** One addon running in game (payload 7): its folder name, title and version as the addon's .toc gives them. */
+export type AddonEntry = { name: string; title?: string; version?: string };
 
 export type Delivery = {
 	id: string;
@@ -232,6 +243,43 @@ function time(x: unknown, path: string, now: number) {
 	const ms = num(x, path, 1_000_000_000, 10_000_000_000) * 1000;
 	if (ms > now + 10 * 60_000) fail(path, "in the future");
 	return Math.round(ms);
+}
+
+/**
+ * Text from another addon's .toc, cleaned rather than refused: color codes,
+ * textures and control characters out, trimmed and cut to `max`. Undefined
+ * when nothing's left.
+ */
+export function addonText(x: unknown, max: number) {
+	if (typeof x !== "string") return undefined;
+	const text = x
+		.replace(/\|c[0-9a-f]{8}/gi, "")
+		.replace(/\|r/g, "")
+		.replace(/\|T.*?\|t/g, "")
+		.split("")
+		.filter((ch) => ch !== "|" && ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) !== 127)
+		.join("")
+		.trim()
+		.slice(0, max)
+		.trim();
+	return text || undefined;
+}
+
+function addons(x: unknown, now: number) {
+	const o = obj(x, "addons");
+	const seen = new Set<string>();
+	const list: AddonEntry[] = [];
+	for (const raw of arr(o.list ?? [], "addons.list", LIMITS.addons)) {
+		if (!isObject(raw)) continue;
+		const name = addonText(raw.name, 64);
+		if (!name || seen.has(name.toLowerCase())) continue;
+		seen.add(name.toLowerCase());
+		const title = addonText(raw.title, 100);
+		const version = addonText(raw.version, 40);
+		list.push({ name, ...(title && title !== name ? { title } : {}), ...(version ? { version } : {}) });
+	}
+	list.sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name));
+	return { capturedAt: time(o.capturedAt, "addons.capturedAt", now), list };
 }
 
 const ITEM_LEVEL_LINE = /^Item Level (\d+)$/;
@@ -467,6 +515,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
 			inventory: opt(c.inventory, (i) => inventory(i, now)),
 			quests: opt(c.quests, (q) => quests(q, now)),
+			addons: opt(c.addons, (a) => addons(a, now)),
 			deliveries: opt(c.deliveries, (events) =>
 				arr(events, "deliveries", 200).map((raw) => {
 					const e = obj(raw, "delivery");

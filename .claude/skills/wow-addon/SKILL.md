@@ -35,7 +35,7 @@ docs/addon.md first; this is the short version.
 | File              | What                                                                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `Guildie.toc`     | Load order, `## Version` (what the app compares to update players' copies)                                                        |
-| `Guildie.lua`     | Events, the debounced read, talents, building `GuildieDB.payload` (JSON, `version` 4)                                             |
+| `Guildie.lua`     | Events, the debounced read, talents, building `GuildieDB.payload` (JSON, `version` 7)                                             |
 | `Capture.lua`     | Gear (with tooltips), professions, weapon/armor skills, recipes, bags and bank, the quest log; modern API first, classic fallback |
 | `Upgrades.lua`    | Gear-upgrade suggestions, a port of `apps/web/convex/shared/upgrades.ts` (gear-and-weights skill)                                 |
 | `Tooltip.lua`     | The lines added to item tooltips (requests, reagents, upgrades)                                                                   |
@@ -77,8 +77,9 @@ hand.
 
 The site validates every upload (`apps/web/convex/addonPayload.ts`, with
 tests). Add fields as optional on both sides; the site still accepts payload
-versions 1 to 3 (current: 4, the quest log), and older addons stay installed
-for a while. Bump `PAYLOAD_VERSIONS` and `VERSION` in `Guildie.lua` together. Document the field in
+versions 1 to 6 (current: 7, the addons running), and older addons stay installed
+for a while. Bump `PAYLOAD_VERSIONS`, `VERSION` in `Guildie.lua` and the
+list in `packages/sync/src/sync.ts` (`queuePixelSnapshot`) together. Document the field in
 docs/addon.md ("API").
 
 ## Shipping

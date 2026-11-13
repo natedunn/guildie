@@ -11,6 +11,7 @@ import {
 	Login03Icon,
 	Menu01Icon,
 	MoneyBag01Icon,
+	PuzzleIcon,
 	ScrollTextIcon,
 	Settings02Icon,
 	Shield01Icon,
@@ -126,6 +127,10 @@ function SidebarNav() {
 										<NavLink to="/g/$region/$slug/gear" params={{ region: g.region, slug: g.slug }} className="pl-3">
 											<HugeiconsIcon icon={Shield01Icon} size={15} strokeWidth={1.75} />
 											Gear
+										</NavLink>
+										<NavLink to="/g/$region/$slug/addons" params={{ region: g.region, slug: g.slug }} className="pl-3">
+											<HugeiconsIcon icon={PuzzleIcon} size={15} strokeWidth={1.75} />
+											Addons
 										</NavLink>
 										{isMember(g) && (
 											<NavLink

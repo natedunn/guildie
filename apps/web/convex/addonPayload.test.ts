@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { matchRecipes, parseCharacter } from "./addonPayload.ts";
+import { addonText, matchRecipes, parseCharacter } from "./addonPayload.ts";
 
 const NOW = 1_794_300_000_000;
 const T = NOW / 1000 - 60;
@@ -360,6 +360,42 @@ test("the quest log (payload 4, addon 0.10.0)", () => {
 	assert.match(colored.error, /quests.list\[0\].title/);
 	const tooMany = parseCharacter(
 		{ ...v2, quests: { capturedAt: T, list: Array.from({ length: 61 }, (_, i) => ({ id: i + 1 })) } },
+		NOW,
+	);
+	assert.ok(!tooMany.ok);
+});
+
+test("payload 7: addons, cleaned rather than refused, deduplicated and sorted by title", () => {
+	const parsed = parseCharacter(
+		{
+			...v2,
+			addons: {
+				capturedAt: T,
+				list: [
+					{ name: "Questie", title: "|cff00ff00Questie|r", version: "9.1.0" },
+					{ name: "Details", title: "|TInterface\\Icon:16|t Details! Damage Meter", version: "|cffffffffv1.2|r" },
+					{ name: "questie", title: "Duplicate" },
+					{ name: "Bagnon", title: "Bagnon" },
+					{ name: "|r", title: "Nothing left" },
+					"not an addon",
+				],
+			},
+		},
+		NOW,
+	);
+	assert.ok(parsed.ok);
+	assert.equal(parsed.character.addons?.capturedAt, T * 1000);
+	assert.deepEqual(parsed.character.addons?.list, [
+		{ name: "Bagnon" },
+		{ name: "Details", title: "Details! Damage Meter", version: "v1.2" },
+		{ name: "Questie", version: "9.1.0" },
+	]);
+	assert.equal(addonText("a".repeat(300), 64)?.length, 64);
+	const older = parseCharacter(v2, NOW);
+	assert.ok(older.ok);
+	assert.equal(older.character.addons, undefined, "older addons don't send it");
+	const tooMany = parseCharacter(
+		{ ...v2, addons: { capturedAt: T, list: Array.from({ length: 201 }, (_, i) => ({ name: `A${i}` })) } },
 		NOW,
 	);
 	assert.ok(!tooMany.ok);

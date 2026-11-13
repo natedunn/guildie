@@ -8,8 +8,8 @@ import { SourcesDebug } from "@/components/sources-debug";
 import { ago, rankLabel } from "@/lib/format";
 import { shareMeta } from "@/lib/share";
 
-// A character's pages: gear (index), talents, professions and, for the player
-// who claimed them, preferences. The header and
+// A character's pages: gear (index), talents, professions, the player's addons
+// (if shared with the viewer) and, for the player who claimed them, preferences. The header and
 // tabs live here so they stay put while the tabs switch.
 export const Route = createFileRoute("/c/$region/$slug")({
 	loader: async ({ context, params }) => {
@@ -123,6 +123,11 @@ function CharacterLayout() {
 						<PageTab to="/c/$region/$slug/professions" params={params}>
 							Professions
 						</PageTab>
+						{data.addons && (
+							<PageTab to="/c/$region/$slug/addons" params={params}>
+								Addons
+							</PageTab>
+						)}
 						{data.canEdit && (
 							<PageTab to="/c/$region/$slug/preferences" params={params}>
 								Preferences

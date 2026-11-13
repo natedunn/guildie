@@ -9,6 +9,8 @@ import { v } from "convex/values";
 export const vFlavor = v.literal("forever");
 export const vRegion = v.union(v.literal("us"), v.literal("eu"), v.literal("kr"), v.literal("tw"));
 export const vVisibility = v.union(v.literal("public"), v.literal("members"));
+/** Who sees a player's addons: nobody (and nothing's kept), their guildmates, or anyone. */
+export const vAddonShare = v.union(v.literal("none"), v.literal("guild"), v.literal("public"));
 
 /**
  * One line of an in-game item tooltip, built from Blizzard's display strings
@@ -744,4 +746,22 @@ export default defineSchema({
 	})
 		.index("by_codeHash", ["codeHash"])
 		.index("by_user", ["userId"]),
+
+	/**
+	 * The addons a player runs in game, account-wide, and who may see them
+	 * (convex/addons.ts). Opt in: `share` is the player's own choice and only
+	 * they change it (Settings → Account); uploads only ever write the list,
+	 * and only while `share` isn't "none". Choosing "none" deletes the list.
+	 */
+	playerAddons: defineTable({
+		userId: v.id("users"),
+		share: vAddonShare,
+		/** Game time (ms) of the read, from the newest upload. */
+		capturedAt: v.optional(v.number()),
+		receivedAt: v.optional(v.number()),
+		/** Running addons only: folder name, the .toc title when it differs, version. */
+		list: v.optional(
+			v.array(v.object({ name: v.string(), title: v.optional(v.string()), version: v.optional(v.string()) })),
+		),
+	}).index("by_user", ["userId"]),
 });
