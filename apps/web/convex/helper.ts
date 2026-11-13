@@ -6,7 +6,7 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
-import { mergeProfile, type Profession } from "./profile";
+import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -204,6 +204,7 @@ export const ingest = mutation({
 							raceToken: c.raceToken,
 							guild: c.guild,
 							talentTrees: await treesFromRanks(ctx, c.talents),
+							talentsCapturedAt: c.talentsAt,
 						}
 					: {
 							capturedAt: existing.capturedAt,
@@ -215,6 +216,7 @@ export const ingest = mutation({
 							raceToken: existing.raceToken,
 							guild: existing.guild,
 							talentTrees: existing.talentTrees,
+							talentsCapturedAt: existing.talentsCapturedAt,
 						};
 
 			const incomingGear: SnapshotFields["equipment"] = c.equipment && {
@@ -227,12 +229,20 @@ export const ingest = mutation({
 				capturedAt: c.professions.capturedAt,
 				list: c.professions.list,
 			};
-			const professions = newer(incomingProfessions, existing?.professions);
+			// An empty list never replaces a non-empty one: in game it's more
+			// likely a read before the data loaded (Forever's GetProfessions
+			// returns nothing right after login, and older addons sent that).
+			// The site shows Blizzard's when only one source is empty (profile.ts).
+			const professions =
+				incomingProfessions && incomingProfessions.list.length === 0 && existing?.professions?.list.length
+					? existing.professions
+					: newer(incomingProfessions, existing?.professions);
 			const proficiencies = newer(c.proficiencies, existing?.proficiencies);
 			const quests = newer(c.quests, existing?.quests);
 
-			// Known recipes, per profession: the newer read, matched to the catalog
-			// (an unchanged read keeps its earlier match).
+			// Known recipes, per profession: the newer read matched to the catalog
+			// (an unchanged read keeps its earlier match), added to what we had:
+			// recipes only grow, so a partial or empty read can't take any away.
 			const recipes = new Map((existing?.recipes ?? []).map((r) => [r.professionId, r]));
 			for (const r of c.recipes) {
 				const before = recipes.get(r.professionId);
@@ -244,14 +254,18 @@ export const ingest = mutation({
 					professionId: r.professionId,
 					profession: r.profession,
 					capturedAt: r.capturedAt,
-					recipeIds,
+					recipeIds: addRecipes(before?.recipeIds, recipeIds),
 					count: r.known.length,
 					unmatched: missing,
 				});
 			}
-			// Professions the character no longer has take their recipes with them.
-			const keptRecipes = [...recipes.values()].filter(
-				(r) => !professions || professions.list.some((p) => p.id === r.professionId),
+			// Recipes stay until both sources say their profession is gone (an
+			// empty or failed profession read deletes nothing); the profile shows
+			// them only for professions in the list it shows (profile.ts).
+			const keptRecipes = dropGoneRecipes(
+				[...recipes.values()],
+				professions?.list.map((p) => p.id),
+				character?.professions?.map((p) => p.id),
 			);
 
 			const snapshot: SnapshotFields = {
@@ -578,7 +592,9 @@ type GuildDataBase = {
 	}[];
 	/** Active guildmates (not the token owner's own characters) for gear-upgrade suggestions. */
 	upgradeMembers: UpgradeMember[];
-	/** Specs from players' own stat priorities that `upgradeMembers` use (shared/upgrades.ts specsFor). */
+	/** The token owner's own characters in those guilds, however long ago they were seen ("for you" rows). */
+	upgradeMine: UpgradeMember[];
+	/** Specs from players' own stat priorities that `upgradeMembers` and `upgradeMine` use (shared/upgrades.ts specsFor). */
 	customSpecs: Rules["specs"];
 	characters: GuildData["characters"];
 	requests: GuildData["requests"];
@@ -599,7 +615,16 @@ export type GuildData = {
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
 	 * active guildmate with the scores of what they wear.
 	 */
-	upgrades: { version: 1; rules: Rules; members: UpgradeMember[] };
+	upgrades: {
+		version: 1;
+		rules: Rules;
+		members: UpgradeMember[];
+		/**
+		 * The player's own characters (addon 0.19.0+; older addons ignore it):
+		 * the tooltip's "You | upgrade +35%" row for the character they're on.
+		 */
+		mine: UpgradeMember[];
+	};
 	/**
 	 * The token owner's own claimed characters as Guildie shows them now, by
 	 * name (addon 0.6.0+; older addons ignore it): the addon compares them
@@ -659,6 +684,7 @@ export const guildDataBase = internalQuery({
 		const itemCache = new Map<number, ItemInfo | undefined>();
 		const ownSlugs = new Set(owned.map((c) => `${c.region}:${c.slug}`));
 		const upgradeMembers: UpgradeMember[] = [];
+		const upgradeMine: UpgradeMember[] = [];
 		const now = Date.now();
 		const recipeCharacters: Parameters<typeof addonRecipes>[1] = [];
 		const allMembers: Doc<"characters">[] = [];
@@ -674,7 +700,12 @@ export const guildDataBase = internalQuery({
 			allMembers.push(...members);
 			allProfessions.push(...profiles.map((p) => p.professions));
 			for (const [i, m] of members.entries()) {
-				if (ownSlugs.has(`${m.region}:${m.slug}`)) continue;
+				if (ownSlugs.has(`${m.region}:${m.slug}`)) {
+					// Their own: judged for themselves in game, whenever they last played it.
+					const own = await memberForUpgrades(ctx, m, profiles[i], rules, itemCache);
+					if (own) upgradeMine.push(own.member);
+					continue;
+				}
 				const found = await memberForUpgrades(ctx, m, profiles[i], rules, itemCache);
 				// Only who's been around lately; the addon checks again as time passes.
 				if (found && now - found.member.seen * 1000 <= rules.activeDays * 86_400_000) upgradeMembers.push(found.member);
@@ -712,13 +743,14 @@ export const guildDataBase = internalQuery({
 		// Specs made from players' own stat priorities (specsFor): the addon looks members' specs up in the rules.
 		const builtIn = upgradeRules().specs;
 		const customSpecs: Rules["specs"] = {};
-		for (const m of upgradeMembers) {
+		for (const m of [...upgradeMembers, ...upgradeMine]) {
 			for (const key of [m.spec, m.spec2]) if (key && !(key in builtIn)) customSpecs[key] = rules.specs[key];
 		}
 		return {
 			mine: owned.map((c) => c.name),
 			guilds,
 			upgradeMembers,
+			upgradeMine,
 			customSpecs,
 			characters,
 			requests: requests.byItem,
@@ -768,6 +800,7 @@ export const guildData = action({
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },
 				members: base.upgradeMembers,
+				mine: base.upgradeMine,
 			},
 			characters: base.characters,
 			requests: base.requests,

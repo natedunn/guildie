@@ -177,15 +177,20 @@ ns.PROFESSIONS = PROFESSIONS
 
 --- { { name, id?, rank, max }, ... }, and whether the list is complete (a
 --- collapsed skill header hides what's under it); nil if unreadable.
+--- An empty list is ambiguous: no professions, or not loaded yet (Forever's
+--- GetProfessions returns all nil right after login). The caller keeps the
+--- last non-empty read over an empty one.
 function ns.readProfessions()
     if GetProfessions and GetProfessionInfo then
         local skills = {}
-        -- prof1, prof2, archaeology, fishing, cooking, first aid: nil where
-        -- missing, so not ipairs.
-        local indexes = { n = 6, GetProfessions() }
+        -- prof1, prof2, archaeology, fishing, cooking, first aid and one more
+        -- on Forever (7 values): nil where missing, so not ipairs.
+        local indexes = { n = 7, GetProfessions() }
+        local seen = {}
         for i = 1, indexes.n do
             local index = indexes[i]
-            if index then
+            if index and not seen[index] then
+                seen[index] = true
                 local name, _, rank, max, _, _, skillLine = GetProfessionInfo(index)
                 if name then table.insert(skills, { name = name, id = skillLine, rank = rank, max = max }) end
             end

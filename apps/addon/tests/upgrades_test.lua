@@ -352,6 +352,119 @@ test("tooltip line: maybe (lvl 24) and second spec; nothing when nobody qualifie
     eq(table.concat(hover(sword)), "No guildmates need this")
 end)
 
+-- ---- For you: the character you're on ---------------------------------------------
+
+local WORN_GLOVES = {
+    id = 4100, name = "Worn Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 2,
+    stats = { ITEM_MOD_AGILITY_SHORT = 2, RESISTANCE0_NAME = 40 },
+}
+
+--- You're `me` (a member), wearing `gear` ({ [slot] = item }); guildmates: Miller.
+local function playAs(me, gear)
+    _G.UnitName = function() return me.name end
+    _G.UnitLevel = function() return me.level end
+    _G.GetInventoryItemLink = function(_, slot) return gear[slot] and gear[slot].link end
+    _G.C_TooltipInfo = nil
+    U.forgetLive()
+    local data = guildData({ vectors.members.Miller })
+    data.upgrades.mine = { me }
+    _G.GuildieData = data
+end
+
+test("for you: your row first, scored against what you wear now", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    GuildieDB.settings = nil
+    stubItems({ GLOVES, WORN_GLOVES })
+    -- The site last saw gloves worth 8; you're wearing Worn Gloves now (2 Agility, 40 armor: 4).
+    playAs(vectors.members.Brisket, { [10] = WORN_GLOVES })
+    local rows = hover(GLOVES)
+    -- Feral: 6 Agility, 2.4 for Stamina, 3 for armor = 11.4 over 4.
+    eq(plain(rows[1]), "You | upgrade +185%")
+    eq(plain(rows[2]), "Miller | maybe (Arms, leather)")
+    eq(#rows, 2)
+    -- Wearing it: nothing to say about yourself.
+    playAs(vectors.members.Brisket, { [10] = GLOVES })
+    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+end)
+
+test("for you: quest rewards and rolls that bind to you still get your row", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    GuildieDB.settings = nil
+    local reward = {}
+    for k, v in pairs(GLOVES) do reward[k] = v end
+    reward.id, reward.link = 4254, nil
+    reward.lines = { "Binds when picked up", "Hands", "60 Armor", "+6 Agility", "+4 Stamina" }
+    stubItems({ reward, WORN_GLOVES })
+    playAs(vectors.members.Brisket, { [10] = WORN_GLOVES })
+    local rows = hover(reward)
+    eq(#rows, 1, "guildmates can't get it")
+    eq(plain(rows[1]), "You | upgrade +185%")
+end)
+
+test("for you: not an upgrade, can't use, needs a level; and the setting", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    GuildieDB.settings = nil
+    local strong = {
+        id = 4101, name = "Strong Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 2,
+        stats = { ITEM_MOD_AGILITY_SHORT = 20, RESISTANCE0_NAME = 80 },
+    }
+    local chain = {
+        id = 4102, name = "Chain Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 3,
+        stats = { ITEM_MOD_AGILITY_SHORT = 6, RESISTANCE0_NAME = 90 },
+    }
+    local later = {
+        id = 4103, name = "Later Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 2, reqLevel = 40,
+        stats = { ITEM_MOD_AGILITY_SHORT = 9, RESISTANCE0_NAME = 70 },
+    }
+    stubItems({ GLOVES, strong, chain, later })
+    playAs(vectors.members.Brisket, { [10] = strong })
+    eq(plain(hover(GLOVES)[1]), "You | not an upgrade")
+    eq(plain(hover(chain)[1]), "You | can't use", "druids don't wear mail")
+    eq(plain(hover(later)[1]), "You | needs lvl 40")
+    GuildieDB.settings = { showForYou = false }
+    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    GuildieDB.settings = nil
+end)
+
+test("for you: older guild data without your characters, or another character", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    stubItems({ GLOVES })
+    playAs(vectors.members.Brisket, {})
+    GuildieData.upgrades.mine = nil
+    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    playAs(vectors.members.Brisket, {})
+    _G.UnitName = function() return "Someone" end
+    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+end)
+
+test("Dialogue UI: its own tooltips get the Guildie block through its API", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    GuildieDB.settings = nil
+    local processor
+    _G.DialogueUIAPI = { AddItemTooltipProcessorExternal = function(fn) processor = fn end }
+    eq(ns.hookDialogueUI(), true)
+    stubItems({ GLOVES })
+    _G.GuildieData = guildData({ vectors.members.Brisket })
+    local added = {}
+    local lines = { { leftText = GLOVES.name } }
+    for _, l in ipairs(GLOVES.lines) do table.insert(lines, { leftText = l }) end
+    local tooltip = {
+        tooltipData = { lines = lines },
+        AddBlankLine = function() table.insert(added, " ") end,
+        AddLine = function(_, text) table.insert(added, text) end,
+        AddDoubleLine = function(_, left, right) table.insert(added, left .. " | " .. right) end,
+        Show = function() error("Dialogue UI shows its tooltip itself") end,
+    }
+    eq(processor(tooltip, GLOVES.id, GLOVES.link), true)
+    local rows = wow.guildieRows(added, ns)
+    eq(plain(rows[1]), "Brisket | upgrade (Feral)")
+    GuildieDB.settings = { dialogueUI = false }
+    eq(processor(tooltip, GLOVES.id, GLOVES.link), false, "turned off")
+    GuildieDB.settings = nil
+    _G.DialogueUIAPI = nil
+    eq(ns.hookDialogueUI(), false, "not installed")
+end)
+
 -- ---- End to end: real guild data, items to hover ------------------------------
 
 local dataPath, itemsPath = arg and arg[1], arg and arg[2]

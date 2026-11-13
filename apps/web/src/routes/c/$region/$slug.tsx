@@ -1,9 +1,10 @@
-import { className, raceName } from "@convex/shared/wow";
+import { className, FLAVORS, raceName } from "@convex/shared/wow";
 import { createFileRoute, Link, notFound, Outlet } from "@tanstack/react-router";
 import { CharacterAvatar, UNFETCHED_NOTE } from "@/components/character-avatar";
 import { characterQuery, sourceNote, useCharacter } from "@/components/character-data";
 import { ClassText } from "@/components/class-name";
 import { PageTab, PageTabs } from "@/components/page-tabs";
+import { SourcesDebug } from "@/components/sources-debug";
 import { ago, rankLabel } from "@/lib/format";
 import { shareMeta } from "@/lib/share";
 
@@ -68,6 +69,12 @@ function CharacterLayout() {
 						</Link>
 						{`, ${rankLabel(c.rank)}`}
 					</p>
+					{c.level < FLAVORS.forever.minProfileLevel && (
+						<p className="mt-2 max-w-xl text-xs text-muted-foreground">
+							Blizzard doesn't publish characters under level {FLAVORS.forever.minProfileLevel}, so everything here
+							comes from the Guildie app in game and may be incomplete or out of date.
+						</p>
+					)}
 					{(seen || ilvl !== undefined) && (
 						<div className="mt-2 flex flex-wrap gap-1.5">
 							{ilvl !== undefined && (
@@ -131,6 +138,7 @@ function CharacterLayout() {
 					<div className="pt-5">
 						<Outlet />
 					</div>
+					<SourcesDebug region={params.region} slug={params.slug} />
 				</>
 			)}
 		</div>

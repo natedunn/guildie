@@ -17,10 +17,20 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Addon:** Item tooltips now say whether an item is an upgrade for the character you're on ("You | upgrade +35%", "not an upgrade", "can't use"), scored against what you're wearing right now. It also shows on quest rewards and loot rolls.
+- **Addon:** Experimental: with the Dialogue UI addon installed, its quest window's item tooltips show the Guildie section too. Turn it off in Guildie's settings.
 - **Guildie, Addon:** Share the addons you run, if you want to. Choose No one (the default), Guild or Public under Settings → Account → Privacy or on your character's new Addons tab. Your guild gets an Addons page showing what members run, most used first. Only enabled addons are listed. Your list shows up after your next /reload or logout in game.
+
+### Fixes
+
+- **Addon:** Guildie no longer tries to open the game's Edit Mode, which WoW blocked ("Guildie has been blocked from an action...") and left half open. To move the live sync square anywhere, press Escape, choose Edit Mode and drag it; the corner buttons in Guildie's settings still work.
+- **Guildie, Addon:** Characters' professions show again. A failed read in game was replacing them with an empty list, and it also deleted the recipes the addon had read: open each profession window once after updating to read them again.
+- **Guildie:** When the game and Blizzard disagree, the newer one shows again, so playing without the Guildie app no longer leaves old gear, talents or quests on your page. An empty read from either side never hides the other's data.
 
 ### Improvements
 
+- **Addon:** A clearer Guildie window: one answer at the top ("Up to date", "Live sync on", "2 changes to upload", or what's wrong and how to fix it), details tucked away, and tabs that show which one you're on. Settings are grouped into Sync, Live square and Display, and you pick how you sync in one place. With live sync on, changes since your last reload no longer show as a warning.
+- **Guildie:** Characters under level 10 say that their details come only from the Guildie app in game.
 - **Guildie, Addon:** Gear suggestions are more sensible: an upgrade has to add at least a point of your main stat, white and grey armor is only suggested for an empty slot (and says "empty slot"), armor outside your preferred types (or cloth on a shaman, leather on a warrior in mail) is a "maybe" at most and counts for less as you level, items you already wear aren't suggested again, and hunters no longer get thrown weapons unless they choose them in their preferences.
 
 ## 0.3.32

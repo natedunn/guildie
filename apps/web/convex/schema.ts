@@ -176,6 +176,19 @@ export default defineSchema({
 		talentTrees: v.optional(v.array(vTalentTree)),
 		/** When we first saw Blizzard's current talentTrees (compared with addon uploads). */
 		talentsChangedAt: v.optional(v.number()),
+		/**
+		 * Per part, the `lastLoginAt` of the sync that last fetched it. A part
+		 * whose fetch failed keeps its older time, so it doesn't look newer than
+		 * it is (profile.ts compares these with the addon's reads).
+		 */
+		blizzardAt: v.optional(
+			v.object({
+				equipment: v.optional(v.number()),
+				professions: v.optional(v.number()),
+				talentTrees: v.optional(v.number()),
+				quests: v.optional(v.number()),
+			}),
+		),
 		avatarUrl: v.optional(v.string()),
 		/** Full-body render on a transparent background ("main-raw"). */
 		renderUrl: v.optional(v.string()),
@@ -343,6 +356,12 @@ export default defineSchema({
 		raceToken: v.optional(v.string()),
 		guild: v.optional(v.object({ name: v.string(), rank: v.optional(v.string()), rankIndex: v.optional(v.number()) })),
 		talentTrees: v.array(vTalentTree),
+		/**
+		 * When the talents were last read successfully (addon 0.19+). A failed
+		 * read keeps the last talents and this time; older addons don't send it,
+		 * and `capturedAt` stands in.
+		 */
+		talentsCapturedAt: v.optional(v.number()),
 		/** Worn gear with each item's tooltip as the game showed it. */
 		equipment: v.optional(
 			v.object({ capturedAt: v.number(), averageItemLevel: v.optional(v.number()), items: v.array(vEquippedItem) }),

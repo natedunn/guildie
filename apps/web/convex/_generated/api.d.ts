@@ -40,6 +40,7 @@ import type * as recipes from "../recipes.js";
 import type * as requests from "../requests.js";
 import type * as sample from "../sample.js";
 import type * as search from "../search.js";
+import type * as sources from "../sources.js";
 import type * as shared_addons from "../shared/addons.js";
 import type * as shared_dungeonQuests from "../shared/dungeonQuests.js";
 import type * as shared_dungeonResources from "../shared/dungeonResources.js";
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   requests: typeof requests;
   sample: typeof sample;
   search: typeof search;
+  sources: typeof sources;
   "shared/addons": typeof shared_addons;
   "shared/dungeonQuests": typeof shared_dungeonQuests;
   "shared/dungeonResources": typeof shared_dungeonResources;

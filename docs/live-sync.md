@@ -7,14 +7,19 @@ is opt-in on both sides and does not provide server-side live health or location
 
 ## Player controls
 
-In WoW, open **Options → AddOns → Guildie**:
+In WoW, open the Guildie window (minimap button or `/guildie`) → **Settings**:
 
-- Enable experimental sync (off initially, remembered across logins).
+- Sync: choose **Live, as you play** (off initially, remembered across logins)
+  or **When you reload or log out**.
 - Choose the default amber palette or grayscale for troubleshooting.
 - Choose small or larger cells. The addon snaps to physical pixels when the
   client exposes screen dimensions; the intended sizes are 32×32 and 64×64.
-- Open Edit Mode to drag the square, or use Move to top left / Move to bottom left. Export pauses while
-  Edit Mode is open. Position is shared across layouts and saved on drag stop.
+- Move the square: Top left / Bottom left, or anywhere in the game's own Edit
+  Mode (Escape → Edit Mode, drag it, close Edit Mode). Guildie only tells the
+  player how; it never opens Edit Mode itself, because entering it from addon
+  code taints its setup (blocked `TargetUnit`/`FocusUnit`, a half-entered Edit
+  Mode). Export pauses while Edit Mode is open. Position is shared across
+  layouts and saved on drag stop.
 
 App capture defaults on unless previously disabled. Manage **Experimental sync without reloading** in Settings → Addon; there is no tray toggle. The in-game export still defaults off. After enabling or disabling it, `/reload` saves the choice; the app reads the newest Forever account save and only starts capture when that setting is enabled. Missing or unreadable saves leave capture stopped. With multiple WoW accounts, the most recently saved account determines this preference.
 Signing out stops the helper, and signing in resumes it if the setting is enabled.
@@ -68,7 +73,7 @@ The website shows the new controls only when the method exists. Use a site build
    still a maintainer step). Fully restart WoW because new Lua files were added.
 2. Confirm the Guildie page appears in WoW's addon settings and defaults to disabled.
    Toggle export, then `/reload` to start or stop app capture; change palette and size there without slash commands. Restart/reload
-   and verify preferences persist. Move/reset in Edit Mode, including near edges.
+   and verify preferences persist. Move/reset with the corner buttons and in the game's Edit Mode, including near edges; no Guildie taint warnings.
 3. Launch the packaged app without Python installed or any pixel config/launch flag.
    Check capture in the updated app settings. Confirm automatic
    calibration on small and large squares, amber and grayscale, then move the
@@ -264,14 +269,13 @@ reports, exact names in partial and completion feed entries, known character
 links versus an unknown sender's plain name, and repeated uploads from both sides
 without duplicate feed entries or quantity changes.
 
-## Recovery and source precedence (addon 0.18.0)
+## Recovery and source precedence
 
-Successful addon gear, profession, recipe, talent and quest-log captures take
-precedence over Blizzard session/fetch timestamps. Blizzard supplies sections
-never captured; levels use the highest observed value. Empty legacy talent
-captures still fall back to Blizzard when it has spent points. Capture timestamps
-remain unchanged and visible: if addon reporting stops, its last observed state
-may be old, including when playing on another computer without the addon.
+Which source a character page shows (the game or Blizzard) is one rule for
+every part: the newer one, except that an empty read never hides the other
+source's data, and recipes and turned-in quests combine both. Details and how
+to check it: docs/addon.md, "Which data wins". (Addon 0.18.0 briefly made every
+in-game read win; that hid Blizzard's professions behind empty in-game reads.)
 
 Quest history and the current log are reconciled every 60 seconds as well as on
 login/events. Only positive completion confirmations are added. API failures,
