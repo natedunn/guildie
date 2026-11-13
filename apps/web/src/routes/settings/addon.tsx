@@ -260,6 +260,11 @@ function ManageAddon() {
 					<Row label="Signed in as">
 						{status?.connected ? status.account : <span className="text-muted-foreground">Not signed in</span>}
 					</Row>
+					{status?.syncIssue && (
+						<Row label="Sync issue">
+							<span className="text-destructive">{status.syncIssue}</span>
+						</Row>
+					)}
 					<Row label="Last upload">
 						{status?.lastUpload ? (
 							<span>

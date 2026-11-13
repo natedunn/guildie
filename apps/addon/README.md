@@ -36,7 +36,8 @@ reload the UI, and the Guildie app, running on the same computer, uploads it the
   Bags, bank, quests and delivery uploads are included alongside gear,
   professions and talents. The addon cannot confirm live receipt or detect
   screen obstruction; the app provides live capture/upload health. Pixel sync
-  displays a visibility reminder and warnings for local export problems.
+  shows a dismissible banner only for local export failures or stalled output.
+  Visibility instructions remain in Settings; cached comparisons stay on Status.
 - **Sync while I'm AFK** (off by default, experimental): reloads the UI for
   you while you're flagged AFK and out of combat, if something changed, at most
   every 20 minutes. If the game doesn't allow addons to reload on their own, it

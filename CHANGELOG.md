@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, App, Addon:** Keep captured character data from being replaced by stale Blizzard responses, recover missed quest completions with periodic checks, retain delivery reports until acknowledged, and retry live captures saved on disk after app restarts. Healthy experimental sync no longer shows a permanent warning banner; upload and storage failures appear in the app's sync settings.
+
 ## 0.3.31
 
 ### Fixes

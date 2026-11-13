@@ -6,6 +6,7 @@
 import type { Api } from "./api.ts";
 import type { Log } from "./config.ts";
 import { writeGuildData } from "./luaData.ts";
+import { Outbox } from "./outbox.ts";
 import { findAddonFolders, findWowFolder, Watcher } from "./watcher.ts";
 
 export const GUILD_DATA_EVERY_MS = 15 * 60_000;
@@ -14,6 +15,7 @@ export type LastUpload = { at: number; characters: string[] };
 
 export type SyncEvents = {
 	log: Log;
+	onIssue?: () => void;
 	/** The site no longer accepts the token: disconnect. */
 	onUnauthorized: () => void | Promise<void>;
 	/** An upload went through and updated these characters (slugs). */
@@ -28,6 +30,11 @@ export type SyncEvents = {
 export const displayName = (slug: string) => (slug.split("-")[0] ?? slug).replace(/^./, (c) => c.toUpperCase());
 
 export class SyncEngine {
+	private storageIssue: string | undefined;
+	private uploadIssue: string | undefined;
+	get issue() {
+		return this.storageIssue ?? this.uploadIssue;
+	}
 	lastUpload: LastUpload | undefined;
 	guildDataAt: number | undefined;
 	private wowSetting: string | undefined;
@@ -41,7 +48,9 @@ export class SyncEngine {
 	private pixelUploaded: string | undefined;
 	private pixelAttemptAt = 0;
 
-	constructor(api: Api, wow: string | undefined, events: SyncEvents) {
+	private readonly outboxRoot?: string;
+	constructor(api: Api, wow: string | undefined, events: SyncEvents, outboxRoot?: string) {
+		this.outboxRoot = outboxRoot;
 		this.api = api;
 		this.wowSetting = wow;
 		this.events = events;
@@ -65,17 +74,26 @@ export class SyncEngine {
 		this.busy = true;
 		try {
 			await this.watcher.tick();
-			const snapshot = this.pixelSnapshot;
+			const outbox = this.outbox();
+			const queued = outbox?.peek();
+			const snapshot = queued?.payload ?? this.pixelSnapshot;
 			if (snapshot && this.api.token && Date.now() - this.pixelAttemptAt >= 30_000) {
 				this.pixelAttemptAt = Date.now();
 				const token = this.api.token;
-				if (await this.upload("live pixel snapshot", snapshot)) {
-					if (this.api.token === token) this.pixelUploaded = snapshot;
+				if (await this.upload("live pixel snapshot", snapshot, !!queued)) {
+					if (this.api.token === token) {
+						this.pixelUploaded = snapshot;
+						if (queued) outbox?.ack(queued.file);
+					}
 					if (this.pixelSnapshot === snapshot) this.pixelSnapshot = undefined;
+				} else if (queued && this.api.token === token) {
+					outbox?.defer(queued.file);
 				}
 			}
 			if (this.api.token && Date.now() - this.lastGuildDataTry > GUILD_DATA_EVERY_MS) await this.refreshGuildData();
 		} catch (e) {
+			this.uploadIssue = "Sync could not reach Guildie. Saved captures will retry automatically.";
+			this.events.onIssue?.();
 			this.events.log(`Sync failed: ${(e as Error).message}`);
 		} finally {
 			this.busy = false;
@@ -89,7 +107,10 @@ export class SyncEngine {
 	}
 
 	/** After signing out: forget what was uploaded, so connecting again uploads everything. */
-	reset() {
+	reset(discard = true) {
+		if (discard) this.outbox()?.clear();
+		this.storageIssue = undefined;
+		this.uploadIssue = undefined;
 		this.pixelSnapshot = undefined;
 		this.pixelUploaded = undefined;
 		this.pixelAttemptAt = 0;
@@ -106,6 +127,12 @@ export class SyncEngine {
 		this.pixelUploaded = undefined;
 	}
 
+	private outbox() {
+		return this.outboxRoot && this.api.token
+			? new Outbox(this.outboxRoot, `${this.api.base}\n${this.api.token}`)
+			: undefined;
+	}
+
 	queuePixelSnapshot(value: unknown) {
 		if (!this.api.token || !value || typeof value !== "object") return false;
 		const { version, characters } = value as { version?: unknown; characters?: unknown };
@@ -113,11 +140,22 @@ export class SyncEngine {
 			return false;
 		const payload = JSON.stringify({ version, characters });
 		if (Buffer.byteLength(payload, "utf8") > 1024 * 1024) return false;
+		try {
+			if (payload !== this.pixelUploaded) this.outbox()?.put(payload);
+			this.storageIssue = undefined;
+			this.events.onIssue?.();
+		} catch (error) {
+			this.storageIssue =
+				"Cannot save new live captures. Check free disk space and the app log. Existing queued captures are retained.";
+			this.events.onIssue?.();
+			this.events.log(`Cannot save live capture: ${(error as Error).message}`);
+			return false;
+		}
 		this.pixelSnapshot = payload !== this.pixelUploaded ? payload : undefined;
 		return true;
 	}
 
-	private async upload(file: string, payload: string) {
+	private async upload(file: string, payload: string, requireAccepted = false) {
 		if (!this.api.token) return false;
 		const token = this.api.token;
 		const { ok, status, body } = await this.api.upload(payload);
@@ -129,9 +167,16 @@ export class SyncEngine {
 			return false;
 		}
 		if (!ok) {
+			this.uploadIssue = `Upload failed (${status}). Saved captures will retry automatically.`;
+			this.events.onIssue?.();
 			this.events.log(`Upload failed (${status}): ${body.error ?? "unknown error"}`);
 			return false;
 		}
+		this.uploadIssue =
+			body.unmatched?.length || body.rejected?.length
+				? "Some characters were not accepted. Check character claims and the addon version; queued captures are retained."
+				: undefined;
+		this.events.onIssue?.();
 		this.events.log(`Uploaded ${file}: updated ${body.accepted?.join(", ") || "nothing"}`);
 		if (body.rejected?.length)
 			this.events.log(`The site refused data for ${body.rejected.join(", ")} (malformed; is the addon current?)`);
@@ -148,7 +193,7 @@ export class SyncEngine {
 			for (const n of newlyUnmatched) this.warnedUnmatched.add(n);
 			this.events.onUnmatched?.(newlyUnmatched);
 		}
-		return true;
+		return !requireAccepted || (!!body.accepted?.length && !body.unmatched?.length && !body.rejected?.length);
 	}
 
 	/** Download the guild data into GuildieData.lua in each installed copy of the addon. */

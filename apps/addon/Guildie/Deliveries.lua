@@ -1,6 +1,25 @@
 -- Observe completed mail/trades; never send mail, collect items, or accept trades.
 local _, ns = ...
-local MAX_RECORDS, MAX_AGE = 200, 30 * 86400
+local MAX_RECORDS = 200
+-- Saved independently of the transmitted window: unacknowledged events do not
+-- expire or get pushed out by newer mail. Acknowledgements load on login/reload.
+function ns.reconcileDeliveries(c)
+    GuildieDB.deliveryOutbox = GuildieDB.deliveryOutbox or {}
+    local records = GuildieDB.deliveryOutbox[c.guid] or c.deliveries or {}
+    local entry = ns.status and ns.status.find(GuildieData, c.guid, c.name)
+    local acknowledged = {}
+    for _, id in ipairs(entry and entry.details and entry.details.deliveryIds or {}) do acknowledged[id] = true end
+    local kept, window = {}, {}
+    for _, event in ipairs(records) do
+        if not acknowledged[event.id] then
+            kept[#kept + 1] = event
+            if #window < MAX_RECORDS then window[#window + 1] = event end
+        end
+    end
+    GuildieDB.deliveryOutbox[c.guid] = kept
+    c.deliveries = window
+    return kept
+end
 local function nameKey(name)
     if type(name) ~= "string" then return nil end
     return name:match("^%s*(.-)%s*$"):lower():gsub(" ", "-")
@@ -27,10 +46,7 @@ local function record(kind, other, items)
     if not c then ns.capture("delivery"); c = GuildieDB.characters and GuildieDB.characters[guid] end
     if not c then return end
     local received = kind == "mailReceived" or kind == "tradeReceived"
-    local now, records = GetServerTime(), {}
-    for _, e in ipairs(c.deliveries or {}) do
-        if now - e.at <= MAX_AGE then records[#records + 1] = e end
-    end
+    local now, records = GetServerTime(), ns.reconcileDeliveries(c)
     for id, quantity in pairs(items) do
         local requestId = requestsFor(id, received and me or other, received and other or me)
         if requestId and quantity > 0 then
@@ -39,8 +55,8 @@ local function record(kind, other, items)
                 requestId = requestId, kind = kind, reporterName = me, other = other, itemId = id, quantity = quantity, at = now}
         end
     end
-    while #records > MAX_RECORDS do table.remove(records, 1) end
-    c.deliveries = records
+    GuildieDB.deliveryOutbox[c.guid] = records
+    ns.reconcileDeliveries(c)
 end
 local function add(items, id, count)
     if type(id) == "number" and id > 0 and type(count) == "number" and count > 0 then

@@ -52,3 +52,13 @@ assert(ns.current().completedQuestIds == nil, "history is per character")
 wow.fire("QUEST_TURNED_IN", 4321)
 assert(table.concat(ns.current().completedQuestIds, ",") == "4321")
 print("Quest completion backlog passed")
+
+-- Timer recovers a completion even when no quest event arrives.
+ns = wow.load({guid = "Player-timer", name = "Timer", questApi = "modern"})
+local reconcile
+C_Timer = {After = function(_, callback) callback() end, NewTicker = function(seconds, callback) if seconds == 60 then reconcile = callback end; return {} end}
+wow.fire("PLAYER_ENTERING_WORLD")
+assert(reconcile, "periodic reconciliation registered")
+C_QuestLog.GetAllCompletedQuestIDs = function() return {6981} end
+reconcile()
+assert(ns.current().completedQuestIds[1] == 6981, "missed turn-in recovered by timer")

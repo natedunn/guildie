@@ -79,32 +79,14 @@ test("a newer in-game read wins per field", () => {
 	assert.deepEqual(p.synced, { kind: "app", at });
 });
 
-test("Blizzard comes back when it's newer", () => {
-	const at = LOGIN - HOUR;
-	const p = mergeProfile(blizzard, { ...snapshot(at), level: 21 });
-	assert.equal(p.level, 22);
-	assert.equal(p.equipment?.[0].name, "Old Hat");
-	assert.equal(p.averageItemLevel, 20);
-	assert.deepEqual(
-		p.professions.map((x) => [x.name, x.knownRecipes]),
-		[
-			["Tailoring", [10, 11]],
-			["Enchanting", [20]],
-		],
-	);
-	assert.equal(p.talentTrees?.[0].points, 13);
-	assert.equal(p.synced?.kind, "blizzard");
-});
-
-test("mixed: old gear, newer recipes for one profession", () => {
+test("later Blizzard timestamps cannot replace successful addon sections", () => {
 	const s = snapshot(LOGIN - HOUR);
-	s.recipes[0].capturedAt = LOGIN + HOUR;
-	const p = mergeProfile(blizzard, s);
-	assert.equal(p.equipment?.[0].name, "Old Hat");
-	assert.equal(p.sources.professions.kind, "blizzard");
+	const p = mergeProfile({ ...blizzard, lastLoginAt: LOGIN + 10 * HOUR, profileSyncedAt: LOGIN + 20 * HOUR }, s);
+	assert.equal(p.equipment?.[0].name, "New Hat");
+	assert.equal(p.talentTrees?.[0].points, 14);
+	assert.equal(p.professions[0].skill, 120);
+	assert.equal(p.sources.gear.at, LOGIN - HOUR, "preserve actual capture age");
 	assert.deepEqual(p.professions[0].knownRecipes, [10, 11, 12]);
-	assert.deepEqual(p.professions[1].knownRecipes, [20]);
-	assert.deepEqual(p.synced, { kind: "app", at: LOGIN + HOUR });
 });
 
 test("no talents from the game while Blizzard has some: Blizzard's", () => {
@@ -173,12 +155,12 @@ test("quests: Blizzard's ids until the game's quest log is newer", () => {
 	assert.deepEqual(newer.quests, log.list);
 	assert.deepEqual(newer.sources.quests, { kind: "addon", at: LOGIN + 3 * HOUR });
 
-	// Played elsewhere without the app and logged out since: Blizzard's again.
+	// A later session timestamp cannot undo an observed quest log.
 	const older = mergeProfile(withQuests, {
 		...snapshot(LOGIN + 3 * HOUR),
 		quests: { ...log, capturedAt: LOGIN - HOUR },
 	});
-	assert.deepEqual(older.quests, [{ id: 166 }, { id: 214 }]);
+	assert.deepEqual(older.quests, log.list);
 
 	// Not synced since quests were added: nothing to show yet.
 	assert.equal(mergeProfile(blizzard, null).quests, undefined);

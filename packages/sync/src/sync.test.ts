@@ -261,3 +261,39 @@ test("capture follows the newest saved Forever preference and stops for missing 
 		rmSync(wow, { recursive: true, force: true });
 	}
 });
+
+test("durable captures survive restart, partial acceptance and disabled capture", async (t) => {
+	let now = 2_000_000;
+	t.mock.method(Date, "now", () => now);
+	const root = mkdtempSync(join(tmpdir(), "guildie-outbox-"));
+	let accept = false;
+	const { api, calls } = fakeApi(() => ({
+		status: 200,
+		body: accept ? { accepted: ["test"] } : { unmatched: ["Test"] },
+	}));
+	const events = { log: () => {}, onUnauthorized: () => {} };
+	const first = new SyncEngine(api, "/missing", events, root);
+	const snapshot = { version: 6, characters: [{ name: "Test", completedQuestIds: [6981] }] };
+	assert.equal(first.queuePixelSnapshot(snapshot), true);
+	first.clearPixelSnapshot();
+	await first.tick();
+	assert.equal(calls.length, 1);
+	first.reset(false); // normal shutdown
+	const second = new SyncEngine(api, "/missing", events, root);
+	now += 30_000;
+	accept = true;
+	await second.tick();
+	assert.deepEqual(JSON.parse(calls[1]!.body!), snapshot);
+	now += 30_000;
+	await second.tick();
+	assert.equal(calls.length, 2, "accepted capture removed from disk");
+	second.queuePixelSnapshot(snapshot);
+	const third = new SyncEngine(api, "/missing", events, root);
+	api.token = "gld_different_account_token_123456";
+	await third.tick();
+	assert.equal(calls.length, 2, "different account cannot replay old captures");
+	api.token = "gld_abcdefghijklmnopqrstuvwxyz012345";
+	third.reset(); // explicit sign-out purges this account
+	await new SyncEngine(api, "/missing", events, root).tick();
+	assert.equal(calls.length, 2);
+});

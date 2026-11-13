@@ -531,9 +531,11 @@ end)
 warning:Hide()
 function ns.refreshSyncWarning()
     if not ns.livePixels.get().enabled or settings().showSyncWarning == false then warning:Hide(); return end
-    local state = ns.windowState()
-    warning.text:SetText("Guildie experimental sync: keep the whole square visible and unobstructed.\n"
-        .. (state.warning or "Pixel output does not confirm receipt. Check the app for live sync status."))
+    local health = ns.livePixels.health()
+    -- Cached server comparisons cannot diagnose live upload failures.
+    local problem = health.error or (health.stalled and "Pixel output has stopped updating. Check Guildie Status.")
+    if not problem then warning:Hide(); return end
+    warning.text:SetText("Guildie experimental sync: " .. problem)
     warning:SetHeight(math.max(54, warning.text:GetStringHeight() + 8))
     warning:Show()
 end
