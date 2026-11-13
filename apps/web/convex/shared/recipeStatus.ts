@@ -93,10 +93,10 @@ export function taughtName(itemName: string) {
 	return i > 0 && i < 12 ? itemName.slice(i + 2) : itemName;
 }
 
-/** Short labels for the UI ("can learn", "at 125"). */
+/** Short labels for the UI ("can learn", "requires lvl 125"). */
 export function recipeStateLabel(state: RecipeState, need?: number) {
 	if (state === "now") return "can learn";
-	if (state === "later") return need !== undefined ? `at ${need}` : "skill too low";
+	if (state === "later") return need !== undefined ? `requires lvl ${need}` : "skill too low";
 	if (state === "has") return "has one";
 	return "knows it";
 }

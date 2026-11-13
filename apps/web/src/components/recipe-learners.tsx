@@ -118,7 +118,7 @@ export function LearnerList({
 						title={HINTS[w.state]}
 						className={cn("pill ml-auto flex-none px-2 py-0", w.state === "now" && "text-foreground")}
 					>
-						{w.state === "later" && need !== undefined ? `At ${need}` : LABELS[w.state]}
+						{w.state === "later" && need !== undefined ? `Requires lvl ${need}` : LABELS[w.state]}
 					</span>
 				</li>
 			))}

@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, Addon:** Recipe tooltips say "requires lvl 25 (at lvl 12)" for a guildmate whose skill is too low, instead of "at 25 (has 12)".
+
 ### Fixes
 
 - **App:** Give the Windows taskbar group an explicit Guildie icon, separate from the window and tray icons.
