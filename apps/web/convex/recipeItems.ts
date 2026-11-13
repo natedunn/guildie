@@ -157,12 +157,14 @@ export const save = internalMutation({
 		for (const { craftedItemId, spellName, ...item } of items) {
 			let recipe: Doc<"recipes"> | undefined;
 			if (craftedItemId) {
+				// The profession by name too: some items give another id for it
+				// (Forever's First Aid manuals: 2942, the catalog and profiles: 129).
 				const makers = (
 					await ctx.db
 						.query("recipes")
 						.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", craftedItemId))
 						.collect()
-				).filter((r) => r.professionId === item.professionId);
+				).filter((r) => r.professionId === item.professionId || r.profession === item.profession);
 				recipe = makers.length === 1 ? makers[0] : makers.find((r) => r.name === taughtName(item.name));
 			}
 			if (!recipe) {
@@ -170,7 +172,14 @@ export const save = internalMutation({
 				const names = [spellName, taughtName(item.name)].filter((n) => n).map((n) => n!.toLowerCase());
 				recipe = (await professionRecipes(item.professionId)).find((r) => names.includes(r.name.toLowerCase()));
 			}
-			const row = { ...item, recipeId: recipe?.recipeId, syncedAt: now };
+			// The catalog's profession id, which characters' professions use.
+			const row = {
+				...item,
+				professionId: recipe?.professionId ?? item.professionId,
+				profession: recipe?.profession ?? item.profession,
+				recipeId: recipe?.recipeId,
+				syncedAt: now,
+			};
 			const existing = await ctx.db
 				.query("recipeItems")
 				.withIndex("by_itemId", (q) => q.eq("itemId", item.itemId))

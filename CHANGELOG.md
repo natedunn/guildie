@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie, Addon:** First Aid manuals now say who can learn them too.
+
 ## 0.3.27
 
 ### New
