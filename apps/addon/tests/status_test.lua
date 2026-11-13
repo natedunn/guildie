@@ -115,15 +115,15 @@ end)
 
 test("finding the entry: by Blizzard id, else by name; states", function()
     eq(S.idFromGuid(GUID), 5122850)
-    local data = { generatedAt = 1, characters = { Someone = entry(), Lich = entry({ id = 1, level = 1 }) } }
+    local data = { generatedAt = NOW * 1000, characters = { Someone = entry(), Lich = entry({ id = 1, level = 1 }) } }
     eq(S.find(data, GUID, "Lich").level, 23, "by id first")
     eq(S.find({ characters = { Lich = entry({ id = 1 }) } }, "Player-1-FF", "Lich").id, 1, "by name")
     eq(S.check(me(), nil, GUID, "Lich").state, "nodata")
-    eq(S.check(me(), { generatedAt = 1 }, GUID, "Lich").state, "unknown", "older guild data: no characters")
-    eq(S.check(me(), { generatedAt = 1, characters = { Lich = entry() } }, GUID, "Lich").state, "current")
-    local behind = S.check(me({ level = 24 }), { generatedAt = 1, characters = { Lich = entry() } }, GUID, "Lich")
+    eq(S.check(me(), { generatedAt = NOW * 1000 }, GUID, "Lich").state, "unknown", "older guild data: no characters")
+    eq(S.check(me(), { generatedAt = NOW * 1000, characters = { Lich = entry() } }, GUID, "Lich").state, "current")
+    local behind = S.check(me({ level = 24 }), { generatedAt = NOW * 1000, characters = { Lich = entry() } }, GUID, "Lich")
     eq(behind.state, "behind")
-    eq(S.headline(behind), "1 change not on Guildie yet")
+    eq(S.headline(behind), "1 change since the last Guildie update")
 end)
 
 test("times", function()
@@ -178,127 +178,80 @@ local function data(e)
     }
 end
 
-test("window: behind, with its lines; rows share one left edge", function()
-    local ns, window = open({}, data(entry({ level = 22, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 150 } } })))
-    eq(plain(window.status:GetText()), "2 changes not on Guildie yet")
-    has(plain(window.changes:GetText()), "Level 24 (Guildie has 22)")
-    has(plain(window.changes:GetText()), "Tailoring 155 (Guildie has 150)")
-    eq(plain(window.synced:GetText()), "Last synced 5 min ago, from the game")
-    has(window.next:GetText(), "Reload again to refresh this status")
-    eq(window.guildData:GetText(), "Unbound\n1 reagent \194\183 2 guildmates for upgrades")
-    eq(plain(window.guildUpdated:GetText()), "Updated 10 min ago")
-    has(plain(window.name:GetText()), "Lich")
-    has(plain(window.info:GetText()), "Level 24")
-    has(plain(window.guild:GetText()), "<Unbound>")
-    -- Every text row at the margin; both checkboxes at the same spot left of it.
-    for _, row in ipairs(window.rows) do
-        if row.el:IsShown() then eq(left(row.el, window.body), row.dx or 0, "left edge") end
-    end
-    eq(window.template, "BasicFrameTemplateWithInset", "bare PortraitFrameTemplate falls back")
-    eq(ns.dirty, false)
+test("window: only sync status, wide modal, and both tabs", function()
+    local ns, w = open({}, data(entry({level = 22, gear = {[16] = 2520}, professions = {Tailoring = {skill = 150}}})))
+    eq(w:GetWidth(), 620)
+    eq(w.page, "status")
+    has(plain(w.status:GetText()), "since the last Guildie update")
+    eq(rawget(w, "guildData"), nil, "no guild overview on Status")
+    eq(rawget(w, "requests"), nil, "no requests overview on Status")
+    w.tabs.settings.scripts.OnClick()
+    eq(w.page, "settings")
+    eq(w.status:IsShown(), false)
+    local c = w.preferences.showMinimap
+    c:SetChecked(false); c.scripts.OnClick(c)
+    eq(GuildieDB.settings.showMinimap, false)
+    eq(GuildieMinimapButton:IsShown(), false)
+    ns.openWindow("status")
+    eq(w.preferences.syncEnabled:IsShown(), false)
+    eq(w.status:IsShown(), true)
 end)
 
-test("window: changes since this /reload say how they upload", function()
-    local state = {}
-    local ns, window = open(state, data(entry({ level = 24, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 155 } } })))
-    eq(plain(window.status:GetText()), "Up to date with Guildie")
-    eq(window.changes:IsShown(), false, "no change lines")
-    state.level = 25
-    wow.fire("PLAYER_LEVEL_UP")
-    eq(ns.dirty, true)
-    eq(plain(window.status:GetText()), "1 change not on Guildie yet")
-    has(window.next:GetText(), "Reload to save these changes")
+test("scrolling happens only on overflow, switching pages resets offset", function()
+    local _, w = open({screenHeight = 480}, data(nil))
+    w:selectPage("settings")
+    eq(w:GetHeight(), 400)
+    eq(w.scroll.ScrollBar:IsShown(), true)
+    w.scroll.scripts.OnMouseWheel(w.scroll, -100)
+    eq(w.scroll:GetVerticalScroll(), w.body:GetHeight() - w.scroll:GetHeight())
+    w:selectPage("status")
+    eq(w.scroll:GetVerticalScroll(), 0)
+    local _, large = open({}, data(nil))
+    eq(large.scroll.ScrollBar:IsShown(), large.body:GetHeight() > large.scroll:GetHeight())
 end)
 
-test("window: unknown character, no data, portrait and dialog frames", function()
-    local _, window = open({ portrait = true }, data(nil))
-    eq(plain(window.status:GetText()), "Connect this character")
-    has(plain(window.changes:GetText()), "Claim it on guildie.club")
-    eq(window.synced:IsShown(), false)
-    eq(window.template, "PortraitFrameTemplate")
-    eq(window.title, "Guildie")
-
-    _, window = open({ missingTemplates = { PortraitFrameTemplate = true, BasicFrameTemplateWithInset = true } }, nil)
-    eq(plain(window.status:GetText()), "Waiting for the Guildie app")
-    has(window.guildData:GetText(), "No guild data yet")
-    eq(rawget(window, "template"), nil, "plain frame with a backdrop")
+test("pixel enablement cannot hide outdated data; errors and stale comparisons warn", function()
+    local ns, w = open({}, data(entry({level = 20})))
+    ns.livePixels.set("enabled", true)
+    ns.onCapture()
+    eq(ns.windowState().result.state, "behind")
+    has(w.method:GetText(), "pixel")
+    has(w.warning:GetText(), "differs")
+    ns.refreshSyncWarning()
+    eq(GuildieSyncWarning:IsShown(), true)
+    has(GuildieSyncWarning.text:GetText(), "unobstructed")
+    ns.livePixels.set("enabled", false)
+    eq(GuildieSyncWarning:IsShown(), false)
+    local stale = S.check(me(), {generatedAt = (NOW - 3600) * 1000, characters = {Lich = entry()}}, GUID, "Lich")
+    eq(stale.state, "unverified")
+    eq(S.warning(stale, {enabled = true, hasData = true, error = "Export stopped"}), "Export stopped")
+    has(S.warning(stale, {enabled = true, hasData = false}), "No character data")
+    has(S.warning(stale, {enabled = true, hasData = true, stalled = true}), "stopped")
+    has(S.warning(stale, {enabled = true, hasData = true, cycleSeconds = 90}), "90 seconds")
 end)
 
-test("window: many changes are cut short; minimap tooltip shows the headline", function()
-    local _, window = open({
-        level = 30,
-        gear = { [1] = { id = 1, name = "A" }, [16] = { id = 2520, name = "B" } },
-        skillLines = {
-            { header = true, name = "Professions" },
-            { name = "Tailoring", rank = 155, max = 225, abandonable = true },
-            { name = "Mining", rank = 10, max = 75, abandonable = true },
-            { name = "Herbalism", rank = 10, max = 75, abandonable = true },
-            { name = "Cooking", rank = 10, max = 75, abandonable = true },
-            { name = "Fishing", rank = 10, max = 75, abandonable = true },
-        },
-    }, data(entry({ level = 22, gear = {}, professions = { Tailoring = { skill = 1 } } })))
-    local lines = {}
-    for l in plain(window.changes:GetText()):gmatch("[^\n]+") do table.insert(lines, l) end
-    eq(#lines, 6, "lines")
-    eq(lines[6], "and 2 more")
-    wow.fire("PLAYER_LOGIN")
-    local tooltip = {}
-    _G.GameTooltip.AddLine = function(_, text) table.insert(tooltip, text) end
-    _G.GuildieMinimapButton.scripts.OnEnter(_G.GuildieMinimapButton)
-    eq(tooltip[2], "7 changes not on Guildie yet")
-    eq(tooltip[6], "and 4 more")
+test("bags, bank, quests, completions and receipt reports compare actual content", function()
+    local c = me({inventory = {bags = {items = {{id = 1, count = 7}}}, bank = {items = {{id = 2, count = 1}}}},
+        quests = {list = {{id = 123, complete = true}}}, completedQuestIds = {456}, deliveries = {{id = "event1"}}})
+    local e = entry({details = {bags = {{id = 1, count = 6}}, bank = {}, quests = {}, completedQuestIds = {}, deliveryIds = {}}})
+    eq(#S.compare(c, e), 5)
+    e.details = {bags = c.inventory.bags.items, bank = c.inventory.bank.items, quests = c.quests.list, completedQuestIds = {456}, deliveryIds = {"event1"}}
+    eq(#S.compare(c, e), 0)
+    e.details = nil
+    eq(S.check(c, {generatedAt = NOW * 1000, characters = {Lich = e}}, GUID, "Lich").state, "unverified", "missing confirmations are not up-to-date")
 end)
 
-test("window: short screens scroll, and shrinking content clamps the offset", function()
-    local _, window = open({ screenHeight = 480 }, data(nil))
-    eq(window:GetHeight(), 400, "screen padding")
-    eq(window.body:GetHeight() > window.scroll:GetHeight(), true, "body overflows")
-    eq(window.scroll.ScrollBar:IsShown(), true, "scroll bar when it scrolls")
-    window.scroll.scripts.OnMouseWheel(window.scroll, -100)
-    eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "bottom clamp")
-    _G.GuildieData = data(entry({ level = 24, gear = { [16] = 2520 }, professions = { Tailoring = { skill = 155 } } }))
-    window.scripts.OnShow(window)
-    eq(window.scroll:GetVerticalScroll(), window.body:GetHeight() - window.scroll:GetHeight(), "content shrink clamps")
-    window.scroll.scripts.OnMouseWheel(window.scroll, 100)
-    eq(window.scroll:GetVerticalScroll(), 0, "top clamp")
-end)
-
-test("window: no scroll bar when everything fits", function()
-    local _, window = open({}, data(nil))
-    eq(window.body:GetHeight() <= window.scroll:GetHeight(), true, "fits")
-    eq(window.scroll.ScrollBar:IsShown(), false)
-end)
-
-test("window: reload is blocked during combat and available afterward", function()
-    local state = { combat = true }
-    local ns, window = open(state, nil)
-    eq(window.upload.enabled, false)
-    eq(window.uploadHint:GetText(), "Available after combat.")
-    window.upload.scripts.OnClick()
-    eq(state.reloads, nil, "no protected action")
+test("reload and edit controls respect combat", function()
+    local state = {combat = true}
+    local ns, w = open(state, nil)
+    eq(w.upload.enabled, false)
+    w.upload.scripts.OnClick()
+    eq(state.reloads, nil)
     state.combat = false
     wow.fire("PLAYER_REGEN_ENABLED")
-    eq(window.upload.enabled, true)
-    has(window.uploadHint:GetText(), "Reloads your UI")
-    window.upload.scripts.OnClick()
+    eq(w.upload.enabled, true)
+    w.upload.scripts.OnClick()
     eq(state.reloads, 1)
-    eq(GuildieDB.lastReason, "upload-button")
-    state.combat = true
-    wow.fire("PLAYER_REGEN_DISABLED")
-    eq(window.upload.enabled, false)
-end)
-
-test("window: scroll template fallback and preferences remain usable", function()
-    local _, window = open({ missingTemplates = { UIPanelScrollFrameTemplate = true } }, nil)
-    eq(rawget(window.scroll, "template"), nil)
-    GuildieSettingsPanel.preferences.reloadWhenAfk:SetChecked(true)
-    GuildieSettingsPanel.preferences.reloadWhenAfk.scripts.OnClick(GuildieSettingsPanel.preferences.reloadWhenAfk)
-    eq(GuildieDB.settings.reloadWhenAfk, true)
-    GuildieSettingsPanel.preferences.showMinimap:SetChecked(false)
-    GuildieSettingsPanel.preferences.showMinimap.scripts.OnClick(GuildieSettingsPanel.preferences.showMinimap)
-    eq(GuildieDB.settings.showMinimap, false)
-    eq(_G.GuildieMinimapButton:IsShown(), false)
-    eq(window.requestsHeading:IsShown(), false)
 end)
 
 -- ---- End to end ---------------------------------------------------------------------

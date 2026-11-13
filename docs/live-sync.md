@@ -187,3 +187,50 @@ Confirm these actual event sequences on Forever before approving release; tests
 use API stubs and do not establish client support. Unknown/restricted APIs are
 caught and leave the manual controls available. Nothing clicks or accepts for
 the player, and no game memory or UI widget text is read.
+
+## Unified addon window and sync warnings
+
+Options → Addons → Guildie now shows only the logo, name and Open Guildie button.
+The minimap and addon compartment open the same wider modal on Status. Settings
+contains general preferences followed by Experimental pixel sync. Each tab's body
+scrolls only if it exceeds the available screen height; Status lists all changes.
+
+Status compares actual local content against the loaded server view, regardless
+of transport: level, talents, gear, professions/recipes, bags, bank, quest log,
+completion IDs and uploaded delivery report IDs. A recent Blizzard profile does
+not override a differing bag/quest/receipt comparison. The new optional
+`addonSnapshots.deliveryIds` field acknowledges upload receipt, not request
+fulfillment. Existing records need no migration. Missing comparison sections or
+a server view older than 15 minutes show unverified status, not "up to date".
+The server view still loads only at login/reload; live upload may have succeeded
+since that view was downloaded. The app remains the source for live receiver and
+upload health. Bank/recipe capture still requires opening the relevant windows.
+
+With pixel sync enabled, an in-game reminder keeps the unobstructed-square
+requirement visible. Warnings identify locally missing data, stopped/failed
+export, Edit Mode pauses, unusually long snapshot cycles, and stale/unverified
+server comparisons. **The addon cannot detect external window occlusion, reader
+packet loss, or an app that has stopped.** There is no live acknowledgement
+channel. These states are never presented as confirmed receiver failures or
+successful uploads.
+
+Corner placement uses the physical screen rectangle, compensates for UIParent's
+origin and frame scale, leaves a 12-physical-pixel margin, and clamps saved custom
+positions. Corner choices are reapplied after display/UI-scale and square-size
+changes. Fallback custom editing has a Done button and preserves sync enablement.
+
+PC acceptance (not yet run):
+- Open the launcher, minimap, slash command and addon compartment; confirm one
+  window, two tabs, no settings embedded in Blizzard's category.
+- Check each tab on a normal and short window; content must wrap, scroll only on
+  overflow, and remain reachable. Verify all controls and combat restrictions.
+- With pixel sync on, change gear, bags and quests. The actual differences must
+  remain prominent even if another data source synced more recently. Check the
+  app separately, then reload after downloading fresh guild data to reconcile.
+- Stop the app or cover the square: the addon must not claim it detected either
+  condition. It should show the visibility reminder and explain unverified
+  receipt. Verify local export failures and Edit Mode pauses show warnings.
+- At 100%, 125%, 150% Windows scaling and different in-game UI scales, move both
+  square sizes to both left corners. Capture a screenshot and verify the whole
+  square is at least 12 physical pixels inside the client image. Resize the
+  window, change square size, reload, and test a previously off-screen position.

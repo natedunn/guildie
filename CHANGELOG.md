@@ -23,6 +23,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Addon:** One wider Guildie window now contains Status and Settings tabs, opened from the minimap or the Options launcher. Status prioritizes actual data differences and warns about unverified or stalled experimental sync; pixel corners stay fully inset when scaling or resizing.
+
 - **Guildie, Addon:** Recipe tooltips say "requires lvl 25 (at lvl 12)" for a guildmate whose skill is too low, instead of "at 25 (has 12)".
 
 ### Fixes

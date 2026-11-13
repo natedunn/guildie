@@ -21,25 +21,22 @@ reload the UI, and the Guildie app, running on the same computer, uploads it the
   and updates it when a newer app ships a higher `## Version`. Bump that
   version in `Guildie.toc` whenever the addon changes, or players keep the old
   copy. (Copying the folder by hand works for development.)
-- **Minimap button** opens Options → AddOns → Guildie (General and Experimental sync tabs). Drag it around the minimap.
-- `/guildie`: opens the
-  window (`UI.lua`): your character, whether Guildie is up to date with it
-  (below), what happens next, **Sync now** (reloads the UI so it goes
-  right away), the guild data for tooltips, and the options. The minimap
-  button's tooltip shows the same headline and the first few changes.
-- **Window layout:** character details stay in the header, with separate
-  Character sync, Guild tooltips, Your requests (when any are open), and
-  Preferences sections below. The body scrolls on smaller screens; the
-  footer stays visible. **Sync now** saves by reloading the UI and needs the
-  Guildie app running to upload. It is disabled during combat. The AFK
-  setting has a separate explanation of its experimental reload behavior.
-- **"On Guildie"** (`Status.lua`, addon 0.6.0): compares what the game shows
-  now with what guildie.club shows for this character (`GuildieData.characters`,
-  which the app downloads) and lists what Guildie doesn't have yet:
-  "3 changes not on Guildie yet: Level 23 (Guildie has 22), New gear: …,
-  Tailoring 155 (Guildie has 150), 4 new Tailoring recipes", or "Up to date
-  with Guildie", with when Guildie last got data for it ("Last synced 5 min
-  ago, from the game"). The rules: docs/addon.md, "Up to date with Guildie".
+- **Minimap button**, addon compartment and `/guildie` open one Guildie window.
+  Options → AddOns → Guildie is a logo/name launcher with an **Open Guildie** button.
+  Drag the minimap button to reposition it.
+- **Status tab:** only character sync status, actual differences from the loaded
+  server comparison, sync method, warnings, and **Save & reload**. The wider
+  window lists all changes and scrolls only when content exceeds the screen.
+- **Settings tab:** general preferences, then experimental pixel sync, color/size
+  controls, safe corner placement and Edit Mode.
+- **Server comparison:** `Status.lua` compares the local character with
+  `GuildieData.characters`, loaded at login/reload. Actual differences take
+  priority regardless of transport. Recent matching data says **Matches the last
+  Guildie update**; old or incomplete comparison data is explicitly unverified.
+  Bags, bank, quests and delivery uploads are included alongside gear,
+  professions and talents. The addon cannot confirm live receipt or detect
+  screen obstruction; the app provides live capture/upload health. Pixel sync
+  displays a visibility reminder and warnings for local export problems.
 - **Sync while I'm AFK** (off by default, experimental): reloads the UI for
   you while you're flagged AFK and out of combat, if something changed, at most
   every 20 minutes. If the game doesn't allow addons to reload on their own, it

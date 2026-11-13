@@ -263,6 +263,9 @@ export const ingest = mutation({
 				proficiencies,
 				quests,
 				completedQuestIds: mergeCompletedQuestIds(existing?.completedQuestIds, c.completedQuestIds),
+				deliveryIds: c.deliveries
+					? [...new Set([...(existing?.deliveryIds ?? []), ...c.deliveries.map((e) => e.id)])].slice(-200)
+					: existing?.deliveryIds,
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
@@ -613,7 +616,15 @@ export const guildDataBase = internalQuery({
 				.first();
 			if (member?.inRoster) guildIds.add(member.guildId);
 			if (!member) continue;
-			const view = addonView(member, await snapshotOf(ctx, member));
+			const inventory = await ctx.db
+				.query("inventories")
+				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
+				.unique();
+			const view = addonView(
+				member,
+				await snapshotOf(ctx, member),
+				inventory?.userId === row.userId ? inventory : undefined,
+			);
 			// The same first name twice (two regions): the one synced last.
 			const before = characters[member.name];
 			if (!before || (view.synced?.at ?? 0) > (before.synced?.at ?? 0)) characters[member.name] = view;
