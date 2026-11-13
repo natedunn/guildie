@@ -468,9 +468,9 @@ export const STAT_POINTS: Record<string, number> = {
 export const THRESHOLDS = {
 	/** Gain over what they wear for "upgrade" (usable now, main spec). */
 	upgrade: 0.15,
-	/** Smallest gain worth a "maybe". */
+	/** Smallest gain worth a "possible upgrade". */
 	maybe: 0.03,
-	/** Items they can use within this many levels are a "maybe (at 24)". */
+	/** Items they can use within this many levels are a "possible upgrade (lvl 24)". */
 	levelsAhead: 3,
 	/** Members not seen (last logout, or the addon's last read) for longer are skipped. */
 	activeDays: 14,
@@ -499,16 +499,16 @@ export const THRESHOLDS = {
 	 * Body armor of a type they don't want: not on their (loose) list of
 	 * preferred types, or, with no list, two or more types below the class's
 	 * best (cloth on a shaman, leather on a warrior in mail). From each level
-	 * (first number) its score counts this much, and it's a "maybe" at most:
+	 * (first number) its score counts this much, and it's a "possible upgrade" at most:
 	 * a cloth piece with real stats can help a low-level shaman, hardly ever a
 	 * level 60 one. One type below the best they can wear, with no list, is
 	 * `preferBestFactor` from `preferBestFrom`.
 	 */
 	offTypeFactors: [
-		[1, 0.7],
-		[20, 0.6],
-		[40, 0.5],
-		[50, 0.4],
-		[60, 0.3],
+		[1, 0.9],
+		[20, 0.85],
+		[40, 0.75],
+		[50, 0.6],
+		[60, 0.5],
 	],
 } as const;

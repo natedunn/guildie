@@ -372,7 +372,7 @@ export const upgradesICanCraft = query({
 				requested: requested.get(recipeId) ?? [],
 			});
 		}
-		const upgrades = (h: { for: Help[] }) => h.for.filter((x) => x.kind === "upgrade" || x.kind === "tradeoff").length;
+		const upgrades = (h: { for: Help[] }) => h.for.filter((x) => x.kind === "upgrade").length;
 		hits.sort(
 			(a, b) =>
 				upgrades(b) - upgrades(a) ||

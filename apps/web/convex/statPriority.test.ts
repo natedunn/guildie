@@ -116,7 +116,7 @@ test("specsFor: talents, another tree, or a custom spec added to the rules", () 
 	assert.equal(r.specs[own!.spec].w.INTELLECT, 0.8);
 	// Bad choices: the talents.
 	assert.equal(specsFor(7, enhTalents, { stats: ["STRENGTH", "STRENGTH", "AGILITY"] }, r)?.spec, "SHAMAN:1");
-	// Up to ten stats all get a weight; a trade-off only looks at the first five.
+	// Up to ten stats all get a weight; only the first five keep an item from being an upgrade.
 	const ten = ["STRENGTH", "ATTACK_POWER", "INTELLECT", "AGILITY", "SPELL_DAMAGE_DONE"];
 	const many = specsFor(
 		7,
@@ -160,11 +160,11 @@ test("a custom priority changes the verdict: Intellect gloves for an Enhancement
 	])!;
 	assert.equal(judge(intGloves, shaman(), r), undefined, "talents' weights: under a point more, not worth a line");
 	const custom = judge(intGloves, shaman({ stats: ["STRENGTH", "INTELLECT", "AGILITY"] }), r);
-	assert.equal(custom?.kind, "tradeoff", "Strength, Intellect, Agility: worth it, but 2 Strength is given up");
+	assert.equal(custom?.kind, "maybe", "Strength, Intellect, Agility: worth it, but 2 Strength is given up: possible");
 	assert.equal(r.specs[custom!.spec].name, "Str/Int/Agi");
 });
 
-test("steepness: Agility pants for a Strength-first shaman are a trade-off, or nothing when steep", () => {
+test("steepness: Agility pants for a Strength-first shaman are a possible upgrade, or nothing when steep", () => {
 	const r = upgradeRules();
 	const worn = [
 		{
@@ -193,9 +193,13 @@ test("steepness: Agility pants for a Strength-first shaman are a trade-off, or n
 		{ left: "82 Armor" },
 		{ left: "+8 Agility" },
 	])!;
-	assert.equal(judge(pants, shaman(), r)?.kind, "tradeoff", "Balanced: 8 Agility is worth more than 4 Strength");
+	assert.equal(
+		judge(pants, shaman(), r)?.kind,
+		"maybe",
+		"Balanced: 8 Agility is worth more than 4 Strength, but it gives Strength up",
+	);
 	assert.equal(judge(pants, shaman([1, 0.55, 0.35]), r), undefined, "Steep: it isn't");
-	assert.equal(judge(pants, shaman([1, 0.9, 0.8]), r)?.kind, "tradeoff", "Even: still gives up Strength");
+	assert.equal(judge(pants, shaman([1, 0.9, 0.8]), r)?.kind, "maybe", "Even: still gives up Strength");
 	assert.notEqual(shaman([1, 0.55, 0.35]).spec, shaman().spec, "own shares: their own spec key");
 	const better = itemInfoFromTooltip([
 		{ left: "Legs", right: "Leather" },

@@ -266,10 +266,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 										</span>
 										<span
 											title={VERDICT_HINTS[u.kind]}
-											className={cn(
-												"pill ml-auto flex-none px-2 py-0",
-												(u.kind === "upgrade" || u.kind === "tradeoff") && "text-foreground",
-											)}
+											className={cn("pill ml-auto flex-none px-2 py-0", u.kind === "upgrade" && "text-foreground")}
 										>
 											{verdictLabel(u.kind, u.at)}
 										</span>

@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, Addon:** Gear suggestions are simpler: "upgrade" when it's clearly better and you give nothing up, otherwise "possible upgrade" (this replaces "maybe" and "trade-off"), so you decide. Armor of a type you didn't pick counts for more, so a good cloth piece on a leveling shaman or druid shows up as a possible upgrade instead of "not an upgrade". Your own row on item tooltips drops the percentage ("You | upgrade"): it was a rough estimate, and the game's compare tooltip shows the actual stat changes.
+
 ## 0.3.33
 
 ### New

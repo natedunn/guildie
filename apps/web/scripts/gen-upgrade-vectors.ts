@@ -30,7 +30,7 @@ const rules = {
 		"DRUID:1": { name: "Feral", w: { AGILITY: 1, STRENGTH: 0.9, STAMINA: 0.6, ARMOR: 0.05, ATTACK_POWER: 0.4 } },
 		"DRUID:2": { name: "Restoration", w: { INTELLECT: 1, SPIRIT: 0.8, STAMINA: 0.5, ARMOR: 0.02 } },
 		"WARRIOR:0": { name: "Arms", w: { STRENGTH: 1, AGILITY: 0.7, STAMINA: 0.6, ARMOR: 0.02, DPS: 8 } },
-		// Priority stats (a player's own, up to five): losing any of them makes an upgrade a trade-off.
+		// Priority stats (a player's own, up to five): losing any of them makes an upgrade only a possible one.
 		"WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR": {
 			name: "Str/Agi/Sta",
 			w: { STRENGTH: 1, AGILITY: 0.7, STAMINA: 0.6, ARMOR: 0.02, DPS: 8 },
@@ -294,8 +294,8 @@ const judgeCases: [string, string, string, number?][] = [
 	["maces, swords, bows only: a dagger left out", "dagger", "MacesSwordsBows"],
 	["maces, swords, bows only: a bow first among ranged", "bow", "MacesSwordsBows"],
 	["more of every priority stat: an upgrade", "strMailGloves", "Sturdy"],
-	["less armor than worn: a trade-off", "thinStrGloves", "Sturdy"],
-	["gives up Strength for Agility: a trade-off", "mailAgiGloves", "Sturdy"],
+	["less armor than worn: a possible upgrade", "thinStrGloves", "Sturdy"],
+	["gives up Strength for Agility: a possible upgrade", "mailAgiGloves", "Sturdy"],
 	["ring vs the weaker ring: its Strength is given up", "agiRingPlain", "Sturdy"],
 	["spell power counts as spell damage: an upgrade", "clothIntHead", "Sparky"],
 	["no priority stats known: an upgrade as before", "clothIntHead", "Frosty"],
@@ -362,7 +362,7 @@ const suggestCases = [
 	{ name: "two-hander: upgrades before maybes", item: "greatsword", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "agility gloves: upgrades before maybes", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
 	{ name: "plain helm: empty slots only", item: "plainLeatherHelm", now: SEEN + 3600, skip: [], max: 6 },
-	{ name: "mail gloves: trade-offs after upgrades", item: "mailAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
+	{ name: "mail gloves: possible upgrades after upgrades", item: "mailAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
 ].map((c) => ({
 	...c,
 	expect: suggest(

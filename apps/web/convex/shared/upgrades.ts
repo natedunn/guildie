@@ -17,14 +17,14 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 //    DPS terms. An item whose stats are of little use to a spec doesn't suit it.
 // 3. Compared with what they wear where it would go: the weaker ring or
 //    trinket, main hand plus off hand for a two-hander, and so on.
-// 4. Upgrade: gain of `upgrade` or more, usable now, main spec, and none of
-//    the spec's priority stats (`stats`, the first five) lower than what it
-//    replaces. Trade-off: the same gain, but it gives up some of one of
-//    those stats for more of another (worth it only by the weights, which
-//    the player can make steeper or flatter: customWeights). Maybe: a
-//    smaller gain (from `maybe`), only the second spec, usable within
+// 4. Upgrade: gain of `upgrade` or more, usable now, main spec, an armor
+//    type they want, and none of the spec's priority stats (`stats`, the
+//    first five) lower than what it replaces. Anything else that gains at
+//    least `maybe` is a "possible upgrade" (kind "maybe"): a smaller gain,
+//    some of a priority stat given up, only the second spec, usable within
 //    `levelsAhead` levels ("at 24"), or armor of a type they don't want
-//    (`offTypeFactors`). Every one adds at least `minGain` points.
+//    (`offTypeFactors`). The player decides those. Every one adds at least
+//    `minGain` points.
 // 5. Plain armor (armor and no stats: white and grey items) only for an empty
 //    slot, as "empty slot": anything worn there has stats it would lose.
 //
@@ -69,7 +69,7 @@ export type Rules = {
 	points: Record<string, number>;
 	/**
 	 * "DRUID:1" (class token, tree index) -> name, weights and its priority
-	 * stats, first to last (the first five of a player's own: what a trade-off gives up).
+	 * stats, first to last (the first five of a player's own: losing any of them keeps it from being an upgrade).
 	 */
 	specs: Record<string, { name: string; w: Weights; stats?: string[] }>;
 	classes: Record<number, ClassRules>;
@@ -91,8 +91,8 @@ export type UpgradeMember = {
 	slots2?: Record<number, number>;
 	/**
 	 * Inventory slot -> the main spec's priority stats on what they wear there
-	 * (keyValue; zeros and unknown items left out), to tell an upgrade from a
-	 * trade-off.
+	 * (keyValue; zeros and unknown items left out): an item with less of one
+	 * is a possible upgrade at most.
 	 */
 	keys?: Record<number, Record<string, number>>;
 	/** Wears a two-hander. */
@@ -131,7 +131,7 @@ export type GearPrefs = Pick<
 >;
 
 export type Verdict = {
-	/** Upgrade (nothing of their priority stats lost), trade-off (some lost), maybe. */
+	/** Upgrade (a clear gain, nothing of their priority stats lost), or a possible upgrade ("maybe"). */
 	kind: VerdictKind;
 	/** (new - current) / current, current at least `minBase`. */
 	gain: number;
@@ -143,18 +143,18 @@ export type Verdict = {
 	second?: boolean;
 	/** Inventory slot(s) compared against. */
 	against: number[];
-	/** Body armor of a type they don't want (armor subclass, cloth 1 ... plate 4): why it's only a maybe. */
+	/** Body armor of a type they don't want (armor subclass, cloth 1 ... plate 4): why it's only a possible upgrade. */
 	off?: number;
 };
 
-/** "empty": plain armor (no stats) for a slot they have nothing in. */
-export type VerdictKind = "upgrade" | "tradeoff" | "maybe" | "empty";
+/** "maybe": a possible upgrade; "empty": plain armor (no stats) for a slot they have nothing in. */
+export type VerdictKind = "upgrade" | "maybe" | "empty";
 
-const KIND_RANK: Record<VerdictKind, number> = { upgrade: 0, tradeoff: 1, maybe: 2, empty: 3 };
-/** Upgrades, then trade-offs, then maybes, then empty slots. */
+const KIND_RANK: Record<VerdictKind, number> = { upgrade: 0, maybe: 1, empty: 2 };
+/** Upgrades, then possible upgrades, then empty slots. */
 export const kindRank = (kind: VerdictKind) => KIND_RANK[kind];
 
-/** Armor type names for verdict notes ("maybe (Enhancement, cloth)"). */
+/** Armor type names for verdict notes ("possible upgrade (Enhancement, cloth)"). */
 export const ARMOR_TYPE_NAMES: Record<number, string> = { 1: "cloth", 2: "leather", 3: "mail", 4: "plate" };
 
 export function upgradeRules(): Rules {
@@ -376,8 +376,8 @@ export function customWeights(
 /** Fewest and most stats a player's own priority names. */
 export const MIN_STATS = 3;
 export const MAX_STATS = 10;
-/** A trade-off gives up one of the first this many (more would make nearly everything a trade-off). */
-export const TRADEOFF_STATS = 5;
+/** Losing one of the first this many keeps an item from being an upgrade (more would make hardly anything one). */
+export const KEPT_STATS = 5;
 
 /** Three to ten distinct stats a priority can name, or undefined. */
 export function validStats(stats: unknown): string[] | undefined {
@@ -415,7 +415,7 @@ export function specsFor(classId: number, trees: Tree[] | undefined, choice: Sta
 				.map((s) => STAT_SHORT[s])
 				.join("/"),
 			w: customWeights(base.w, own, rules.points, tiers),
-			stats: own.slice(0, TRADEOFF_STATS),
+			stats: own.slice(0, KEPT_STATS),
 		};
 		return { spec, spec2: talents.spec2 };
 	}
@@ -720,7 +720,7 @@ function loses(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, ag
 	return false;
 }
 
-/** Upgrade, trade-off, maybe, or nothing, for one guildmate. */
+/** Upgrade, possible upgrade ("maybe"), empty slot, or nothing, for one guildmate. */
 export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: number): Verdict | undefined {
 	if (itemId !== undefined && m.dismissed?.includes(itemId)) return undefined;
 	if (itemId !== undefined && !PAIRED.has(item.invType) && m.worn?.includes(itemId)) return undefined;
@@ -738,10 +738,11 @@ export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: n
 	const minGain = rules.minGain ?? 0;
 	if (main && main.gain >= rules.maybe && main.net >= minGain) {
 		const kind =
-			main.gain >= rules.upgrade && !later && main.off === undefined
-				? loses(item, m, rules.specs[m.spec]?.stats, main.against)
-					? "tradeoff"
-					: "upgrade"
+			main.gain >= rules.upgrade &&
+			!later &&
+			main.off === undefined &&
+			!loses(item, m, rules.specs[m.spec]?.stats, main.against)
+				? "upgrade"
 				: "maybe";
 		const off = main.off !== undefined ? { off: main.off } : {};
 		return { kind, gain: main.gain, spec: m.spec, against: main.against, ...extra, ...off };
@@ -764,7 +765,7 @@ export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: n
 }
 
 /**
- * Who the item would help: upgrades first, then trade-offs, then by gain, at most `max`.
+ * Who the item would help: upgrades first, then possible upgrades, then by gain, at most `max`.
  * `skip`: names to leave out (the viewer's own characters). `now` in seconds.
  */
 export function suggest(

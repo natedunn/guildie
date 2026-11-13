@@ -218,7 +218,7 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     eq(#added, 2, "a row each")
     eq(plain(added[1]), "Brisket | upgrade (Feral)")
     -- Leather on a warrior who wears mail: a maybe at most, and why.
-    eq(plain(added[2]), "Miller | maybe (Arms, leather)")
+    eq(plain(added[2]), "Miller | possible upgrade (Arms, leather)")
     assert(added[1]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[1])
     -- Soulbound to the viewer: can't be traded, so no suggestions.
     local bound = {}
@@ -248,7 +248,7 @@ test("a player's own stat priority: a custom spec the site adds to the rules", f
     eq(plain(added[1]), "Brisket | upgrade (Agi/Sta/Str)")
 end)
 
-test("trade-offs: after upgrades, when a priority stat is given up", function()
+test("giving up a priority stat: a possible upgrade, after upgrades", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local mailGloves = {
         id = 4254, name = "Chain Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 3,
@@ -261,7 +261,7 @@ test("trade-offs: after upgrades, when a priority stat is given up", function()
     local added = hover(mailGloves)
     eq(#added, 2)
     eq(plain(added[1]), "Miller | upgrade (Arms)")
-    eq(plain(added[2]), "Sturdy | trade-off (Str/Agi/Sta)")
+    eq(plain(added[2]), "Sturdy | possible upgrade (Str/Agi/Sta)")
 end)
 
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()
@@ -323,7 +323,7 @@ test("tooltip line: plain armor for an empty slot, and an armor type they don't 
     eq(plain(hover(hood)[1]), "Miller | empty slot (Arms, cloth)")
 end)
 
-test("tooltip line: maybe (lvl 24) and second spec; nothing when nobody qualifies", function()
+test("tooltip line: possible upgrade (lvl 24) and second spec; nothing when nobody qualifies", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local helm = {
         id = 5, name = "Spellweaver Cowl", equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 1, reqLevel = 33,
@@ -340,12 +340,12 @@ test("tooltip line: maybe (lvl 24) and second spec; nothing when nobody qualifie
     stubItems({ helm, sword, resist })
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, vectors.members.Rage })
     local helm_rows = hover(helm)
-    eq(plain(helm_rows[1]), "Frosty | maybe (lvl 33)")
-    eq(plain(helm_rows[2]), "Brisket | maybe (Restoration, lvl 33)")
+    eq(plain(helm_rows[1]), "Frosty | possible upgrade (lvl 33)")
+    eq(plain(helm_rows[2]), "Brisket | possible upgrade (Restoration, lvl 33)")
     local sword_rows = hover(sword)
     eq(#sword_rows, 2, "upgrade first, then maybe")
     eq(plain(sword_rows[1]), "Rage | upgrade (Fury)")
-    eq(plain(sword_rows[2]), "Miller | maybe (lvl 25)")
+    eq(plain(sword_rows[2]), "Miller | possible upgrade (lvl 25)")
     eq(table.concat(hover(resist)), "No guildmates need this", "nobody")
     -- Older data without `upgrades`: just the reagent line, if any.
     _G.GuildieData = { version = 1, mine = {}, reagents = {} }
@@ -379,12 +379,12 @@ test("for you: your row first, scored against what you wear now", function()
     playAs(vectors.members.Brisket, { [10] = WORN_GLOVES })
     local rows = hover(GLOVES)
     -- Feral: 6 Agility, 2.4 for Stamina, 3 for armor = 11.4 over 4.
-    eq(plain(rows[1]), "You | upgrade +185%")
-    eq(plain(rows[2]), "Miller | maybe (Arms, leather)")
+    eq(plain(rows[1]), "You | upgrade")
+    eq(plain(rows[2]), "Miller | possible upgrade (Arms, leather)")
     eq(#rows, 2)
     -- Wearing it: nothing to say about yourself.
     playAs(vectors.members.Brisket, { [10] = GLOVES })
-    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    eq(plain(hover(GLOVES)[1]), "Miller | possible upgrade (Arms, leather)")
 end)
 
 test("for you: quest rewards and rolls that bind to you still get your row", function()
@@ -398,7 +398,7 @@ test("for you: quest rewards and rolls that bind to you still get your row", fun
     playAs(vectors.members.Brisket, { [10] = WORN_GLOVES })
     local rows = hover(reward)
     eq(#rows, 1, "guildmates can't get it")
-    eq(plain(rows[1]), "You | upgrade +185%")
+    eq(plain(rows[1]), "You | upgrade")
 end)
 
 test("for you: not an upgrade, can't use, needs a level; and the setting", function()
@@ -422,7 +422,7 @@ test("for you: not an upgrade, can't use, needs a level; and the setting", funct
     eq(plain(hover(chain)[1]), "You | can't use", "druids don't wear mail")
     eq(plain(hover(later)[1]), "You | needs lvl 40")
     GuildieDB.settings = { showForYou = false }
-    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    eq(plain(hover(GLOVES)[1]), "Miller | possible upgrade (Arms, leather)")
     GuildieDB.settings = nil
 end)
 
@@ -431,10 +431,10 @@ test("for you: older guild data without your characters, or another character", 
     stubItems({ GLOVES })
     playAs(vectors.members.Brisket, {})
     GuildieData.upgrades.mine = nil
-    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    eq(plain(hover(GLOVES)[1]), "Miller | possible upgrade (Arms, leather)")
     playAs(vectors.members.Brisket, {})
     _G.UnitName = function() return "Someone" end
-    eq(plain(hover(GLOVES)[1]), "Miller | maybe (Arms, leather)")
+    eq(plain(hover(GLOVES)[1]), "Miller | possible upgrade (Arms, leather)")
 end)
 
 test("Dialogue UI: its own tooltips get the Guildie block through its API", function()

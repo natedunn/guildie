@@ -1,5 +1,5 @@
 -- Adds a Guildie block to item tooltips: whether it's an upgrade for you
--- ("You | upgrade +35%", Upgrades.lua), guild requests for this item ("Todd
+-- ("You | upgrade", Upgrades.lua), guild requests for this item ("Todd
 -- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
 -- whose known recipes use it (reagents), who could learn it (recipe items:
 -- patterns, plans, formulas), and guildmates it might be a gear upgrade

@@ -258,13 +258,12 @@ your last login or reload.
   Soulbound), scores it for each of them the same way
   (`Guildie/Upgrades.lua`, a port of `convex/shared/upgrades.ts`; both run
   `apps/addon/tests/upgrade_vectors.json`) and adds a row each for up to 3 people:
-  "Brisket | upgrade (Feral)", "Pip | trade-off (Str/Int/Agi)", "Miller | maybe (lvl 24)",
-  "Todd | maybe (Enhancement, cloth)", "Skurg | empty slot (Arms)". Upgrade:
+  "Brisket | upgrade (Feral)", "Pip | possible upgrade (Str/Int/Agi)", "Miller | possible upgrade (lvl 24)",
+  "Todd | possible upgrade (Enhancement, cloth)", "Skurg | empty slot (Arms)". Upgrade:
   15%+ better than what they wear there (and at least a point of their main
-  stat), usable now, main spec, none of
-  their priority stats lower. Trade-off: the same, but some of a priority
-  stat is given up. Maybe: 3-15%,
-  their second spec, usable within 3 levels, or an armor type they don't
+  stat), usable now, main spec, an armor type they want, none of
+  their priority stats lower. Possible upgrade: anything else 3%+ better,
+  some of a priority stat given up, their second spec, usable within 3 levels, or an armor type they don't
   want. Empty slot: plain armor (no stats) for a slot they have nothing in. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
   Stamina over Embossed Leather Gloves"). About 20 KB of the file for a guild
@@ -276,7 +275,7 @@ your last login or reload.
   `GetInventoryItemLink` per slot, the site's score for a slot whose item
   hasn't loaded yet; cached until `PLAYER_EQUIPMENT_CHANGED`,
   `PLAYER_LEVEL_UP` or `GET_ITEM_INFO_RECEIVED`) and puts your row first:
-  "You | upgrade +35%", "You | maybe +8% (cloth)", "You | empty slot", "You |
+  "You | upgrade", "You | possible upgrade (cloth)", "You | empty slot", "You |
   not an upgrade", "You | needs lvl 30", "You | can't use"; nothing for an item
   you wear. It shows for items that can't be traded too (quest rewards,
   loot rolls), where guildmates' rows don't. Setting: "Show whether items are

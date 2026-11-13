@@ -35,10 +35,10 @@ didn't list). Spec = tree with most points (under
 Score = Σ weight × stat + armor and DPS terms; items whose stats are mostly
 useless to the spec (`minFit`) don't suit it. Compare with what they wear in
 that slot (weaker ring/trinket, main+off hand for a two-hander). **Upgrade:**
-gain ≥ `upgrade` (15%), usable now, main spec, none of the spec's priority
-stats (`stats`) lower than worn (member `keys`). **Trade-off:** the same but
-some priority stat is given up. **Maybe:** gain ≥ `maybe`
-(3%), second spec, usable within `levelsAhead`, or body armor of a type they
+gain ≥ `upgrade` (15%), usable now, main spec, a wanted armor type, none of
+the spec's priority stats (`stats`) lower than worn (member `keys`).
+**Possible upgrade** (kind `maybe`): anything else with gain ≥ `maybe`
+(3%): a priority stat given up, second spec, usable within `levelsAhead`, or body armor of a type they
 don't want (`off`: not on their loose list, or with no list two+ types below
 the class's best; scored × `offTypeFactors` by level). Every verdict needs a
 net gain of `minGain` points. **Empty slot:** plain armor (no stats) only
@@ -111,7 +111,7 @@ The two implementations must match exactly:
   the member (`armorPref`, `weaponPref`, ordered `armorPrefs`/`weaponPrefs`, `...Strict`; `gearPrefs`) and are
   read by `scoreItem` and `judge` in both TS and Lua (`preferred`): a rule
   change, so it goes through the vectors and needs an addon release.
-- "For you" (the tooltip's "You | upgrade +35%" row) is addon-only: the
+- "For you" (the tooltip's "You | upgrade" row) is addon-only: the
   site sends your own characters as `upgrades.mine` (helper.ts), and
   `U.liveMember` rescores what you wear now with the same `scoreItem` before
   `judge`; `U.forYou` words the verdict. No TS twin, so it's tested in
