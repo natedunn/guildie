@@ -502,3 +502,33 @@ function ns.readQuests()
     end
     return list, collapsed
 end
+
+-- Completion confirmations are independent of the quest UI. Never infer a
+-- turn-in from a quest disappearing or having all its objectives complete.
+function ns.validCompletedQuestID(id)
+    local ok, valid = pcall(function()
+        if issecretvalue and issecretvalue(id) then return false end
+        return type(id) == "number" and id > 0 and id <= 10000000 and id == math.floor(id)
+    end)
+    return ok and valid
+end
+
+function ns.readCompletedQuestIDs()
+    local get = C_QuestLog and C_QuestLog.GetAllCompletedQuestIDs
+    if type(get) == "function" then
+        local ok, ids = pcall(get)
+        if ok and type(ids) == "table" then return ids end
+    end
+    -- Older clients fill an id -> true table (the query may arrive later).
+    if type(GetQuestsCompleted) == "function" then
+        local completed = {}
+        local ok = pcall(GetQuestsCompleted, completed)
+        if ok then
+            local ids = {}
+            for id, done in pairs(completed) do
+                if done == true or done == 1 then ids[#ids + 1] = id end
+            end
+            return ids
+        end
+    end
+end

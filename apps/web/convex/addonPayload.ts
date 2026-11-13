@@ -4,10 +4,10 @@
 // and level), 2 (plus guild, XP, gear, professions and known recipes; from
 // addon 0.7.0 also weapon and armor skills), 3 (addon 0.8.0: plus bags and
 // the last bank read, for guild requests) and 4 (addon 0.10.0: plus the quest
-// log) are all accepted. Kept free of
+// log), and 5 (retained quest completion IDs) are all accepted. Kept free of
 // Convex and value imports so `node --test` can run it (addonPayload.test.ts).
 
-export const PAYLOAD_VERSIONS = [1, 2, 3, 4] as const;
+export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5] as const;
 
 export const LIMITS = {
 	characters: 50,
@@ -23,6 +23,7 @@ export const LIMITS = {
 	inventoryItems: 600,
 	/** Quests in the log (the game allows 25), objectives per quest. */
 	quests: 60,
+	completedQuests: 20000,
 	objectives: 12,
 	name: 120,
 } as const;
@@ -137,6 +138,8 @@ export type AddonCharacter = {
 	inventory?: { bags?: InventoryPart; bank?: InventoryPart };
 	/** The quest log (payload 4, addon 0.10.0). Public like Blizzard's quest list, to guildmates. */
 	quests?: { capturedAt: number; list: QuestEntry[] };
+	/** Retained positive completion confirmations; absence is not a deletion. */
+	completedQuestIds?: number[];
 };
 
 export type QuestEntry = {
@@ -449,6 +452,15 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			proficiencies: opt(c.proficiencies, (p) => proficiencies(p, now)),
 			inventory: opt(c.inventory, (i) => inventory(i, now)),
 			quests: opt(c.quests, (q) => quests(q, now)),
+			completedQuestIds: opt(c.completedQuestIds, (ids) =>
+				[
+					...new Set(
+						arr(ids, "completedQuestIds", LIMITS.completedQuests).map((id, i) =>
+							int(id, `completedQuestIds[${i}]`, 1, 10_000_000),
+						),
+					),
+				].sort((a, b) => a - b),
+			),
 		};
 		return { ok: true, character };
 	} catch (error) {

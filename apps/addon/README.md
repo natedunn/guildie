@@ -124,3 +124,20 @@ Not confirmed in game yet (0.4.0): which of the gear, tooltip, profession and
 recipe APIs above Forever has (each read tries the modern API, then the
 classic one, and an unreadable part keeps its last read), and whether
 `TRADE_SKILL_*` or `CRAFT_*` fire for Enchanting there.
+
+### Retained quest completions (0.17.0)
+
+The addon records confirmed `QUEST_TURNED_IN` IDs per character and keeps sending
+that set in later snapshots. Covering the sync square, disabling live export, or
+closing the desktop app delays delivery; it does not clear the set. Normal
+SavedVariables uploads carry the same records after `/reload` or logout. WoW
+only writes SavedVariables at reload/logout/normal exit, so a crash can still
+lose records from the current session.
+
+Where supported, `C_QuestLog.GetAllCompletedQuestIDs()` restores earlier history;
+older clients use `QueryQuestsCompleted`, `QUEST_QUERY_COMPLETE`, and
+`GetQuestsCompleted`. Calls/events are guarded and failures keep the last known
+IDs. A quest disappearing from the log, completing its objectives, or showing a
+reward window never counts as a confirmed turn-in. Repeated turn-ins record an
+ID once, not a count of repetitions. Forever's event/history APIs still need an
+in-game acceptance check; custom quest UI addons should not affect these events.

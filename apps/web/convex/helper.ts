@@ -13,6 +13,7 @@ import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
+import { mergeCompletedQuestIds } from "./shared/quests";
 import { addonRecipes, type PackedAddonRecipes, packAddonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
 import { memberForUpgrades } from "./upgradeProfiles";
@@ -261,6 +262,7 @@ export const ingest = mutation({
 				recipes: keptRecipes.length ? keptRecipes : undefined,
 				proficiencies,
 				quests,
+				completedQuestIds: mergeCompletedQuestIds(existing?.completedQuestIds, c.completedQuestIds),
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);

@@ -95,3 +95,9 @@ export function dungeonGroups(holders: QuestHolder[]): DungeonGroup[] {
 	}
 	return out.sort((a, b) => b.people.length - a.people.length || a.area.localeCompare(b.area));
 }
+
+/** Positive confirmations accumulate. Missing/empty/older snapshots cannot undo a turn-in. */
+export function mergeCompletedQuestIds(...sources: (readonly number[] | undefined)[]): number[] | undefined {
+	if (sources.every((ids) => ids === undefined)) return undefined;
+	return [...new Set(sources.flatMap((ids) => ids ?? []))].sort((a, b) => a - b);
+}

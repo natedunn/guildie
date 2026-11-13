@@ -178,7 +178,10 @@ test("pixel snapshots coalesce, retry with throttling, deduplicate and reset on 
 	const engine = new SyncEngine(api, wow, { log: () => {}, onUnauthorized: () => {} });
 	await engine.tick();
 	calls.length = 0;
-	const snapshot = (level: number) => ({ version: 4, characters: [{ name: "Test", level }] });
+	const snapshot = (level: number) => ({
+		version: 5,
+		characters: [{ name: "Test", level, completedQuestIds: [6981] }],
+	});
 	assert.equal(engine.queuePixelSnapshot({ health: 10 }), false);
 	assert.equal(engine.queuePixelSnapshot(snapshot(1)), true);
 	engine.queuePixelSnapshot(snapshot(2));

@@ -56,6 +56,49 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             assembler.feed(b'S|x|1|999999|x')
 
+    def test_covered_square_replays_quest_completion_backlog(self):
+        root = Path(__file__).resolve().parents[2]
+        script = r"""
+local wow = dofile("apps/addon/tests/wow.lua")
+local ns = wow.load({guid = "Player-test", name = "Test", level = 26})
+wow.fire("PLAYER_ENTERING_WORLD")
+local panel
+for _, f in ipairs(wow.frames) do
+    if f.scripts.OnDragStop and f.scripts.OnUpdate and f.events.PLAYER_LOGIN then panel = f end
+end
+assert(panel)
+local visible = true
+local encode = GuildiePixelProtocol.encode
+GuildiePixelProtocol.encode = function(packet)
+    local values = encode(packet)
+    if visible then
+        for _, value in ipairs(values) do io.write(value, " ") end
+        io.write("\n")
+    end
+    return values
+end
+ns.livePixels.set("enabled", true)
+panel.scripts.OnUpdate(panel, 0.1) -- first packet of an incomplete snapshot
+visible = false -- the reader misses frames while another UI covers the square
+wow.fire("QUEST_TURNED_IN", 6981)
+wow.fire("QUEST_TURNED_IN", 3369)
+wow.fire("QUEST_TURNED_IN", 6981)
+for i = 1, 200 do panel.scripts.OnUpdate(panel, 0.1) end
+visible = true
+for i = 1, 400 do panel.scripts.OnUpdate(panel, 0.1) end
+assert(#ns.current().completedQuestIds == 2, "transmitting does not delete confirmations")
+"""
+        output = subprocess.check_output(["luajit", "-e", script], cwd=root)
+        assembler = Assembler()
+        snapshots = []
+        for line in output.splitlines():
+            result = assembler.feed(decode(list(map(int, line.split()))))
+            if result and result["channel"] == "snapshot":
+                snapshots.append(result["data"])
+        self.assertTrue(snapshots, "a complete snapshot arrives after the square is uncovered")
+        self.assertEqual(snapshots[-1]["version"], 5)
+        self.assertEqual(snapshots[-1]["characters"][0]["completedQuestIds"], [3369, 6981])
+
     def test_live_export_omits_protected_values(self):
         addon = Path(__file__).resolve().parents[2] / "apps/addon/Guildie"
         script = r"""

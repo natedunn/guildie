@@ -40,7 +40,7 @@ type Character = Pick<
 >;
 type Snapshot = Pick<
 	Doc<"addonSnapshots">,
-	"capturedAt" | "level" | "talentTrees" | "equipment" | "professions" | "recipes" | "quests"
+	"capturedAt" | "level" | "talentTrees" | "equipment" | "professions" | "recipes" | "quests" | "completedQuestIds"
 >;
 type Item = NonNullable<Character["equipment"]>[number];
 
@@ -143,6 +143,7 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 		professions,
 		talentTrees,
 		quests,
+		completedQuestIds: snap?.completedQuestIds,
 		sources: {
 			level: levelSource,
 			gear: gearSource,
