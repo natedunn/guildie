@@ -125,6 +125,11 @@ export const save = internalMutation({
 	},
 	handler: async (ctx, { recipes }) => {
 		const now = Date.now();
+		// Guildie's own entries (negative ids, recipeItems.ts): a few dozen.
+		const own = await ctx.db
+			.query("recipes")
+			.withIndex("by_recipeId", (q) => q.lt("recipeId", 0))
+			.collect();
 		for (const r of recipes) {
 			const existing = await ctx.db
 				.query("recipes")
@@ -132,6 +137,13 @@ export const save = internalMutation({
 				.unique();
 			if (existing) await ctx.db.replace(existing._id, { ...r, syncedAt: now });
 			else await ctx.db.insert("recipes", { ...r, syncedAt: now });
+			// Blizzard has it now: drop Guildie's own entry for it (recipeItems.ts
+			// matches the real one on its next sync).
+			for (const o of own) {
+				if (o.professionId === r.professionId && o.name.toLowerCase() === r.name.toLowerCase()) {
+					await ctx.db.delete(o._id);
+				}
+			}
 		}
 	},
 });

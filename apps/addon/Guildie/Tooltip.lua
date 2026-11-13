@@ -88,18 +88,37 @@ local MAX_KNOWN = 3
 --- character who could use it ("Brenna | can learn it", "Miller | at 125
 --- (has 90)", "Todd | has one already"), then "Known by Lich, Isai +2".
 --- Leaves out the character you're on: the game's own tooltip says.
+--- 0.15.0: a cookbook teaches several recipes (ids 3..n: knows it with all
+--- of them), and rank books (`ranks`: { profession, skill, max skill it
+--- unlocks }) count as known once their max skill is there.
 local function recipeRows(itemID)
     local data = GuildieData and type(GuildieData.recipes) == "table" and GuildieData.recipes
     local item = data and type(data.items) == "table" and data.items[itemID]
-    if type(item) ~= "table" then return {} end
-    local profession, need, recipeID = item[1], item[2] or 0, item[3]
+    local rank
+    if type(item) ~= "table" then
+        item = data and type(data.ranks) == "table" and data.ranks[itemID]
+        if type(item) ~= "table" then return {} end
+        rank = item[3]
+    end
+    local profession, need = item[1], item[2] or 0
+    local function knows(c)
+        if rank then
+            local max = type(c.max) == "table" and c.max[profession] or nil
+            return type(max) == "number" and max >= rank
+        end
+        local known = asSet(c.known)
+        for i = 3, #item do
+            if not known[item[i]] then return false end
+        end
+        return #item >= 3
+    end
     local groups = { now = {}, later = {}, has = {}, knows = {} }
     local me = UnitName and UnitName("player")
     for _, c in ipairs(type(data.crafters) == "table" and data.crafters or {}) do
         local skill = type(c.skills) == "table" and c.skills[profession]
         if skill and c.name ~= me then
             local state
-            if asSet(c.known)[recipeID] then
+            if knows(c) then
                 state = "knows"
             elseif asSet(c.has)[itemID] then
                 state = "has"

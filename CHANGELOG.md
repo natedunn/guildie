@@ -18,6 +18,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Fixes
 
 - **Guildie, Addon:** First Aid manuals now say who can learn them too.
+- **Guildie, Addon:** So do the Expert Cookbook, First Aid and Fishing books, Carrie's Cookbook, and Forever's new plans and patterns that Blizzard's recipe list doesn't have yet (like the "Adaptive" sets).
 
 ## 0.3.27
 

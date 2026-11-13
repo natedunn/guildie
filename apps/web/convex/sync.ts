@@ -206,8 +206,8 @@ type ProfessionEntry = {
 	profession: { id: number; name: string };
 	skill_points?: number;
 	max_skill_points?: number;
-	known_recipes?: { id: number }[];
-	tiers?: { skill_points?: number; max_skill_points?: number; known_recipes?: { id: number }[] }[];
+	known_recipes?: { id: number; name?: string }[];
+	tiers?: { skill_points?: number; max_skill_points?: number; known_recipes?: { id: number; name?: string }[] }[];
 };
 type Professions = { primaries?: ProfessionEntry[]; secondaries?: ProfessionEntry[] };
 type Media = { assets?: { key: string; value: string }[] };
@@ -260,9 +260,20 @@ function mapTalentTrees(data: Specializations | undefined) {
 		.sort((a, b) => b.points - a.points);
 }
 
-function mapProfessions(data: Professions | undefined) {
+/**
+ * `own`: Guildie's own recipe entries (recipeItems.ts ownRecipes) for recipes
+ * Blizzard's catalog lacks; a known recipe with the same name counts as that
+ * one too, so recipe items that teach it show who knows it.
+ */
+export function mapProfessions(
+	data: Professions | undefined,
+	own: { recipeId: number; professionId: number; name: string }[] = [],
+) {
 	if (!data) return undefined;
 	const map = (entry: ProfessionEntry, secondary: boolean) => {
+		const known = [...(entry.known_recipes ?? []), ...(entry.tiers ?? []).flatMap((t) => t.known_recipes ?? [])];
+		const names = new Set(known.map((r) => r.name?.toLowerCase()).filter((n) => n));
+		const ours = own.filter((o) => o.professionId === entry.profession.id && names.has(o.name.toLowerCase()));
 		// Classic-style responses put skill on the entry; Retail-style on tiers.
 		const tier = entry.tiers?.[0];
 		return {
@@ -271,9 +282,7 @@ function mapProfessions(data: Professions | undefined) {
 			skill: entry.skill_points ?? tier?.skill_points,
 			maxSkill: entry.max_skill_points ?? tier?.max_skill_points,
 			secondary,
-			knownRecipes: [...(entry.known_recipes ?? []), ...(entry.tiers ?? []).flatMap((t) => t.known_recipes ?? [])].map(
-				(r) => r.id,
-			),
+			knownRecipes: [...known.map((r) => r.id), ...ours.map((o) => o.recipeId)],
 		};
 	};
 	return [...(data.primaries ?? []).map((e) => map(e, false)), ...(data.secondaries ?? []).map((e) => map(e, true))];
@@ -333,7 +342,9 @@ export const syncCharacter = internalAction({
 						tooltip: tooltipLines(i),
 					}))
 				: undefined,
-			professions: professions.ok ? mapProfessions(professions.data) : undefined,
+			professions: professions.ok
+				? mapProfessions(professions.data, await ctx.runQuery(internal.recipeItems.ownRecipes, {}))
+				: undefined,
 			talentTrees: specializations.ok ? mapTalentTrees(specializations.data) : undefined,
 			avatarUrl: media.ok ? media.data.assets?.find((a) => a.key === "avatar")?.value : undefined,
 			renderUrl: media.ok ? media.data.assets?.find((a) => a.key === "main-raw")?.value : undefined,

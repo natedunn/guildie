@@ -386,9 +386,15 @@ export default defineSchema({
 		name: v.string(),
 	}).index("by_class_tree", ["classToken", "treeIndex"]),
 
-	/** Forever's recipes and their reagents, from Blizzard's static data (recipes.ts). */
+	/**
+	 * Forever's recipes and their reagents, from Blizzard's static data
+	 * (recipes.ts). Plus Guildie's own entries for recipes a recipe item
+	 * teaches that Blizzard's catalog lacks (`fromItem`: that item; negative
+	 * `recipeId`, shared/recipeResearch.ts), until Blizzard adds them.
+	 */
 	recipes: defineTable({
 		recipeId: v.number(),
+		fromItem: v.optional(v.number()),
 		professionId: v.number(),
 		profession: v.string(),
 		name: v.string(),
@@ -406,7 +412,9 @@ export default defineSchema({
 	 * Recipe items (patterns, plans, formulas...) and what they teach, from
 	 * Blizzard's static data (recipeItems.ts, weekly after the recipes).
 	 * `recipeId`: the recipe in `recipes` it teaches, unset when we couldn't
-	 * match it. `skill`: the profession skill it needs to learn.
+	 * match it; `recipeIds`: all of them, when it teaches several (a
+	 * cookbook). `rank`: for a rank book (Expert Cookbook), the max skill it
+	 * unlocks instead. `skill`: the profession skill it needs to learn.
 	 */
 	recipeItems: defineTable({
 		itemId: v.number(),
@@ -418,6 +426,8 @@ export default defineSchema({
 		profession: v.string(),
 		skill: v.optional(v.number()),
 		recipeId: v.optional(v.number()),
+		recipeIds: v.optional(v.array(v.number())),
+		rank: v.optional(v.number()),
 		syncedAt: v.number(),
 	})
 		.index("by_itemId", ["itemId"])
