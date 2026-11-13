@@ -1,6 +1,6 @@
 # convex-auth-start
 
-A stopgap TanStack Start adapter for Convex Auth v2 (`@convex-dev/auth@beta`),
+A stopgap TanStack Start adapter for Convex Auth v2 (`@convex-dev/auth@2`),
 which only ships a Next.js adapter today (get-convex/convex-auth#350).
 
 It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
@@ -15,6 +15,16 @@ It mirrors `@convex-dev/auth/ssr/nextjs` using the package's framework-agnostic
   It keeps the access token in page memory, not localStorage (`pageStorage`),
   and the Convex client reuses the page's first token (`initialAuthTokenReuse`
   in `router.tsx`): see the comments there for the mobile sign-in bug both fix.
+  The browser's Convex client also holds queries until auth is settled
+  (`expectAuth`), so the server-rendered data isn't replaced by signed-out
+  answers before hydration; `ResumeWhenSignedOut` lets them through for
+  signed-out visitors.
+  `SessionGuard` catches the page up when its session ends elsewhere (sessions
+  are stateful since 2.0): it refreshes from the cookie rather than signing
+  out, because the package's `SessionWatcher` would revoke whatever session the
+  shared cookie holds by then.
+- `server.ts` also refreshes a pre-2.0 access-token cookie instead of using
+  it, so the first visit after the upgrade renders signed out, not an error.
 - Routes: `apps/web/src/routes/auth/{signin,refresh,signout}.ts`.
 
 Workaround: `AuthProvider`/`useAuth` aren't in the package's exports map, so

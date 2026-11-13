@@ -8,6 +8,7 @@ import { ClassText } from "@/components/class-name";
 import { ViewAs } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { Page, PageHeader } from "@/components/page-header";
+import { LearnerSummary } from "@/components/recipe-learners";
 import { Input } from "@/components/ui/input";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,8 @@ import { cn } from "@/lib/utils";
 // the addon last read them (bags at the last /reload or logout, the bank as
 // of the last time it was open). "Where's my Silk Cloth?": Lich bags 37 ·
 // Isai bank 20. Only you see it (inventory:all). `?character=<slug>` shows
-// one character (old /c/…/inventory links land here).
+// one character (old /c/…/inventory links land here). Recipe items say who
+// in your guilds could learn them ("Can learn Brenna · Knows it 3").
 
 type Search = { character?: string };
 
@@ -164,6 +166,15 @@ function InventoryPage() {
 												</span>
 												<span className="num text-muted-foreground">×{item.total}</span>
 											</ItemHover>
+											{item.recipe ? (
+												<p className="-mt-1 truncate pr-3 pb-1.5 pl-[3.125rem] text-xs">
+													<LearnerSummary
+														who={item.recipe.who}
+														region={item.recipe.who[0]?.region ?? "us"}
+														profession={item.recipe.profession}
+													/>
+												</p>
+											) : null}
 										</li>
 									);
 								})}

@@ -33,8 +33,6 @@ type Env = {
   readonly AUTH_BATTLENET_CALLBACK_URL: string | undefined;
   readonly AUTH_BATTLENET_CLIENT_ID: string;
   readonly AUTH_BATTLENET_CLIENT_SECRET: string;
-  readonly AUTH_JWKS: string;
-  readonly AUTH_PRIVATE_KEY: string;
 };
 
 /**

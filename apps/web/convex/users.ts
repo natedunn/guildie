@@ -14,27 +14,35 @@ export async function requireUserId(ctx: QueryCtx | MutationCtx) {
 	return userId as Id<"users">;
 }
 
-const vBattlenetProvider = v.object({
+const vBattlenetMethod = v.object({
 	name: v.literal("battlenet"),
-	accountId: v.string(),
 	profile: vBattlenetProfile,
 });
 
 export const createFromBattlenet = internalMutation({
-	args: { provider: vBattlenetProvider },
+	args: { method: vBattlenetMethod },
 	returns: v.id("users"),
-	handler: async (ctx, { provider: { profile } }) =>
-		await ctx.db.insert("users", {
+	handler: async (ctx, { method: { profile } }) => {
+		// Convex Auth 2.0 moved the Battle.net accounts into the authBattlenet
+		// component, so a player who signed in before the upgrade comes back as
+		// "new". Their user row is still here: reuse it.
+		const existing = await ctx.db
+			.query("users")
+			.withIndex("by_battlenetId", (q) => q.eq("battlenetId", profile.id))
+			.first();
+		if (existing) return existing._id;
+		return await ctx.db.insert("users", {
 			battlenetId: profile.id,
 			battletag: profile.battletag,
 			name: profile.battletag?.split("#")[0],
-		}),
+		});
+	},
 });
 
 export const onBattlenetSignIn = internalMutation({
-	args: { provider: vBattlenetProvider, userId: v.id("users") },
+	args: { method: vBattlenetMethod, userId: v.id("users") },
 	returns: v.null(),
-	handler: async (ctx, { provider: { profile }, userId }) => {
+	handler: async (ctx, { method: { profile }, userId }) => {
 		const user = await ctx.db.get(userId);
 		// BattleTags can change (paid name change); keep ours current.
 		if (user && profile.battletag && user.battletag !== profile.battletag) {
@@ -47,14 +55,13 @@ export const onBattlenetSignIn = internalMutation({
 /** The desktop app's sign-in (auth:signInWithDesktopCode): the account belongs to an existing user. */
 export const createFromDesktop = internalMutation({
 	args: {
-		provider: v.object({
+		method: v.object({
 			name: v.literal("desktop"),
-			accountId: v.string(),
 			profile: v.object({ userId: v.id("users") }),
 		}),
 	},
 	returns: v.id("users"),
-	handler: async (ctx, { provider: { profile } }) => {
+	handler: async (ctx, { method: { profile } }) => {
 		if (!(await ctx.db.get(profile.userId))) throw new ConvexError("No such user");
 		return profile.userId;
 	},
@@ -62,7 +69,7 @@ export const createFromDesktop = internalMutation({
 
 export const createFromGuest = internalMutation({
 	args: {
-		provider: v.object({ name: v.literal("anonymous"), accountId: v.string(), profile: v.object({}) }),
+		method: v.object({ name: v.literal("anonymous"), profile: v.object({}) }),
 	},
 	returns: v.id("users"),
 	handler: async (ctx) => {

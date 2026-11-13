@@ -6,12 +6,14 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
-import { mergeProfile } from "./profile";
+import { mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
+import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
+import { type AddonRecipes, addonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
@@ -541,6 +543,7 @@ type GuildDataBase = {
 	characters: GuildData["characters"];
 	requests: GuildData["requests"];
 	myRequests: GuildData["myRequests"];
+	recipes: GuildData["recipes"];
 };
 
 export type GuildData = {
@@ -570,6 +573,12 @@ export type GuildData = {
 	 */
 	requests: Record<string, AddonRequest[]>;
 	myRequests: { open: number; stale: number };
+	/**
+	 * Recipe items and guild crafters (addon 0.14.0+; older addons ignore
+	 * it): whether a pattern is worth sending someone, judged in game
+	 * (shared/recipeStatus.ts addonRecipes, Tooltip.lua recipeRows).
+	 */
+	recipes: AddonRecipes;
 };
 
 /** The token's guilds (those its claimed characters are in) and their members. */
@@ -602,6 +611,9 @@ export const guildDataBase = internalQuery({
 		const ownSlugs = new Set(owned.map((c) => `${c.region}:${c.slug}`));
 		const upgradeMembers: UpgradeMember[] = [];
 		const now = Date.now();
+		const recipeCharacters: Parameters<typeof addonRecipes>[1] = [];
+		const allMembers: Doc<"characters">[] = [];
+		const allProfessions: Profession[][] = [];
 		for (const guildId of guildIds) {
 			const guild = await ctx.db.get(guildId);
 			if (!guild) continue;
@@ -610,6 +622,8 @@ export const guildDataBase = internalQuery({
 				.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
 				.collect();
 			const profiles = await Promise.all(members.map((m) => pickProfile(ctx, m)));
+			allMembers.push(...members);
+			allProfessions.push(...profiles.map((p) => p.professions));
 			for (const [i, m] of members.entries()) {
 				if (ownSlugs.has(`${m.region}:${m.slug}`)) continue;
 				const found = await memberForUpgrades(ctx, m, profiles[i], rules, itemCache);
@@ -632,6 +646,20 @@ export const guildDataBase = internalQuery({
 			});
 		}
 		const requests = await addonRequests(ctx, [...guildIds], row.userId);
+		// Recipe items for the professions the guilds have, and who holds one unlearned.
+		const taught = await recipeItemsFor(
+			ctx,
+			allProfessions.flatMap((list) => list.map((p) => p.id)),
+		);
+		const held = await heldUnlearned(
+			ctx,
+			allMembers,
+			new Map(taught.map((t) => [t.itemId, t])),
+			(i) => allProfessions[i],
+		);
+		for (const [i, m] of allMembers.entries()) {
+			recipeCharacters.push({ name: m.name, classId: m.classId, professions: allProfessions[i], holding: held[i] });
+		}
 		// Specs made from players' own stat priorities (specsFor): the addon looks members' specs up in the rules.
 		const builtIn = upgradeRules().specs;
 		const customSpecs: Rules["specs"] = {};
@@ -646,6 +674,7 @@ export const guildDataBase = internalQuery({
 			characters,
 			requests: requests.byItem,
 			myRequests: requests.mine,
+			recipes: addonRecipes(taught, recipeCharacters),
 		};
 	},
 });
@@ -694,6 +723,7 @@ export const guildData = action({
 			characters: base.characters,
 			requests: base.requests,
 			myRequests: base.myRequests,
+			recipes: base.recipes,
 		};
 	},
 });

@@ -207,7 +207,7 @@ mounted in `__root.tsx`):
   from the first render when the user agent says so, and once mounted when only
   the bridge does (app builds before 0.2).
 
-## Guild data in game (requests, reagent and gear-upgrade tooltips)
+## Guild data in game (requests, recipe, reagent and gear-upgrade tooltips)
 
 The other direction: the helper downloads `GET /api/helper/guild-data` every
 15 minutes (and on connect, on "Upload now", and right after any upload the
@@ -231,7 +231,7 @@ your last login or reload.
 - Tooltips end with a Guildie block: a blank line, a gold "Guildie" header
   with the addon's icon, then one indented row per person, in two columns:
   the class-colored name, and what Guildie knows in muted grey. Requests
-  first, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
+  first, then recipe items, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
   so other addons' lines (added at load) come before the block. Reagent
   rows, skipping your own characters, up to 8 (all the site sends):
   "Brenna | might want (Tailoring, Alchemy)", then "+2 more". With "Say
@@ -264,8 +264,63 @@ your last login or reload.
   date with Guildie". About 0.5 KB per character.
 - Guild requests (addon 0.8.0): `requests` and `myRequests`; see "Guild
   requests".
+- Recipe items (addon 0.14.0): `recipes`; see "Recipe items".
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.
+
+## Recipe items
+
+Is a pattern (plans, formula, schematic...) worth sending someone? For each
+guild character with its profession, one of four states, most useful first:
+**can learn it** now, **later** (skill below what it needs), **has one**
+already (in bags or bank, not learned), or **knows it**. The rule is
+`apps/web/convex/shared/recipeStatus.ts` (tested), mirrored in
+`Guildie/Tooltip.lua` `recipeRows` (`tests/recipes_test.lua`).
+
+- **Catalog:** `recipeItems` (`apps/web/convex/recipeItems.ts`), weekly after
+  the recipe catalog: Blizzard's item search for item class 9 (paged by id,
+  the search caps at 1,000; "Book" class tomes skipped), then each item for
+  its skill requirement (`preview_item.requirements.skill`: profession id and
+  level) and what it teaches. Matched to `recipes` by the crafted item
+  (`preview_item.recipe.item`) within the profession, else by name
+  ("Formula: Enchant Bracer - Minor Health" or the item's spell name against
+  the recipe name), with the profession by name when the item gives another
+  id for it (Forever's First Aid manuals: 2942, the catalog: 129).
+- **Filling the gaps** (`apps/web/convex/shared/recipeResearch.ts`):
+  - Rank books (Expert Cookbook, Expert First Aid, Expert Fishing) teach a
+    max skill, read from their text ("allowing a maximum of 225"): known once
+    the character's max skill is there (`rank`).
+  - Items whose recipe Blizzard's catalog lacks (Forever's "Adaptive" plans
+    and patterns, some schematics) say "Teaches you how to craft X": Guildie
+    adds its own `recipes` row for X (negative `recipeId`, `fromItem`), with
+    the crafted item and reagents when the item has them. The addon's recipe
+    reads match it by name like any other; profile syncs count a known recipe
+    of that name as it (`mapProfessions`). When Blizzard adds the real recipe,
+    `recipes.save` drops ours and the next recipe-item sync matches the real one.
+  - What neither Blizzard nor the item says, looked up by hand (`RESEARCHED`,
+    with the source): Carrie's Cookbook teaches Grand Lobster Banquet and
+    Specklefin Feast (`recipeIds`; known with both).
+  - Anything else unmatched is kept without `recipeId` and not shown.
+- **Known recipes and skill:** the merged profile (Blizzard plus newer addon
+  reads), as everywhere else.
+- **Has one:** the one part of a character's bags and bank guildmates see:
+  recipe items for a profession they have that they haven't learned
+  (`heldUnlearned`). Members of the guild only; nothing else in their
+  inventory is shared.
+- **On the site:** the item panel's "Who can learn it" (guild pages), the
+  Crafting page's "Who can learn" tab (`crafting.guildRecipeItems`, search by
+  name, "Only ones someone needs" on by default), and under recipe items on
+  Inventory (across the player's guilds, their own characters included).
+- **In game:** `recipes = { items = { [itemId] = { profession, skill (0:
+  unknown), recipeId, more recipeIds (0.15.0) } }, ranks = { [itemId] = {
+  profession, skill, max skill it unlocks } } (0.15.0; apart, so 0.14.0
+  leaves them out), crafters = { { name, classId, skills = { Tailoring =
+  120 } (-1: unknown), max = { Tailoring = 225 } (0.15.0), known = {
+  recipeIds it teaches }, has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | at 25 (has 5)",
+  "Di | has one already" (up to 8, then "+N more could use it"), then "Known
+  by Ada, Ben, Cat +2". The character you're on is left out (the game's own
+  tooltip says "Already known" or the requirement in red); your other
+  characters are listed. Nothing for recipe items that bind on pickup.
 
 ## Up to date with Guildie
 
@@ -353,9 +408,20 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   knows the recipe (merged professions, so the addon's recipe reads count).
 - **Lifecycle:** open → claimed → done (the requester; the claimant can mark
   it sent first) or cancelled (the requester). The claimant, or the
-  requester, can release a claim (back to open). 10 open per player per
+  requester, can release a claim (back to open). 15 open per player per
   guild, quantity 1-1000, note up to 140 characters.
-- **Stale:** no activity for 7 days shows as stale, with "Still need it?" on
+- **Fixed amount or ongoing:** an item can instead be asked for as ongoing
+  ("send me any you have"): no quantity (stored as 0), nobody claims it,
+  guildmates just send it. It's up for 2 weeks, 1 month or 3 months (no
+  open-ended ones), then the daily cron closes it as expired; so does a
+  requester with no character left in the guild. 20 ongoing per player per
+  guild, apart from the 15. One active item request per item, of either
+  kind: the page offers "Change request" instead, which switches kinds while
+  nobody has claimed it (`requests.update`). The Requests page has a tab
+  each (`?type=ongoing`) with the same Open / Mine / I can help filter;
+  "I can help" on Ongoing is anything in your bags or bank someone wants.
+  The feed says "Todd is collecting Silk Cloth".
+- **Stale:** (fixed amounts) no activity for 7 days shows as stale, with "Still need it?" on
   the Requests page, in the sidebar and in the addon window. 30 days: the
   daily cron (`expire stale requests`) closes it as expired.
 - **Mats for crafts:** sending the reagents is on the requester. The addon
@@ -368,9 +434,11 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   and when bags and bank were last read; nobody else ever sees the counts.
   Claimed requests keep their mats state (the mats may be in the mail).
 - **In game:** `requests` in the guild data, by item id: `{ kind, quantity,
-  name, classId, claimedBy? }`, at most 5 per item and 300 items. The
-  tooltip has a row per request: "Todd | requesting 20, claimed by Miller",
-  "Brenna | wants it crafted (2)". `myRequests` `{ open, stale }` feeds the
+  name, classId, claimedBy? }`, or `{ kind, ongoing = true, name, classId }`
+  (no quantity), ongoing first, at most 5 per item and 300 items. The
+  tooltip has a row per request: "Todd | wants all you have" (ongoing, and
+  then no "might want" row for Todd), "Miller | requesting 20, claimed by
+  Brenna", "Brenna | wants it crafted (2)". `myRequests` `{ open, stale }` feeds the
   window's "Your requests: 2 open (1 stale)". Enchants (no item) aren't on
   tooltips.
 

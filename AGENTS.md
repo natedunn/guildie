@@ -21,7 +21,7 @@ Monorepo (pnpm workspaces):
   docs/auth-environments.md.
 - Convex: plain `query`/`mutation`/`action` with `v` validators. Blizzard API
   calls only in actions (`apps/web/convex/blizzard.ts`, `apps/web/convex/sync.ts`).
-- Auth: `@convex-dev/auth@2.0.0-beta.0` (patched). Users via `getAuthUserId` /
+- Auth: `@convex-dev/auth@2.0.0` (patched). Users via `getAuthUserId` /
   `requireUserId` (apps/web/convex/users.ts). Adapter notes: docs/convex-auth.md.
 - Shared game data (classes, races, API paths per flavor): `apps/web/convex/shared/wow.ts`,
   imported by both sides. Forever is realmless: characters are `{name}-{surname}`.
@@ -64,7 +64,7 @@ Task guides for AI assistants in `.claude/skills/<name>/SKILL.md` (Claude
 Code loads them by itself; with another assistant, point it at the file):
 
 - `convex-in-guildie`: functions, schema changes on a live database, running functions locally vs prod, crons.
-- `auth-and-sign-in`: Convex Auth v2 beta (patched), Battle.net via the gateway, claims, desktop sign-in, guest sign-in.
+- `auth-and-sign-in`: Convex Auth 2.0 (patched), Battle.net via the gateway, claims, desktop sign-in, guest sign-in.
 - `tanstack-start-routes`: file routes, loaders and queries, layouts, search params, SSR and desktop detection, breadcrumbs.
 - `design-system`: the look, tokens, shared components, checking UI with screenshots.
 - `wow-addon`: the Lua addon, SavedVariables, GuildieData.lua, the luajit test harness.

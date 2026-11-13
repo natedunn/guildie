@@ -386,9 +386,15 @@ export default defineSchema({
 		name: v.string(),
 	}).index("by_class_tree", ["classToken", "treeIndex"]),
 
-	/** Forever's recipes and their reagents, from Blizzard's static data (recipes.ts). */
+	/**
+	 * Forever's recipes and their reagents, from Blizzard's static data
+	 * (recipes.ts). Plus Guildie's own entries for recipes a recipe item
+	 * teaches that Blizzard's catalog lacks (`fromItem`: that item; negative
+	 * `recipeId`, shared/recipeResearch.ts), until Blizzard adds them.
+	 */
 	recipes: defineTable({
 		recipeId: v.number(),
+		fromItem: v.optional(v.number()),
 		professionId: v.number(),
 		profession: v.string(),
 		name: v.string(),
@@ -401,6 +407,32 @@ export default defineSchema({
 		.index("by_professionId", ["professionId"])
 		// Omni search (search.ts).
 		.searchIndex("search_name", { searchField: "name" }),
+
+	/**
+	 * Recipe items (patterns, plans, formulas...) and what they teach, from
+	 * Blizzard's static data (recipeItems.ts, weekly after the recipes).
+	 * `recipeId`: the recipe in `recipes` it teaches, unset when we couldn't
+	 * match it; `recipeIds`: all of them, when it teaches several (a
+	 * cookbook). `rank`: for a rank book (Expert Cookbook), the max skill it
+	 * unlocks instead. `skill`: the profession skill it needs to learn.
+	 */
+	recipeItems: defineTable({
+		itemId: v.number(),
+		name: v.string(),
+		/** Blizzard's quality type ("UNCOMMON") and icon URL, so lists need no items lookups. */
+		quality: v.string(),
+		icon: v.optional(v.string()),
+		professionId: v.number(),
+		profession: v.string(),
+		skill: v.optional(v.number()),
+		recipeId: v.optional(v.number()),
+		recipeIds: v.optional(v.array(v.number())),
+		rank: v.optional(v.number()),
+		syncedAt: v.number(),
+	})
+		.index("by_itemId", ["itemId"])
+		.index("by_recipeId", ["recipeId"])
+		.index("by_professionId", ["professionId"]),
 
 	/**
 	 * Forever items we show: equipped gear, crafted items and reagents. Name,
@@ -486,6 +518,8 @@ export default defineSchema({
 		requestKind: v.optional(v.union(v.literal("item"), v.literal("craft"))),
 		itemId: v.optional(v.number()),
 		quantity: v.optional(v.number()),
+		/** An ongoing request ("is collecting Silk Cloth"). */
+		ongoing: v.optional(v.boolean()),
 		other: v.optional(vRequestCharacter),
 	}).index("by_guild", ["guildId", "at"]),
 
@@ -542,7 +576,9 @@ export default defineSchema({
 	 * Each character's bags and last bank read, from the Guildie addon (payload
 	 * version 3). Private: only its own player sees it (Inventory,
 	 * convex/inventory.ts), and it tells them, for their own craft requests,
-	 * whether they have the reagents (convex/requests.ts). Item id → count.
+	 * whether they have the reagents (convex/requests.ts). The one thing
+	 * guildmates see: recipe items held unlearned for a profession the
+	 * character has (recipeItems.ts heldUnlearned). Item id → count.
 	 */
 	inventories: defineTable({
 		userId: v.id("users"),
@@ -571,8 +607,15 @@ export default defineSchema({
 		/** The item wanted, or the crafted item (none for enchants). */
 		itemId: v.optional(v.number()),
 		recipeId: v.optional(v.number()),
+		/** 0 for ongoing requests (no amount). */
 		quantity: v.number(),
 		note: v.optional(v.string()),
+		/**
+		 * Ongoing ("send me any you have"): items only, never claimed, closes
+		 * as expired at `until` (2 weeks to 3 months after it was set).
+		 */
+		ongoing: v.optional(v.boolean()),
+		until: v.optional(v.number()),
 		status: v.union(
 			v.literal("open"),
 			v.literal("claimed"),
@@ -605,7 +648,8 @@ export default defineSchema({
 	})
 		.index("by_guild_status", ["guildId", "status"])
 		.index("by_user_status", ["userId", "status"])
-		.index("by_status_activity", ["status", "lastActivityAt"]),
+		.index("by_status_activity", ["status", "lastActivityAt"])
+		.index("by_status_until", ["status", "until"]),
 
 	/** Cached client-credentials tokens for the Blizzard API. */
 	apiTokens: defineTable({

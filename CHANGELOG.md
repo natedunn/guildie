@@ -17,20 +17,40 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
-- **Guildie, App, Addon:** Add opt-in experimental sync without reloading, with in-game addon settings, an amber square movable in Edit Mode, and automatic capture discovery in the Windows app. Updating the addon requires a full WoW restart.
+- **Guildie, App, Addon:** Experimental sync without reloading (off by default). Enable it in the app and WoW's addon settings to sync through a small amber square, move it in Edit Mode, and let the app find it automatically. Updating the addon requires a full WoW restart.
 
-- **Addon:** Move the experimental sync square in WoW's Edit Mode; export pauses while positioning it and resumes afterward if it was enabled.
-
-- **App, Addon:** Test syncing complete character snapshots without reloading WoW using the small amber pixel square; the opt-in desktop integration reports capture status and keeps normal saved-file sync available.
-
-- **Addon:** Add a warm amber default palette to the live pixel experiment, with matching reader support and a grayscale debugging option.
-
-- **Addon:** Make the experimental pixel export a compact square (32×32 on the tested Windows display) with a draggable edit mode and remembered position; restart WoW once after updating the experiment.
-
-- **Addon:** Add a manually installed experiment for reading character snapshots and live player state through a screen pixel strip; installing it requires a full game restart.
+## 0.3.28
 
 ### Fixes
 
+- **Guildie, Addon:** First Aid manuals now say who can learn them too.
+- **Guildie, Addon:** So do the Expert Cookbook, First Aid and Fishing books, Carrie's Cookbook, and Forever's new plans and patterns that Blizzard's recipe list doesn't have yet (like the "Adaptive" sets).
+
+## 0.3.27
+
+### New
+
+- **Guildie, Addon:** See whether a recipe (pattern, plans, formula...) is worth sending someone: for each guildmate with the profession, whether they already know it, already have one, can learn it now, or need more skill first. It shows on the recipe's tooltip in game, in the item panel, under recipes in your Inventory, and on Crafting's new "Who can learn" tab. Guildmates see only the recipes you're holding for your own professions, nothing else in your bags.
+
+### Improvements
+
+- **Guildie:** Requests stay where they are while you're on the page, so a request you claim no longer jumps to the top of the list. Crafts you can make, then crafts in your professions, now come first.
+
+## 0.3.26
+
+### New
+
+- **Guildie, Addon:** Ask the guild for an item as an ongoing request ("send me any you have") for 2 weeks, 1 month or 3 months, next to the fixed-amount requests. Ongoing requests have their own tab on Requests, where "I can help" shows what's in your bags that someone wants, and lead the item's tooltip in game as "wants all you have".
+
+### Improvements
+
+- **Guildie, App:** Signing out now ends that session right away, on every page and window that used it. Everyone is signed out once by this update; sign in again.
+
+### Fixes
+
+- **Guildie:** Let phone pages scroll behind the browser’s floating controls instead of stopping above an empty bottom area.
+
+- **Guildie:** Members-only pages (Requests, Feed and others) no longer flash "only for members" or redraw the whole page while loading when you're signed in.
 - **Guildie:** Align request feed text, show only inventory-covered requests in “I can help,” and add a searchable inventory character selector with an All characters view.
 
 ## 0.3.25

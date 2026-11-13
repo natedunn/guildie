@@ -12,6 +12,8 @@ export type GuildData = {
 	upgrades?: { members?: unknown[] };
 	/** Your own characters as Guildie shows them, for the addon's "not on Guildie yet" check (addon 0.6.0). */
 	characters?: Record<string, unknown>;
+	/** Recipe items and guild crafters, for "who can learn this" (addon 0.14.0). */
+	recipes?: { items?: Record<string, unknown>; crafters?: unknown[] };
 };
 export type Pairing = { code: string; pollSecret: string; expiresInSeconds: number; connectUrl: string };
 export type PairingResult =

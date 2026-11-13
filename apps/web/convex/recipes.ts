@@ -7,6 +7,7 @@ import { appToken, blizzardGet } from "./blizzard";
 // from Blizzard's static data (the same in every region, so read from US).
 // Synced weekly (crons.ts); about one request per recipe, in staggered
 // batches. Characters' known recipes come with their profiles (sync.ts).
+// The items that teach them (patterns, plans...): recipeItems.ts.
 
 const REFRESH_MS = 7 * 24 * 3600_000;
 const BATCH = 25;
@@ -71,6 +72,8 @@ export const syncCatalog = internalAction({
 		// reagents, and the talent tree layouts (the other weekly static data).
 		const afterBatches = Math.ceil(due.length / BATCH) * BATCH_STAGGER_MS + 60_000;
 		await ctx.scheduler.runAfter(afterBatches, internal.items.syncRecipeItems, {});
+		// Patterns, plans and formulas, matched to the recipes just saved.
+		await ctx.scheduler.runAfter(afterBatches, internal.recipeItems.syncCatalog, {});
 		await ctx.scheduler.runAfter(0, internal.talents.syncLayouts, {});
 		return { queued: due.length };
 	},
@@ -122,6 +125,11 @@ export const save = internalMutation({
 	},
 	handler: async (ctx, { recipes }) => {
 		const now = Date.now();
+		// Guildie's own entries (negative ids, recipeItems.ts): a few dozen.
+		const own = await ctx.db
+			.query("recipes")
+			.withIndex("by_recipeId", (q) => q.lt("recipeId", 0))
+			.collect();
 		for (const r of recipes) {
 			const existing = await ctx.db
 				.query("recipes")
@@ -129,6 +137,13 @@ export const save = internalMutation({
 				.unique();
 			if (existing) await ctx.db.replace(existing._id, { ...r, syncedAt: now });
 			else await ctx.db.insert("recipes", { ...r, syncedAt: now });
+			// Blizzard has it now: drop Guildie's own entry for it (recipeItems.ts
+			// matches the real one on its next sync).
+			for (const o of own) {
+				if (o.professionId === r.professionId && o.name.toLowerCase() === r.name.toLowerCase()) {
+					await ctx.db.delete(o._id);
+				}
+			}
 		}
 	},
 });

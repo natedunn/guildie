@@ -157,6 +157,13 @@ html:not([data-desktop="true"]) {
 	}
 }
 
+/* Browser chrome and exposed safe areas should continue the page's fill.
+   The Windows shell keeps its own chrome / Mica background. */
+html:not([data-desktop="true"]):not(:has(.landing-shell)),
+html:not([data-desktop="true"]):not(:has(.landing-shell)) body {
+	background-color: var(--background);
+}
+
 /* Windows draws the app in Segoe; the site keeps Inter elsewhere. */
 html[data-desktop="true"] {
 	--font-sans: "Segoe UI Variable Text", "Segoe UI", "Inter Variable", system-ui, sans-serif;
@@ -938,5 +945,39 @@ select:not([multiple]) {
 	to {
 		opacity: 1;
 		translate: 0 0;
+	}
+}
+
+/* Phone browsers need the document to scroll so Safari can carry the page
+   behind its floating controls. A viewport-height inner scroller clips that
+   content before it reaches the browser's toolbar region. */
+@media (width < 48rem) {
+	html:not([data-desktop="true"]),
+	html:not([data-desktop="true"]) body {
+		height: auto;
+		overflow: visible;
+		overscroll-behavior: auto;
+	}
+	html:not([data-desktop="true"]) {
+		scroll-padding-top: calc(env(safe-area-inset-top) + var(--pane-inset));
+	}
+	html:not([data-desktop="true"]) :is(.app-shell, .onboarding-shell) {
+		height: auto;
+		min-height: 100svh;
+	}
+	html:not([data-desktop="true"]) :is(.app-content, .onboarding-shell > main) {
+		overflow: visible;
+		overscroll-behavior: auto;
+	}
+	html:not([data-desktop="true"]) .app-topbar {
+		position: fixed;
+		top: 0;
+		height: calc(3rem + env(safe-area-inset-top));
+		padding-top: env(safe-area-inset-top);
+		padding-left: max(0.5rem, env(safe-area-inset-left));
+		padding-right: max(0.5rem, env(safe-area-inset-right));
+	}
+	html:not([data-desktop="true"]) .table-sticky thead th {
+		top: calc(env(safe-area-inset-top) + var(--pane-inset));
 	}
 }

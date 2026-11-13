@@ -34,6 +34,7 @@ import type * as proficiencies from "../proficiencies.js";
 import type * as profile from "../profile.js";
 import type * as quests from "../quests.js";
 import type * as reagentSuggestions from "../reagentSuggestions.js";
+import type * as recipeItems from "../recipeItems.js";
 import type * as recipes from "../recipes.js";
 import type * as requests from "../requests.js";
 import type * as sample from "../sample.js";
@@ -92,6 +93,7 @@ declare const fullApi: ApiFromModules<{
   profile: typeof profile;
   quests: typeof quests;
   reagentSuggestions: typeof reagentSuggestions;
+  recipeItems: typeof recipeItems;
   recipes: typeof recipes;
   requests: typeof requests;
   sample: typeof sample;

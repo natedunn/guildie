@@ -11,6 +11,7 @@ import { untradeable } from "./shared/itemInfo";
 import {
 	ACTIVE,
 	type Action,
+	canChange,
 	canHelpFromInventory,
 	check,
 	EXPIRE_MS,
@@ -18,8 +19,10 @@ import {
 	matsCheck,
 	matsState,
 	nextStatus,
+	ongoingUntil,
 	rosterCharacters,
 	shouldExpire,
+	sumInventory,
 	validateNew,
 } from "./shared/requests";
 
@@ -95,6 +98,13 @@ async function knownRecipes(ctx: Ctx, characters: Doc<"characters">[]) {
 	return out;
 }
 
+/** Profession ids any of these characters has. */
+async function professionIds(ctx: Ctx, characters: Doc<"characters">[]) {
+	const out = new Set<number>();
+	for (const c of characters) for (const p of (await pickProfile(ctx, c)).professions) out.add(p.id);
+	return out;
+}
+
 const brief = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
 	slug: c.slug,
 	name: c.name,
@@ -109,7 +119,11 @@ async function scansOf(ctx: Ctx, userId: Id<"users">) {
 		.collect();
 }
 
+/** Ongoing requests past their end date count as closed before the daily cron gets to them. */
+const live = (r: Doc<"requests">, now: number) => !(r.ongoing && r.until !== undefined && r.until <= now);
+
 export async function activeIn(ctx: Ctx, guildId: Id<"guilds">) {
+	const now = Date.now();
 	const lists = await Promise.all(
 		ACTIVE.map((status) =>
 			ctx.db
@@ -118,10 +132,11 @@ export async function activeIn(ctx: Ctx, guildId: Id<"guilds">) {
 				.collect(),
 		),
 	);
-	return lists.flat();
+	return lists.flat().filter((r) => live(r, now));
 }
 
 async function activeOf(ctx: Ctx, userId: Id<"users">) {
+	const now = Date.now();
 	const lists = await Promise.all(
 		ACTIVE.map((status) =>
 			ctx.db
@@ -130,7 +145,7 @@ async function activeOf(ctx: Ctx, userId: Id<"users">) {
 				.collect(),
 		),
 	);
-	return lists.flat();
+	return lists.flat().filter((r) => live(r, now));
 }
 
 type ItemCache = Map<number, Doc<"items"> | null>;
@@ -143,7 +158,7 @@ async function cachedItem(ctx: Ctx, items: ItemCache, itemId: number) {
 async function view(
 	ctx: QueryCtx,
 	r: Doc<"requests">,
-	viewer: { userId: Id<"users">; known: Set<number> },
+	viewer: { userId: Id<"users">; known: Set<number>; professions?: Set<number> },
 	items: ItemCache,
 	scans: () => Promise<Doc<"inventories">[]>,
 	now: number,
@@ -165,11 +180,29 @@ async function view(
 		mine && r.kind === "craft" && recipe && r.status === "open"
 			? matsCheck(recipe.reagents, r.quantity, await scans())
 			: undefined;
+	const ongoing = !!r.ongoing;
+	// Crafts the viewer knows, then crafts in a profession they have: first in the list.
+	const fit =
+		r.kind === "craft" && !mine && recipe
+			? viewer.known.has(recipe.recipeId)
+				? 2
+				: viewer.professions?.has(recipe.professionId)
+					? 1
+					: 0
+			: 0;
+	// Ongoing, someone else's: how many the viewer has (their own scans; only they see it).
+	const have =
+		ongoing && active && !mine && r.itemId !== undefined
+			? (sumInventory(await scans()).counts.get(r.itemId) ?? 0)
+			: undefined;
 	return {
 		_id: r._id,
 		kind: r.kind,
 		status: r.status,
 		quantity: r.quantity,
+		ongoing,
+		until: r.until,
+		have,
 		note: r.note,
 		item: item
 			? { itemId: item.itemId, name: item.name, quality: item.quality, icon: item.icon, tooltip: item.tooltip }
@@ -199,10 +232,12 @@ async function view(
 		lastActivityAt: r.lastActivityAt,
 		closedAt: r.closedAt,
 		stale: isStale(r, now),
+		fit,
 		canHelp: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
 		canClaim:
 			active &&
 			r.status === "open" &&
+			!ongoing &&
 			!mine &&
 			(r.kind === "item" || (r.recipeId !== undefined && viewer.known.has(r.recipeId))),
 	};
@@ -221,6 +256,7 @@ export const list = query({
 		if (!member) return { member: false as const };
 		const now = Date.now();
 		const known = new Set([...(await knownRecipes(ctx, member.characters)).values()].flatMap((s) => [...s]));
+		const professions = await professionIds(ctx, member.characters);
 		const rows = await activeIn(ctx, guild._id);
 		for (const status of ["done", "cancelled", "expired"] as const) {
 			const closed = await ctx.db
@@ -234,8 +270,9 @@ export const list = query({
 		let scans: Doc<"inventories">[] | undefined;
 		const lazyScans = async () => (scans ??= await scansOf(ctx, member.userId));
 		const out = [];
-		for (const r of rows) out.push(await view(ctx, r, { userId: member.userId, known }, items, lazyScans, now));
-		out.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+		for (const r of rows)
+			out.push(await view(ctx, r, { userId: member.userId, known, professions }, items, lazyScans, now));
+		out.sort((a, b) => b.fit - a.fit || b.lastActivityAt - a.lastActivityAt);
 		return {
 			member: true as const,
 			characters: member.characters.map(brief),
@@ -306,7 +343,8 @@ export const sidebar = query({
 			const known = new Set([...(await knownRecipes(ctx, characters)).values()].flatMap((s) => [...s]));
 			let canHelp = 0;
 			for (const r of await activeIn(ctx, guildId)) {
-				if (r.status !== "open" || r.userId === userId) continue;
+				// Fixed amounts only: any Silk in your bags would light this up for weeks.
+				if (r.status !== "open" || r.userId === userId || r.ongoing) continue;
 				const recipe = r.recipeId !== undefined ? await recipeRow(ctx, r.recipeId) : null;
 				if (canHelpFromInventory(r, false, known, scans, recipe?.reagents)) canHelp++;
 			}
@@ -334,6 +372,20 @@ export const matsPreview = query({
 	},
 });
 
+/** The viewer's own active item request, as the request form needs it to change it. */
+function myRequest(r: Doc<"requests"> | undefined) {
+	return r
+		? {
+				requestId: r._id,
+				status: r.status,
+				ongoing: !!r.ongoing,
+				quantity: r.quantity,
+				until: r.until,
+				note: r.note,
+			}
+		: undefined;
+}
+
 /** The character to act as: the one asked for (if it's theirs), else the first that fits. */
 function pickCharacter(
 	characters: Doc<"characters">[],
@@ -359,16 +411,28 @@ export const create = mutation({
 		character: v.optional(v.string()),
 		/** Crafts: "I have the mats". */
 		declared: v.optional(v.boolean()),
+		/** Items: "send me any you have", for `days` (14, 30 or 90). `quantity` is ignored. */
+		ongoing: v.optional(v.boolean()),
+		days: v.optional(v.number()),
 	},
 	handler: async (ctx, args) => {
 		const guild = await guildByKey(ctx, args.region, args.slug);
 		if (!guild) throw new ConvexError("No such guild");
 		const member = await requireMember(ctx, guild);
 		const character = pickCharacter(member.characters, args.character)!;
+		const ongoing = !!args.ongoing;
+		if (ongoing && args.kind !== "item") throw new ConvexError("Only items can be ongoing requests.");
+		const now = Date.now();
 		const active = (await activeOf(ctx, member.userId)).filter((r) => r.guildId === guild._id);
-		let fields: { quantity: number; note?: string };
+		let fields: { quantity: number; note?: string; until?: number };
 		try {
-			fields = validateNew({ quantity: args.quantity, note: args.note, openCount: active.length });
+			fields = validateNew({
+				ongoing,
+				quantity: args.quantity,
+				note: args.note,
+				openCount: active.filter((r) => !!r.ongoing === ongoing).length,
+			});
+			if (ongoing) fields.until = ongoingUntil(args.days ?? 0, now);
 		} catch (error) {
 			throw new ConvexError((error as Error).message);
 		}
@@ -406,10 +470,12 @@ export const create = mutation({
 			const declared = !!args.declared;
 			mats = { state: matsState(checked.covered, declared), declared, checkedAt: checked.checkedAt };
 		}
+		// One item request per item, fixed or ongoing (change that one instead).
+		if (args.kind === "item" && active.some((r) => r.kind === "item" && r.itemId === itemId))
+			throw new ConvexError("You already have a request for this item. Change that one instead.");
 		if (active.some((r) => r.kind === args.kind && r.itemId === itemId && r.recipeId === recipeId))
 			throw new ConvexError("You already have an open request for this.");
 
-		const now = Date.now();
 		const request = {
 			guildId: guild._id,
 			userId: member.userId,
@@ -418,6 +484,7 @@ export const create = mutation({
 			itemId,
 			recipeId,
 			...fields,
+			...(ongoing ? { ongoing: true } : {}),
 			status: "open" as const,
 			mats,
 			createdAt: now,
@@ -501,9 +568,60 @@ export const setDeclared = mutation({
 	},
 });
 
+/**
+ * The requester changes their own item request while nobody has claimed it:
+ * fixed amount ↔ ongoing, the quantity, how long (from now), the note.
+ */
+export const update = mutation({
+	args: {
+		requestId: v.id("requests"),
+		ongoing: v.boolean(),
+		quantity: v.optional(v.number()),
+		/** Ongoing: 14, 30 or 90 days from now; left out keeps the end date it has. */
+		days: v.optional(v.number()),
+		note: v.optional(v.string()),
+	},
+	handler: async (ctx, args) => {
+		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
+		if (!userId) throw new ConvexError("Not signed in");
+		const r = await ctx.db.get(args.requestId);
+		if (!r || !live(r, Date.now())) throw new ConvexError("That request is gone.");
+		const verdict = canChange(ruleView(r), userId);
+		if (!verdict.ok) throw new ConvexError(verdict.error);
+		const now = Date.now();
+		// Switching kinds counts against the other kind's cap; staying put doesn't.
+		const others = (await activeOf(ctx, userId)).filter(
+			(x) => x.guildId === r.guildId && x._id !== r._id && !!x.ongoing === args.ongoing,
+		);
+		let fields: { quantity: number; note?: string };
+		let until: number | undefined;
+		try {
+			fields = validateNew({
+				ongoing: args.ongoing,
+				quantity: args.quantity ?? r.quantity,
+				note: args.note,
+				openCount: others.length,
+			});
+			if (args.ongoing)
+				until =
+					args.days !== undefined || !r.ongoing || r.until === undefined ? ongoingUntil(args.days ?? 0, now) : r.until;
+		} catch (error) {
+			throw new ConvexError((error as Error).message);
+		}
+		await ctx.db.patch(r._id, {
+			...fields,
+			ongoing: args.ongoing || undefined,
+			until,
+			lastActivityAt: now,
+		});
+	},
+});
+
 const ruleView = (r: Doc<"requests">) => ({
 	kind: r.kind,
 	status: r.status,
+	ongoing: r.ongoing,
+	until: r.until,
 	requester: r.userId as string,
 	claim: r.claim && { userId: r.claim.userId as string, sentAt: r.claim.sentAt },
 	lastActivityAt: r.lastActivityAt,
@@ -534,7 +652,11 @@ export async function refreshMats(ctx: MutationCtx, userId: Id<"users">) {
 	}
 }
 
-/** Daily: requests with no activity for 30 days close as expired. */
+/**
+ * Daily: fixed-amount requests with no activity for 30 days close as
+ * expired; so do ongoing ones past their end date, and ongoing ones whose
+ * requester has no character left in the guild.
+ */
 export const expireStale = internalMutation({
 	args: {},
 	handler: async (ctx) => {
@@ -545,6 +667,7 @@ export const expireStale = internalMutation({
 			const rows = await ctx.db
 				.query("requests")
 				.withIndex("by_status_activity", (q) => q.eq("status", status).lt("lastActivityAt", now - EXPIRE_MS))
+				.filter((q) => q.neq(q.field("ongoing"), true))
 				.take(BATCH);
 			for (const r of rows) {
 				if (!shouldExpire(r, now)) continue;
@@ -552,7 +675,41 @@ export const expireStale = internalMutation({
 				closed++;
 			}
 		}
+		// Ongoing requests are always "open" and always have an end date.
+		const ended = await ctx.db
+			.query("requests")
+			.withIndex("by_status_until", (q) => q.eq("status", "open").gte("until", 0).lt("until", now))
+			.take(BATCH);
+		for (const r of ended) {
+			await ctx.db.patch(r._id, { status: "expired", closedAt: now });
+			closed++;
+		}
 		if (closed >= BATCH) await ctx.scheduler.runAfter(1000, internal.requests.expireStale, {});
+		else await ctx.scheduler.runAfter(0, internal.requests.closeOngoingOfLeavers, {});
+		return { closed };
+	},
+});
+
+/** Ongoing requests whose requester has no character left in that guild close as expired. */
+export const closeOngoingOfLeavers = internalMutation({
+	args: { cursor: v.optional(v.union(v.string(), v.null())) },
+	handler: async (ctx, { cursor }) => {
+		const now = Date.now();
+		const page = await ctx.db
+			.query("requests")
+			.withIndex("by_status_until", (q) => q.eq("status", "open").gte("until", now))
+			.paginate({ cursor: cursor ?? null, numItems: 200 });
+		const member = new Map<string, boolean>();
+		let closed = 0;
+		for (const r of page.page) {
+			const key = `${r.userId}:${r.guildId}`;
+			if (!member.has(key)) member.set(key, (await charactersIn(ctx, r.userId, r.guildId)).length > 0);
+			if (member.get(key)) continue;
+			await ctx.db.patch(r._id, { status: "expired", closedAt: now });
+			closed++;
+		}
+		if (!page.isDone)
+			await ctx.scheduler.runAfter(1000, internal.requests.closeOngoingOfLeavers, { cursor: page.continueCursor });
 		return { closed };
 	},
 });
@@ -561,7 +718,10 @@ export const expireStale = internalMutation({
 
 export type AddonRequest = {
 	kind: "item" | "craft";
-	quantity: number;
+	/** Left out for ongoing requests (older addons then show "requesting 1"). */
+	quantity?: number;
+	/** Ongoing (addons since ongoing requests; older ones ignore it): "wants all you have", and no "might want" row for them. */
+	ongoing?: true;
 	name: string;
 	classId: number;
 	claimedBy?: { name: string; classId: number };
@@ -580,7 +740,8 @@ const ADDON_ITEMS = 300;
 export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], userId: Id<"users">) {
 	const now = Date.now();
 	const rows = (await Promise.all(guildIds.map((id) => activeIn(ctx, id)))).flat();
-	rows.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+	// Ongoing first (they lead each tooltip), then newest activity.
+	rows.sort((a, b) => Number(!!b.ongoing) - Number(!!a.ongoing) || b.lastActivityAt - a.lastActivityAt);
 	const byItem: Record<string, AddonRequest[]> = {};
 	let items = 0;
 	for (const r of rows) {
@@ -594,7 +755,7 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 		if (byItem[key].length >= ADDON_PER_ITEM) continue;
 		byItem[key].push({
 			kind: r.kind,
-			quantity: r.quantity,
+			...(r.ongoing ? { ongoing: true as const } : { quantity: r.quantity }),
 			name: r.character.name,
 			classId: r.character.classId,
 			...(r.claim ? { claimedBy: { name: r.claim.character.name, classId: r.claim.character.classId } } : {}),
@@ -633,6 +794,12 @@ export const search = query({
 			if (made.length) recipesByItem.set(item.itemId, made);
 		}
 		const mine = new Set(member.characters.map((c) => c.slug));
+		// The viewer's own item requests here, so the page offers "Change request" (one per item).
+		const myItemRequests = new Map(
+			(await activeOf(ctx, member.userId))
+				.filter((r) => r.guildId === guild._id && r.kind === "item" && r.itemId !== undefined)
+				.map((r) => [r.itemId as number, r]),
+		);
 		let known = new Map<Id<"characters">, Set<number>>();
 		let roster: Doc<"characters">[] = [];
 		if (recipesByItem.size) {
@@ -661,6 +828,7 @@ export const search = query({
 				kind: item.kind,
 				craft,
 				untradeable: untradeable(item.tooltip),
+				mine: myRequest(myItemRequests.get(item.itemId)),
 			};
 		});
 	},

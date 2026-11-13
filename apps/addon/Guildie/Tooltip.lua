@@ -1,6 +1,8 @@
 -- Adds a Guildie block to item tooltips: guild requests for this item ("Todd
--- requesting 20"), guildmates whose known recipes use it (reagents), and
--- guildmates it might be a gear upgrade for (Upgrades.lua).
+-- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
+-- whose known recipes use it (reagents), who could learn it (recipe items:
+-- patterns, plans, formulas), and guildmates it might be a gear upgrade
+-- for (Upgrades.lua).
 -- Suggestions, not certainties: knowing a recipe doesn't mean they're still
 -- making it. Data comes from GuildieData.lua, which the helper downloads.
 
@@ -33,13 +35,14 @@ end
 
 --- One row per guildmate whose known recipes use it, with their professions
 --- merged: { left = "Brenna", right = "might want (Tailoring)" }, then
---- "+2 more" past MAX_NAMES people.
-local function reagentRows(itemID)
+--- "+2 more" past MAX_NAMES people. `skip`: names already on a request row
+--- (someone who wants all of it doesn't also "might want" it).
+local function reagentRows(itemID, skip)
     local entry = GuildieData and GuildieData.reagents and GuildieData.reagents[itemID]
     if not entry then return {} end
     local rows, byName, extra = {}, {}, 0
     for _, user in ipairs(entry.users or {}) do
-        if not isMine(user.name) then
+        if not isMine(user.name) and not (skip and skip[user.name]) then
             local row = byName[user.name]
             if row then
                 table.insert(row.professions, user.profession)
@@ -62,17 +65,126 @@ local function reagentRows(itemID)
 end
 ns.reagentRows = reagentRows
 
+--- A list as a set, cached per list (GuildieData is replaced only on /reload).
+local sets = setmetatable({}, { __mode = "k" })
+local function asSet(list)
+    if type(list) ~= "table" then return {} end
+    local set = sets[list]
+    if not set then
+        set = {}
+        for _, v in ipairs(list) do set[v] = true end
+        sets[list] = set
+    end
+    return set
+end
+
+-- How many names a recipe row lists before "+N".
+local MAX_KNOWN = 3
+
+--- Is this recipe item worth sending someone? (GuildieData.recipes, addon
+--- 0.14.0; the same rule as apps/web/convex/shared/recipeStatus.ts.) For
+--- each guild character with the profession: can learn it now, later
+--- (skill too low), already has one unlearned, or knows it. Rows: one per
+--- character who could use it ("Brenna | can learn it", "Miller | at 125
+--- (has 90)", "Todd | has one already"), then "Known by Lich, Isai +2".
+--- Leaves out the character you're on: the game's own tooltip says.
+--- 0.15.0: a cookbook teaches several recipes (ids 3..n: knows it with all
+--- of them), and rank books (`ranks`: { profession, skill, max skill it
+--- unlocks }) count as known once their max skill is there.
+local function recipeRows(itemID)
+    local data = GuildieData and type(GuildieData.recipes) == "table" and GuildieData.recipes
+    local item = data and type(data.items) == "table" and data.items[itemID]
+    local rank
+    if type(item) ~= "table" then
+        item = data and type(data.ranks) == "table" and data.ranks[itemID]
+        if type(item) ~= "table" then return {} end
+        rank = item[3]
+    end
+    local profession, need = item[1], item[2] or 0
+    local function knows(c)
+        if rank then
+            local max = type(c.max) == "table" and c.max[profession] or nil
+            return type(max) == "number" and max >= rank
+        end
+        local known = asSet(c.known)
+        for i = 3, #item do
+            if not known[item[i]] then return false end
+        end
+        return #item >= 3
+    end
+    local groups = { now = {}, later = {}, has = {}, knows = {} }
+    local me = UnitName and UnitName("player")
+    for _, c in ipairs(type(data.crafters) == "table" and data.crafters or {}) do
+        local skill = type(c.skills) == "table" and c.skills[profession]
+        if skill and c.name ~= me then
+            local state
+            if knows(c) then
+                state = "knows"
+            elseif asSet(c.has)[itemID] then
+                state = "has"
+            elseif skill >= 0 and need > 0 and skill < need then
+                state = "later"
+            else
+                state = "now"
+            end
+            table.insert(groups[state], { name = c.name, classId = c.classId, skill = skill })
+        end
+    end
+    -- Closest to learning it first.
+    for _, list in pairs(groups) do
+        table.sort(list, function(a, b)
+            if a.skill ~= b.skill then return a.skill > b.skill end
+            return a.name < b.name
+        end)
+    end
+    local rows, extra = {}, 0
+    local function add(list, right)
+        for _, c in ipairs(list) do
+            if #rows < MAX_NAMES then
+                table.insert(rows, { left = classColored(c.name, c.classId), right = right(c) })
+            else
+                extra = extra + 1
+            end
+        end
+    end
+    add(groups.now, function() return "can learn it" end)
+    add(groups.later, function(c)
+        if c.skill >= 0 then return string.format("at %d (has %d)", need, c.skill) end
+        return "skill too low"
+    end)
+    add(groups.has, function() return "has one already" end)
+    if extra > 0 then table.insert(rows, { left = string.format("+%d more could use it", extra) }) end
+    local known = groups.knows
+    if #known > 0 then
+        local names = {}
+        for i = 1, math.min(#known, MAX_KNOWN) do
+            table.insert(names, classColored(known[i].name, known[i].classId))
+        end
+        local text = "Known by " .. table.concat(names, ", ")
+        if #known > MAX_KNOWN then text = text .. string.format(" +%d", #known - MAX_KNOWN) end
+        table.insert(rows, { left = text })
+    end
+    if #rows == 0 then table.insert(rows, { left = "No guildmates have " .. tostring(profession) }) end
+    return rows
+end
+ns.recipeRows = recipeRows
+
 --- One two-column row per open request for this item (GuildieData.requests,
 --- addon 0.8.0): { left = "Todd", right = "requesting 20, claimed by Miller" }.
+--- Ongoing requests (no quantity, never claimed) come first: "Todd
+--- wants all you have". Also returns the names with an ongoing request.
 local function requestRows(itemID)
     local list = GuildieData and type(GuildieData.requests) == "table" and GuildieData.requests[itemID]
-    if type(list) ~= "table" then return {} end
-    local rows = {}
+    if type(list) ~= "table" then return {}, {} end
+    local rows, later, ongoing = {}, {}, {}
     for _, r in ipairs(list) do
         if type(r) == "table" and r.name then
             local mine = isMine(r.name)
             local right
-            if r.kind == "craft" then
+            if r.ongoing then
+                right = mine and "collecting" or "wants all you have"
+                ongoing[r.name] = true
+            elseif r.kind == "craft" then
                 right = mine and "want it crafted" or "wants it crafted"
                 if (r.quantity or 1) > 1 then right = right .. string.format(" (%d)", r.quantity) end
             else
@@ -81,10 +193,12 @@ local function requestRows(itemID)
             if type(r.claimedBy) == "table" and r.claimedBy.name then
                 right = right .. ", claimed by " .. classColored(r.claimedBy.name, r.claimedBy.classId)
             end
-            table.insert(rows, { left = mine and "You" or classColored(r.name, r.classId), right = right })
+            local row = { left = mine and "You" or classColored(r.name, r.classId), right = right }
+            table.insert(r.ongoing and rows or later, row)
         end
     end
-    return rows
+    for _, row in ipairs(later) do table.insert(rows, row) end
+    return rows, ongoing
 end
 ns.requestRows = requestRows
 
@@ -113,12 +227,13 @@ end
 
 --- Everything Guildie has to say about this item, as rows (no header).
 local function rowsFor(tooltip, itemID, data)
-    local rows = requestRows(itemID)
+    local rows, ongoing = requestRows(itemID)
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
     local binding = ns.upgrades and ns.upgrades.binding(ns.upgrades.tooltipLines(tooltip, data))
     local bound = binding ~= nil
     if not bound then
-        for _, row in ipairs(reagentRows(itemID)) do table.insert(rows, row) end
+        for _, row in ipairs(recipeRows(itemID)) do table.insert(rows, row) end
+        for _, row in ipairs(reagentRows(itemID, ongoing)) do table.insert(rows, row) end
     end
     local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)
     if ok and upgrades then

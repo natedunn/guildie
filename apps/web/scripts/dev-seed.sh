@@ -2,7 +2,7 @@
 # Run by scripts/dev.sh once the local backend is up. A new backend gets its
 # settings and guild data from cloud dev (scripts/deployments.sh) when this
 # machine's Convex login can read it (the maintainer). Otherwise (contributors,
-# forks, GUILDIE_SAMPLE=1): local signing keys and the sample guild
+# forks, GUILDIE_SAMPLE=1): local settings and the sample guild
 # (fixtures/sample). Decided once per backend. Every run sets SITE_URL to this
 # checkout's URL, the one origin sign-in may return to. Until the settings are
 # in, Convex holds the first push and retries it. See docs/local-dev.md.
@@ -41,9 +41,8 @@ else
 fi
 
 if [ "$data_from" = sample ]; then
-	# Signing keys, guest sign-in and placeholder Battle.net keys, generated
-	# locally (scripts/dev-env.mjs), then the sample guild. Your own Blizzard
-	# keys, once set, are kept.
+	# SITE_URL and placeholder Battle.net keys (scripts/dev-env.mjs), then
+	# the sample guild. Your own Blizzard keys, once set, are kept.
 	node scripts/dev-env.mjs "$url"
 	marker=.convex/local/sample-seeded
 	if [ ! -f "$marker" ] && [ ! -f .convex/local/fake-guild-seeded ]; then
@@ -53,9 +52,9 @@ if [ "$data_from" = sample ]; then
 fi
 
 # `env get` rather than `env list`: the CLI lists names only when it detects an agent.
-# Keyed on the gateway secret, not the signing keys: a backend made before
-# cloud dev existed has local placeholder keys but no gateway settings, and
-# needs cloud dev's (overwriting the placeholders) for sign-in to work.
+# Keyed on the gateway secret: a backend made before cloud dev existed has
+# local placeholder settings but no gateway ones, and needs cloud dev's
+# (overwriting the placeholders) for sign-in to work.
 if [ -z "$(npx convex env get AUTH_GATEWAY_SECRET 2>/dev/null)" ]; then
 	npx convex env list --include-values --deployment "$cloud_dev" | grep -vE '^(SITE_URL|VITE_CONVEX_URL|VITE_CONVEX_SITE_URL)=' > "$dir/env"
 	npx convex env set --force --from-file "$dir/env" > /dev/null

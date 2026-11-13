@@ -36,8 +36,9 @@ The branch name becomes one DNS label: lowercased, anything outside
   own address into the OAuth `state`, and the dev gateway accepts any
   `*.convex.site`.
 - **New Convex previews start from the preview defaults**
-  (`npx convex env default list --type preview`): cloud dev's settings plus a
-  signing key pair just for previews, written by `apps/web/scripts/preview-defaults.sh`.
+  (`npx convex env default list --type preview`): cloud dev's settings, written by
+  `apps/web/scripts/preview-defaults.sh`. (Deployments sign their own session
+  tokens, so there are no signing keys to copy.)
 - **Previews start empty.** Add a guild in the preview and it syncs from
   Blizzard; the crons keep it current.
 - **Cleanup.** When a pull request closes or a branch is deleted,

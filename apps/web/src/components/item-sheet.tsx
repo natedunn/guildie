@@ -9,6 +9,7 @@ import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-ro
 import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
+import { LearnerList } from "@/components/recipe-learners";
 import { RequestButton, RequestRow } from "@/components/requests";
 import { buttonVariants } from "@/components/ui/button";
 import { UpgradeWhy } from "@/components/upgrade-why";
@@ -17,8 +18,9 @@ import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
 // The item panel: click any item and it slides in from the right over the
 // page you're on (`?item=<id>`, so Back closes it). What the item is, who in
-// the guild can make it, who it might be an upgrade for, and what it's used
-// for, and the guild's requests for it (members); Wowhead is one click on.
+// the guild can make it, who it might be an upgrade for, who could learn it
+// (recipe items), and what it's used for, and the guild's requests for it
+// (members); Wowhead is one click on.
 
 /** The guild the page is about, so the panel can list its crafters. */
 function useGuildContext() {
@@ -73,6 +75,10 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 		enabled: !!where,
 	});
 	const member = where && requests ? { guild: where, characters: requests.characters } : undefined;
+	// The viewer's own item request for it (one per item): the button changes that one.
+	const mine = requests?.requests.find(
+		(r) => r.mine && r.kind === "item" && (r.status === "open" || r.status === "claimed"),
+	);
 	return (
 		<>
 			<div className="flex flex-none items-start gap-3 border-b border-border p-4">
@@ -101,6 +107,34 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					</div>
 				)}
 
+				{data?.learn && data.guild && (
+					<Section title="Who can learn it">
+						{data.learn.who.length === 0 ? (
+							<p className="text-[13px] text-muted-foreground">
+								Nobody in {data.guild.name} has {data.learn.profession}.
+							</p>
+						) : (
+							<LearnerList
+								who={data.learn.who.map((w) => ({
+									...w,
+									mine: member?.characters.some((c) => c.slug === w.slug),
+								}))}
+								region={data.guild.region}
+								profession={data.learn.profession}
+								need={data.learn.skill}
+							/>
+						)}
+						<p className="text-xs text-muted-foreground">
+							Teaches {data.learn.teaches ?? "a recipe"}
+							{data.learn.skill ? ` from ${data.learn.profession} ${data.learn.skill}` : ""}. From what Guildie last
+							read of their professions{member ? " and bags" : ""}.
+							{data.learn.ownEntry
+								? " Blizzard's recipe list doesn't have this one yet: Guildie goes by the recipe's name until it does."
+								: null}
+						</p>
+					</Section>
+				)}
+
 				{member && (
 					<Section title="Requests">
 						{requests && requests.requests.length > 0 && (
@@ -119,6 +153,16 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 								<RequestButton
 									guild={member.guild}
 									characters={member.characters}
+									existing={
+										mine && {
+											requestId: mine._id,
+											status: mine.status,
+											ongoing: mine.ongoing,
+											quantity: mine.quantity,
+											until: mine.until,
+											note: mine.note,
+										}
+									}
 									target={{
 										kind: "item",
 										itemId,
