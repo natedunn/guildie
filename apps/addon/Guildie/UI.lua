@@ -21,12 +21,11 @@ local function settings() return ns.settings() end
 -- to fit them until it reaches the screen height, keeping the footer visible.
 
 local ICON = "Interface\\AddOns\\Guildie\\icon"
-local WIDTH = 400
+local WIDTH = 620
 local MARGIN = 20
 local TEXT_WIDTH = WIDTH - 2 * MARGIN - 20 -- room for the scrollbar
-local BODY_TOP = 104 -- below the character header
+local BODY_TOP = 140 -- below the character header
 local FOOTER_HEIGHT = 36
-local MAX_CHANGES = 6
 
 local window
 
@@ -165,7 +164,7 @@ end
 
 local function setRow(fs, value)
     fs:SetText(value or "")
-    for _, row in ipairs(window.rows) do
+    for _, row in ipairs(window.statusRows or window.rows) do
         if row.el == fs then row.shown = value ~= nil and value ~= "" end
     end
 end
@@ -185,18 +184,17 @@ function ns.windowState()
 
     if result.state == "behind" then
         local n = #result.changes
-        s.status = GOLD .. ns.status.plural(n, "change") .. " not on Guildie yet|r"
+        s.status = GOLD .. ns.status.plural(n, "change") .. " since the last Guildie update|r"
         local lines = {}
-        for i, change in ipairs(result.changes) do
-            if i > MAX_CHANGES - 1 and n > MAX_CHANGES then
-                table.insert(lines, GREY .. string.format("and %d more", n - i + 1) .. "|r")
-                break
-            end
+        for _, change in ipairs(result.changes) do
             table.insert(lines, GREY .. "-|r " .. change)
         end
         s.changes = table.concat(lines, "\n")
     elseif result.state == "current" then
-        s.status = GREEN .. "Up to date with Guildie|r"
+        s.status = GREEN .. "Matches the last Guildie update|r"
+    elseif result.state == "unverified" then
+        s.status = GOLD .. "Sync status needs verification|r"
+        s.changes = "The loaded server data is old or incomplete. Reload to load the latest comparison, or check the Guildie app."
     elseif result.state == "unknown" then
         s.status = GOLD .. "Connect this character|r"
         s.changes = GREY .. "Claim it on guildie.club (level 10 or higher) with the Guildie app running; it shows here after your next /reload.|r"
@@ -218,30 +216,14 @@ function ns.windowState()
         s.next = "Changes save for the app to upload when you log out or reload."
     end
 
-    if type(GuildieData) == "table" and GuildieData.generatedAt then
-        local reagents = 0
-        for _ in pairs(GuildieData.reagents or {}) do reagents = reagents + 1 end
-        local upgrades = GuildieData.upgrades and GuildieData.upgrades.members
-        local guilds = table.concat(GuildieData.guilds or {}, ", ")
-        s.guildData = string.format("%s\n%s \194\183 %s for upgrades",
-            guilds ~= "" and guilds or "No guild",
-            ns.status.plural(reagents, "reagent"),
-            ns.status.plural(type(upgrades) == "table" and #upgrades or 0, "guildmate"))
-        s.guildUpdated = GREY .. "Updated " .. ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now) .. "|r"
-    else
-        s.guildData = "No guild data yet. Keep the Guildie app running, then reload to load tooltip hints."
+    s.method = ns.livePixels.get().enabled and "Method: experimental pixel sync" or "Method: reload / logout sync"
+    if ns.livePixels.get().enabled then
+        s.next = "The app can read the square without reloading. This window cannot verify live receipt; its server comparison refreshes at login or reload."
     end
-
-    -- Guild requests (0.8.0): yours, with a nudge when some went quiet.
-    local mine = type(GuildieData) == "table" and type(GuildieData.myRequests) == "table" and GuildieData.myRequests
-    if mine and (mine.open or 0) > 0 then
-        local stale = mine.stale or 0
-        s.requests = string.format("%d open", mine.open)
-            .. (stale > 0 and string.format(" (%d stale)", stale) or "")
-        s.requestsHint = GREY .. (stale > 0
-            and "Still need them? Keep or close them on guildie.club (Requests)."
-            or "Manage them on guildie.club (Requests).") .. "|r"
-    end
+    s.verified = type(GuildieData) == "table" and GuildieData.generatedAt
+        and ("Server comparison updated " .. ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now))
+        or "No server comparison loaded."
+    s.warning = ns.status.warning(result, ns.livePixels.health())
     return s
 end
 
@@ -255,14 +237,13 @@ local function refresh()
     setRow(window.changes, s.changes)
     setRow(window.synced, s.synced)
     setRow(window.next, s.next)
-    setRow(window.guildData, s.guildData)
-    setRow(window.guildUpdated, s.guildUpdated)
-    setRow(window.requestsHeading, s.requests and "Your requests" or nil)
-    setRow(window.requests, s.requests)
-    setRow(window.requestsHint, s.requestsHint)
+    setRow(window.method, s.method)
+    setRow(window.verified, s.verified)
+    setRow(window.warning, s.warning)
+    if window.refreshSettings then window.refreshSettings() end
     local inCombat = InCombatLockdown and InCombatLockdown()
     window.upload:SetEnabled(not inCombat)
-    window.uploadHint:SetText(inCombat and "Available after combat." or "Reloads your UI. Keep the Guildie app running.")
+    window.uploadHint:SetText(inCombat and "Available after combat." or "Saves data and refreshes this comparison. Keep the Guildie app running.")
     layout()
 end
 ns.onCapture = refresh
@@ -332,15 +313,13 @@ local function buildWindow()
     window.changes = text("GameFontHighlightSmall")
     window.synced = text("GameFontHighlightSmall")
     window.next = text("GameFontHighlightSmall")
-    window.guildData = text("GameFontHighlightSmall")
-    window.guildUpdated = text("GameFontDisableSmall")
-    window.requestsHeading = heading("Your requests")
-    window.requests = text("GameFontHighlightSmall")
-    window.requestsHint = text("GameFontHighlightSmall")
+    window.method = text("GameFontHighlight")
+    window.verified = text("GameFontDisableSmall")
+    window.warning = text("GameFontNormal")
 
     local upload = CreateFrame("Button", nil, window.body, "UIPanelButtonTemplate")
     upload:SetSize(144, 26)
-    upload:SetText("Sync now")
+    upload:SetText("Save & reload")
     upload:SetScript("OnClick", function()
         if InCombatLockdown and InCombatLockdown() then return end
         ns.capture("upload-button")
@@ -349,39 +328,58 @@ local function buildWindow()
     window.upload = upload
     window.uploadHint = text("GameFontDisableSmall")
 
-    local preferences = CreateFrame("Button", nil, window.body, "UIPanelButtonTemplate")
-    preferences:SetSize(180, 26)
-    preferences:SetText("Open Guildie settings")
-    preferences:SetScript("OnClick", function() window:Hide(); ns.openSettings() end)
     local footerRule = rule(window, WIDTH - 2 * MARGIN)
     footerRule:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, FOOTER_HEIGHT - 4)
     local foot = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     foot:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, 12)
     foot:SetText("Guildie app required \194\183 guildie.club")
 
-    window.rows = {
+    window.statusRows = {
         { el = heading("Character sync"), gap = 0 },
         { el = window.status, gap = 10 },
         { el = window.changes, gap = 8 },
         { el = window.synced, gap = 6 },
+        { el = window.verified, gap = 6 },
+        { el = window.method, gap = 18 },
         { el = window.next, gap = 8 },
-        { el = upload, gap = 12, height = 26 },
+        { el = window.warning, gap = 12 },
+        { el = upload, gap = 16, height = 26 },
         { el = window.uploadHint, gap = 6 },
-        { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
-        { el = heading("Guild tooltips"), gap = 14 },
-        { el = window.guildData, gap = 10 },
-        { el = window.guildUpdated, gap = 6 },
-        { el = window.requestsHeading, gap = 18 },
-        { el = window.requests, gap = 10 },
-        { el = window.requestsHint, gap = 4 },
-        { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
-        { el = preferences, gap = 14, height = 26 },
     }
+    window.settingsRows, window.refreshSettings, window.preferences = ns.buildSettingsRows(window.body, TEXT_WIDTH, refresh)
+    window.tabs = {}
+    function window:selectPage(page)
+        self.page = page == "settings" and "settings" or "status"
+        for _, list in ipairs({self.statusRows, self.settingsRows}) do
+            for _, row in ipairs(list) do row.el:Hide() end
+        end
+        self.rows = self.page == "status" and self.statusRows or self.settingsRows
+        self.scroll:SetVerticalScroll(0)
+        for key, tab in pairs(self.tabs) do tab:SetEnabled(key ~= self.page) end
+        refresh()
+    end
+    for i, key in ipairs({"status", "settings"}) do
+        local tab = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
+        tab:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN + (i - 1) * 132, -100)
+        tab:SetSize(124, 26)
+        tab:SetText(key == "status" and "Status" or "Settings")
+        tab:SetScript("OnClick", function() window:selectPage(key) end)
+        window.tabs[key] = tab
+    end
+    window.page, window.rows = "status", window.statusRows
+    for _, row in ipairs(window.settingsRows) do row.el:Hide() end
+    window.tabs.status:SetEnabled(false)
     window:SetScript("OnShow", refresh)
 end
 ns.buildWindow = function()
     if not window then buildWindow() end
     return window
+end
+
+function ns.openWindow(page)
+    ns.buildWindow()
+    window:Show()
+    window:selectPage(page or "status")
 end
 
 function ns.toggleWindow()
@@ -391,7 +389,7 @@ end
 
 -- Entry in the minimap's add-on menu, where the client has one.
 function Guildie_OnAddonCompartmentClick()
-    ns.openSettings()
+    ns.openWindow("status")
 end
 
 -- ---- Minimap button ------------------------------------------------------------
@@ -432,7 +430,7 @@ local function buildButton()
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT")
 
-    button:SetScript("OnClick", function() ns.openSettings() end)
+    button:SetScript("OnClick", function() ns.openWindow("status") end)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guildie")
@@ -448,7 +446,7 @@ local function buildButton()
             GameTooltip:AddLine(change, 1, 1, 1)
         end
         if #result.changes > 3 then GameTooltip:AddLine(string.format("and %d more", #result.changes - 3), 0.6, 0.6, 0.6) end
-        GameTooltip:AddLine("Click for Guildie settings. Drag to move.", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("Click to open Guildie. Drag to move.", 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -496,7 +494,11 @@ events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 events:SetScript("OnEvent", function(_, event, addon, action)
     if event == "PLAYER_LOGIN" then
         ns.updateMinimapButton()
-        if C_Timer and C_Timer.NewTicker then C_Timer.NewTicker(60, maybeReloadWhileAfk) end
+        if C_Timer and C_Timer.NewTicker then
+            C_Timer.NewTicker(60, maybeReloadWhileAfk)
+            C_Timer.NewTicker(5, function() refresh(); ns.refreshSyncWarning() end)
+        end
+        ns.refreshSyncWarning()
     elseif event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" then
         refresh()
     elseif addon == ADDON and action and tostring(action):find("ReloadUI") then
@@ -504,3 +506,25 @@ events:SetScript("OnEvent", function(_, event, addon, action)
         print(GOLD .. "Guildie|r: the game doesn't let addons reload the UI on their own, so \"Sync while I'm AFK\" is off. Uploads still happen when you log out.")
     end
 end)
+
+
+-- A small, non-interactive reminder away from the pixel square. This reports
+-- local export health and cached comparison freshness, never inferred receipt.
+local warning = CreateFrame("Frame", "GuildieSyncWarning", UIParent)
+warning:SetSize(520, 54)
+warning:SetPoint("TOP", UIParent, "TOP", 0, -80)
+warning:SetFrameStrata("HIGH")
+warning:SetClampedToScreen(true)
+warning:EnableMouse(false)
+warning.text = warning:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+warning.text:SetAllPoints(warning)
+warning.text:SetJustifyH("CENTER")
+warning:Hide()
+function ns.refreshSyncWarning()
+    if not ns.livePixels.get().enabled then warning:Hide(); return end
+    local state = ns.windowState()
+    warning.text:SetText("Guildie experimental sync: keep the whole square visible and unobstructed.\n"
+        .. (state.warning or "Pixel output does not confirm receipt. Check the app for live sync status."))
+    warning:SetHeight(math.max(54, warning.text:GetStringHeight() + 8))
+    warning:Show()
+end

@@ -91,3 +91,30 @@ test("talents without ids: no ranks string; nothing known: empty", () => {
 	assert.deepEqual(view.professions, {});
 	assert.ok(JSON.stringify(view).length < 200, "small");
 });
+
+test("server comparison includes actual inventory, quest and accepted delivery data", () => {
+	const snapshot = {
+		capturedAt: LOGIN,
+		talentTrees: [],
+		quests: { capturedAt: LOGIN, list: [{ id: 1, complete: true }] },
+		completedQuestIds: [2],
+		deliveryIds: ["event1"],
+	};
+	const inventory = {
+		bags: { capturedAt: LOGIN, items: [{ id: 4306, count: 7, name: "Silk Cloth" }] },
+		bank: { capturedAt: LOGIN, items: [] },
+	};
+	const view = addonView(character, snapshot, inventory);
+	assert.deepEqual(view.details, {
+		bags: [{ id: 4306, count: 7 }],
+		bank: [],
+		quests: [{ id: 1, complete: true }],
+		completedQuestIds: [2],
+		deliveryIds: ["event1"],
+	});
+	assert.equal(
+		addonView(character, null).details?.bags,
+		undefined,
+		"missing evidence must not become an empty confirmed inventory",
+	);
+});

@@ -131,10 +131,15 @@ frame.CreateTexture = function()
     return {SetSize = noop, SetPoint = noop, ClearAllPoints = noop, SetColorTexture = color}
 end
 local expectedSize = 25.6
+frame.GetWidth = function() return expectedSize end
+frame.GetHeight = function() return expectedSize end
 frame.SetSize = function(_, width, height) assert(width == expectedSize and height == expectedSize) end
-CreateFrame = function() return frame end
+CreateFrame = function(kind)
+    if kind == "Button" then return setmetatable({}, {__index = function() return noop end}) end
+    return frame
+end
 print = noop
-UIParent = {GetEffectiveScale = function() return 1 end}
+UIParent = {GetEffectiveScale = function() return 1 end, GetHeight = function() return 500 end, GetLeft = function() return 0 end}
 SlashCmdList = {}
 GuildieDB = {version = 4, characters = {test = {talents = {}, inventory = {bags = {capturedAt = 1, items = {}}}}}}
 local secret = {}

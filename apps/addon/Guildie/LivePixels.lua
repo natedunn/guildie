@@ -39,12 +39,13 @@ local function read(fn, ...)
     if ok then return publicValue(value) end
 end
 -- Keep the default header clear of client borders and screen-edge clipping.
-local DEFAULT_INSET_PIXELS = 4
+local DEFAULT_INSET_PIXELS = 12
 local panel = CreateFrame("Frame", nil, UIParent)
 panel:SetFrameStrata("TOOLTIP")
 panel:SetScale(1 / (read(UIParent.GetEffectiveScale, UIParent) or 1))
 panel:SetMovable(true)
 panel:SetClampedToScreen(true)
+if panel.SetClampRectInsets then panel:SetClampRectInsets(0, 0, 0, 0) end
 panel:EnableMouse(false)
 panel:RegisterForDrag("LeftButton")
 local editing, nativeEditing, exportEnabled, dragging = false, false, false, false
@@ -52,27 +53,51 @@ local attachEditMode, applyOptions
 local DEFAULT_CELL_SIZE = 1.6
 local cellSize = DEFAULT_CELL_SIZE
 local theme = "amber"
+-- Convert the actual screen rectangle into this frame's anchor coordinates.
+-- UIParent can have a nonzero origin, and parent/frame scale need not match.
+local function bounds()
+    local scale = read(panel.GetEffectiveScale, panel) or 1
+    local ps = read(UIParent.GetEffectiveScale, UIParent) or 1
+    local pw = read(UIParent.GetWidth, UIParent) or 1024
+    local ph = read(UIParent.GetHeight, UIParent) or 768
+    if pw <= 0 then pw = 1024 end
+    if ph <= 0 then ph = 768 end
+    if scale <= 0 then scale = 1 end
+    if ps <= 0 then ps = 1 end
+    local physicalW, physicalH
+    if type(GetPhysicalScreenSize) == "function" then
+        local ok, w, h = pcall(GetPhysicalScreenSize)
+        if ok then physicalW, physicalH = w, h end
+    end
+    local ratio = physicalW and pw > 0 and ps > 0 and physicalW / (pw * ps) or 1
+    if ratio < 0.25 or ratio > 4 then ratio = 1 end
+    local inset = DEFAULT_INSET_PIXELS / (ratio * scale)
+    local screenW = physicalW and physicalW / (ratio * scale) or pw * ps / scale
+    local screenH = physicalH and physicalH / (ratio * scale) or ph * ps / scale
+    local originX = -(read(UIParent.GetLeft, UIParent) or 0) * ps / scale
+    local originY = screenH - (read(UIParent.GetTop, UIParent) or ph) * ps / scale
+    return originX + inset, originY - screenH + panel:GetHeight() + inset,
+        originX + screenW - panel:GetWidth() - inset, originY - inset
+end
 local function place(x, y)
+    local left, bottom, right, top = bounds()
+    x, y = math.max(left, math.min(right, x)), math.max(bottom, math.min(top, y))
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
+    return x, y
 end
 local function defaultPosition()
-    local scale = read(panel.GetEffectiveScale, panel) or 1
-    local width = read(GetPhysicalScreenSize)
-    local parentWidth = read(UIParent.GetWidth, UIParent)
-    local parentScale = read(UIParent.GetEffectiveScale, UIParent)
-    if width and parentWidth and parentWidth > 0 and parentScale and parentScale > 0 then
-        local ratio = width / (parentWidth * parentScale)
-        if ratio >= 0.25 and ratio <= 4 then scale = scale * ratio end
-    end
-    local inset = DEFAULT_INSET_PIXELS / (scale > 0 and scale or 1)
-    return inset, -inset
+    local left, _, _, top = bounds()
+    return left, top
 end
 place(defaultPosition())
 local function restorePosition()
     local position = options()
-    if type(position) == "table" and type(position.x) == "number" and type(position.y) == "number" then
-        place(position.x, position.y)
+    if position.corner == "top" or position.corner == "bottom" then
+        local left, bottom, _, top = bounds()
+        position.x, position.y = place(left, position.corner == "bottom" and bottom or top)
+    elseif type(position) == "table" and type(position.x) == "number" and type(position.y) == "number" then
+        position.x, position.y = place(position.x, position.y)
     else
         place(defaultPosition())
     end
@@ -102,10 +127,10 @@ local function savePosition()
     panel:StopMovingOrSizing()
     local scale = panel:GetEffectiveScale()
     local parentScale = UIParent:GetEffectiveScale()
-    local x = math.floor(panel:GetLeft() + 0.5)
+    local x = math.floor(panel:GetLeft() - (UIParent:GetLeft() or 0) * parentScale / scale + 0.5)
     local y = math.floor(panel:GetTop() - UIParent:GetTop() * parentScale / scale + 0.5)
-    options().x, options().y = x, y
-    place(x, y)
+    options().corner = nil
+    options().x, options().y = place(x, y)
 end
 panel:SetScript("OnDragStop", savePosition)
 local cells, displayed = {}, {}
@@ -142,6 +167,8 @@ local session = tostring(read(GetServerTime) or 0) .. "-" .. tostring(math.floor
 local serial, index, ticks, elapsed = 0, 1, 0, 0
 local snapshot, snapshotId, live, liveId
 local previousSnapshot
+local exportError, lastPacketAt, snapshotBytes
+local startedAt = read(GetTime) or 0
 local function nextId()
     serial = serial + 1
     return session .. "-" .. serial
@@ -163,7 +190,7 @@ local function liveState()
         combat = read(UnitAffectingCombat, "player"), dead = read(UnitIsDeadOrGhost, "player")})
 end
 local liveIndex = 1
-panel:SetScript("OnUpdate", function(_, delta)
+local function render(_, delta)
     if editing then return end
     elapsed = elapsed + delta
     if elapsed < 0.1 then return end
@@ -182,8 +209,10 @@ panel:SetScript("OnUpdate", function(_, delta)
                 characters[#characters + 1] = character
             end
             snapshot = json({version = GuildieDB and GuildieDB.version or 4, characters = characters})
+            snapshotBytes = #snapshot
             if #snapshot > 1048576 then
-                print("Guildie pixels: snapshot exceeds 1 MiB; experiment stopped.")
+                exportError = "Too much data for pixel sync. Use reload/logout sync."
+                print("Guildie: " .. exportError)
                 exportEnabled = false
                 panel:Hide()
                 return
@@ -205,11 +234,25 @@ panel:SetScript("OnUpdate", function(_, delta)
             displayed[i] = value
         end
     end
+    lastPacketAt = read(GetTime) or 0
+end
+panel:SetScript("OnUpdate", function(self, delta)
+    local ok = pcall(render, self, delta)
+    if not ok then
+        exportError = "Pixel export stopped because game data could not be encoded. Use reload/logout sync."
+        exportEnabled = false
+        panel:Hide()
+    end
 end)
 local editLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 editLabel:SetPoint("LEFT", panel, "RIGHT", 4, 0)
 editLabel:SetText("Guildie sync")
 editLabel:Hide()
+local doneEditing = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+doneEditing:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -8)
+doneEditing:SetSize(90, 24)
+doneEditing:SetText("Done")
+doneEditing:Hide()
 local function beginEditing()
     editing = true
     layout(cellSize)
@@ -220,6 +263,7 @@ local function beginEditing()
     end
     displayed = {}
     editLabel:Show()
+    doneEditing:SetShown(not nativeEditing)
     panel:EnableMouse(true)
     panel:Show()
 end
@@ -228,12 +272,14 @@ local function endEditing()
     panel:StopMovingOrSizing()
     editing = false
     editLabel:Hide()
+    doneEditing:Hide()
     panel:EnableMouse(false)
     displayed = {}
     snapshot, live = nil, nil
     elapsed = 0
     if exportEnabled then panel:Show() else panel:Hide() end
 end
+doneEditing:SetScript("OnClick", endEditing)
 -- Follow the manager's visibility, as LibEditMode does, without touching
 -- Blizzard's protected system registrations. Retry when its load-on-demand UI loads.
 local hookedManager
@@ -267,6 +313,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     editing = false
     exportEnabled = false
     editLabel:Hide()
+    doneEditing:Hide()
     panel:EnableMouse(false)
     local requestedTheme = command:match(" (amber)$") or command:match(" (gray)$")
     if requestedTheme then command = command:sub(1, #command - #requestedTheme - 1) end
@@ -280,6 +327,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         snapshot, live = nil, nil
         elapsed = 0
         layout(validSize and requestedSize or (command == "on large" and 8 or DEFAULT_CELL_SIZE))
+        restorePosition()
         options().theme, options().size = theme, cellSize
         panel:Show()
         print("Guildie pixels: " .. theme .. " export enabled. Match reader --theme and recalibrate after moving or resizing.")
@@ -288,6 +336,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         beginEditing()
         print("Guildie pixels: drag the square. /guildiepixels lock hides it; /guildiepixels on starts export.")
     elseif command == "reset" then
+        options().corner = "top"
         options().enabled = false
         options().x, options().y = defaultPosition()
         place(options().x, options().y)
@@ -303,44 +352,50 @@ end
 -- Settings are owned by the addon; the desktop capture consent is separate.
 applyOptions = function()
     local config = options()
+    exportError, lastPacketAt, startedAt = nil, nil, read(GetTime) or 0
     theme = config.theme == "gray" and "gray" or "amber"
     cellSize = type(config.size) == "number" and math.max(1.6, math.min(8, config.size)) or DEFAULT_CELL_SIZE
     exportEnabled = config.enabled == true
     displayed, snapshot, live, elapsed = {}, nil, nil, 0
     if nativeEditing then beginEditing() else
         layout(cellSize)
+        restorePosition()
         endEditing()
     end
 end
 ns.livePixels = {
     get = options,
+    health = function()
+        local now = read(GetTime) or 0
+        local hasData = ns.current and ns.current() ~= nil
+        return {enabled = options().enabled == true, editing = editing,
+            error = exportError, hasData = hasData,
+            stalled = exportEnabled and not editing and now - (lastPacketAt or startedAt) > 5,
+            cycleSeconds = snapshotBytes and math.ceil(snapshotBytes / 180 / (10 * 2 / 3)) or nil}
+    end,
     set = function(key, value)
         if key == "enabled" and type(value) == "boolean" then options().enabled = value
         elseif key == "theme" and (value == "amber" or value == "gray") then options().theme = value
         elseif key == "size" and type(value) == "number" and value >= 1.6 and value <= 8 then options().size = value
         else return end
         applyOptions()
+        if ns.refreshSyncWarning then ns.refreshSyncWarning() end
     end,
     position = function()
         if read(InCombatLockdown) then return end
         if EditModeManagerFrame and type(EditModeManagerFrame.EnterEditMode) == "function" then
             EditModeManagerFrame:EnterEditMode()
         else
-            SlashCmdList.GUILDIELIVEPIXELS("edit")
+            beginEditing()
         end
     end,
     corner = function(edge)
         if read(InCombatLockdown) then return end
-        local x, y = defaultPosition()
-        if edge == "bottom" then
-            local scale = read(panel.GetEffectiveScale, panel) or 1
-            local height = (read(UIParent.GetHeight, UIParent) or 0) * (read(UIParent.GetEffectiveScale, UIParent) or 1) / scale
-            y = -height + panel:GetHeight() + x
-        end
-        options().x, options().y = x, y
-        place(x, y)
+        options().corner = edge == "bottom" and "bottom" or "top"
+        restorePosition()
     end,
     reset = function()
+        options().corner = "top"
         options().x, options().y = defaultPosition()
         place(options().x, options().y)
     end,

@@ -1,5 +1,5 @@
 local ADDON, ns = ...
-local function settings()
+function ns.settings()
     GuildieDB.settings = GuildieDB.settings or {}
     local s = GuildieDB.settings
     if s.minimapAngle == nil then s.minimapAngle = 220 end
@@ -8,135 +8,107 @@ local function settings()
     if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
     return s
 end
-ns.settings = settings
 
+-- Blizzard's category is only a launcher. All controls live in Guildie's window.
 local root = CreateFrame("Frame", "GuildieSettingsPanel", UIParent)
-local panel = CreateFrame("Frame", nil, root)
-panel:SetAllPoints(root)
 root.name = "Guildie"
 root:Hide()
-local function text(value, y, font)
-    local label = panel:CreateFontString(nil, "ARTWORK", font or "GameFontHighlightSmall")
-    label:SetPoint("TOPLEFT", 20, y)
-    label:SetWidth(520)
-    label:SetJustifyH("LEFT")
-    label:SetText(value)
-    return label
-end
-
-text("Experimental sync without reloading", -58, "GameFontNormal")
-text("The square shows your character data as colors that the Guildie app reads from your screen. Keep it visible and uncovered; move it to a free corner or use Edit Mode for a custom position. Reload once after enabling or disabling sync so the app can read your choice.", -84)
-local refresh
-local function checkbox(label, y, get, set)
-    local control = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    control:SetPoint("TOPLEFT", 16, y)
-    local title = control:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    title:SetPoint("LEFT", control, "RIGHT", 4, 0)
-    title:SetText(label)
-    control:SetHitRectInsets(0, -(title:GetStringWidth() + 8), 0, 0)
-    control:SetScript("OnClick", function(self) set(self:GetChecked() == true); refresh() end)
-    return control, function() control:SetChecked(get()) end
-end
-local enabled, updateEnabled = checkbox("Enable experimental sync", -158,
-    function() return ns.livePixels.get().enabled == true end,
-    function(on) ns.livePixels.set("enabled", on) end)
-root.syncEnabled = enabled
-text("After changing this setting, type /reload. Once enabled, updates sync live without further reloads. Bank and recipe updates still need their windows opened.", -200)
-local gray, updateGray = checkbox("Use grayscale (troubleshooting)", -245,
-    function() return ns.livePixels.get().theme == "gray" end,
-    function(on) ns.livePixels.set("theme", on and "gray" or "amber") end)
-local large, updateLarge = checkbox("Larger square", -283,
-    function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
-    function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end)
-text("Amber is the default. Use the larger square if capture is unreliable. The app finds its position and appearance automatically.", -325)
-local function button(label, x, y, click)
-    local control = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    control:SetPoint("TOPLEFT", x, y)
-    control:SetSize(180, 26)
-    control:SetText(label)
-    control:SetScript("OnClick", click)
-    return control
-end
-local move = button("Open Edit Mode", 20, -411, function()
-    if SettingsPanel and SettingsPanel.Hide then SettingsPanel:Hide() end
-    if InterfaceOptionsFrame and InterfaceOptionsFrame.Hide then InterfaceOptionsFrame:Hide() end
-    ns.livePixels.position()
-end)
-local top = button("Move to top left", 20, -375, function() ns.livePixels.corner("top") end)
-local bottom = button("Move to bottom left", 212, -375, function() ns.livePixels.corner("bottom") end)
-local status = text("", -455)
-refresh = function()
-    updateEnabled(); updateGray(); updateLarge()
-    local combat = InCombatLockdown and InCombatLockdown()
-    move:SetEnabled(not combat)
-    top:SetEnabled(not combat)
-    bottom:SetEnabled(not combat)
-    status:SetText(ns.livePixels.get().enabled and "Export enabled. Check the Guildie app for capture and upload status."
-        or "Export disabled. Normal sync on logout or reload remains available.")
-end
-panel:SetScript("OnShow", refresh)
-root:RegisterEvent("PLAYER_REGEN_DISABLED")
-root:RegisterEvent("PLAYER_REGEN_ENABLED")
-root:RegisterEvent("ADDON_LOADED")
-local registered, categoryID
-root:SetScript("OnEvent", function()
-    if not registered then
-        if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-            local category = Settings.RegisterCanvasLayoutCategory(root, "Guildie")
-            Settings.RegisterAddOnCategory(category)
-            categoryID = category.GetID and category:GetID() or category.ID or category.id
-            registered = true
-        elseif InterfaceOptions_AddCategory then
-            InterfaceOptions_AddCategory(root)
-            registered = true
-        end
-    end
-    if panel:IsShown() then refresh() end
-end)
-
--- Keep all preferences in Blizzard's addon settings, with two compact pages.
-local syncPanel = panel
-local general = CreateFrame("Frame", nil, root)
-general:SetAllPoints(root)
-panel = general
-text("General", -58, "GameFontNormal")
-local updates = {}
-root.preferences = {}
-local function preference(label, y, key, changed)
-    local control, update = checkbox(label, y,
-        function() return ns.settings()[key] end,
-        function(on)
-            ns.settings()[key] = on
-            if changed then changed() end
-        end)
-    root.preferences[key] = control
-    updates[#updates + 1] = update
-end
-preference("Show minimap button", -92, "showMinimap", function() ns.updateMinimapButton() end)
-preference("Say why tooltips have nothing", -132, "sayWhyEmpty")
-preference("Sync while I'm AFK (experimental)", -172, "reloadWhenAfk")
-text("Reloads your UI while AFK, out of combat, at most every 20 minutes. Keep the Guildie app running.", -216)
-button("Character sync status", 20, -270, function()
+local logo = root:CreateTexture(nil, "ARTWORK")
+logo:SetTexture("Interface\\AddOns\\Guildie\\icon")
+logo:SetSize(64, 64)
+logo:SetPoint("TOPLEFT", 24, -24)
+local name = root:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+name:SetPoint("LEFT", logo, "RIGHT", 16, 8)
+name:SetText("Guildie")
+local description = root:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+description:SetPoint("TOPLEFT", logo, "BOTTOMLEFT", 0, -20)
+description:SetWidth(420)
+description:SetJustifyH("LEFT")
+description:SetText("Check your character's sync status and manage all Guildie settings in one window.")
+local open = CreateFrame("Button", nil, root, "UIPanelButtonTemplate")
+open:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -20)
+open:SetSize(180, 28)
+open:SetText("Open Guildie")
+open:SetScript("OnClick", function()
     if SettingsPanel then SettingsPanel:Hide() end
     if InterfaceOptionsFrame then InterfaceOptionsFrame:Hide() end
-    ns.toggleWindow()
+    ns.openWindow("status")
 end)
-general:SetScript("OnShow", function() for _, update in ipairs(updates) do update() end end)
-local generalTab, syncTab
-local function selectPage(live)
-    general:SetShown(not live)
-    syncPanel:SetShown(live)
-    if generalTab then generalTab:SetEnabled(live); syncTab:SetEnabled(not live) end
-end
-panel = root
-generalTab = button("General", 20, -16, function() selectPage(false) end)
-syncTab = button("Experimental sync", 212, -16, function() selectPage(true) end)
-selectPage(false)
-function ns.openSettings()
-    selectPage(false)
-    if Settings and Settings.OpenToCategory and categoryID then
-        Settings.OpenToCategory(categoryID)
-    elseif InterfaceOptionsFrame_OpenToCategory then
-        InterfaceOptionsFrame_OpenToCategory(root)
+root.openButton = open
+local registered
+root:RegisterEvent("ADDON_LOADED")
+root:SetScript("OnEvent", function()
+    if registered then return end
+    if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+        Settings.RegisterAddOnCategory(Settings.RegisterCanvasLayoutCategory(root, "Guildie"))
+        registered = true
+    elseif InterfaceOptions_AddCategory then
+        InterfaceOptions_AddCategory(root)
+        registered = true
     end
+end)
+function ns.openSettings() ns.openWindow("settings") end
+
+-- Reusable rows inside the modal's scrolling Settings page.
+function ns.buildSettingsRows(parent, width, changed)
+    local rows, updates, controls = {}, {}, {}
+    local function label(value, heading)
+        local text = parent:CreateFontString(nil, "ARTWORK", heading and "GameFontNormal" or "GameFontHighlightSmall")
+        text:SetWidth(width)
+        text:SetJustifyH("LEFT")
+        text:SetText(value)
+        rows[#rows + 1] = {el = text, gap = heading and 22 or 8}
+    end
+    local function checkbox(title, key, get, set)
+        local control = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+        local text = control:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+        text:SetPoint("LEFT", control, "RIGHT", 4, 0)
+        text:SetWidth(width - 40)
+        text:SetJustifyH("LEFT")
+        text:SetText(title)
+        control:SetHitRectInsets(0, -(width - 32), 0, 0)
+        control:SetScript("OnClick", function(self) set(self:GetChecked() == true); changed() end)
+        rows[#rows + 1] = {el = control, height = 32, gap = 8, dx = -4}
+        updates[#updates + 1] = function() control:SetChecked(get()) end
+        controls[key] = control
+    end
+    local function preference(title, key)
+        checkbox(title, key, function() return ns.settings()[key] end, function(on)
+            ns.settings()[key] = on
+            if key == "showMinimap" then ns.updateMinimapButton() end
+        end)
+    end
+    label("General", true)
+    preference("Show minimap button", "showMinimap")
+    preference("Explain empty tooltips", "sayWhyEmpty")
+    preference("Reload while AFK (experimental)", "reloadWhenAfk")
+    label("Saves for the app by reloading while AFK and out of combat, at most every 20 minutes.")
+    label("Experimental pixel sync", true)
+    label("The Guildie app reads character data from the colored square on your screen. Keep the whole square visible and unobstructed. Move it to a free corner, or use Edit Mode for a custom position.")
+    checkbox("Enable experimental pixel sync", "syncEnabled", function() return ns.livePixels.get().enabled == true end,
+        function(on) ns.livePixels.set("enabled", on) end)
+    label("Reload once after enabling or disabling so the app can read your choice. Keep the app running. Bank and recipe data still require opening their windows.")
+    checkbox("Larger square", "large", function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
+        function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end)
+    checkbox("Grayscale (troubleshooting)", "gray", function() return ns.livePixels.get().theme == "gray" end,
+        function(on) ns.livePixels.set("theme", on and "gray" or "amber") end)
+    local group = CreateFrame("Frame", nil, parent)
+    group:SetSize(width, 28)
+    for i, spec in ipairs({{"Move to top left", "top"}, {"Move to bottom left", "bottom"}, {"Open Edit Mode", "edit"}}) do
+        local button = CreateFrame("Button", nil, group, "UIPanelButtonTemplate")
+        button:SetPoint("TOPLEFT", (i - 1) * (width / 3), 0)
+        button:SetSize(width / 3 - 8, 28)
+        button:SetText(spec[1])
+        local action = spec[2]
+        button:SetScript("OnClick", function()
+            if InCombatLockdown and InCombatLockdown() then return end
+            if action == "edit" then ns.buildWindow():Hide(); ns.livePixels.position()
+            else ns.livePixels.corner(action) end
+            changed()
+        end)
+        updates[#updates + 1] = function() button:SetEnabled(not (InCombatLockdown and InCombatLockdown())) end
+    end
+    rows[#rows + 1] = {el = group, gap = 16, height = 28}
+    label("Pixel output alone does not confirm a sync. Status compares actual data with the last server update loaded at login or reload; check the app for live capture and upload errors.")
+    return rows, function() for _, update in ipairs(updates) do update() end end, controls
 end

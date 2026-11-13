@@ -374,6 +374,7 @@ export default defineSchema({
 		quests: v.optional(v.object({ capturedAt: v.number(), list: v.array(vQuestLogEntry) })),
 		/** Additive completion confirmations from the addon; never removed by an older upload. */
 		completedQuestIds: v.optional(v.array(v.number())),
+		deliveryIds: v.optional(v.array(v.string())),
 	}).index("by_slug", ["flavor", "region", "slug"]),
 
 	/**

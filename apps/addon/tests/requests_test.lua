@@ -161,36 +161,13 @@ test("hooks item tooltips at PLAYER_LOGIN, after every addon has loaded", functi
     _G.TooltipDataProcessor, _G.Enum = nil, nil
 end)
 
-test("window: your requests, with the stale nudge", function()
+test("Status window excludes request management; tooltip requests remain separate", function()
     local ns = load(DATA)
     wow.fire("PLAYER_ENTERING_WORLD")
-    local s = ns.windowState()
-    eq(s.requests, "2 open (1 stale)")
-    eq(plain(s.requestsHint), "Still need them? Keep or close them on guildie.club (Requests).")
-    local fresh = {}
-    for k, v in pairs(DATA) do fresh[k] = v end
-    fresh.myRequests = { open = 3, stale = 0 }
-    ns = load(fresh)
-    s = ns.windowState()
-    eq(s.requests, "3 open")
-    eq(plain(s.requestsHint), "Manage them on guildie.club (Requests).")
-    fresh.myRequests = { open = 0, stale = 0 }
-    eq(ns.windowState().requests, nil, "none open: no row")
-    _G.GuildieData = nil
-    eq(ns.windowState().requests, nil, "no data: no row")
-end)
-
-test("window: the rows show and hide", function()
-    local ns = load(DATA)
-    wow.fire("PLAYER_ENTERING_WORLD")
-    ns.toggleWindow()
-    local window = _G.GuildieWindow
-    eq(plain(window.requests:GetText()), "2 open (1 stale)")
-    local shown
-    for _, row in ipairs(window.rows) do
-        if row.el == window.requests then shown = row.shown end
-    end
-    eq(shown, true, "requests row shown")
+    ns.openWindow("status")
+    eq(ns.windowState().requests, nil)
+    eq(rawget(GuildieWindow, "requests"), nil)
+    eq(GuildieWindow.page, "status")
 end)
 
 test("ongoing: first, 'wants all you have', and no 'might want' row for the same person", function()

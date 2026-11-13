@@ -47,6 +47,32 @@ function S.talentRanks(talents)
     return table.concat(parts, ",")
 end
 
+local function inventoryKey(items)
+    local parts = {}
+    for _, item in ipairs(items or {}) do parts[#parts + 1] = item.id .. ":" .. item.count end
+    table.sort(parts)
+    return table.concat(parts, ",")
+end
+local function questKey(quests)
+    local parts = {}
+    for _, q in ipairs(quests or {}) do
+        local value = q.id .. ":" .. tostring(q.complete == true) .. ":" .. tostring(q.failed == true)
+        for _, o in ipairs(q.objectives or {}) do value = value .. ":" .. tostring(o.done == true) .. ":" .. (o.text or "") end
+        parts[#parts + 1] = value
+    end
+    table.sort(parts)
+    return table.concat(parts, "\n")
+end
+local function missing(list, known, getID)
+    local seen, count = {}, 0
+    for _, id in ipairs(known or {}) do seen[id] = true end
+    for _, value in ipairs(list or {}) do
+        local id = getID and getID(value) or value
+        if not seen[id] then count = count + 1 end
+    end
+    return count
+end
+
 --- What's different in game, as short lines. `me`: a saved character
 --- (GuildieDB.characters[guid]); `entry`: Guildie's.
 function S.compare(me, entry)
@@ -124,19 +150,36 @@ function S.compare(me, entry)
         local new = #section.known - ((known and known.recipes) or 0)
         if new > 0 then add(string.format("%d new %s %s", new, section.profession, new == 1 and "recipe" or "recipes")) end
     end
+    local details = entry.details or {}
+    for _, part in ipairs({"bags", "bank"}) do
+        local mine = me.inventory and me.inventory[part]
+        if mine and details[part] and inventoryKey(mine.items) ~= inventoryKey(details[part]) then
+            add(part == "bags" and "Bag contents changed" or "Bank contents changed")
+        end
+    end
+    if me.quests and details.quests and questKey(me.quests.list) ~= questKey(details.quests) then add("Quest log changed") end
+    local completions = details.completedQuestIds and missing(me.completedQuestIds, details.completedQuestIds) or 0
+    if completions > 0 then add(plural(completions, "quest completion") .. " awaiting confirmation") end
+    local deliveries = details.deliveryIds and missing(me.deliveries, details.deliveryIds, function(e) return e.id end) or 0
+    if deliveries > 0 then add(plural(deliveries, "delivery report") .. " awaiting confirmation") end
     return changes
 end
 
 --- Where this character stands: { state, changes, entry }. States: "nodata"
 --- (no GuildieData yet), "unknown" (Guildie has no entry for it), "current",
---- "behind" (changes listed).
+--- "behind" (changes listed), "unverified" (old or incomplete comparison).
 function S.check(me, data, guid, name)
     if type(data) ~= "table" or not data.generatedAt then return { state = "nodata", changes = {} } end
     local entry = S.find(data, guid, name)
     if not entry then return { state = "unknown", changes = {} } end
-    if not me then return { state = "current", changes = {}, entry = entry } end
+    if not me then return { state = "unverified", changes = {}, entry = entry } end
     local changes = S.compare(me, entry)
-    return { state = #changes > 0 and "behind" or "current", changes = changes, entry = entry }
+    local details = entry.details or {}
+    local incomplete = (me.inventory and ((me.inventory.bags and not details.bags) or (me.inventory.bank and not details.bank)))
+        or (me.quests and not details.quests) or (me.completedQuestIds and not details.completedQuestIds)
+        or (me.deliveries and #me.deliveries > 0 and not details.deliveryIds)
+    local stale = (GetServerTime() - data.generatedAt / 1000) > 15 * 60 or incomplete
+    return { state = #changes > 0 and "behind" or (stale and "unverified" or "current"), changes = changes, entry = entry }
 end
 
 --- "just now", "5 min ago", "3 hr ago", "2 days ago". Both in seconds.
@@ -159,11 +202,27 @@ end
 --- One line for the minimap button's tooltip.
 function S.headline(result)
     if result.state == "behind" then
-        return plural(#result.changes, "change") .. " not on Guildie yet"
+        return plural(#result.changes, "change") .. " since the last Guildie update"
     elseif result.state == "current" then
-        return "Up to date with Guildie"
+        return "Matches the last Guildie update"
+    elseif result.state == "unverified" then
+        return "Sync status needs verification"
     elseif result.state == "unknown" then
         return "Guildie doesn't know this character yet"
     end
     return "No data from the Guildie app yet"
+end
+
+
+function S.warning(result, health)
+    if not health.enabled then return nil end
+    if health.error then return health.error end
+    if health.editing then return "Pixel export is paused in Edit Mode. Close Edit Mode to resume." end
+    if not health.hasData then return "No character data is available to export yet. Reload after the character has loaded." end
+    if health.stalled then return "Pixel output has stopped updating. Check the square and use reload/logout sync if needed." end
+    if health.cycleSeconds and health.cycleSeconds > 30 then
+        return string.format("A full data cycle takes about %d seconds. Keep the entire square uncovered; check the app for incomplete captures.", health.cycleSeconds)
+    end
+    if result.state == "behind" then return "Local data differs from the last server update. Live receipt cannot be verified here; check the app." end
+    if result.state ~= "current" then return "No recent matching server data is available. Check the app, then reload to refresh this comparison." end
 end

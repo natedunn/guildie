@@ -24,14 +24,28 @@ export type AddonView = {
 	professions: Record<string, { skill?: number; recipes?: number }>;
 	/** When Guildie's data was last current, and where it came from (the game, through the app, or Blizzard). */
 	synced?: { at: number; from: "game" | "blizzard" };
+	details?: {
+		bags?: { id: number; count: number }[];
+		bank?: { id: number; count: number }[];
+		quests?: NonNullable<NonNullable<Snapshot>["quests"]>["list"];
+		completedQuestIds?: number[];
+		deliveryIds?: string[];
+	};
 };
 
 type Character = Parameters<typeof mergeProfile>[0] & Pick<Doc<"characters">, "slug" | "blizzardId">;
-type Snapshot = Parameters<typeof mergeProfile>[1];
+type Snapshot =
+	| (NonNullable<Parameters<typeof mergeProfile>[1]> & Pick<Doc<"addonSnapshots">, "deliveryIds">)
+	| null
+	| undefined;
 
 const SLOT_IDS = new Map(Object.entries(SLOTS).map(([id, slot]) => [slot, Number(id)]));
 
-export function addonView(character: Character, snapshot: Snapshot): AddonView {
+export function addonView(
+	character: Character,
+	snapshot: Snapshot,
+	inventory?: Pick<Doc<"inventories">, "bags" | "bank"> | null,
+): AddonView {
 	const profile = mergeProfile(character, snapshot);
 	const talents = (profile.talentTrees ?? []).flatMap((t) => t.talents);
 	const gear: AddonView["gear"] = {};
@@ -66,6 +80,13 @@ export function addonView(character: Character, snapshot: Snapshot): AddonView {
 		},
 		gear,
 		professions,
+		details: {
+			bags: inventory?.bags?.items.map(({ id, count }) => ({ id, count })),
+			bank: inventory?.bank?.items.map(({ id, count }) => ({ id, count })),
+			quests: snapshot?.quests?.list,
+			completedQuestIds: snapshot?.completedQuestIds,
+			deliveryIds: snapshot?.deliveryIds,
+		},
 		synced: profile.synced && { at: profile.synced.at, from: profile.synced.kind === "app" ? "game" : "blizzard" },
 	};
 }
