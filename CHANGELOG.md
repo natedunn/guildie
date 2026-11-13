@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.31
+
 ### Fixes
 
 - **Addon:** Close the experimental sync warning without stopping sync. Your choice is remembered across reloads and logins; restore it in Settings, and view sync warnings anytime on Status.
