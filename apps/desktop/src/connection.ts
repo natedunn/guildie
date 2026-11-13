@@ -12,8 +12,8 @@ import {
 	type LastUpload,
 	type Log,
 	loadedAddonVersion,
-	savedLivePixelsEnabled,
 	SyncEngine,
+	savedLivePixelsEnabled,
 } from "@guildie/sync";
 import { net } from "electron";
 import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
