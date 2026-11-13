@@ -1,18 +1,18 @@
 # Windows integrated live-sync acceptance — 2026-11-12
 
-Status: IN PROGRESS. This is not a release approval. No release or deployment performed.
+Status: Windows test session completed with remaining blockers and untested cases. NOT release-approved. No release or deployment performed.
 
 ## Tested build
 
-- Windows packaged desktop 0.3.28 and main addon 0.15.0.
-- Initial source: `5fb97c0`; installed and packaged addon subsequently received the physical-cell sizing fix committed as `6e0efb2df8aea092114d3b3f49435cb3b9b9317a`.
-- Follow-up addon-only patch changes default/reset to a four-physical-pixel inset. Both installed addon and unpacked bundle were updated; earlier installer/zip artifacts do not include this follow-up.
-- The running desktop executable predates the intervening taskbar-icon commit `a16436d`. Do not describe the entire executable as built from `6e0efb2`.
+- Windows 11 build 26200, current display at 125% scaling.
+- Final packaged desktop 0.3.28 and main addon 0.15.0 built from `9f8b1a0cb60e10556c4fd19dfbf1db74f2374674`.
+- Earlier functional tests used `5fb97c0` plus the physical-cell sizing fix committed as `6e0efb2`. The final rebuild includes the intervening taskbar-icon change and four-physical-pixel inset default/reset fix. Final automatic discovery, decoding and complete snapshot upload passed after restart.
 - Bundled PyInstaller capture helper; no pixel configuration, manual capture coordinates, or separately launched reader used for acceptance.
 - Python 3.12 build environment. Runtime loads bundled Python. A machine without Python installed has NOT BEEN TESTED.
 - Existing addon backed up; legacy separate addon moved outside AddOns; guild data preserved.
+- Final installer and ZIP built successfully with publishing disabled. Unpacked packaged app was exercised; installer was not run.
 
-## Results so far
+## Results
 
 | Check | Result | Evidence / limitation |
 | --- | --- | --- |
@@ -26,14 +26,14 @@ Status: IN PROGRESS. This is not a release approval. No release or deployment pe
 | Edit Mode move | PASS | User confirmed native Edit Mode opened and square moved. |
 | Reset position / edge placement after fix | PASS after fix | Zero-offset reset caused discovery failure; moving inward recovered. Changed default/reset to four physical pixels inward, preserving custom positions. User reset; automatic decoding and a complete snapshot upload succeeded at the new default. |
 | Settings/position survive reload | PASS | User confirmed enabled state, theme, size and position survived. |
-| Settings survive login | NOT TESTED | Pending. |
+| Settings survive login | PASS | User logged out to character selection and back in; enabled state, grayscale theme, large size and inset reset position survived. |
 | Alt-tab recovery | PASS | Logs repeatedly transition waiting-game → searching/calibrating → receiving. |
 | Addon export off/on recovery | PASS | User hid export through WoW settings, waited, then re-enabled it. App remained enabled; logs show searching while absent and automatic calibration/receiving after return. |
 | Covered square recovery | NOT TESTED | Not independently exercised in integrated build. |
 | Actual gear and bags update | PASS | Site changed equipped test slot to empty and showed test item in bags without game reload. |
 | Actual bank transfer | PASS | Site subsequently showed the same item in bank, replacing its bag location, without game reload. Bank read time refreshed. |
 | Actual recipe changes | NOT TESTED | No convenient new recipe; user chose to skip. |
-| Actual quest changes | NOT TESTED | Pending. |
+| Actual quest changes | NOT TESTED | User chose to skip. |
 | Force-close orphan cleanup | PASS | One helper before stopping desktop parent; zero after four seconds. Restart recovered. |
 | App toggle-off | PASS | User disabled capture through tray; log reported stopped and zero capture helpers remained. |
 | Sign-out | PASS | User signed out with capture preference enabled. Log reported stopped; zero capture helpers remained. |
@@ -44,7 +44,7 @@ Status: IN PROGRESS. This is not a release approval. No release or deployment pe
 | Installer/zip build | PASS with workaround | NSIS failed at a 263-character include path. Short local template path allowed packaging, without repository/dependency changes. |
 | Installer upgrade/uninstall | NOT TESTED | Packaged unpacked application used; installer not executed. |
 | 100% scaling / HDR / display changes | NOT TESTED | Current display uses 125% scaling. |
-| Resource sample | OBSERVED | 60 samples over five minutes: average CPU 0.2615%, maximum 1.758% of total system capacity; aggregate average private memory 332.2 MB, maximum 582.8 MB. Mixed UI/discovery conditions, not a controlled benchmark. FPS not measured. |
+| Resource sample | OBSERVED | 60 samples over five minutes: average CPU 0.2615%, maximum 1.758% of total system capacity; aggregate average private memory 332.2 MB, maximum 582.8 MB. Mixed UI/discovery conditions, not a controlled benchmark. User reported FPS feels normal during the session; FPS not directly measured. |
 
 ## Automated verification
 
@@ -55,3 +55,19 @@ Status: IN PROGRESS. This is not a release approval. No release or deployment pe
 - New regression covers physical sizing with non-unit actual panel scale and scale-change relayout.
 
 Private capture records, account identifiers, inventory details, screenshots, tokens and local configuration are excluded from this report.
+
+## Remaining blockers and handoff
+
+- Guild-data download repeatedly returns HTTP 500. Outbound live and SavedVariables uploads work, but returned guild data is not healthy. Server-side cause was not established; no deployment attempted.
+- Quest/recipe value changes skipped at user request. Installer upgrade/uninstall, a clean machine without Python, 100% scaling, HDR/display changes, covered-square recovery and game minimize/close/reopen were not tested.
+- Five-minute resource sample and user FPS observation are not a controlled long-duration benchmark.
+- Final test app is running with capture enabled and user signed in. Normal installed app remains closed. Experimental labels and initial off defaults are preserved.
+
+## Final artifact SHA-256
+
+- Guildie.exe: `DA56E873639E22AFE88C73C1D6B3E77DBFBB6E7B18AAFA449BE087971ECE7032`
+- app.asar: `96A3D465C321172112189A0DDF9ABBDBD5332BE07B6AB29B7ECD7947098C3E31`
+- GuildieCapture.exe: `4357F7A2AEC9592899CCF5A059E67BB555EB67ECEE63105BF2B3026F76234614`
+- Guildie-Setup-0.3.28.exe: `33EDC3A3459D5542B983FAA6B05A0283CB33394962B6318401DBE171113FD40D`
+- Guildie-0.3.28-win-x64.zip: `91EC06EBA9E0058F1C207A2AD24EAFDE9EE1835123688357FA86188991CD5F83`
+- LivePixels.lua: `7564A03B95335758779DC4C5B902411E0684ED73FBE2BACF2458B8972030B147`
