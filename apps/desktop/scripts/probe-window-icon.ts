@@ -28,6 +28,7 @@ const draw = user.func(
 	"bool __stdcall DrawIconEx(intptr dc, int x, int y, intptr icon, int width, int height, uint32 step, intptr brush, uint32 flags)",
 );
 const deleteObject = gdi.func("bool __stdcall DeleteObject(intptr object)");
+const flush = gdi.func("bool __stdcall GdiFlush()");
 const deleteDC = gdi.func("bool __stdcall DeleteDC(intptr dc)");
 function pixels(icon: number): Buffer {
 	assert(icon, "Windows returned an empty icon handle");
@@ -44,6 +45,7 @@ function pixels(icon: number): Buffer {
 	const previous = select(context, bitmap);
 	try {
 		assert(draw(context, 0, 0, icon, 32, 32, 0, 0, 3), "DrawIconEx failed");
+		flush();
 		return Buffer.from(koffi.decode(bits[0], "uint8", 32 * 32 * 4));
 	} finally {
 		select(context, previous);

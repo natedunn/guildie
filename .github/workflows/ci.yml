@@ -69,6 +69,13 @@ jobs:
       # uploader), not the site's code in this PR.
       - run: pnpm --filter @guildie/desktop smoke --url https://guildie.club
 
+      - name: Build native icon probe
+        working-directory: apps/desktop
+        run: pnpm exec esbuild scripts/probe-window-icon.ts --bundle --platform=node --format=esm --external:electron --external:koffi --define:__VERSION__='"probe"' --outfile=dist/icon-probe.mjs --banner:js='import { createRequire } from "node:module"; import { fileURLToPath } from "node:url"; import { dirname } from "node:path"; const require = createRequire(import.meta.url); const __dirname = dirname(fileURLToPath(import.meta.url));'
+      - name: Check the running window icon
+        working-directory: apps/desktop
+        run: pnpm exec electron dist/icon-probe.mjs
+
   changelog:
     name: CHANGELOG entry
     if: github.event_name == 'pull_request'
