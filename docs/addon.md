@@ -284,7 +284,23 @@ already (in bags or bank, not learned), or **knows it**. The rule is
   level) and what it teaches. Matched to `recipes` by the crafted item
   (`preview_item.recipe.item`) within the profession, else by name
   ("Formula: Enchant Bracer - Minor Health" or the item's spell name against
-  the recipe name). Unmatched items are kept without `recipeId` and not shown.
+  the recipe name), with the profession by name when the item gives another
+  id for it (Forever's First Aid manuals: 2942, the catalog: 129).
+- **Filling the gaps** (`apps/web/convex/shared/recipeResearch.ts`):
+  - Rank books (Expert Cookbook, Expert First Aid, Expert Fishing) teach a
+    max skill, read from their text ("allowing a maximum of 225"): known once
+    the character's max skill is there (`rank`).
+  - Items whose recipe Blizzard's catalog lacks (Forever's "Adaptive" plans
+    and patterns, some schematics) say "Teaches you how to craft X": Guildie
+    adds its own `recipes` row for X (negative `recipeId`, `fromItem`), with
+    the crafted item and reagents when the item has them. The addon's recipe
+    reads match it by name like any other; profile syncs count a known recipe
+    of that name as it (`mapProfessions`). When Blizzard adds the real recipe,
+    `recipes.save` drops ours and the next recipe-item sync matches the real one.
+  - What neither Blizzard nor the item says, looked up by hand (`RESEARCHED`,
+    with the source): Carrie's Cookbook teaches Grand Lobster Banquet and
+    Specklefin Feast (`recipeIds`; known with both).
+  - Anything else unmatched is kept without `recipeId` and not shown.
 - **Known recipes and skill:** the merged profile (Blizzard plus newer addon
   reads), as everywhere else.
 - **Has one:** the one part of a character's bags and bank guildmates see:
@@ -296,9 +312,11 @@ already (in bags or bank, not learned), or **knows it**. The rule is
   name, "Only ones someone needs" on by default), and under recipe items on
   Inventory (across the player's guilds, their own characters included).
 - **In game:** `recipes = { items = { [itemId] = { profession, skill (0:
-  unknown), recipeId } }, crafters = { { name, classId, skills = {
-  Tailoring = 120 } (-1: unknown), known = { recipeIds it teaches },
-  has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | at 25 (has 5)",
+  unknown), recipeId, more recipeIds (0.15.0) } }, ranks = { [itemId] = {
+  profession, skill, max skill it unlocks } } (0.15.0; apart, so 0.14.0
+  leaves them out), crafters = { { name, classId, skills = { Tailoring =
+  120 } (-1: unknown), max = { Tailoring = 225 } (0.15.0), known = {
+  recipeIds it teaches }, has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | at 25 (has 5)",
   "Di | has one already" (up to 8, then "+N more could use it"), then "Known
   by Ada, Ben, Cat +2". The character you're on is left out (the game's own
   tooltip says "Already known" or the requirement in red); your other

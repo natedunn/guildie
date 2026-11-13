@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { internalAction, internalMutation, internalQuery, type QueryCtx } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
+import { craftedName, guildieRecipeId, RESEARCHED, rankFrom } from "./shared/recipeResearch";
 import {
 	type CrafterProfession,
 	type RecipeItemInfo,
@@ -15,8 +16,10 @@ import {
 // Recipe items: the patterns, plans, formulas and recipes that teach a
 // recipe, with the profession skill each needs. From Blizzard's item search
 // (item class 9) and each item's preview, matched to the recipe catalog
-// (recipes.ts) by what it crafts, or by name for enchants. Synced weekly
-// after the recipe catalog. Guild members' standing with each (knows it,
+// (recipes.ts) by what it crafts, or by name for enchants. What that leaves
+// out is filled in by shared/recipeResearch.ts: rank books (Expert
+// Cookbook), cookbooks we looked up, and Guildie's own recipe entries for
+// what Blizzard's catalog lacks. Synced weekly after the recipe catalog. Guild members' standing with each (knows it,
 // has one, can learn it now or later) is shared/recipeStatus.ts.
 
 const REFRESH_MS = 7 * 24 * 3600_000;
@@ -33,8 +36,12 @@ type Item = {
 	name?: string;
 	quality?: { type?: string };
 	preview_item?: {
-		recipe?: { item?: { item?: { id?: number } } };
-		spells?: { spell?: { name?: string } }[];
+		description?: string;
+		recipe?: {
+			item?: { item?: { id?: number } };
+			reagents?: { reagent?: { id?: number; name?: string }; quantity?: number }[];
+		};
+		spells?: { spell?: { name?: string }; description?: string }[];
 		requirements?: { skill?: { level?: number; profession?: { id?: number; name?: string } } };
 	};
 };
@@ -100,6 +107,9 @@ const vFetched = v.object({
 	skill: v.optional(v.number()),
 	craftedItemId: v.optional(v.number()),
 	spellName: v.optional(v.string()),
+	/** The item's own text and its spells': what it teaches, when nothing else says. */
+	texts: v.optional(v.array(v.string())),
+	reagents: v.optional(v.array(v.object({ itemId: v.number(), name: v.string(), quantity: v.number() }))),
 });
 
 export const syncBatch = internalAction({
@@ -126,6 +136,14 @@ export const syncBatch = internalAction({
 						skill: req.level,
 						craftedItemId: p?.recipe?.item?.item?.id,
 						spellName: p?.spells?.[0]?.spell?.name,
+						texts: [p?.description, ...(p?.spells ?? []).map((x) => x.description)].filter((t): t is string => !!t),
+						reagents: (p?.recipe?.reagents ?? [])
+							.filter((x) => x.reagent?.id)
+							.map((x) => ({
+								itemId: x.reagent!.id!,
+								name: x.reagent!.name ?? `Item ${x.reagent!.id}`,
+								quantity: x.quantity ?? 1,
+							})),
 					};
 				} catch (e) {
 					console.warn(`recipeItems: ${itemId}: ${(e as Error).message}`);
@@ -154,30 +172,59 @@ export const save = internalMutation({
 			}
 			return list;
 		};
-		for (const { craftedItemId, spellName, ...item } of items) {
-			let recipe: Doc<"recipes"> | undefined;
-			if (craftedItemId) {
-				// The profession by name too: some items give another id for it
-				// (Forever's First Aid manuals: 2942, the catalog and profiles: 129).
-				const makers = (
-					await ctx.db
-						.query("recipes")
-						.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", craftedItemId))
-						.collect()
-				).filter((r) => r.professionId === item.professionId || r.profession === item.profession);
-				recipe = makers.length === 1 ? makers[0] : makers.find((r) => r.name === taughtName(item.name));
+		// The catalog's id for a profession, by name: some items give another
+		// (Forever's First Aid manuals: 2942, the catalog and profiles: 129).
+		const catalogIds = new Map<string, number | null>();
+		const catalogId = async (profession: string, id: number) => {
+			if ((await professionRecipes(id)).length) return id;
+			if (!catalogIds.has(profession)) {
+				// Rare (First Aid manuals): a scan that stops at the first one.
+				const one = await ctx.db
+					.query("recipes")
+					.filter((q) => q.and(q.eq(q.field("profession"), profession), q.gte(q.field("recipeId"), 0)))
+					.first();
+				catalogIds.set(profession, one?.professionId ?? null);
 			}
-			if (!recipe) {
+			return catalogIds.get(profession) ?? id;
+		};
+		for (const { craftedItemId, spellName, texts, reagents, ...fetched } of items) {
+			const item = { ...fetched, professionId: await catalogId(fetched.profession, fetched.professionId) };
+			const byName = async (name: string) =>
+				(await professionRecipes(item.professionId)).find(
+					(r) => r.recipeId >= 0 && r.name.toLowerCase() === name.toLowerCase(),
+				);
+			let recipes: Pick<Doc<"recipes">, "recipeId" | "profession">[] = [];
+			const rank = rankFrom(texts ?? []);
+			const researched = RESEARCHED[item.itemId];
+			if (researched) {
+				for (const name of researched.recipes) {
+					const r = await byName(name);
+					if (r) recipes.push(r);
+				}
+			} else if (rank === undefined) {
+				let recipe: Pick<Doc<"recipes">, "recipeId" | "profession"> | undefined;
+				if (craftedItemId) {
+					const makers = (
+						await ctx.db
+							.query("recipes")
+							.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", craftedItemId))
+							.collect()
+					).filter((r) => r.recipeId >= 0 && r.professionId === item.professionId);
+					recipe = makers.length === 1 ? makers[0] : makers.find((r) => r.name === taughtName(item.name));
+				}
 				// Enchants make nothing: match the name it teaches.
-				const names = [spellName, taughtName(item.name)].filter((n) => n).map((n) => n!.toLowerCase());
-				recipe = (await professionRecipes(item.professionId)).find((r) => names.includes(r.name.toLowerCase()));
+				for (const name of [spellName, taughtName(item.name)]) if (!recipe && name) recipe = await byName(name);
+				// Not in Blizzard's catalog: Guildie's own entry, from what the item says it teaches.
+				const named = craftedName(texts ?? []);
+				if (!recipe && named) recipe = await ownRecipe(ctx, item, named, craftedItemId, reagents ?? [], now);
+				if (recipe) recipes = [recipe];
 			}
-			// The catalog's profession id, which characters' professions use.
 			const row = {
 				...item,
-				professionId: recipe?.professionId ?? item.professionId,
-				profession: recipe?.profession ?? item.profession,
-				recipeId: recipe?.recipeId,
+				profession: recipes[0]?.profession ?? item.profession,
+				recipeId: recipes[0]?.recipeId,
+				recipeIds: recipes.length > 1 ? recipes.map((r) => r.recipeId) : undefined,
+				rank,
 				syncedAt: now,
 			};
 			const existing = await ctx.db
@@ -188,6 +235,47 @@ export const save = internalMutation({
 			else await ctx.db.insert("recipeItems", row);
 		}
 	},
+});
+
+/** Guildie's own recipe entry for one Blizzard's catalog lacks (recipeResearch.ts). */
+async function ownRecipe(
+	ctx: MutationCtx,
+	item: { itemId: number; professionId: number; profession: string },
+	name: string,
+	craftedItemId: number | undefined,
+	reagents: { itemId: number; name: string; quantity: number }[],
+	now: number,
+) {
+	const recipeId = guildieRecipeId(item.itemId);
+	const row = {
+		recipeId,
+		fromItem: item.itemId,
+		professionId: item.professionId,
+		profession: item.profession,
+		name,
+		craftedItemId,
+		reagents,
+		syncedAt: now,
+	};
+	const existing = await ctx.db
+		.query("recipes")
+		.withIndex("by_recipeId", (q) => q.eq("recipeId", recipeId))
+		.unique();
+	if (existing) await ctx.db.replace(existing._id, row);
+	else await ctx.db.insert("recipes", row);
+	return { recipeId, profession: item.profession };
+}
+
+/** Guildie's own recipe entries (negative ids), for profile syncs to match by name. */
+export const ownRecipes = internalQuery({
+	args: {},
+	handler: async (ctx) =>
+		(
+			await ctx.db
+				.query("recipes")
+				.withIndex("by_recipeId", (q) => q.lt("recipeId", 0))
+				.collect()
+		).map((r) => ({ recipeId: r.recipeId, professionId: r.professionId, name: r.name })),
 });
 
 export const allItemIds = internalQuery({
@@ -213,7 +301,8 @@ export type RecipeItemRow = RecipeItemInfo & {
 };
 
 function toRow(r: Doc<"recipeItems">): RecipeItemRow | null {
-	if (r.recipeId === undefined) return null;
+	const recipeIds = r.recipeIds ?? (r.recipeId !== undefined ? [r.recipeId] : []);
+	if (!recipeIds.length && r.rank === undefined) return null;
 	return {
 		itemId: r.itemId,
 		name: r.name,
@@ -221,7 +310,8 @@ function toRow(r: Doc<"recipeItems">): RecipeItemRow | null {
 		icon: r.icon,
 		profession: r.profession,
 		professionId: r.professionId,
-		recipeId: r.recipeId,
+		recipeIds,
+		rank: r.rank,
 		skill: r.skill,
 	};
 }

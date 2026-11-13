@@ -90,5 +90,43 @@ test("nobody with the profession, or an older file without recipes", function()
     eq(#ns.recipeRows(2598), 0)
 end)
 
+test("a cookbook with two recipes: known only with both", function()
+    local ns = load({
+        generatedAt = 1, reagents = {},
+        recipes = {
+            items = { [239021] = { "Cooking", 280, 52014, 52015 } },
+            crafters = {
+                { name = "Ada", classId = 8, skills = { Cooking = 300 }, known = { 52014 }, has = {} },
+                { name = "Bo", classId = 1, skills = { Cooking = 300 }, known = { 52014, 52015 }, has = {} },
+            },
+        },
+    })
+    local lines = hover(ns, 239021)
+    eq(plain(lines[1]), "Ada | can learn it")
+    eq(plain(lines[2]), "Known by Bo")
+end)
+
+test("rank books: known once the max skill is there", function()
+    local ns = load({
+        generatedAt = 1, reagents = {},
+        recipes = {
+            items = {},
+            ranks = { [16072] = { "Cooking", 125, 225 } },
+            crafters = {
+                { name = "Ada", classId = 8, skills = { Cooking = 140 }, max = { Cooking = 150 }, known = {}, has = {} },
+                { name = "Bo", classId = 1, skills = { Cooking = 90 }, max = { Cooking = 150 }, known = {}, has = {} },
+                { name = "Cy", classId = 4, skills = { Cooking = 200 }, max = { Cooking = 225 }, known = {}, has = {} },
+                { name = "Di", classId = 9, skills = { Cooking = 140 }, known = {}, has = {} },
+            },
+        },
+    })
+    local lines = hover(ns, 16072)
+    eq(#lines, 4)
+    eq(plain(lines[1]), "Ada | can learn it")
+    eq(plain(lines[2]), "Di | can learn it", "no max skill sent: the game will say")
+    eq(plain(lines[3]), "Bo | at 125 (has 90)")
+    eq(plain(lines[4]), "Known by Cy")
+end)
+
 print(string.format("%d passed, %d failed", passed, failures))
 if failures > 0 then os.exit(1) end

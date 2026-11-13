@@ -539,11 +539,19 @@ export const itemDetail = query({
 				[taught],
 				!!allowed?.isMember,
 			);
-			const recipe = await recipeRow(ctx, taught.recipeId);
+			const names = [];
+			for (const id of taught.recipeIds) {
+				const recipe = await recipeRow(ctx, id);
+				if (recipe) names.push(recipe.name);
+			}
 			learn = {
 				profession: taught.profession,
 				skill: taught.skill,
-				recipeName: recipe?.name,
+				/** What it teaches: "Red Linen Robe", "Grand Lobster Banquet and Specklefin Feast", or a rank. */
+				teaches:
+					taught.rank !== undefined ? `up to ${taught.profession} ${taught.rank}` : names.join(" and ") || undefined,
+				/** Guildie's own recipe entry (Blizzard's catalog lacks it). */
+				ownEntry: taught.recipeIds.some((id) => id < 0),
 				who: who.get(itemId) ?? [],
 			};
 		}

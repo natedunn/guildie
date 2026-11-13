@@ -125,9 +125,12 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 							/>
 						)}
 						<p className="text-xs text-muted-foreground">
-							Teaches {data.learn.recipeName ?? "a recipe"}
-							{data.learn.skill ? ` at ${data.learn.profession} ${data.learn.skill}` : ""}. From what Guildie last read
-							of their professions{member ? " and bags" : ""}.
+							Teaches {data.learn.teaches ?? "a recipe"}
+							{data.learn.skill ? ` from ${data.learn.profession} ${data.learn.skill}` : ""}. From what Guildie last
+							read of their professions{member ? " and bags" : ""}.
+							{data.learn.ownEntry
+								? " Blizzard's recipe list doesn't have this one yet: Guildie goes by the recipe's name until it does."
+								: null}
 						</p>
 					</Section>
 				)}
