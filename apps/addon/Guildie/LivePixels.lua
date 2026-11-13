@@ -38,10 +38,11 @@ local function read(fn, ...)
     local ok, value = pcall(fn, ...)
     if ok then return publicValue(value) end
 end
+-- Keep the default header clear of client borders and screen-edge clipping.
+local DEFAULT_INSET_PIXELS = 4
 local panel = CreateFrame("Frame", nil, UIParent)
 panel:SetFrameStrata("TOOLTIP")
 panel:SetScale(1 / (read(UIParent.GetEffectiveScale, UIParent) or 1))
-panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 0, 0)
 panel:SetMovable(true)
 panel:SetClampedToScreen(true)
 panel:EnableMouse(false)
@@ -55,10 +56,25 @@ local function place(x, y)
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", UIParent, "TOPLEFT", x, y)
 end
+local function defaultPosition()
+    local scale = read(panel.GetEffectiveScale, panel) or 1
+    local width = read(GetPhysicalScreenSize)
+    local parentWidth = read(UIParent.GetWidth, UIParent)
+    local parentScale = read(UIParent.GetEffectiveScale, UIParent)
+    if width and parentWidth and parentWidth > 0 and parentScale and parentScale > 0 then
+        local ratio = width / (parentWidth * parentScale)
+        if ratio >= 0.25 and ratio <= 4 then scale = scale * ratio end
+    end
+    local inset = DEFAULT_INSET_PIXELS / (scale > 0 and scale or 1)
+    return inset, -inset
+end
+place(defaultPosition())
 local function restorePosition()
     local position = options()
     if type(position) == "table" and type(position.x) == "number" and type(position.y) == "number" then
         place(position.x, position.y)
+    else
+        place(defaultPosition())
     end
 end
 panel:RegisterEvent("ADDON_LOADED")
@@ -273,8 +289,8 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         print("Guildie pixels: drag the square. /guildiepixels lock hides it; /guildiepixels on starts export.")
     elseif command == "reset" then
         options().enabled = false
-        options().x, options().y = 0, 0
-        place(0, 0)
+        options().x, options().y = defaultPosition()
+        place(options().x, options().y)
         panel:Hide()
         print("Guildie pixels: position reset; export disabled.")
     else
@@ -314,7 +330,7 @@ ns.livePixels = {
         end
     end,
     reset = function()
-        options().x, options().y = 0, 0
-        place(0, 0)
+        options().x, options().y = defaultPosition()
+        place(options().x, options().y)
     end,
 }
