@@ -71,11 +71,11 @@ jobs:
 
       - name: Build native icon probe
         working-directory: apps/desktop
-        run: pnpm exec esbuild scripts/probe-window-icon.ts --bundle --platform=node --format=esm --external:electron --external:koffi --define:__VERSION__='"probe"' --outfile=dist/icon-probe.mjs --banner:js='import { createRequire } from "node:module"; import { fileURLToPath } from "node:url"; import { dirname } from "node:path"; const require = createRequire(import.meta.url); const __dirname = dirname(fileURLToPath(import.meta.url));'
+        run: pnpm exec esbuild scripts/probe-window-icon.ts --bundle --platform=node --format=cjs --external:electron --external:koffi --define:__VERSION__='"probe"' --outfile=dist/icon-probe.cjs
       - name: Check the running window icon
         timeout-minutes: 2
         working-directory: apps/desktop
-        run: pnpm exec electron dist/icon-probe.mjs
+        run: pnpm exec electron dist/icon-probe.cjs
 
   changelog:
     name: CHANGELOG entry
