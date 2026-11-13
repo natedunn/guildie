@@ -118,6 +118,21 @@ export function addBlizzardRecipes<P extends { id: number; knownRecipes?: number
 	return fetched.map((p) => ({ ...p, knownRecipes: addRecipes(known.get(p.id), p.knownRecipes) }));
 }
 
+/**
+ * The game's stored recipes, less those of professions both sources say are
+ * gone (so relearning one later doesn't bring back its old recipes). Without a
+ * Blizzard list (under level 10) the game's list decides; an empty or missing
+ * list from the game decides nothing.
+ */
+export function dropGoneRecipes<R extends { professionId: number }>(
+	recipes: R[],
+	addonIds: number[] | undefined,
+	blizzardIds: number[] | undefined,
+): R[] {
+	if (!addonIds?.length) return recipes;
+	return recipes.filter((r) => addonIds.includes(r.professionId) || (blizzardIds?.includes(r.professionId) ?? false));
+}
+
 /** Each Blizzard part's time after a sync: the parts it fetched get `at`, the rest keep theirs. */
 export function blizzardPartTimes(
 	before: Character["blizzardAt"],

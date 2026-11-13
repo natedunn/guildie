@@ -7,6 +7,7 @@ import {
 	averageItemLevel,
 	blizzardPartTimes,
 	decide,
+	dropGoneRecipes,
 	mergeProfile,
 } from "./profile.ts";
 
@@ -442,4 +443,13 @@ test("a Blizzard part whose fetch failed keeps its older time", () => {
 	assert.equal(p.equipment?.[0].name, "New Hat");
 	assert.equal(p.sources.gear.kind, "addon");
 	assert.equal(p.sources.professions.kind, "blizzard", "professions were fetched after the read");
+});
+
+test("recipes of a profession both sources say is gone are dropped", () => {
+	const r = [{ professionId: 197 }, { professionId: 333 }];
+	assert.deepEqual(dropGoneRecipes(r, [197], [197]), [{ professionId: 197 }], "unlearned Enchanting");
+	assert.deepEqual(dropGoneRecipes(r, [197], [197, 333]), r, "Blizzard still lists it");
+	assert.deepEqual(dropGoneRecipes(r, [], [197]), r, "an empty read in game decides nothing");
+	assert.deepEqual(dropGoneRecipes(r, undefined, undefined), r);
+	assert.deepEqual(dropGoneRecipes(r, [197], undefined), [{ professionId: 197 }], "under 10: the game decides");
 });

@@ -6,7 +6,7 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
-import { addRecipes, mergeProfile, type Profession } from "./profile";
+import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -257,10 +257,14 @@ export const ingest = mutation({
 					unmatched: missing,
 				});
 			}
-			// Recipes are kept for every profession: the profile shows them only
-			// for professions in the list it shows (profile.ts), and an empty or
-			// failed profession read must not delete them.
-			const keptRecipes = [...recipes.values()];
+			// Recipes stay until both sources say their profession is gone (an
+			// empty or failed profession read deletes nothing); the profile shows
+			// them only for professions in the list it shows (profile.ts).
+			const keptRecipes = dropGoneRecipes(
+				[...recipes.values()],
+				professions?.list.map((p) => p.id),
+				character?.professions?.map((p) => p.id),
+			);
 
 			const snapshot: SnapshotFields = {
 				userId: row.userId,
