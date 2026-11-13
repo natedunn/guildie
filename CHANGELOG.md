@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.30
+
 ### New
 
 - **Guildie, Addon:** Keep sender and recipient names with request deliveries. The feed shows who received which items, how many, and whether they arrived by mail or trade, including partial contributions and the delivery that completed the request.
