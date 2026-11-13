@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, Addon:** Recipe tooltips say "requires lvl 25 (at lvl 12)" for a guildmate whose skill is too low, instead of "at 25 (has 12)".
+
 ### Fixes
 
 - **App, Addon:** Guild data reaches the game again. For about a day the app couldn't download it, so tooltips kept showing old requests, reagents and upgrades, and "who can learn it" never appeared.

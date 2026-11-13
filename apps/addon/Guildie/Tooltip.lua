@@ -85,8 +85,8 @@ local MAX_KNOWN = 3
 --- 0.14.0; the same rule as apps/web/convex/shared/recipeStatus.ts.) For
 --- each guild character with the profession: can learn it now, later
 --- (skill too low), already has one unlearned, or knows it. Rows: one per
---- character who could use it ("Brenna | can learn it", "Miller | at 125
---- (has 90)", "Todd | has one already"), then "Known by Lich, Isai +2".
+--- character who could use it ("Brenna | can learn it", "Miller | requires lvl
+--- 125 (at lvl 90)", "Todd | has one already"), then "Known by Lich, Isai +2".
 --- Leaves out the character you're on: the game's own tooltip says.
 --- 0.15.0: a cookbook teaches several recipes (ids 3..n: knows it with all
 --- of them), and rank books (`ranks`: { profession, skill, max skill it
@@ -149,7 +149,7 @@ local function recipeRows(itemID)
     end
     add(groups.now, function() return "can learn it" end)
     add(groups.later, function(c)
-        if c.skill >= 0 then return string.format("at %d (has %d)", need, c.skill) end
+        if c.skill >= 0 then return string.format("requires lvl %d (at lvl %d)", need, c.skill) end
         return "skill too low"
     end)
     add(groups.has, function() return "has one already" end)

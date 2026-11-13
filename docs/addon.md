@@ -316,7 +316,7 @@ already (in bags or bank, not learned), or **knows it**. The rule is
   profession, skill, max skill it unlocks } } (0.15.0; apart, so 0.14.0
   leaves them out), crafters = { { name, classId, skills = { Tailoring =
   120 } (-1: unknown), max = { Tailoring = 225 } (0.15.0), known = {
-  recipeIds it teaches }, has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | at 25 (has 5)",
+  recipeIds it teaches }, has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | requires lvl 25 (at lvl 5)",
   "Di | has one already" (up to 8, then "+N more could use it"), then "Known
   by Ada, Ben, Cat +2". The character you're on is left out (the game's own
   tooltip says "Already known" or the requirement in red); your other
