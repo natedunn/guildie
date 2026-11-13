@@ -53,30 +53,40 @@ function pixels(icon: number): Buffer {
 		deleteDC(context);
 	}
 }
-await app.whenReady();
-const reference = load(0, join(__dirname, "assets", "guildie.ico"), 1, 32, 32, 0x10);
-const expected = pixels(reference);
-destroy(reference);
-let failures = 0;
-for (let attempt = 0; attempt < 2; attempt++) {
-	const win = createWindow("about:blank", { show: false, preload: join(__dirname, "preload.cjs") });
-	const hwnd = Number(win.getNativeWindowHandle().readBigUInt64LE());
-	const check = (stage: string) => {
-		const icon = Number(send(hwnd, 0x7f, 1, 0)) || Number(getClass(hwnd, -14));
-		const matches = pixels(icon).equals(expected);
-		console.log(`${matches ? "PASS" : "FAIL"} window ${attempt + 1}, ${stage}: native taskbar icon matches Guildie`);
-		if (!matches) failures++;
-	};
-	check("created");
-	await new Promise<void>((resolve) => win.webContents.once("did-finish-load", () => resolve()));
-	win.show();
-	await new Promise((resolve) => setTimeout(resolve, 300));
-	check("shown");
-	win.hide();
-	win.show();
-	check("shown again");
-	win.setIcon(join(__dirname, "assets", "guildie.ico"));
-	check("explicit setIcon after show");
-	win.destroy();
+async function main() {
+	await app.whenReady();
+	setTimeout(() => {
+		console.error("Icon probe timed out");
+		app.exit(2);
+	}, 20000).unref();
+	const reference = load(0, join(__dirname, "assets", "guildie.ico"), 1, 32, 32, 0x10);
+	const expected = pixels(reference);
+	destroy(reference);
+	let failures = 0;
+	for (let attempt = 0; attempt < 2; attempt++) {
+		const win = createWindow("about:blank", { show: false, preload: join(__dirname, "preload.cjs") });
+		const hwnd = Number(win.getNativeWindowHandle().readBigUInt64LE());
+		const check = (stage: string) => {
+			const icon = Number(send(hwnd, 0x7f, 1, 0)) || Number(getClass(hwnd, -14));
+			const matches = pixels(icon).equals(expected);
+			console.log(`${matches ? "PASS" : "FAIL"} window ${attempt + 1}, ${stage}: native taskbar icon matches Guildie`);
+			if (!matches) failures++;
+		};
+		check("created");
+		await new Promise<void>((resolve) => win.webContents.once("did-finish-load", () => resolve()));
+		win.show();
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		check("shown");
+		win.hide();
+		win.show();
+		check("shown again");
+		win.setIcon(join(__dirname, "assets", "guildie.ico"));
+		check("explicit setIcon after show");
+		win.destroy();
+	}
+	app.exit(failures ? 1 : 0);
 }
-app.exit(failures ? 1 : 0);
+void main().catch((error) => {
+	console.error(error);
+	app.exit(1);
+});
