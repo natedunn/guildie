@@ -508,7 +508,7 @@ events:SetScript("OnEvent", function(_, event, addon, action)
 end)
 
 
--- A small, non-interactive reminder away from the pixel square. This reports
+-- A dismissible reminder away from the pixel square. This reports
 -- local export health and cached comparison freshness, never inferred receipt.
 local warning = CreateFrame("Frame", "GuildieSyncWarning", UIParent)
 warning:SetSize(520, 54)
@@ -517,11 +517,20 @@ warning:SetFrameStrata("HIGH")
 warning:SetClampedToScreen(true)
 warning:EnableMouse(false)
 warning.text = warning:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-warning.text:SetAllPoints(warning)
+warning.text:SetPoint("TOPLEFT", warning, "TOPLEFT", 0, -4)
+warning.text:SetPoint("TOPRIGHT", warning, "TOPRIGHT", -28, -4)
 warning.text:SetJustifyH("CENTER")
+warning.close = CreateFrame("Button", nil, warning, "UIPanelCloseButton")
+warning.close:SetSize(28, 28)
+warning.close:SetPoint("TOPRIGHT", warning, "TOPRIGHT", 0, 0)
+warning.close:SetScript("OnClick", function()
+    settings().showSyncWarning = false
+    warning:Hide()
+    refresh()
+end)
 warning:Hide()
 function ns.refreshSyncWarning()
-    if not ns.livePixels.get().enabled then warning:Hide(); return end
+    if not ns.livePixels.get().enabled or settings().showSyncWarning == false then warning:Hide(); return end
     local state = ns.windowState()
     warning.text:SetText("Guildie experimental sync: keep the whole square visible and unobstructed.\n"
         .. (state.warning or "Pixel output does not confirm receipt. Check the app for live sync status."))

@@ -254,6 +254,29 @@ test("reload and edit controls respect combat", function()
     eq(state.reloads, 1)
 end)
 
+test("dismissing sync warning persists without disabling export", function()
+    local db = {}
+    local ns = wow.load({db = db, time = NOW, guid = GUID})
+    ns.livePixels.set("enabled", true)
+    ns.refreshSyncWarning()
+    local banner = _G.GuildieSyncWarning
+    eq(banner:IsShown(), true)
+    banner.close.scripts.OnClick()
+    eq(banner:IsShown(), false)
+    ns.refreshSyncWarning()
+    eq(banner:IsShown(), false, "timer must not reopen dismissed warning")
+    eq(ns.livePixels.get().enabled, true, "export stays enabled")
+    ns = wow.load({db = db, time = NOW, guid = GUID})
+    ns.refreshSyncWarning()
+    eq(_G.GuildieSyncWarning:IsShown(), false, "dismissal survives reload")
+    ns.settings().showSyncWarning = true
+    ns.refreshSyncWarning()
+    eq(_G.GuildieSyncWarning:IsShown(), true, "preference restores warning")
+    ns.livePixels.set("enabled", false)
+    ns.refreshSyncWarning()
+    eq(_G.GuildieSyncWarning:IsShown(), false)
+end)
+
 -- ---- End to end ---------------------------------------------------------------------
 
 local file = arg and arg[1]
