@@ -263,6 +263,25 @@ your last login or reload.
   Stamina over Embossed Leather Gloves"). About 20 KB of the file for a guild
   of 60. How the scoring works, with every spec's weights:
   [gear-upgrades.md](gear-upgrades.md).
+- For you (addon 0.19.0): `upgrades.mine` holds the same profile for each of
+  your own characters, however long ago you played them. On the character
+  you're on, the addon scores what you wear right now (`U.liveMember`:
+  `GetInventoryItemLink` per slot, the site's score for a slot whose item
+  hasn't loaded yet; cached until `PLAYER_EQUIPMENT_CHANGED`,
+  `PLAYER_LEVEL_UP` or `GET_ITEM_INFO_RECEIVED`) and puts your row first:
+  "You | upgrade +35%", "You | maybe +8% (cloth)", "You | empty slot", "You |
+  not an upgrade", "You | needs lvl 30", "You | can't use"; nothing for an item
+  you wear. It shows for items that can't be traded too (quest rewards,
+  loot rolls), where guildmates' rows don't. Setting: "Show whether items are
+  an upgrade for you" (`showForYou`, on by default).
+- Dialogue UI (experimental, addon 0.19.0): the Dialogue UI addon draws its
+  own quest-window tooltips, which the game's tooltip hooks don't reach. When
+  it's installed, the addon registers with its public API
+  (`DialogueUIAPI.AddItemTooltipProcessorExternal`, the hook its own
+  translations use) and adds the same Guildie block there
+  (`ns.hookDialogueUI` in `Tooltip.lua`; `## OptionalDeps: DialogueUI` so it
+  loads first). Setting: "Guildie in Dialogue UI tooltips (experimental)"
+  (`dialogueUI`, on by default).
 - Your own characters (addon 0.6.0): `characters`, by name, each claimed
   character as Guildie shows it now (the merged profile, below): see "Up to
   date with Guildie". About 0.5 KB per character.

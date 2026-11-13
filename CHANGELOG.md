@@ -15,6 +15,11 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Addon:** Item tooltips now say whether an item is an upgrade for the character you're on ("You | upgrade +35%", "not an upgrade", "can't use"), scored against what you're wearing right now. It also shows on quest rewards and loot rolls.
+- **Addon:** Experimental: with the Dialogue UI addon installed, its quest window's item tooltips show the Guildie section too. Turn it off in Guildie's settings.
+
 ### Fixes
 
 - **Addon:** Guildie no longer tries to open the game's Edit Mode, which WoW blocked ("Guildie has been blocked from an action...") and left half open. To move the live sync square anywhere, press Escape, choose Edit Mode and drag it; the corner buttons in Guildie's settings still work.

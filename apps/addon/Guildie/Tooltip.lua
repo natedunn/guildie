@@ -1,4 +1,5 @@
--- Adds a Guildie block to item tooltips: guild requests for this item ("Todd
+-- Adds a Guildie block to item tooltips: whether it's an upgrade for you
+-- ("You | upgrade +35%", Upgrades.lua), guild requests for this item ("Todd
 -- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
 -- whose known recipes use it (reagents), who could learn it (recipe items:
 -- patterns, plans, formulas), and guildmates it might be a gear upgrade
@@ -202,12 +203,15 @@ local function requestRows(itemID)
 end
 ns.requestRows = requestRows
 
---- The gear-upgrade rows for the item in this tooltip, if any.
-local function upgradeRows(tooltip, itemID, data)
-    if not ns.upgrades or not tooltip.GetItem then return nil end
-    local _, link = tooltip:GetItem()
-    local item = ns.upgrades.readItem(link, ns.upgrades.tooltipLines(tooltip, data))
-    return ns.upgrades.lines(item, itemID, classColored)
+--- The item in this tooltip, read for the gear rules (Upgrades.lua), or nil.
+local function gearItem(tooltip, data, link, lines)
+    if not ns.upgrades then return nil end
+    if not link and tooltip.GetItem then
+        local _, l = tooltip:GetItem()
+        link = l
+    end
+    if not link and data then link = data.hyperlink end
+    return link and ns.upgrades.readItem(link, lines)
 end
 
 --- Why there's nothing to say, for the "Say why tooltips have nothing"
@@ -226,16 +230,25 @@ local function explainEmpty()
 end
 
 --- Everything Guildie has to say about this item, as rows (no header).
-local function rowsFor(tooltip, itemID, data)
-    local rows, ongoing = requestRows(itemID)
+--- `link`: the item's link when the tooltip can't say (another addon's).
+local function rowsFor(tooltip, itemID, data, link)
+    local lines = ns.upgrades and ns.upgrades.tooltipLines(tooltip, data) or {}
+    local okItem, item = pcall(gearItem, tooltip, data, link, lines)
+    if not okItem then item = nil end
+    local rows = {}
+    -- Yours first: it's for you whether or not it can be traded (quest rewards, loot rolls).
+    local okMine, mine = pcall(function() return item and ns.upgrades.mineRow(item, itemID, classColored) end)
+    if okMine and mine then table.insert(rows, mine) end
+    local requests, ongoing = requestRows(itemID)
+    for _, row in ipairs(requests) do table.insert(rows, row) end
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
-    local binding = ns.upgrades and ns.upgrades.binding(ns.upgrades.tooltipLines(tooltip, data))
+    local binding = ns.upgrades and ns.upgrades.binding(lines)
     local bound = binding ~= nil
     if not bound then
         for _, row in ipairs(recipeRows(itemID)) do table.insert(rows, row) end
         for _, row in ipairs(reagentRows(itemID, ongoing)) do table.insert(rows, row) end
     end
-    local ok, upgrades = pcall(upgradeRows, tooltip, itemID, data)
+    local ok, upgrades = pcall(function() return item and ns.upgrades.lines(item, itemID, classColored) end)
     if ok and upgrades then
         for _, row in ipairs(upgrades) do table.insert(rows, row) end
     end
@@ -253,13 +266,17 @@ local MUTED = { 0.66, 0.66, 0.66 }
 local INDENT = "   "
 ns.TOOLTIP_HEADER = HEADER
 
-local function addTo(tooltip, itemID, data)
-    if not itemID then return end
+--- Adds the block; true when it added something. `link`: the item's link
+--- for tooltips that can't say (Dialogue UI's); `noShow`: the caller shows
+--- the tooltip itself.
+local function addTo(tooltip, itemID, data, link, noShow)
+    if not itemID then return false end
     -- Not our own hidden tooltip, which reads worn gear (Capture.lua).
-    if tooltip.GetName and tooltip:GetName() == "GuildieScanTooltip" then return end
-    local rows = rowsFor(tooltip, itemID, data)
-    if #rows == 0 then return end
-    tooltip:AddLine(" ")
+    if tooltip.GetName and tooltip:GetName() == "GuildieScanTooltip" then return false end
+    local rows = rowsFor(tooltip, itemID, data, link)
+    if #rows == 0 then return false end
+    -- Dialogue UI's tooltip has a shorter blank line of its own.
+    if tooltip.AddBlankLine then tooltip:AddBlankLine() else tooltip:AddLine(" ") end
     tooltip:AddLine(HEADER, HEADER_COLOR[1], HEADER_COLOR[2], HEADER_COLOR[3])
     local m = MUTED
     for _, row in ipairs(rows) do
@@ -271,9 +288,27 @@ local function addTo(tooltip, itemID, data)
             tooltip:AddLine(INDENT .. row.left, m[1], m[2], m[3], true)
         end
     end
-    tooltip:Show()
+    if not noShow then tooltip:Show() end
+    return true
 end
 ns.addToTooltip = addTo
+
+--- Dialogue UI (Peterodox's quest window) draws its own tooltips, which the
+--- game's tooltip hooks never see. Its public API takes item tooltip
+--- processors: ours adds the same Guildie block (experimental; Settings:
+--- "Guildie in Dialogue UI tooltips"). Returns true when it hooked in.
+local function hookDialogueUI()
+    local api = _G.DialogueUIAPI
+    if type(api) ~= "table" or type(api.AddItemTooltipProcessorExternal) ~= "function" then return false end
+    api.AddItemTooltipProcessorExternal(function(tooltip, itemID, link)
+        local s = GuildieDB and GuildieDB.settings
+        if (s and s.dialogueUI == false) or not tooltip or not itemID then return false end
+        local ok, added = pcall(addTo, tooltip, itemID, tooltip.tooltipData, link, true)
+        return ok and added == true
+    end)
+    return true
+end
+ns.hookDialogueUI = hookDialogueUI
 
 -- Hooked at PLAYER_LOGIN, once every addon has loaded: tooltip hooks run
 -- in the order they were added, so ours comes after other addons' lines
@@ -294,6 +329,7 @@ local function hookTooltips()
         GameTooltip:HookScript("OnTooltipSetItem", onSetItem)
         ItemRefTooltip:HookScript("OnTooltipSetItem", onSetItem)
     end
+    pcall(hookDialogueUI)
 end
 
 if IsLoggedIn and IsLoggedIn() then

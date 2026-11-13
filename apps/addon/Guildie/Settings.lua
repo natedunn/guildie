@@ -6,6 +6,8 @@ function ns.settings()
     if s.showMinimap == nil then s.showMinimap = true end
     if s.reloadWhenAfk == nil then s.reloadWhenAfk = false end
     if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
+    if s.showForYou == nil then s.showForYou = true end
+    if s.dialogueUI == nil then s.dialogueUI = true end
     return s
 end
 
@@ -129,5 +131,8 @@ function ns.buildSettingsRows(parent, width, changed)
     section("Display")
     preference("Minimap button", "showMinimap")
     preference("Explain empty item tooltips", "sayWhyEmpty")
+    preference("Say whether items are an upgrade for you", "showForYou")
+    preference("Guildie in Dialogue UI tooltips", "dialogueUI")
+    note("Experimental. Adds Guildie to the quest window's item tooltips when the Dialogue UI addon is installed.", nil, 24)
     return rows, function() for _, update in ipairs(updates) do update() end end, controls
 end

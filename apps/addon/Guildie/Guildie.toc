@@ -4,6 +4,7 @@
 ## Author: Guildie
 ## Version: 0.18.0
 ## SavedVariables: GuildieDB
+## OptionalDeps: DialogueUI
 ## IconTexture: Interface\AddOns\Guildie\icon
 ## AddonCompartmentFunc: Guildie_OnAddonCompartmentClick
 ## X-Website: https://guildie.club

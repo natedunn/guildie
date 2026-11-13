@@ -569,7 +569,9 @@ type GuildDataBase = {
 	}[];
 	/** Active guildmates (not the token owner's own characters) for gear-upgrade suggestions. */
 	upgradeMembers: UpgradeMember[];
-	/** Specs from players' own stat priorities that `upgradeMembers` use (shared/upgrades.ts specsFor). */
+	/** The token owner's own characters in those guilds, however long ago they were seen ("for you" rows). */
+	upgradeMine: UpgradeMember[];
+	/** Specs from players' own stat priorities that `upgradeMembers` and `upgradeMine` use (shared/upgrades.ts specsFor). */
 	customSpecs: Rules["specs"];
 	characters: GuildData["characters"];
 	requests: GuildData["requests"];
@@ -590,7 +592,16 @@ export type GuildData = {
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
 	 * active guildmate with the scores of what they wear.
 	 */
-	upgrades: { version: 1; rules: Rules; members: UpgradeMember[] };
+	upgrades: {
+		version: 1;
+		rules: Rules;
+		members: UpgradeMember[];
+		/**
+		 * The player's own characters (addon 0.19.0+; older addons ignore it):
+		 * the tooltip's "You | upgrade +35%" row for the character they're on.
+		 */
+		mine: UpgradeMember[];
+	};
 	/**
 	 * The token owner's own claimed characters as Guildie shows them now, by
 	 * name (addon 0.6.0+; older addons ignore it): the addon compares them
@@ -650,6 +661,7 @@ export const guildDataBase = internalQuery({
 		const itemCache = new Map<number, ItemInfo | undefined>();
 		const ownSlugs = new Set(owned.map((c) => `${c.region}:${c.slug}`));
 		const upgradeMembers: UpgradeMember[] = [];
+		const upgradeMine: UpgradeMember[] = [];
 		const now = Date.now();
 		const recipeCharacters: Parameters<typeof addonRecipes>[1] = [];
 		const allMembers: Doc<"characters">[] = [];
@@ -665,7 +677,12 @@ export const guildDataBase = internalQuery({
 			allMembers.push(...members);
 			allProfessions.push(...profiles.map((p) => p.professions));
 			for (const [i, m] of members.entries()) {
-				if (ownSlugs.has(`${m.region}:${m.slug}`)) continue;
+				if (ownSlugs.has(`${m.region}:${m.slug}`)) {
+					// Their own: judged for themselves in game, whenever they last played it.
+					const own = await memberForUpgrades(ctx, m, profiles[i], rules, itemCache);
+					if (own) upgradeMine.push(own.member);
+					continue;
+				}
 				const found = await memberForUpgrades(ctx, m, profiles[i], rules, itemCache);
 				// Only who's been around lately; the addon checks again as time passes.
 				if (found && now - found.member.seen * 1000 <= rules.activeDays * 86_400_000) upgradeMembers.push(found.member);
@@ -703,13 +720,14 @@ export const guildDataBase = internalQuery({
 		// Specs made from players' own stat priorities (specsFor): the addon looks members' specs up in the rules.
 		const builtIn = upgradeRules().specs;
 		const customSpecs: Rules["specs"] = {};
-		for (const m of upgradeMembers) {
+		for (const m of [...upgradeMembers, ...upgradeMine]) {
 			for (const key of [m.spec, m.spec2]) if (key && !(key in builtIn)) customSpecs[key] = rules.specs[key];
 		}
 		return {
 			mine: owned.map((c) => c.name),
 			guilds,
 			upgradeMembers,
+			upgradeMine,
 			customSpecs,
 			characters,
 			requests: requests.byItem,
@@ -759,6 +777,7 @@ export const guildData = action({
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },
 				members: base.upgradeMembers,
+				mine: base.upgradeMine,
 			},
 			characters: base.characters,
 			requests: base.requests,

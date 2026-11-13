@@ -502,12 +502,152 @@ function U.readItem(link, lines)
     return item
 end
 
+-- ---- For you: the character you're on, with what you wear right now -----------------
+
+local function round1(n) return math.floor(n * 10 + 0.5) / 10 end
+
+--- Your own profile (GuildieData.upgrades.mine) with what you wear now
+--- instead of what the site last saw: scores and priority stats per slot,
+--- two-hander, worn ids, your level. `read(slot)` -> item id, item (as
+--- readItem; nil while the client hasn't loaded it: the site's score is
+--- kept for that slot). Same scoring as wornScores / wornKeys in upgrades.ts.
+function U.liveMember(m, rules, level, read)
+    local live = {}
+    for k, v in pairs(m) do live[k] = v end
+    live.level = level or m.level
+    local cls = rules.classes[m.classId]
+    local spec, spec2 = rules.specs[m.spec], m.spec2 and m.slots2 and rules.specs[m.spec2]
+    if not cls or not spec then return live end
+    local slots, slots2, keys, worn = {}, spec2 and {} or nil, {}, {}
+    local th = nil
+    for slot = 1, 18 do
+        if slot ~= 4 then
+            local id, item = read(slot)
+            if id then
+                table.insert(worn, id)
+                if item then
+                    local offHand = slot == 17 and item.cls == 2
+                    slots[slot] = round1((U.scoreItem(item, spec.w, live.level, cls, rules, offHand, m)))
+                    if spec2 then
+                        slots2[slot] = round1((U.scoreItem(item, spec2.w, live.level, cls, rules, offHand, m)))
+                    end
+                    local values, any = {}, false
+                    for _, k in ipairs(spec.stats or {}) do
+                        local v = U.keyValue(item, k)
+                        if v ~= 0 then values[k], any = v, true end
+                    end
+                    if any then keys[slot] = values end
+                    if slot == 16 and item.invType == "2HWEAPON" then th = true end
+                else
+                    slots[slot] = m.slots and m.slots[slot]
+                    if spec2 then slots2[slot] = m.slots2[slot] end
+                    keys[slot] = m.keys and m.keys[slot]
+                    if slot == 16 then th = m.th end
+                end
+            end
+        end
+    end
+    live.slots, live.slots2, live.keys, live.worn, live.th = slots, slots2, keys, worn, th
+    return live
+end
+
+local ARMOR_NAMES = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate" }
+local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe", empty = "empty slot" }
+
+--- What the item is to you, as a row's right side: "upgrade +35%",
+--- "trade-off +20%", "maybe +8% (cloth)", "empty slot", "not an upgrade",
+--- "needs lvl 30", "can't use"; nil when you wear it.
+function U.forYou(item, itemID, m, rules)
+    if itemID and contains(m.worn, itemID) then return nil end
+    local v = U.judge(item, m, rules, nil)
+    if not v then
+        if U.usableAt(item, m, rules, nil) then return "not an upgrade" end
+        if item.reqLevel and item.reqLevel > m.level + rules.levelsAhead then
+            -- Usable once you're old enough?
+            local older = {}
+            for k, val in pairs(m) do older[k] = val end
+            older.level = item.reqLevel
+            if U.usableAt(item, older, rules, nil) then return "needs lvl " .. item.reqLevel end
+        end
+        return "can't use"
+    end
+    local text = LABELS[v.kind] or "maybe"
+    if v.kind ~= "empty" then text = text .. string.format(" +%d%%", math.floor(v.gain * 100 + 0.5)) end
+    local notes = {}
+    if v.second then
+        local spec = rules.specs[v.spec]
+        if spec then table.insert(notes, spec.name) end
+    end
+    if v.off and ARMOR_NAMES[v.off] then table.insert(notes, ARMOR_NAMES[v.off]) end
+    if v.at then table.insert(notes, "lvl " .. v.at) end
+    if #notes > 0 then text = text .. " (" .. table.concat(notes, ", ") .. ")" end
+    return text
+end
+
+--- The item you have equipped in an inventory slot: id, item (readItem),
+--- and true when it can't be read on this client at all (no GetItemStats, no
+--- tooltip data: the site's score stands, rather than a stat-less item).
+local function readEquipped(slot)
+    local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
+    local id = link and tonumber(link:match("item:(%d+)"))
+    if not id then return nil end
+    local data = C_TooltipInfo and C_TooltipInfo.GetInventoryItem and C_TooltipInfo.GetInventoryItem("player", slot)
+    local hasStats = (C_Item and C_Item.GetItemStats) or GetItemStats
+    if not hasStats and not (data and data.lines) then return id, nil, true end
+    return id, U.readItem(link, U.tooltipLines(nil, data))
+end
+
+-- Your live profile, until your gear or level changes (or an item loads).
+local liveCache
+local watcher = CreateFrame and CreateFrame("Frame")
+if watcher and watcher.RegisterEvent then
+    for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "GET_ITEM_INFO_RECEIVED" }) do
+        pcall(watcher.RegisterEvent, watcher, event)
+    end
+    watcher:SetScript("OnEvent", function() liveCache = nil end)
+end
+function U.forgetLive() liveCache = nil end
+
 -- ---- The tooltip rows ---------------------------------------------------------------
 
 local function upgradeData()
     local data = GuildieData and GuildieData.upgrades
     if type(data) ~= "table" or data.version ~= 1 or type(data.rules) ~= "table" then return nil end
     return data
+end
+
+--- Your row, first under the Guildie header: { left = "You", right =
+--- "upgrade +35%" }, for the character you're on (GuildieData.upgrades.mine,
+--- addon 0.19.0), or nil. Also for items that can't be traded: it's yours.
+--- `color(name, classId)` colors a name.
+function U.mineRow(item, itemID, color)
+    local data = upgradeData()
+    local me = UnitName and UnitName("player")
+    if not data or not item or not me or type(data.mine) ~= "table" then return nil end
+    local s = GuildieDB and GuildieDB.settings
+    if s and s.showForYou == false then return nil end
+    local m
+    for _, c in ipairs(data.mine) do
+        if c.name == me then m = c end
+    end
+    if not m then return nil end
+    local live
+    if liveCache and liveCache.member == m then
+        live = liveCache.live
+    else
+        local level = UnitLevel and UnitLevel("player")
+        local complete = true
+        live = U.liveMember(m, data.rules, (level and level > 0) and level or nil, function(slot)
+            local id, read, never = readEquipped(slot)
+            if id and not read and not never then complete = false end
+            return id, read
+        end)
+        -- Kept only once every worn item has loaded (else built again next time).
+        if complete then liveCache = { member = m, live = live } end
+    end
+    local right = U.forYou(item, itemID, live, data.rules)
+    if not right then return nil end
+    return { left = color("You", m.classId), right = right }
 end
 
 --- Rows under the tooltip's Guildie header, one per person, upgrades first:
