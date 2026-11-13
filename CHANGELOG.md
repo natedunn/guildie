@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.33
+
 ### New
 
 - **Addon:** Item tooltips now say whether an item is an upgrade for the character you're on ("You | upgrade +35%", "not an upgrade", "can't use"), scored against what you're wearing right now. It also shows on quest rewards and loot rolls.
