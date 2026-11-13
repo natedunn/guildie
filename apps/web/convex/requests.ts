@@ -98,6 +98,13 @@ async function knownRecipes(ctx: Ctx, characters: Doc<"characters">[]) {
 	return out;
 }
 
+/** Profession ids any of these characters has. */
+async function professionIds(ctx: Ctx, characters: Doc<"characters">[]) {
+	const out = new Set<number>();
+	for (const c of characters) for (const p of (await pickProfile(ctx, c)).professions) out.add(p.id);
+	return out;
+}
+
 const brief = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
 	slug: c.slug,
 	name: c.name,
@@ -151,7 +158,7 @@ async function cachedItem(ctx: Ctx, items: ItemCache, itemId: number) {
 async function view(
 	ctx: QueryCtx,
 	r: Doc<"requests">,
-	viewer: { userId: Id<"users">; known: Set<number> },
+	viewer: { userId: Id<"users">; known: Set<number>; professions?: Set<number> },
 	items: ItemCache,
 	scans: () => Promise<Doc<"inventories">[]>,
 	now: number,
@@ -174,6 +181,15 @@ async function view(
 			? matsCheck(recipe.reagents, r.quantity, await scans())
 			: undefined;
 	const ongoing = !!r.ongoing;
+	// Crafts the viewer knows, then crafts in a profession they have: first in the list.
+	const fit =
+		r.kind === "craft" && !mine && recipe
+			? viewer.known.has(recipe.recipeId)
+				? 2
+				: viewer.professions?.has(recipe.professionId)
+					? 1
+					: 0
+			: 0;
 	// Ongoing, someone else's: how many the viewer has (their own scans; only they see it).
 	const have =
 		ongoing && active && !mine && r.itemId !== undefined
@@ -216,6 +232,7 @@ async function view(
 		lastActivityAt: r.lastActivityAt,
 		closedAt: r.closedAt,
 		stale: isStale(r, now),
+		fit,
 		canHelp: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
 		canClaim:
 			active &&
@@ -239,6 +256,7 @@ export const list = query({
 		if (!member) return { member: false as const };
 		const now = Date.now();
 		const known = new Set([...(await knownRecipes(ctx, member.characters)).values()].flatMap((s) => [...s]));
+		const professions = await professionIds(ctx, member.characters);
 		const rows = await activeIn(ctx, guild._id);
 		for (const status of ["done", "cancelled", "expired"] as const) {
 			const closed = await ctx.db
@@ -252,8 +270,9 @@ export const list = query({
 		let scans: Doc<"inventories">[] | undefined;
 		const lazyScans = async () => (scans ??= await scansOf(ctx, member.userId));
 		const out = [];
-		for (const r of rows) out.push(await view(ctx, r, { userId: member.userId, known }, items, lazyScans, now));
-		out.sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+		for (const r of rows)
+			out.push(await view(ctx, r, { userId: member.userId, known, professions }, items, lazyScans, now));
+		out.sort((a, b) => b.fit - a.fit || b.lastActivityAt - a.lastActivityAt);
 		return {
 			member: true as const,
 			characters: member.characters.map(brief),

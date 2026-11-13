@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** Requests stay where they are while you're on the page, so a request you claim no longer jumps to the top of the list. Crafts you can make, then crafts in your professions, now come first.
+
 ## 0.3.26
 
 ### New
