@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.29
+
 ### New
 
 - **Guildie, App, Addon:** Experimental sync without reloading (enable it in WoW; app capture is on by default unless previously disabled). Enable it in WoW's addon settings and reload once to sync through a small amber square, move it in Edit Mode, and let the app find it automatically. Updating the addon requires a full WoW restart.
