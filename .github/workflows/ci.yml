@@ -69,6 +69,22 @@ jobs:
       # uploader), not the site's code in this PR.
       - run: pnpm --filter @guildie/desktop smoke --url https://guildie.club
 
+      - name: Build native icon probe
+        working-directory: apps/desktop
+        run: pnpm exec esbuild scripts/probe-window-icon.ts --bundle --platform=node --format=cjs --external:electron --external:koffi --define:__VERSION__='"probe"' --outfile=dist/icon-probe.cjs
+      - name: Check the running window icon
+        timeout-minutes: 2
+        working-directory: apps/desktop
+        run: pnpm exec electron dist/icon-probe.cjs
+
+      - name: Package and check the icon inside ASAR
+        timeout-minutes: 2
+        run: |
+          node -e 'require("fs").writeFileSync("apps/desktop/dist/package.json", JSON.stringify({main:"icon-probe.cjs"}))'
+          node node_modules/.pnpm/@electron+asar@*/node_modules/@electron/asar/bin/asar.js pack apps/desktop/dist apps/desktop/icon-probe.asar
+          cd apps/desktop
+          GUILDIE_ICON_REFERENCE=assets/guildie.ico pnpm exec electron icon-probe.asar
+
   changelog:
     name: CHANGELOG entry
     if: github.event_name == 'pull_request'
