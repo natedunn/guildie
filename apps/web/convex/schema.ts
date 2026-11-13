@@ -103,6 +103,13 @@ const vGearPreference = v.object({
 	weapon: v.optional(vTypeChoice),
 });
 
+const vDeliveryParticipant = v.object({
+	name: v.string(),
+	characterId: v.optional(v.id("characters")),
+	slug: v.optional(v.string()),
+	classId: v.optional(v.number()),
+});
+
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
 
 export default defineSchema({
@@ -507,6 +514,7 @@ export default defineSchema({
 			v.literal("request"),
 			v.literal("claim"),
 			v.literal("fulfilled"),
+			v.literal("delivery"),
 		),
 		/** Who it's about (the requester for requests). */
 		character: vRequestCharacter,
@@ -524,6 +532,9 @@ export default defineSchema({
 		/** An ongoing request ("is collecting Silk Cloth"). */
 		ongoing: v.optional(v.boolean()),
 		other: v.optional(vRequestCharacter),
+		otherName: v.optional(v.string()),
+		deliveryMethod: v.optional(v.union(v.literal("mail"), v.literal("trade"))),
+		requestCompleted: v.optional(v.boolean()),
 	}).index("by_guild", ["guildId", "at"]),
 
 	/**
@@ -602,6 +613,13 @@ export default defineSchema({
 	 * them. Rules: convex/shared/requests.ts.
 	 */
 	requestDeliveryEvents: defineTable({
+		// Optional for compatibility with receipts stored before participant snapshots.
+		guildId: v.optional(v.id("guilds")),
+		reporterGuid: v.optional(v.string()),
+		itemId: v.optional(v.number()),
+		method: v.optional(v.union(v.literal("mail"), v.literal("trade"))),
+		sender: v.optional(vDeliveryParticipant),
+		recipient: v.optional(vDeliveryParticipant),
 		characterId: v.id("characters"),
 		eventId: v.string(),
 		requestId: v.id("requests"),

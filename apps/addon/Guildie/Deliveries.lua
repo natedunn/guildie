@@ -36,7 +36,7 @@ local function record(kind, other, items)
         if requestId and quantity > 0 then
             c.deliverySequence = (c.deliverySequence or 0) + 1
             records[#records + 1] = {id = guid .. ":" .. now .. ":" .. c.deliverySequence,
-                requestId = requestId, kind = kind, other = other, itemId = id, quantity = quantity, at = now}
+                requestId = requestId, kind = kind, reporterName = me, other = other, itemId = id, quantity = quantity, at = now}
         end
     end
     while #records > MAX_RECORDS do table.remove(records, 1) end

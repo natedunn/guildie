@@ -282,7 +282,7 @@ export function canHelpFromInventory(
 }
 
 /** Exact names only: never guess a Forever surname from a first name. */
-const deliveryName = (name: string) => name.trim().toLowerCase().replace(/ /g, "-");
+export const deliveryName = (name: string) => name.trim().toLowerCase().replace(/ /g, "-");
 type DeliveryReport = { kind: string; other: string; itemId: number; quantity: number; at: number };
 type DeliveryRequest = {
 	kind: string;
@@ -341,5 +341,24 @@ export function deliveryProgress(
 		receivedQuantity,
 		sentQuantity,
 		status: !r.ongoing && receivedQuantity >= r.quantity ? ("done" as const) : (r.status as RequestStatus),
+	};
+}
+
+/** Keep the observed names even when there is no exact known character match. */
+export function deliveryParticipants<T extends { name: string }>(
+	event: Pick<DeliveryReport, "kind" | "other">,
+	reporter: T,
+	knownOther?: T,
+) {
+	const other =
+		knownOther && deliveryName(knownOther.name) === deliveryName(event.other)
+			? { ...knownOther, name: event.other }
+			: { name: event.other };
+	const received = event.kind.endsWith("Received");
+	return {
+		sender: received ? other : reporter,
+		recipient: received ? reporter : other,
+		method: event.kind.startsWith("mail") ? ("mail" as const) : ("trade" as const),
+		received,
 	};
 }

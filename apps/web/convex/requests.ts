@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import type { Delivery } from "./addonPayload";
-import { noteRequest } from "./feed";
+import { noteDelivery, noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { vRegion } from "./schema";
@@ -16,6 +16,8 @@ import {
 	canHelpFromInventory,
 	check,
 	deliveryMatches,
+	deliveryName,
+	deliveryParticipants,
 	deliveryProgress,
 	EXPIRE_MS,
 	isStale,
@@ -847,6 +849,8 @@ export async function recordDeliveries(
 	userId: Id<"users">,
 	character: Doc<"characters">,
 	events: Delivery[],
+	reporterName = character.name,
+	reporterGuid?: string,
 ) {
 	if (!character.inRoster || !character.guildId) return;
 	for (const event of events) {
@@ -868,7 +872,27 @@ export async function recordDeliveries(
 			)
 		)
 			continue;
+		const knownOther = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) =>
+				q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", deliveryName(event.other)),
+			)
+			.first();
+		const observedReporterName = event.reporterName ?? reporterName;
+		const participants = deliveryParticipants(
+			event,
+			{ name: observedReporterName, characterId: character._id, slug: character.slug, classId: character.classId },
+			knownOther
+				? { name: knownOther.name, characterId: knownOther._id, slug: knownOther.slug, classId: knownOther.classId }
+				: undefined,
+		);
 		await ctx.db.insert("requestDeliveryEvents", {
+			guildId: r.guildId,
+			reporterGuid,
+			itemId: event.itemId,
+			method: participants.method,
+			sender: participants.sender,
+			recipient: participants.recipient,
 			characterId: character._id,
 			eventId: event.id,
 			requestId,
@@ -881,15 +905,30 @@ export async function recordDeliveries(
 		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };
 		if (progress.status === "done") patch.closedAt = Date.now();
 		await ctx.db.patch(r._id, patch);
-		if (progress.status === "done") await noteRequest(ctx, "fulfilled", r, r.claim?.character);
+		if (participants.received) {
+			await noteDelivery(
+				ctx,
+				r,
+				event,
+				{ ...brief(character), name: observedReporterName },
+				participants.sender,
+				progress.status === "done",
+			);
+		}
 	}
 }
 
 /** Internal batches contain only payloads already validated and ownership-checked by helper.ingest. */
 export const applyDeliveries = internalMutation({
-	args: { userId: v.id("users"), characterId: v.id("characters"), events: v.array(v.any()) },
-	handler: async (ctx, { userId, characterId, events }): Promise<void> => {
+	args: {
+		userId: v.id("users"),
+		characterId: v.id("characters"),
+		events: v.array(v.any()),
+		reporterName: v.optional(v.string()),
+		reporterGuid: v.optional(v.string()),
+	},
+	handler: async (ctx, { userId, characterId, events, reporterName, reporterGuid }): Promise<void> => {
 		const character = await ctx.db.get(characterId);
-		if (character) await recordDeliveries(ctx, userId, character, events);
+		if (character) await recordDeliveries(ctx, userId, character, events, reporterName, reporterGuid);
 	},
 });

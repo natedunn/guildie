@@ -282,6 +282,8 @@ export const ingest = mutation({
 					await ctx.scheduler.runAfter(0, internal.requests.applyDeliveries, {
 						userId: row.userId,
 						characterId: character._id,
+						reporterName: c.name,
+						reporterGuid: c.guid,
 						events: c.deliveries.slice(i, i + 50),
 					});
 				}
