@@ -219,6 +219,9 @@ function wow.reset(state)
     -- { id, title, level, tag, complete (1, -1 or nil), objectives = { { text, done } } }, ... };
     -- state.questApi "modern" (C_QuestLog), "classic" (GetQuestLogTitle) or nil (none).
     _G.C_QuestLog = nil
+    _G.GetQuestsCompleted = nil
+    _G.QueryQuestsCompleted = nil
+    _G.issecretvalue = nil
     _G.GetNumQuestLogEntries = nil
     _G.GetQuestLogTitle = nil
     _G.GetQuestTagInfo = nil

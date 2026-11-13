@@ -80,7 +80,7 @@ test("captures level, XP, guild, gear and professions on login", function()
     wow.load(state)
     wow.fire("PLAYER_ENTERING_WORLD")
     local p = payload(state.db)
-    eq(p.version, 4, "version")
+    eq(p.version, 5, "version")
     eq(state.db.addonVersion, "0.10.1", "the addon's own version, for the app")
     eq(#p.characters, 1, "characters")
     local c = p.characters[1]

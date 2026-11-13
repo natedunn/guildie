@@ -91,8 +91,8 @@ used); the account page lists them with Disconnect.
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
-  `{ "version": 4, "characters": [ ... ] }` (versions 1, talents and level
-  only, 2, without `inventory`, and 3, without `quests`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
+  `{ "version": 5, "characters": [ ... ] }` (versions 1, talents and level
+  only, 2, without `inventory`, 3, without `quests`, and 4, without `completedQuestIds`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
   One upload per 5 s per token, at most 50 characters. A character, version 2:
 
   ```jsonc
@@ -462,6 +462,17 @@ dungeon and raid quests by dungeon, so people can see who to group with.
   by `quests.ensure` when new ids turn up, and daily (`backfill quest
   titles`). A quest Blizzard 404s gets the game's (or Blizzard's
   in-progress) title and is retried weekly.
+- **Turned-in quests (payload 5, addon 0.17.0):** optional `completedQuestIds`
+  is a sorted, unique array of positive quest IDs (up to 20,000 per uploaded
+  character; IDs at most 10,000,000). The addon retains IDs from actual turn-in
+  events and supported completed-history APIs in `GuildieDB.characters[guid]`.
+  Every snapshot repeats them. Ingestion unions them with the previous addon
+  snapshot after the existing ownership check, even for older uploads; missing
+  and empty arrays never delete confirmations. The Dungeons page unions these
+  with Blizzard's `completedQuests` table, so a stale Blizzard response cannot
+  undo a live turn-in. An unknown history remains unknown until either source
+  supplies it. This records ever-completed IDs, not an event timeline or counts
+  of repeatable quests; the existing Blizzard-driven quest feed is unchanged.
 - **Who sees what:** which quests a character has in progress is public on
   Blizzard's profiles; Guildie shows it only to the guild's signed-in
   members ("Also on it", Dungeons). Objectives and progress only to the

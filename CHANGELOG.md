@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie, App, Addon:** Remember confirmed quest turn-ins and sync them when the live square is visible again, or through normal reload/logout sync. Completed dungeon quest markers keep those confirmations even while Blizzard catches up.
+
 ### Improvements
 
 - **Guildie, Addon:** Recipe tooltips say "requires lvl 25 (at lvl 12)" for a guildmate whose skill is too low, instead of "at 25 (has 12)".

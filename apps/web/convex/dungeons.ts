@@ -24,6 +24,7 @@ import {
 	withFacts,
 } from "./shared/dungeons";
 import { QUEST_LEVELS } from "./shared/questLevels";
+import { mergeCompletedQuestIds } from "./shared/quests";
 
 // A guild's Dungeons page: each dungeon (shared/dungeons.ts) with how many
 // members are level ready, quest ready and done with its quests, and its
@@ -194,6 +195,7 @@ async function membersOf(ctx: QueryCtx, region: Doc<"guilds">["region"], slug: s
 			.query("completedQuests")
 			.withIndex("by_character", (q) => q.eq("characterId", c._id))
 			.unique();
+		const done = mergeCompletedQuestIds(completed?.ids, profile.completedQuestIds);
 		members.push({
 			character: c,
 			mine: ownSlugs.has(c.slug),
@@ -201,7 +203,7 @@ async function membersOf(ctx: QueryCtx, region: Doc<"guilds">["region"], slug: s
 				level: profile.level,
 				classId: c.classId,
 				inProgress: new Set((profile.quests ?? []).map((q) => q.id)),
-				completed: completed ? new Set(completed.ids) : undefined,
+				completed: done ? new Set(done) : undefined,
 			},
 		});
 	}

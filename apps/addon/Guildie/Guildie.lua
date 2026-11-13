@@ -13,8 +13,8 @@
 local ADDON, ns = ...
 -- The payload's format. 2 added guild, XP, gear, professions and recipes;
 -- 3 (0.8.0) bags and the last bank read; 4 (0.10.0) the quest log. The site
--- accepts all four.
-local VERSION = 4
+-- accepts all five. 5 (0.17.0) adds retained quest completion IDs.
+local VERSION = 5
 
 GuildieDB = GuildieDB or {}
 
@@ -200,6 +200,27 @@ function ns.readQuestLog(previous, now)
     return { capturedAt = now, list = list }
 end
 
+-- A retained set, not a delivery queue: there is no acknowledgment from the
+-- app. Every later snapshot repeats these IDs, even after the square is covered.
+function ns.mergeCompletedQuestIDs(previous, incoming)
+    if previous == nil and incoming == nil then return nil end
+    local seen, ids = {}, {}
+    for _, list in ipairs({previous or {}, incoming or {}}) do
+        for _, id in pairs(list) do
+            if ns.validCompletedQuestID(id) and not seen[id] then
+                seen[id] = true
+                ids[#ids + 1] = id
+            end
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+local function completedQuestIDs(previous)
+    local ok, ids = pcall(ns.readCompletedQuestIDs)
+    return ns.mergeCompletedQuestIDs(previous, ok and ids or nil)
+end
+
 local function readGuild(previous)
     if IsInGuild and not IsInGuild() then return nil end
     local name, rank, rankIndex = GetGuildInfo("player")
@@ -241,6 +262,7 @@ local function capture(reason, recipes)
         proficiencies = previous.proficiencies,
         inventory = previous.inventory,
         quests = previous.quests,
+        completedQuestIds = completedQuestIDs(previous.completedQuestIds),
     }
     -- When the level last went up (game time): the guild's feed shows it.
     if character.level and previous.level and character.level > previous.level then
@@ -328,8 +350,20 @@ local function captureQuests()
     local character = guid and GuildieDB.characters and GuildieDB.characters[guid]
     if not character then return capture("quests") end
     character.quests = ns.readQuestLog(character.quests, GetServerTime())
+    character.completedQuestIds = completedQuestIDs(character.completedQuestIds)
 end
 ns.captureQuests = captureQuests
+
+local function recordQuestTurnIn(id)
+    if not ns.validCompletedQuestID(id) then return end
+    local guid = UnitGUID("player")
+    if not guid then return end
+    if not (GuildieDB.characters and GuildieDB.characters[guid]) then capture("quest-turn-in") end
+    local character = GuildieDB.characters and GuildieDB.characters[guid]
+    if character then
+        character.completedQuestIds = ns.mergeCompletedQuestIDs(character.completedQuestIds, {id})
+    end
+end
 
 --- A profession window is open: read its recipes, then save.
 local function captureRecipes(which, reason)
@@ -373,6 +407,8 @@ local EVENTS = {
     PLAYERBANKBAGSLOTS_CHANGED = "inventory",
     BANKFRAME_CLOSED = "bankClosed",
     QUEST_LOG_UPDATE = "quests",
+    QUEST_TURNED_IN = "quests",
+    QUEST_QUERY_COMPLETE = "quests",
     PLAYER_LOGOUT = "all",
 }
 
@@ -395,8 +431,13 @@ for event in pairs(EVENTS) do
     -- Not every client has every event, and registering an unknown one errors.
     pcall(frame.RegisterEvent, frame, event)
 end
-frame:SetScript("OnEvent", function(_, event)
+frame:SetScript("OnEvent", function(_, event, questID)
     local kind = EVENTS[event]
+    -- Record every event before debouncing: several turn-ins can arrive in one second.
+    if event == "QUEST_TURNED_IN" then recordQuestTurnIn(questID) end
+    if event == "PLAYER_ENTERING_WORLD" and type(QueryQuestsCompleted) == "function" then
+        pcall(QueryQuestsCompleted)
+    end
     -- The bank answers only while it's open: track that right away.
     if event == "BANKFRAME_OPENED" then ns.bankOpen = true end
     -- At login the quest log is empty until the game has loaded it.

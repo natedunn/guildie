@@ -90,3 +90,40 @@ palette/size/origin discovery, movement and foreground loss in simulated capture
 settings persistence and registration, process lifecycle and snapshot upload logic.
 Actual in-game UI and the new packaged auto-discovery require this Windows pass.
 Blizzard approval of this transport remains unconfirmed.
+
+## Quest completion backlog (addon 0.17.0, payload 5)
+
+The square repeats snapshots containing retained quest completion IDs. The
+reader needs a complete valid snapshot, but does not need to see the moment of
+the turn-in. It can recover after the square is uncovered or the app restarts.
+Sending a snapshot never clears the addon's records: there is no acknowledgment
+channel. Duplicate and out-of-order snapshots merge safely on the server.
+SavedVariables uploads carry the same backlog when live export is off.
+
+The existing 1 MiB live-snapshot limit still applies; growing history and many
+saved alts can increase transfer time. SavedVariables remain the fallback.
+In-memory events survive a covered square, but not necessarily a WoW crash
+before its next save. Only data exposed by supported game APIs can be retained.
+
+Acceptance on Forever (not yet run):
+
+1. Install addon 0.17.0 and a matching desktop build that accepts payload 5;
+   deploy the compatible backend first. Keep ordinary/custom quest UI addons on.
+2. Enable experimental sync and `/reload`. Cover the square, turn in two quests
+   (accepting a follow-up if available), then uncover it. Check both completed
+   markers appear and the follow-up remains in the log, without another reload.
+3. Turn in a quest with the app stopped, restart the app, and verify recovery.
+   Reload/relog and verify the backlog survives; switch characters and verify
+   completions remain separate.
+4. Abandon a different quest and finish another's objectives without turning it
+   in. Neither should gain a turned-in marker.
+5. Turn off live capture, turn in another quest, and `/reload`. Verify normal
+   SavedVariables upload updates the same marker. Trigger a Blizzard refresh;
+   a stale result must not remove the addon-confirmed completion.
+6. Check an earlier completed quest is restored by the available history API.
+   If no history API works, report that limitation separately from event capture.
+
+Automated coverage drops pixel frames during turn-ins, then decodes a subsequent
+snapshot using the shipped Lua exporter and Python reader. It also covers event
+bursts, duplicate delivery, reload persistence, character isolation, history API
+failures and older payloads. This does not establish Forever API support.
