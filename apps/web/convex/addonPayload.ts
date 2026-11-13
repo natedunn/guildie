@@ -109,6 +109,8 @@ export type AddonCharacter = {
 	capturedAt: number;
 	/** ms: when the addon saw `level` reached (addon 0.13+); absent if it never saw a level-up. */
 	levelAt?: number;
+	/** ms: when `talents` were last read successfully (addon 0.19+); a failed read keeps the last ones. */
+	talentsAt?: number;
 	guild?: { name: string; rank?: string; rankIndex?: number };
 	talents: { id: number; rank: number; name?: string }[];
 	equipment?: { capturedAt: number; averageItemLevel?: number; items: AddonItem[] };
@@ -449,6 +451,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			raceToken: opt(c.raceToken, (s) => str(s, "raceToken", 32)),
 			capturedAt: time(c.capturedAt, "capturedAt", now),
 			levelAt: opt(c.levelAt, (t) => time(t, "levelAt", now)),
+			talentsAt: opt(c.talentsAt, (t) => time(t, "talentsAt", now)),
 			guild,
 			talents: arr(c.talents ?? [], "talents", LIMITS.talents).map((t, i) => {
 				const o = obj(t, `talents[${i}]`);

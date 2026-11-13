@@ -311,6 +311,7 @@ test("a version 1 saved character upgrades and keeps its talents", function()
     local c = payload(state.db).characters[1]
     eq(c.level, 23)
     eq(c.talents[1].id, 134214, "talents kept when they can't be read")
+    eq(c.talentsAt, nil, "and not given a new read time")
     eq(#c.equipment.items, 2)
 end)
 

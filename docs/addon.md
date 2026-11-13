@@ -101,6 +101,7 @@ used); the account page lists them with Disconnect.
     "xp": 1200, "xpMax": 15000, "classToken": "PRIEST", "raceToken": "NightElf",
     "capturedAt": 1794336950,                 // game server time, seconds
     "levelAt": 1794330000,                    // optional: when `level` was reached (seen in game)
+    "talentsAt": 1794330000,                  // optional (0.19+): when `talents` were last read; a failed read keeps both
     "guild": { "name": "Unbound", "rank": "Member", "rankIndex": 5 },
     "talents": [ { "id": 134214, "rank": 5, "name": "Wand Specialization" } ],
     "equipment": {
@@ -377,7 +378,10 @@ last session, so its time is `lastLoginAt`:
 
 - Gear (and item level), talents, the profession list with skill, the quest
   log: if only one source has the part, that one. If both do, the newer: the
-  addon's read time against `lastLoginAt`.
+  addon's read time for that part (talents: `talentsAt`, which a failed read
+  doesn't move) against the `lastLoginAt` of the sync that last fetched that
+  part from Blizzard (`characters.blizzardAt`; a part whose fetch failed
+  keeps its older time).
 - Empty (no gear, no talent points, no professions, an empty quest log) shows
   only when both sources say empty. Either can come back empty by mistake:
   Forever's `GetProfessions` returns nothing right after login and at logout,
@@ -387,15 +391,19 @@ last session, so its time is `lastLoginAt`:
 - Under level 10 Blizzard has no profile, so everything is the addon's (the
   character page says so).
 - Known recipes: Blizzard's and the addon's together, per profession in the
-  list shown (recipes are only lost with the profession). Uploads keep every
-  recipe read; the profile drops them only with their profession.
+  list shown (recipes are only lost with the profession). Both writers only
+  add: an upload adds a read's recipes to the stored ones, and a Blizzard
+  sync adds to the recipes earlier syncs listed. The profile drops them only
+  with their profession.
 - Turned-in quests: everything either source has seen (both lists only grow).
 - Level: the higher of the two (levels never drop).
 
 Both sides also protect against failed reads before they reach the rule: the
 addon never replaces a non-empty profession list with an empty one (and reads
 again 5 seconds after login), and the upload keeps the stored list when an
-older addon sends an empty one.
+older addon sends an empty one. The in-game status window compares with the
+quest log Guildie shows (`questsFrom`: Blizzard's has ids only, so only ids
+are compared).
 
 Checking it: `profile.test.ts` runs every part through every case (missing,
 empty, older, newer, from either source). Maintainers see a "Data sources"

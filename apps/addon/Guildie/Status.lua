@@ -53,11 +53,16 @@ local function inventoryKey(items)
     table.sort(parts)
     return table.concat(parts, ",")
 end
-local function questKey(quests)
+--- `idsOnly`: Guildie shows Blizzard's quest list (ids, no progress), so
+--- only which quests are in the log can be compared.
+local function questKey(quests, idsOnly)
     local parts = {}
     for _, q in ipairs(quests or {}) do
-        local value = q.id .. ":" .. tostring(q.complete == true) .. ":" .. tostring(q.failed == true)
-        for _, o in ipairs(q.objectives or {}) do value = value .. ":" .. tostring(o.done == true) .. ":" .. (o.text or "") end
+        local value = tostring(q.id)
+        if not idsOnly then
+            value = value .. ":" .. tostring(q.complete == true) .. ":" .. tostring(q.failed == true)
+            for _, o in ipairs(q.objectives or {}) do value = value .. ":" .. tostring(o.done == true) .. ":" .. (o.text or "") end
+        end
         parts[#parts + 1] = value
     end
     table.sort(parts)
@@ -157,7 +162,10 @@ function S.compare(me, entry)
             add(part == "bags" and "Bag contents changed" or "Bank contents changed")
         end
     end
-    if me.quests and details.quests and questKey(me.quests.list) ~= questKey(details.quests) then add("Quest log changed") end
+    local idsOnly = details.questsFrom == "blizzard"
+    if me.quests and details.quests and questKey(me.quests.list, idsOnly) ~= questKey(details.quests, idsOnly) then
+        add("Quest log changed")
+    end
     local completions = details.completedQuestIds and missing(me.completedQuestIds, details.completedQuestIds) or 0
     if completions > 0 then add(plural(completions, "quest completion") .. " awaiting confirmation") end
     local deliveries = details.deliveryIds and missing(me.deliveries, details.deliveryIds, function(e) return e.id end) or 0

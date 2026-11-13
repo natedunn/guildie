@@ -7,6 +7,7 @@ import { guildOfProfile } from "./claimRegions";
 import { blizzardWhen, noteClears, noteLevel, noteQuests } from "./feed";
 import { setOwner } from "./guilds";
 import { type ItemPreview, tooltipLines } from "./items";
+import { addBlizzardRecipes, blizzardPartTimes } from "./profile";
 import { isSampleGuild } from "./sample";
 import { vEquippedItem, vTalentTree } from "./schema";
 import { dungeonOfKillStatistic } from "./shared/dungeons";
@@ -418,6 +419,17 @@ export const applyProfile = internalMutation({
 			if (value !== undefined) (patch as Record<string, unknown>)[key] = value;
 		}
 		if (questIds) patch.quests = { syncedAt: now, ids: questIds };
+		// Known recipes only grow: a partial response can't take any away.
+		if (data.professions) patch.professions = addBlizzardRecipes(character.professions, data.professions);
+		// Each part's own time: a part whose fetch failed keeps its older one.
+		if (data.lastLoginAt !== undefined) {
+			patch.blizzardAt = blizzardPartTimes(character.blizzardAt, data.lastLoginAt, {
+				equipment: data.equipment !== undefined,
+				professions: data.professions !== undefined,
+				talentTrees: data.talentTrees !== undefined,
+				quests: questIds !== undefined,
+			});
+		}
 		await ctx.db.patch(characterId, patch);
 		if (completedQuestIds) {
 			const row = await ctx.db

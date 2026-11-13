@@ -240,6 +240,16 @@ test("bags, bank, quests, completions and receipt reports compare actual content
     eq(S.check(c, {generatedAt = NOW * 1000, characters = {Lich = e}}, GUID, "Lich").state, "unverified", "missing confirmations are not up-to-date")
 end)
 
+test("Blizzard's quest list (ids only) compares by which quests are in the log", function()
+    local c = me({quests = {list = {{id = 123, complete = true, objectives = {{text = "x", done = true}}}}}})
+    local e = entry({details = {quests = {{id = 123}}, questsFrom = "blizzard"}})
+    eq(#S.compare(c, e), 0, "same quests, no progress to compare")
+    e.details.quests = {{id = 999}}
+    eq(#S.compare(c, e), 1, "a different log")
+    e.details = {quests = {{id = 123}}, questsFrom = "game"}
+    eq(#S.compare(c, e), 1, "the game's list compares progress too")
+end)
+
 test("reload and edit controls respect combat", function()
     local state = {combat = true}
     local ns, w = open(state, nil)

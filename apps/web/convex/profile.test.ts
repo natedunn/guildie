@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { auditCharacter, averageItemLevel, decide, mergeProfile } from "./profile.ts";
+import {
+	addBlizzardRecipes,
+	addRecipes,
+	auditCharacter,
+	averageItemLevel,
+	blizzardPartTimes,
+	decide,
+	mergeProfile,
+} from "./profile.ts";
 
 const HOUR = 3600_000;
 const LOGIN = 1_794_261_703_000;
@@ -383,4 +391,55 @@ test("audit: flags one source empty, and is quiet when the sources agree", () =>
 		findings.map((f) => [f.section, f.problem]),
 		[["professions", "addon empty, the other has 2"]],
 	);
+});
+
+// ---- Review fixes: reads in sequence ---------------------------------------
+
+test("recipes in sequence: a partial or empty read never takes recipes away", () => {
+	let stored = addRecipes(undefined, [1, 2, 3]);
+	stored = addRecipes(stored, [2]); // a filtered window
+	stored = addRecipes(stored, []); // an older addon's empty read
+	stored = addRecipes(stored, [4]);
+	assert.deepEqual(stored, [1, 2, 3, 4]);
+
+	// Blizzard: a partial response keeps what earlier syncs listed.
+	const first = addBlizzardRecipes(undefined, [{ id: 171, knownRecipes: [10, 11] }]);
+	const second = addBlizzardRecipes(first, [{ id: 171, knownRecipes: [11, 12] }, { id: 182 }]);
+	assert.deepEqual(second, [
+		{ id: 171, knownRecipes: [10, 11, 12] },
+		{ id: 182, knownRecipes: [] },
+	]);
+});
+
+test("a failed talent read keeps its old time and loses to Blizzard's newer respec", () => {
+	// Talents read at LOGIN - HOUR; later reads failed, so the snapshot is newer
+	// but its talents aren't. Blizzard has the respec from the session after.
+	const s = { ...snapshot(LOGIN + 3 * HOUR), talentsCapturedAt: LOGIN - HOUR };
+	const p = mergeProfile({ ...blizzard, blizzardAt: { talentTrees: LOGIN } }, s);
+	assert.equal(p.talentTrees?.[0].points, 13, "Blizzard's");
+	assert.equal(p.sources.talents.kind, "blizzard");
+	// The same talents read after Blizzard's session: the game's.
+	const fresh = mergeProfile(blizzard, { ...s, talentsCapturedAt: LOGIN + 3 * HOUR });
+	assert.equal(fresh.talentTrees?.[0].points, 14);
+});
+
+test("a Blizzard part whose fetch failed keeps its older time", () => {
+	// Gear fetched at an old login; the latest sync's gear fetch failed.
+	const times = blizzardPartTimes({ equipment: LOGIN - 5 * HOUR }, LOGIN + 5 * HOUR, {
+		equipment: false,
+		professions: true,
+		talentTrees: true,
+		quests: true,
+	});
+	assert.deepEqual(times, {
+		equipment: LOGIN - 5 * HOUR,
+		professions: LOGIN + 5 * HOUR,
+		talentTrees: LOGIN + 5 * HOUR,
+		quests: LOGIN + 5 * HOUR,
+	});
+	// The game's gear, read after that old fetch, wins although lastLoginAt is newer.
+	const p = mergeProfile({ ...blizzard, lastLoginAt: LOGIN + 5 * HOUR, blizzardAt: times }, snapshot(LOGIN));
+	assert.equal(p.equipment?.[0].name, "New Hat");
+	assert.equal(p.sources.gear.kind, "addon");
+	assert.equal(p.sources.professions.kind, "blizzard", "professions were fetched after the read");
 });

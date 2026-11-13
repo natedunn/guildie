@@ -256,6 +256,9 @@ local function capture(reason, recipes)
         -- Keep the last good read of anything that can't be read right now
         -- (with its own capturedAt, so the site knows how old it is).
         talents = (okTalents and talents) or previous.talents or {},
+        -- When the talents were last read: a failed read keeps the last ones
+        -- with their own time, so the site doesn't take them for newer.
+        talentsAt = (okTalents and talents) and now or previous.talentsAt,
         equipment = previous.equipment,
         professions = previous.professions,
         recipes = previous.recipes,
