@@ -145,6 +145,7 @@ export type AddonCharacter = {
 
 export type Delivery = {
 	id: string;
+	reporterName?: string;
 	requestId: string;
 	kind: "mailSent" | "mailReceived" | "tradeSent" | "tradeReceived";
 	other: string;
@@ -472,6 +473,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 					return {
 						id: plain(e.id, "delivery.id", 160),
 						requestId: plain(e.requestId, "delivery.requestId", 64),
+						reporterName: opt(e.reporterName, (name) => plain(name, "delivery.reporterName", 120)),
 						kind: kind as Delivery["kind"],
 						other: plain(e.other, "delivery.other", 120),
 						itemId: int(e.itemId, "delivery.itemId", 1, 10000000),

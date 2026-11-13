@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseCharacter } from "./addonPayload.ts";
-import { deliveryMatches, deliveryProgress } from "./shared/requests.ts";
+import { deliveryMatches, deliveryParticipants, deliveryProgress } from "./shared/requests.ts";
 
 const now = 1794300000000;
 const request = {
@@ -83,4 +83,36 @@ test("delivery payload bounds, old payloads, and timestamps", () => {
 	])
 		assert(!parseCharacter({ ...c, deliveries: [{ ...raw, ...patch }] }, now).ok);
 	assert(!parseCharacter({ ...c, deliveries: Array(201).fill(raw) }, now).ok);
+});
+
+test("participant names and direction survive both mail and trade reports", () => {
+	const reporter = { name: "Nate-Last", slug: "nate-last", characterId: "reporter", classId: 1 };
+	const known = { name: "Jane-Last", slug: "jane-last", characterId: "other", classId: 2 };
+	for (const method of ["mail", "trade"]) {
+		const sent = deliveryParticipants({ kind: `${method}Sent`, other: "Jane-Last" }, reporter, known);
+		assert.deepEqual(sent.sender, reporter);
+		assert.deepEqual(sent.recipient, known);
+		assert.equal(sent.received, false);
+		assert.equal(sent.method, method);
+		const received = deliveryParticipants({ kind: `${method}Received`, other: "Jane-Last" }, reporter, known);
+		assert.deepEqual(received.sender, known);
+		assert.deepEqual(received.recipient, reporter);
+		assert.equal(received.received, true);
+	}
+	const unknown = deliveryParticipants({ kind: "mailReceived", other: "Unknown-Surname" }, reporter);
+	assert.deepEqual(unknown.sender, { name: "Unknown-Surname" });
+	const wrongMatch = deliveryParticipants({ kind: "tradeReceived", other: "Jane" }, reporter, known);
+	assert.deepEqual(wrongMatch.sender, { name: "Jane" }, "no guessed surname, slug or character link");
+	const exact = deliveryParticipants({ kind: "tradeReceived", other: "jane-last" }, reporter, known);
+	assert.equal(exact.sender.name, "jane-last", "retain observed spelling");
+});
+
+test("reporter's observed name is optional for older payloads and validated when supplied", () => {
+	const c = { guid: "Player-1", name: "Receiver-Last", talents: [], capturedAt: now / 1000 };
+	const raw = { ...event, at: now / 1000, reporterName: "Original-Name" };
+	const parsed = parseCharacter({ ...c, deliveries: [raw] }, now);
+	assert(parsed.ok);
+	assert.equal(parsed.character.deliveries?.[0].reporterName, "Original-Name");
+	for (const reporterName of ["", "|cffbad", "a".repeat(121)])
+		assert(!parseCharacter({ ...c, deliveries: [{ ...raw, reporterName }] }, now).ok);
 });

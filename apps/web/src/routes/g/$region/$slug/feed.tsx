@@ -211,6 +211,7 @@ const KIND_ICON = {
 	request: InboxIcon,
 	claim: HandHelpingIcon,
 	fulfilled: DeliveryBox01Icon,
+	delivery: DeliveryBox01Icon,
 } as const;
 
 /** Names shown in a grouped row before "and N others". */
@@ -335,6 +336,16 @@ function EventRow({ row }: { row: Row }) {
 			) : (
 				<>Someone claimed {person(e.character)}'s request</>
 			);
+			break;
+		case "delivery":
+			text = (
+				<>
+					{person(e.character)} {e.deliveryMethod === "mail" ? "collected" : "received"} {item} from{" "}
+					{e.other ? person(e.other) : <span className="font-medium">{e.otherName ?? "an unknown sender"}</span>}{" "}
+					{e.deliveryMethod === "mail" ? "by mail" : "in trade"}
+				</>
+			);
+			detail = e.requestCompleted ? "Request completed" : "Contribution toward their request";
 			break;
 		case "fulfilled":
 			text = e.other ? (

@@ -234,3 +234,30 @@ PC acceptance (not yet run):
   square sizes to both left corners. Capture a screenshot and verify the whole
   square is at least 12 physical pixels inside the client image. Resize the
   window, change square size, reload, and test a previously off-screen position.
+
+### Delivery identities and feed entries
+
+New matched delivery ledger entries retain sender and recipient snapshots (the
+observed names, with character IDs/slugs/class IDs only when resolved), item ID,
+quantity, mail/trade method, event time, guild/request IDs, reporting character,
+and reporter GUID. The addon records its own name alongside the other person's
+name at capture time; older v6 records fall back to the uploaded character name.
+The other character is linked only after an exact name match in the same game
+flavor/region. Unknown names remain text, never guessed character links.
+
+Only recipient-confirmed reports produce delivery feed entries. Partial receipts
+show their own item quantity and actual sender; the receipt crossing the target
+adds "Request completed". This replaces the automatic generic fulfilled entry,
+so the last contributor is not credited with supplying the entire request.
+Manual completion retains its existing feed behavior. The ledger, request update
+and delivery feed insertion are in the same mutation, with the existing
+character/event ID deduplication preventing repeat upload entries.
+
+Schema fields are optional for older rows; no missing historical identities are
+invented or backfilled. This is request-matched delivery information, not a log
+of every mail or trade. Existing request matching and receipt requirements apply.
+
+Extend the PC pass: verify sender/recipient orientation in both mail and trade
+reports, exact names in partial and completion feed entries, known character
+links versus an unknown sender's plain name, and repeated uploads from both sides
+without duplicate feed entries or quantity changes.

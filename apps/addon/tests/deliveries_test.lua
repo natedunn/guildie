@@ -22,6 +22,7 @@ assert(count() == 0, "success event alone does not prove collection")
 bags = 7
 wow.fire("BAG_UPDATE_DELAYED")
 assert(count() == 1 and ns.current().deliveries[1].kind == "mailReceived")
+assert(ns.current().deliveries[1].reporterName == "Receiver-Last" and ns.current().deliveries[1].other == "Sender-Last", "both observed names captured")
 wow.fire("MAIL_SUCCESS", 4306); wow.fire("BAG_UPDATE_DELAYED")
 assert(count() == 1, "duplicate game events do not duplicate receipts")
 callbacks.TakeInboxItem(1, 1)

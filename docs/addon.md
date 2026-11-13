@@ -554,3 +554,9 @@ manual claim/sent/done controls remain supported. See the request delivery
 acceptance section in [live-sync.md](live-sync.md) for matching, retention,
 limitations, and release verification. Publish backend support before the new
 addon/app. Installing the new Lua file requires a full game restart.
+
+Delivery records also accept optional `reporterName`, the character name observed
+at capture time. New server ledger entries preserve both participant names and
+resolved character references, plus item, quantity, method and time. Legacy v6
+records remain accepted. Recipient-confirmed contributions produce detailed
+members-only feed entries, with an explicit completion note on the final receipt.

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { type MutationCtx, query } from "./_generated/server";
+import type { Delivery } from "./addonPayload";
 import { access } from "./guilds";
 import { vRegion } from "./schema";
 
@@ -129,6 +130,33 @@ export async function noteRequest(
 	});
 }
 
+/** One recipient-confirmed contribution; called atomically with the deduplication ledger. */
+export async function noteDelivery(
+	ctx: MutationCtx,
+	request: Doc<"requests">,
+	event: Delivery,
+	recipient: Doc<"requests">["character"],
+	sender: { name: string; slug?: string; classId?: number },
+	completed: boolean,
+) {
+	await ctx.db.insert("feedEvents", {
+		guildId: request.guildId,
+		at: Math.min(event.at, Date.now()),
+		kind: "delivery",
+		character: recipient,
+		otherName: sender.name,
+		...(sender.slug !== undefined && sender.classId !== undefined
+			? { other: { name: sender.name, slug: sender.slug, classId: sender.classId } }
+			: {}),
+		requestId: request._id,
+		requestKind: request.kind,
+		itemId: event.itemId,
+		quantity: event.quantity,
+		deliveryMethod: event.kind === "mailReceived" ? "mail" : "trade",
+		requestCompleted: completed,
+	});
+}
+
 // ---- Reading ---------------------------------------------------------------------
 
 /**
@@ -219,6 +247,9 @@ export const list = query({
 					requestKind: e.requestKind,
 					quantity: e.quantity,
 					ongoing: e.ongoing,
+					otherName: e.otherName,
+					deliveryMethod: e.deliveryMethod,
+					requestCompleted: e.requestCompleted,
 					item:
 						e.itemId !== undefined
 							? {
