@@ -9,6 +9,7 @@ import { app, safeStorage } from "electron";
 export type Bounds = { x: number; y: number; width: number; height: number; maximized?: boolean };
 
 type Stored = {
+	livePixelsOrigins?: string[];
 	/** origin -> encrypted token (base64) and the account it belongs to. */
 	tokens: Record<string, { token: string; account?: string }>;
 	wow?: string;
@@ -59,6 +60,17 @@ function save() {
 }
 
 export const settings = {
+	livePixelsEnabled(origin: string) {
+		const origins = load().livePixelsOrigins;
+		return origins === undefined || origins.includes(origin);
+	},
+	setLivePixels(origin: string, enabled: boolean) {
+		const origins = new Set(load().livePixelsOrigins ?? []);
+		if (enabled) origins.add(origin);
+		else origins.delete(origin);
+		load().livePixelsOrigins = [...origins];
+		save();
+	},
 	get wow() {
 		return load().wow;
 	},

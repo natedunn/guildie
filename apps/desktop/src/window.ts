@@ -67,7 +67,8 @@ export function createWindow(url: string, options: { show: boolean; preload: str
 		// Mica shows through wherever the page is transparent (its sidebar and title bar).
 		...(mica ? { backgroundMaterial: "mica" as const } : {}),
 		backgroundColor: mica ? TRANSPARENT : TITLEBAR.color,
-		icon: join(__dirname, "assets", "guildie-256.png"),
+		// Use the multi-size Windows icon for the running window/taskbar, as the tray does.
+		icon: join(__dirname, "assets", process.platform === "win32" ? "guildie.ico" : "guildie-256.png"),
 		titleBarStyle: "hidden",
 		titleBarOverlay: {
 			color: mica ? TRANSPARENT : TITLEBAR.color,

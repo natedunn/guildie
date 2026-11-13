@@ -37,6 +37,9 @@ export class SyncEngine {
 	private readonly warnedUnmatched = new Set<string>();
 	private lastGuildDataTry = 0;
 	private busy = false;
+	private pixelSnapshot: string | undefined;
+	private pixelUploaded: string | undefined;
+	private pixelAttemptAt = 0;
 
 	constructor(api: Api, wow: string | undefined, events: SyncEvents) {
 		this.api = api;
@@ -62,6 +65,15 @@ export class SyncEngine {
 		this.busy = true;
 		try {
 			await this.watcher.tick();
+			const snapshot = this.pixelSnapshot;
+			if (snapshot && this.api.token && Date.now() - this.pixelAttemptAt >= 30_000) {
+				this.pixelAttemptAt = Date.now();
+				const token = this.api.token;
+				if (await this.upload("live pixel snapshot", snapshot)) {
+					if (this.api.token === token) this.pixelUploaded = snapshot;
+					if (this.pixelSnapshot === snapshot) this.pixelSnapshot = undefined;
+				}
+			}
 			if (this.api.token && Date.now() - this.lastGuildDataTry > GUILD_DATA_EVERY_MS) await this.refreshGuildData();
 		} catch (e) {
 			this.events.log(`Sync failed: ${(e as Error).message}`);
@@ -78,6 +90,9 @@ export class SyncEngine {
 
 	/** After signing out: forget what was uploaded, so connecting again uploads everything. */
 	reset() {
+		this.pixelSnapshot = undefined;
+		this.pixelUploaded = undefined;
+		this.pixelAttemptAt = 0;
 		this.watcher.forget();
 		this.warnedUnmatched.clear();
 		this.lastUpload = undefined;
@@ -85,9 +100,28 @@ export class SyncEngine {
 		this.lastGuildDataTry = 0;
 	}
 
+	/** Complete snapshots only; character ownership and field validation remain server-side. */
+	clearPixelSnapshot() {
+		this.pixelSnapshot = undefined;
+		this.pixelUploaded = undefined;
+	}
+
+	queuePixelSnapshot(value: unknown) {
+		if (!this.api.token || !value || typeof value !== "object") return false;
+		const { version, characters } = value as { version?: unknown; characters?: unknown };
+		if (![1, 2, 3, 4].includes(version as number) || !Array.isArray(characters) || !characters.length) return false;
+		const payload = JSON.stringify({ version, characters });
+		if (Buffer.byteLength(payload, "utf8") > 1024 * 1024) return false;
+		this.pixelSnapshot = payload !== this.pixelUploaded ? payload : undefined;
+		return true;
+	}
+
 	private async upload(file: string, payload: string) {
 		if (!this.api.token) return false;
+		const token = this.api.token;
 		const { ok, status, body } = await this.api.upload(payload);
+		// A request begun before sign-out/account switching must not update the new session.
+		if (this.api.token !== token) return false;
 		if (status === 401) {
 			this.events.log("The site no longer accepts this token; disconnecting.");
 			await this.events.onUnauthorized();

@@ -169,3 +169,30 @@ export class Watcher {
 		}
 	}
 }
+
+/** Latest saved Forever account preference. No game-memory reads or screen capture. */
+export function savedLivePixelsEnabled(wow?: string): boolean {
+	try {
+		const files = findSavedVariables(wow).filter((file) => file.split(/[\\/]/).includes("_forever_"));
+		const newest = files
+			.map((file) => ({ file, at: statSync(file).mtimeMs, size: statSync(file).size }))
+			.sort((a, b) => b.at - a.at)[0];
+		if (!newest) return false;
+		if (
+			pixelPreference?.file === newest.file &&
+			pixelPreference.at === newest.at &&
+			pixelPreference.size === newest.size
+		)
+			return pixelPreference.enabled;
+		// The addon owns this flat table; quoted JSON in payload uses escaped quotes.
+		const lua = readFileSync(newest.file, "utf8");
+		const table = lua.match(/\["livePixels"\]\s*=\s*\{([^{}]*)\}/)?.[1];
+		const enabled = !!table && /\["enabled"\]\s*=\s*true\b/.test(table);
+		pixelPreference = { ...newest, enabled };
+		return enabled;
+	} catch {
+		// Missing, unreadable or partly written saves must never opt into capture.
+		return false;
+	}
+}
+let pixelPreference: { file: string; at: number; size: number; enabled: boolean } | undefined;

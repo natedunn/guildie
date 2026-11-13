@@ -49,6 +49,7 @@ export function createTray(actions: TrayActions) {
 			Menu.buildFromTemplate([
 				{ label: statusLine, enabled: false },
 				{ label: lastLine, enabled: false },
+				...(status.livePixels ? [{ label: `Live capture: ${status.livePixels}`, enabled: false }] : []),
 				{ label: status.wowFolder ? `WoW: ${status.wowFolder}` : "WoW folder not found", enabled: false },
 				status.addonVersion
 					? { label: `Addon: ${status.addonVersion}`, enabled: false }

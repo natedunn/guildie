@@ -42,6 +42,11 @@ publish:
   tagNamePrefix: desktop-v
   releaseType: release
 win:
+  extraResources:
+    - from: capture/dist/GuildieCapture
+      to: capture
+      filter:
+        - "**/*"
   icon: dist/assets/guildie.ico
   executableName: Guildie
   # The installer is the one that updates itself; the zip is for trying a

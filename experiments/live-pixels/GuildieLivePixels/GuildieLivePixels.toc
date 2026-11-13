@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Guildie Live Pixels (experimental)
+## Notes: Manually enabled outbound pixel telemetry experiment.
+## Dependencies: Guildie
+## SavedVariables: GuildieLivePixelsDB
+Protocol.lua
+Live.lua

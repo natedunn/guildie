@@ -165,6 +165,46 @@ test("token shape and display names", () => {
 	assert.equal(displayName("brenna-ironfoot"), "Brenna");
 });
 
+test("pixel snapshots coalesce, retry with throttling, deduplicate and reset on disconnect", async (t) => {
+	let now = 1_000_000;
+	t.mock.method(Date, "now", () => now);
+	const { wow } = fakeWow();
+	let fail = false;
+	const { api, calls } = fakeApi(({ path }) =>
+		path === "/api/helper/snapshot"
+			? { status: fail ? 503 : 200, body: { accepted: ["test-player"] } }
+			: { status: 200, body: { generatedAt: 1, guilds: [], reagents: {} } },
+	);
+	const engine = new SyncEngine(api, wow, { log: () => {}, onUnauthorized: () => {} });
+	await engine.tick();
+	calls.length = 0;
+	const snapshot = (level: number) => ({ version: 4, characters: [{ name: "Test", level }] });
+	assert.equal(engine.queuePixelSnapshot({ health: 10 }), false);
+	assert.equal(engine.queuePixelSnapshot(snapshot(1)), true);
+	engine.queuePixelSnapshot(snapshot(2));
+	fail = true;
+	await engine.tick();
+	assert.equal(calls.length, 1);
+	assert.deepEqual(JSON.parse(calls[0]!.body!), snapshot(2));
+	await engine.tick();
+	assert.equal(calls.length, 1, "retry waits 30 seconds");
+	fail = false;
+	now += 30_000;
+	await engine.tick();
+	assert.equal(calls.filter((c) => c.path.endsWith("snapshot")).length, 2);
+	assert.ok(engine.lastUpload);
+	engine.queuePixelSnapshot(snapshot(2));
+	now += 30_000;
+	await engine.tick();
+	assert.equal(calls.filter((c) => c.path.endsWith("snapshot")).length, 2, "identical snapshot not sent twice");
+	engine.queuePixelSnapshot(snapshot(3));
+	engine.reset();
+	api.token = undefined;
+	assert.equal(engine.queuePixelSnapshot(snapshot(4)), false);
+	await engine.tick();
+	assert.equal(calls.filter((c) => c.path.endsWith("snapshot")).length, 2, "disconnect discards pending data");
+});
+
 test("loadedAddonVersion: what the game last ran, from the newest saved file", () => {
 	const { wow, file } = fakeWow();
 	assert.equal(loadedAddonVersion(wow), null, "an addon from before 0.10.1 doesn't say");
@@ -172,4 +212,32 @@ test("loadedAddonVersion: what the game last ran, from the newest saved file", (
 	utimesSync(file, new Date(), new Date(Date.now() + 1000));
 	assert.equal(loadedAddonVersion(wow), "0.10.1");
 	assert.equal(loadedAddonVersion(mkdtempSync(join(tmpdir(), "guildie-empty-"))), undefined, "nothing saved");
+});
+
+test("capture follows the newest saved Forever preference and stops for missing or invalid saves", async () => {
+	const { savedLivePixelsEnabled } = await import("./watcher.ts");
+	const { rmSync } = await import("node:fs");
+	const { wow, file } = fakeWow();
+	try {
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true, ["theme"] = "amber" } }');
+		assert.equal(savedLivePixelsEnabled(wow), true);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = false } }');
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true');
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		const second = join(wow, "_forever_", "WTF", "Account", "ACCOUNT2", "SavedVariables", "Guildie.lua");
+		mkdirSync(join(second, ".."), { recursive: true });
+		writeFileSync(second, 'GuildieDB = { ["livePixels"] = { ["enabled"] = true } }');
+		utimesSync(second, new Date(), new Date(Date.now() + 5000));
+		assert.equal(savedLivePixelsEnabled(wow), true);
+		writeFileSync(file, 'GuildieDB = { ["livePixels"] = { ["enabled"] = false } }');
+		utimesSync(file, new Date(), new Date(Date.now() + 10000));
+		assert.equal(savedLivePixelsEnabled(wow), false);
+		rmSync(file);
+		rmSync(second);
+		assert.equal(savedLivePixelsEnabled(wow), false);
+	} finally {
+		rmSync(wow, { recursive: true, force: true });
+	}
 });

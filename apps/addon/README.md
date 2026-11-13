@@ -1,5 +1,12 @@
 # Guildie addon
 
+Experimental sync without reloading is configured under **Options → AddOns →
+Guildie**. Export starts off; enabling it is remembered across logins. Choose amber
+(default) or grayscale troubleshooting mode, small or large squares, and move it
+through Edit Mode. After enabling or disabling export, `/reload` saves your choice for the app. The signed-in Windows app captures only while that saved choice is enabled, unless capture was also disabled in its Settings → Addon. See
+[live sync](../../docs/live-sync.md) for setup and current limitations. New files
+in this update require a full game restart.
+
 Saves your character as the game sees it for the Guildie desktop app
 (`apps/desktop`) to upload to
 guildie.club, so the site shows it before Blizzard's profile catches up
@@ -14,7 +21,8 @@ reload the UI, and the Guildie app, running on the same computer, uploads it the
   and updates it when a newer app ships a higher `## Version`. Bump that
   version in `Guildie.toc` whenever the addon changes, or players keep the old
   copy. (Copying the folder by hand works for development.)
-- **Minimap button** (drag it around the minimap) or `/guildie`: opens the
+- **Minimap button** opens Options → AddOns → Guildie (General and Experimental sync tabs). Drag it around the minimap.
+- `/guildie`: opens the
   window (`UI.lua`): your character, whether Guildie is up to date with it
   (below), what happens next, **Sync now** (reloads the UI so it goes
   right away), the guild data for tooltips, and the options. The minimap

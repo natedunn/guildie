@@ -49,6 +49,17 @@ jobs:
       - run: pnpm --filter @guildie/desktop check
       - run: pnpm --filter @guildie/desktop test
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r apps/desktop/capture/requirements.txt
+      - run: python -m unittest discover -s apps/desktop/capture -p "test_*.py"
+      - run: pnpm --filter @guildie/desktop capture:build
+      - name: Check bundled capture runtime and parent-exit guard
+        run: |
+          apps/desktop/capture/dist/GuildieCapture/GuildieCapture.exe --help
+          apps/desktop/capture/dist/GuildieCapture/GuildieCapture.exe --auto --parent-pid 4294967295
+
       # Creates the release desktop-v<version> (a normal one, not a draft:
       # electron-builder.yml publish.releaseType) and uploads the installer,
       # its .blockmap and latest.yml.

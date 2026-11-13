@@ -214,3 +214,21 @@ installing the addon into a real WoW: Forever folder (and the folder swap
 while the game runs; if Windows won't rename the folder the app overwrites
 the files one by one instead), self-updates from a release (needs two
 releases to see one), and Start with Windows surviving an update.
+## Experimental live pixel sync
+
+The current integration is documented in [live sync](../../docs/live-sync.md).
+Windows builds bundle a capture helper; the app's Settings → Addon provides
+an opt-in switch. The addon has its own persistent settings under WoW's addon menu.
+The additive optional bridge method `setLivePixels(boolean)` controls capture;
+status adds `livePixelsAvailable`, `livePixelsEnabled` and `livePixels`. Every call
+uses the normal main-frame/origin gate, validates a boolean, and exposes no paths,
+screenshots or tokens. `capture:build` and Windows CI package the helper/runtime.
+
+The following launch flag remains for manual diagnostics:
+
+Development builds can start the separately installed pixel reader with
+`--live-pixels-config <absolute JSON path>`. Setup, calibration and the Windows
+verification checklist are in [the experiment guide](../../experiments/live-pixels/README.md#desktop-upload-pilot).
+The app owns capture for that run, uses its existing authenticated snapshot uploader,
+and shows capture state in the tray. This does not change the web bridge or enable
+capture in ordinary launches. The legacy standalone experimental addon is not bundled; automatic capture uses the bundled helper.

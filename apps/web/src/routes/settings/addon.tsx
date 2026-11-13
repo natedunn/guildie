@@ -125,6 +125,51 @@ function ManageAddon() {
 
 	return (
 		<div className="max-w-3xl">
+			{app?.setLivePixels && (
+				<section className="mb-10">
+					<SectionTitle>Experimental sync without reloading</SectionTitle>
+					<div className="surface-card mt-2 p-4 text-[0.8125rem]">
+						<label className="flex items-start gap-3">
+							<Switch
+								checked={status?.livePixelsEnabled ?? false}
+								disabled={busy || !status?.livePixelsAvailable}
+								onCheckedChange={(on) => run(() => app.setLivePixels?.(on))}
+							/>
+							<span>
+								Capture the Guildie sync square
+								<span className="mt-1 block text-muted-foreground">
+									Enabled by default, but capture only starts after WoW saves its enabled setting. While signed in and
+									WoW is in the foreground, the app finds and reads the square. Images stay in memory; complete
+									character snapshots upload to your account.
+								</span>
+							</span>
+						</label>
+						<p className="mt-3 text-muted-foreground">
+							In WoW, open Options → AddOns → Guildie to enable export and choose its size and appearance. Move it in
+							Edit Mode; the app finds it again automatically. Type /reload after enabling or disabling export so the
+							app can read your choice.
+						</p>
+						<p className="mt-3" role="status">
+							{!status?.livePixelsAvailable
+								? "Requires a Windows build with live capture installed."
+								: !status.livePixelsEnabled
+									? "Capture off. Normal sync remains available."
+									: !status.connected
+										? "Sign in to start capture."
+										: {
+												waiting: "Starting capture…",
+												"waiting-game": "Waiting for WoW to be in the foreground.",
+												searching: "Looking for the sync square. Enable it in WoW's addon settings.",
+												calibrating: "Checking the square's alignment…",
+												receiving: "Receiving data. Complete snapshots upload automatically.",
+												stale: "No recent data. Keep the square visible.",
+												stopped: "Capture stopped. Enable experimental sync in WoW and /reload to start.",
+												failed: "Capture failed. Turn it off and on to retry.",
+											}[status.livePixels ?? "waiting"]}
+						</p>
+					</div>
+				</section>
+			)}
 			<section>
 				<SectionTitle>Guildie addon</SectionTitle>
 				<Rows>

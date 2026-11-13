@@ -13,12 +13,17 @@ import {
 	type Log,
 	loadedAddonVersion,
 	SyncEngine,
+	savedLivePixelsEnabled,
 } from "@guildie/sync";
 import { net } from "electron";
+import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
 import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
 
 export type Status = {
+	livePixelsEnabled?: boolean;
+	livePixelsAvailable?: boolean;
+	livePixels?: PixelStatus;
 	connected: boolean;
 	account?: string;
 	lastUpload?: LastUpload;
@@ -63,15 +68,21 @@ export class Connection {
 	private update: UpdateState | undefined;
 	private timer: NodeJS.Timeout | undefined;
 	private lastRetry = 0;
+	private readonly pixels: LivePixels | undefined;
+	private pixelStatus: PixelStatus | undefined;
+	private pixelsEnabled = false;
+	private readonly automaticPixels: boolean;
 	private readonly listeners = new Set<(status: Status) => void>();
 	/** Notices for the user (shown as notifications by main). */
 	onNotice: (title: string, body: string) => void = () => {};
 	/** The WoW folder was chosen (main installs or updates the addon there). */
 	onWowFolder: (folder: string) => void = () => {};
 
-	constructor(origin: string, log: Log) {
+	constructor(origin: string, log: Log, pixelConfig?: CaptureConfig) {
+		this.automaticPixels = !!pixelConfig && "auto" in pixelConfig;
 		this.origin = origin;
 		this.log = log;
+		this.pixelsEnabled = !!pixelConfig && (!("auto" in pixelConfig) || settings.livePixelsEnabled(origin));
 		const saved = loadToken(origin);
 		// Electron's network stack: the system's proxy and certificates, and
 		// *.localhost's self-signed certificate (see main.ts).
@@ -87,10 +98,25 @@ export class Connection {
 			onUnmatched: (names) =>
 				this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
 		});
+		if (pixelConfig)
+			this.pixels = new LivePixels(
+				pixelConfig,
+				(data) => {
+					if (this.account && !this.sync.queuePixelSnapshot(data)) log("Live pixels: invalid snapshot ignored.");
+				},
+				(state) => {
+					this.pixelStatus = state;
+					log(`Live pixels: ${state}`);
+					this.emit();
+				},
+			);
 	}
 
 	get status(): Status {
 		return {
+			livePixelsEnabled: this.pixelsEnabled,
+			livePixelsAvailable: !!this.pixels,
+			livePixels: this.pixelStatus,
 			connected: !!this.account,
 			account: this.account,
 			lastUpload: this.sync.lastUpload,
@@ -141,9 +167,33 @@ export class Connection {
 
 	stop() {
 		clearInterval(this.timer);
+		this.pixels?.stop();
+		this.sync.reset();
+	}
+
+	setLivePixels(enabled: unknown) {
+		if (typeof enabled !== "boolean") throw new Error("Expected a boolean");
+		if (enabled && !this.pixels) throw new Error("Live capture is unavailable in this build");
+		this.pixelsEnabled = enabled;
+		settings.setLivePixels(this.origin, enabled);
+		this.sync.clearPixelSnapshot();
+		this.pixels?.stop();
+		this.updatePixelCapture();
+		this.emit();
+	}
+
+	private updatePixelCapture() {
+		if (!this.pixels) return;
+		const savedEnabled = !this.automaticPixels || savedLivePixelsEnabled(this.sync.wowFolder);
+		if (this.account && this.pixelsEnabled && savedEnabled) this.pixels.start();
+		else {
+			this.pixels.stop();
+			this.sync.clearPixelSnapshot();
+		}
 	}
 
 	private async tick() {
+		this.updatePixelCapture();
 		// Which addon the game last ran changes when it saves (at /reload or logout).
 		const loaded = loadedAddonVersion(this.sync.wowFolder);
 		if (loaded !== this.addonLoaded) {
@@ -167,6 +217,7 @@ export class Connection {
 			return false;
 		}
 		this.account = me.battletag ?? this.account ?? "you";
+		this.updatePixelCapture();
 		if (this.api.token) saveToken(this.origin, this.api.token, this.account);
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		if (!me.characters.length)
@@ -188,17 +239,23 @@ export class Connection {
 		if (!saveToken(this.origin, token, this.account))
 			this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
 		this.sync.reset();
+		this.pixels?.stop();
+		this.updatePixelCapture();
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		this.emit();
 	}
 
 	/** Disconnect this computer: the site forgets the token (unless it already has) and so do we. */
 	async disconnect(revoke = true) {
-		if (revoke && this.api.token) await this.api.signOut();
+		this.account = undefined;
+		this.pixels?.stop();
+		this.sync.reset();
+		const revocation = revoke && this.api.token ? this.api.signOut() : undefined;
 		this.api.token = undefined;
 		forgetToken(this.origin);
 		this.sync.reset();
 		this.emit();
+		await revocation;
 	}
 
 	/** "Upload now": upload the saved files again and refresh guild data. */
@@ -212,6 +269,7 @@ export class Connection {
 			throw new Error("That folder doesn't look like World of Warcraft (no _classic_ or _forever_ folder inside).");
 		settings.wow = folder;
 		this.sync.setWow(folder);
+		this.updatePixelCapture();
 		this.log(`WoW folder: ${folder}`);
 		this.onWowFolder(folder);
 		this.emit();

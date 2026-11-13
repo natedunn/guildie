@@ -11,16 +11,7 @@ local GREEN = "|cff40e040"
 local GREY = "|cff9d9d9d"
 local AFK_INTERVAL = 20 * 60 -- seconds between automatic reloads, at most
 
-local function settings()
-    GuildieDB.settings = GuildieDB.settings or {}
-    local s = GuildieDB.settings
-    if s.minimapAngle == nil then s.minimapAngle = 220 end
-    if s.showMinimap == nil then s.showMinimap = true end
-    if s.reloadWhenAfk == nil then s.reloadWhenAfk = false end
-    if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
-    return s
-end
-ns.settings = settings
+local function settings() return ns.settings() end
 
 -- ---- Window ------------------------------------------------------------------
 -- The game's own look: PortraitFrameTemplate (the logo in the portrait ring,
@@ -115,21 +106,6 @@ local function text(template, width)
     fs:SetWidth(width or TEXT_WIDTH)
     if fs.SetWordWrap then fs:SetWordWrap(true) end
     return fs
-end
-
-local function checkbox(label, get, set)
-    local cb = CreateFrame("CheckButton", nil, window.body, "UICheckButtonTemplate")
-    cb:SetSize(24, 24)
-    local fs = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    fs:SetPoint("LEFT", cb, "RIGHT", 2, 0)
-    fs:SetWidth(TEXT_WIDTH - 26)
-    fs:SetJustifyH("LEFT")
-    fs:SetText(label)
-    -- Clicking the label toggles it too.
-    cb:SetHitRectInsets(0, -((fs:GetStringWidth() or 200) + 4), 0, 0)
-    cb:SetScript("OnShow", function(self) self:SetChecked(get()) end)
-    cb:SetScript("OnClick", function(self) set(self:GetChecked() and true or false) end)
-    return cb
 end
 
 local function heightOf(row)
@@ -373,21 +349,10 @@ local function buildWindow()
     window.upload = upload
     window.uploadHint = text("GameFontDisableSmall")
 
-    window.afk = checkbox("Sync while I'm AFK",
-        function() return settings().reloadWhenAfk end,
-        function(on) settings().reloadWhenAfk = on end)
-    window.minimap = checkbox("Show minimap button",
-        function() return settings().showMinimap end,
-        function(on)
-            settings().showMinimap = on
-            if ns.updateMinimapButton then ns.updateMinimapButton() end
-        end)
-    window.explain = checkbox("Say why tooltips have nothing",
-        function() return settings().sayWhyEmpty end,
-        function(on) settings().sayWhyEmpty = on end)
-
-    local afkHint = text("GameFontDisableSmall", TEXT_WIDTH - 26)
-    afkHint:SetText("Experimental. Reloads your UI while AFK, out of combat, at most every 20 minutes.")
+    local preferences = CreateFrame("Button", nil, window.body, "UIPanelButtonTemplate")
+    preferences:SetSize(180, 26)
+    preferences:SetText("Open Guildie settings")
+    preferences:SetScript("OnClick", function() window:Hide(); ns.openSettings() end)
     local footerRule = rule(window, WIDTH - 2 * MARGIN)
     footerRule:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, FOOTER_HEIGHT - 4)
     local foot = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -410,11 +375,7 @@ local function buildWindow()
         { el = window.requests, gap = 10 },
         { el = window.requestsHint, gap = 4 },
         { el = rule(window.body, TEXT_WIDTH), gap = 18, height = 1 },
-        { el = heading("Preferences"), gap = 14 },
-        { el = window.minimap, gap = 6, dx = -4, height = 24 },
-        { el = window.explain, gap = 2, dx = -4, height = 24 },
-        { el = window.afk, gap = 2, dx = -4, height = 24 },
-        { el = afkHint, gap = 0, dx = 26 },
+        { el = preferences, gap = 14, height = 26 },
     }
     window:SetScript("OnShow", refresh)
 end
@@ -430,7 +391,7 @@ end
 
 -- Entry in the minimap's add-on menu, where the client has one.
 function Guildie_OnAddonCompartmentClick()
-    ns.toggleWindow()
+    ns.openSettings()
 end
 
 -- ---- Minimap button ------------------------------------------------------------
@@ -471,7 +432,7 @@ local function buildButton()
     border:SetSize(53, 53)
     border:SetPoint("TOPLEFT")
 
-    button:SetScript("OnClick", function() ns.toggleWindow() end)
+    button:SetScript("OnClick", function() ns.openSettings() end)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guildie")
@@ -487,7 +448,7 @@ local function buildButton()
             GameTooltip:AddLine(change, 1, 1, 1)
         end
         if #result.changes > 3 then GameTooltip:AddLine(string.format("and %d more", #result.changes - 3), 0.6, 0.6, 0.6) end
-        GameTooltip:AddLine("Click to open. Drag to move.", 0.6, 0.6, 0.6)
+        GameTooltip:AddLine("Click for Guildie settings. Drag to move.", 0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
