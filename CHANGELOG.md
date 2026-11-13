@@ -19,6 +19,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 - **Guildie, App, Addon:** Experimental sync without reloading (off by default). Enable it in the app and WoW's addon settings to sync through a small amber square, move it in Edit Mode, and let the app find it automatically. Updating the addon requires a full WoW restart.
 
+### Fixes
+
+- **App:** Use Guildie's Windows icon for the running app's taskbar button.
+
 ## 0.3.28
 
 ### Fixes
