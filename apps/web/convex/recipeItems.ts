@@ -157,13 +157,13 @@ export const save = internalMutation({
 		for (const { craftedItemId, spellName, ...item } of items) {
 			let recipe: Doc<"recipes"> | undefined;
 			if (craftedItemId) {
+				// The profession by name too: some items give another id for it
+				// (Forever's First Aid manuals: 2942, the catalog and profiles: 129).
 				const makers = (
 					await ctx.db
 						.query("recipes")
 						.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", craftedItemId))
 						.collect()
-				// By name too: some items give another id for the same profession
-				// (Forever's First Aid manuals: 2942, the catalog and profiles: 129).
 				).filter((r) => r.professionId === item.professionId || r.profession === item.profession);
 				recipe = makers.length === 1 ? makers[0] : makers.find((r) => r.name === taughtName(item.name));
 			}
