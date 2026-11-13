@@ -101,24 +101,23 @@ function ns.buildSettingsRows(parent, width, changed)
 
     section("Live square", live)
     note("Keep the whole square on screen and uncovered. Bank and recipes still need their windows opened.", live)
-    note("Drag to move: drag the square, then Done. It also moves in the game's Edit Mode.", live)
     local group = CreateFrame("Frame", nil, parent)
     group:SetSize(width, 26)
-    for i, spec in ipairs({{"Top left", "top"}, {"Bottom left", "bottom"}, {"Drag to move", "edit"}}) do
+    for i, spec in ipairs({{"Top left", "top"}, {"Bottom left", "bottom"}}) do
         local button = CreateFrame("Button", nil, group, "UIPanelButtonTemplate")
         button:SetPoint("TOPLEFT", (i - 1) * 132, 0)
-        button:SetSize(i == 3 and 150 or 124, 24)
+        button:SetSize(124, 24)
         button:SetText(spec[1])
         local action = spec[2]
         button:SetScript("OnClick", function()
             if InCombatLockdown and InCombatLockdown() then return end
-            if action == "edit" then ns.buildWindow():Hide(); ns.livePixels.position()
-            else ns.livePixels.corner(action) end
+            ns.livePixels.corner(action)
             changed()
         end)
         updates[#updates + 1] = function() button:SetEnabled(not (InCombatLockdown and InCombatLockdown())) end
     end
     rows[#rows + 1] = {el = group, gap = 10, height = 26, visible = live}
+    note("Anywhere else: press Escape and choose Edit Mode, drag the square, then close Edit Mode.", live)
     toggle("UICheckButtonTemplate", "Larger square", "large", function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
         function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end, live)
     toggle("UICheckButtonTemplate", "Warn on screen when live sync stops", "showSyncWarning",

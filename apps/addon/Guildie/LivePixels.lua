@@ -248,18 +248,6 @@ local editLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 editLabel:SetPoint("LEFT", panel, "RIGHT", 4, 0)
 editLabel:SetText("Guildie sync")
 editLabel:Hide()
-local doneEditing = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-doneEditing:SetPoint("TOPLEFT", panel, "BOTTOMLEFT", 0, -8)
-doneEditing:SetSize(90, 24)
-doneEditing:SetText("Done")
-doneEditing:Hide()
-local cancelEditing = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-cancelEditing:SetPoint("LEFT", doneEditing, "RIGHT", 6, 0)
-cancelEditing:SetSize(90, 24)
-cancelEditing:SetText("Cancel")
-cancelEditing:Hide()
--- Where the square was when Guildie's own move began (Cancel puts it back).
-local before
 local function beginEditing()
     editing = true
     layout(cellSize)
@@ -270,8 +258,6 @@ local function beginEditing()
     end
     displayed = {}
     editLabel:Show()
-    doneEditing:SetShown(not nativeEditing)
-    cancelEditing:SetShown(not nativeEditing)
     panel:EnableMouse(true)
     panel:Show()
 end
@@ -280,29 +266,16 @@ local function endEditing()
     panel:StopMovingOrSizing()
     editing = false
     editLabel:Hide()
-    doneEditing:Hide()
-    cancelEditing:Hide()
-    before = nil
     panel:EnableMouse(false)
     displayed = {}
     snapshot, live = nil, nil
     elapsed = 0
     if exportEnabled then panel:Show() else panel:Hide() end
 end
-doneEditing:SetScript("OnClick", endEditing)
-cancelEditing:SetScript("OnClick", function()
-    if dragging then panel:StopMovingOrSizing(); dragging = false end
-    if before then
-        local o = options()
-        o.corner, o.x, o.y = before.corner, before.x, before.y
-        restorePosition()
-    end
-    endEditing()
-end)
--- Guildie never opens Blizzard's Edit Mode itself: entering it from addon
--- code taints its setup (TargetUnit/FocusUnit get blocked and the UI is left
--- half in Edit Mode). Moving the square from Guildie uses the square's own
--- drag mode; players who open Edit Mode themselves can drag it there too.
+-- The square moves only in the game's Edit Mode, which the player opens
+-- (Escape > Edit Mode). Guildie never opens it: entering it from addon code
+-- taints its setup (TargetUnit/FocusUnit get blocked and the UI is left half
+-- in Edit Mode, seen on Forever 1.60.1), and there's no safe way to call it.
 -- Follow the manager's visibility, as LibEditMode does, without touching
 -- Blizzard's protected system registrations. Retry when its load-on-demand UI loads.
 local hookedManager
@@ -331,13 +304,11 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         return
     end
     command = command:lower():match("^%s*(.-)%s*$")
-    if dragging then savePosition() end
-    panel:StopMovingOrSizing()
-    editing = false
+    if command == "edit" or command == "lock" then
+        print("Guildie pixels: to move the square, press Escape and choose Edit Mode, drag it, then close Edit Mode.")
+        return
+    end
     exportEnabled = false
-    editLabel:Hide()
-    doneEditing:Hide()
-    panel:EnableMouse(false)
     local requestedTheme = command:match(" (amber)$") or command:match(" (gray)$")
     if requestedTheme then command = command:sub(1, #command - #requestedTheme - 1) end
     local requestedSize = tonumber(command:match("^on (%d+%.?%d*)$"))
@@ -354,10 +325,6 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
         options().theme, options().size = theme, cellSize
         panel:Show()
         print("Guildie pixels: " .. theme .. " export enabled. Match reader --theme and recalibrate after moving or resizing.")
-    elseif command == "edit" then
-        options().enabled = false
-        beginEditing()
-        print("Guildie pixels: drag the square. /guildiepixels lock hides it; /guildiepixels on starts export.")
     elseif command == "reset" then
         options().corner = "top"
         options().enabled = false
@@ -368,7 +335,7 @@ SlashCmdList.GUILDIELIVEPIXELS = function(command)
     else
         options().enabled = false
         panel:Hide()
-        print("Guildie pixels: disabled. Commands: on, on amber, on <cell size 1-8> amber, on large, edit, lock, off, reset.")
+        print("Guildie pixels: disabled. Commands: on, on amber, on <cell size 1-8> amber, on large, off, reset.")
     end
 end
 
@@ -403,14 +370,6 @@ ns.livePixels = {
         else return end
         applyOptions()
         if ns.refreshSyncWarning then ns.refreshSyncWarning() end
-    end,
-    -- Guildie's own move: drag the square, then Done (or Cancel). Never
-    -- Blizzard's Edit Mode (see above). Already in Edit Mode: it's draggable.
-    position = function()
-        if read(InCombatLockdown) or editing then return end
-        local o = options()
-        before = { corner = o.corner, x = o.x, y = o.y }
-        beginEditing()
     end,
     corner = function(edge)
         if read(InCombatLockdown) then return end

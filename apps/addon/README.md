@@ -3,8 +3,8 @@
 Experimental sync without reloading is configured in the Guildie window →
 **Settings** → Sync (Live, as you play). Export starts off; enabling it is
 remembered across logins. Choose amber (default) or grayscale troubleshooting
-mode, small or large squares, and move it to a corner, with Drag to move, or in
-the game's own Edit Mode (Guildie never opens Edit Mode itself). After enabling or disabling export, `/reload` saves your choice for the app. The signed-in Windows app captures only while that saved choice is enabled, unless capture was also disabled in its Settings → Addon. See
+mode, small or large squares, and move it to a corner or anywhere in the
+game's own Edit Mode (Escape → Edit Mode; Guildie never opens it itself). After enabling or disabling export, `/reload` saves your choice for the app. The signed-in Windows app captures only while that saved choice is enabled, unless capture was also disabled in its Settings → Addon. See
 [live sync](../../docs/live-sync.md) for setup and current limitations. New files
 in this update require a full game restart.
 

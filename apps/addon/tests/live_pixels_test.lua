@@ -120,28 +120,28 @@ GuildieDB.livePixels.corner, GuildieDB.livePixels.x, GuildieDB.livePixels.y = ni
 wow.fire("UI_SCALE_CHANGED")
 assert(GuildieDB.livePixels.x > 0 and GuildieDB.livePixels.y < 0, "unsafe saved position is clamped")
 GetPhysicalScreenSize = nil
--- Moving never opens Blizzard's Edit Mode (it taints its setup), and must
--- not silently disable the saved export setting.
-local enteredEditMode = false
-EditModeManagerFrame = {EnterEditMode = function() enteredEditMode = true end}
+-- The square moves only in the game's Edit Mode, opened by the player.
+-- Guildie never opens it (entering it from addon code taints its setup):
+-- no source file may call EnterEditMode, and there's no Guildie move mode.
+for _, file in ipairs({"LivePixels.lua", "Settings.lua", "UI.lua", "Guildie.lua"}) do
+    local source = assert(io.open("apps/addon/Guildie/" .. file)):read("*a")
+    assert(not source:find("EnterEditMode%s*%("), file .. " must not call EnterEditMode")
+end
+assert(ns.livePixels.position == nil, "no Guildie-only move mode")
+local hooks = {}
+local shown = false
+EditModeManagerFrame = {
+    HookScript = function(_, script, fn) hooks[script] = fn end,
+    IsShown = function() return shown end,
+}
 ns.livePixels.set("enabled", true)
-ns.livePixels.position()
-assert(not enteredEditMode, "Guildie must not call EditModeManagerFrame:EnterEditMode()")
+wow.fire("PLAYER_LOGIN") -- attaches to Edit Mode, as when its UI loads
+assert(hooks.OnShow and hooks.OnHide, "follows Edit Mode")
+shown = true; hooks.OnShow()
+assert(ns.livePixels.health().editing, "draggable while the player has Edit Mode open")
+shown = false; hooks.OnHide()
+assert(ns.livePixels.get().enabled and not ns.livePixels.health().editing, "export resumes, still enabled")
 EditModeManagerFrame = nil
--- Cancel puts the square back where it was.
-local savedX, savedY = GuildieDB.livePixels.x, GuildieDB.livePixels.y
-GuildieDB.livePixels.x, GuildieDB.livePixels.y = savedX + 40, savedY - 40
-for _, f in ipairs(wow.frames) do
-    if rawget(f, "_text") == "Cancel" and f.scripts.OnClick then f.scripts.OnClick() end
-end
-assert(GuildieDB.livePixels.x == savedX and GuildieDB.livePixels.y == savedY, "Cancel restores the position")
-assert(not ns.livePixels.health().editing)
-ns.livePixels.position()
-assert(ns.livePixels.get().enabled and ns.livePixels.health().editing)
-for _, f in ipairs(wow.frames) do
-    if rawget(f, "_text") == "Done" and f.scripts.OnClick then f.scripts.OnClick() end
-end
-assert(ns.livePixels.get().enabled and not ns.livePixels.health().editing)
 -- Export failures surface in game, rather than looking successfully connected.
 GuildieDB.characters = {test = {oversize = string.rep("x", 1048577)}}
 ns.livePixels.set("enabled", true)
