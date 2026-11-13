@@ -3,7 +3,7 @@ import argparse
 import json
 import time
 import zlib
-from discovery import candidates, RegionShot, foreground_wow
+from discovery import candidates, RegionShot, foreground_wow, parent_watch
 
 
 def decode(values):
@@ -67,6 +67,7 @@ def sample_values(shot, cell, columns=16, theme="gray"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--auto", action="store_true", help="Find and follow the square in foreground WoW")
+    parser.add_argument("--parent-pid", type=int, help="Exit if the owning desktop process exits")
     parser.add_argument("--left", type=int)
     parser.add_argument("--top", type=int)
     parser.add_argument("--cell", type=int, default=2,
@@ -80,11 +81,14 @@ def main():
         parser.error("cell must be between 2 and 64")
     import mss
     if args.auto:
+        parent_alive = parent_watch(args.parent_pid)
+        if not parent_alive():
+            return
         with mss.mss() as capture:
             try:
-                while True:
+                while parent_alive():
                     try:
-                        automatic(capture)
+                        automatic(capture, parent_alive)
                     except mss.exception.ScreenShotError:
                         emit("status", {"state": "searching"})
                         time.sleep(2)
@@ -115,7 +119,7 @@ def emit(channel, data):
     print(json.dumps({"receivedAt": time.time(), "channel": channel, "data": data}, ensure_ascii=False), flush=True)
 
 
-def automatic(capture):
+def automatic(capture, parent_alive=lambda: True):
     region = None
     window = None
     pending = None
@@ -130,7 +134,7 @@ def automatic(capture):
             emit("status", {"state": value})
             last_state = value
 
-    while True:
+    while parent_alive():
         current = foreground_wow()
         if current != window:
             region, pending, window = None, None, current
@@ -155,8 +159,10 @@ def automatic(capture):
                 status("calibrating")
                 break
             if pending is None:
+                del shot
                 time.sleep(2)
                 continue
+            del shot
         target = region or pending
         try:
             packet = decode(sample_values(capture.grab(target), cell, theme=theme))

@@ -96,7 +96,7 @@ export class LivePixels {
 		const child = spawn(
 			"auto" in c ? c.executable : c.python,
 			"auto" in c
-				? ["--auto"]
+				? ["--auto", "--parent-pid", String(process.pid)]
 				: [c.reader, "--left", String(c.left), "--top", String(c.top), "--cell", String(c.cell), "--theme", c.theme],
 			{
 				windowsHide: true,

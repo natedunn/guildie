@@ -23,6 +23,9 @@ Turning the app setting off or quitting stops capture. Turning export off in WoW
 hides the square; the app continues looking while WoW is foreground until its own
 capture setting is disabled.
 
+The bundled helper monitors the original desktop process handle and exits if the
+app crashes or is force-closed, even when there are no new capture records.
+
 The app scans the foreground WoW client rectangle to locate the protocol header,
 validates eight distinct packets, then captures only the square. It searches again
 after moving/resizing/theme changes or interrupted visibility. It does not capture

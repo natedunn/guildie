@@ -30,6 +30,13 @@ class Shot:
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_exits_without_capture_when_parent_is_gone(self):
+        class Capture:
+            def grab(self, _):
+                raise AssertionError("must not capture after parent exits")
+        with patch.object(reader, "foreground_wow", side_effect=AssertionError("must exit first")):
+            reader.automatic(Capture(), lambda: False)
+
     def test_automatic_reacquires_and_does_not_capture_other_apps(self):
         clock = [0.0]
         serial = [0]

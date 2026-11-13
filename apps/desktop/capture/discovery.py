@@ -2,6 +2,7 @@
 import ctypes
 from ctypes import wintypes
 import sys
+import atexit
 
 
 class RegionShot:
@@ -10,6 +11,25 @@ class RegionShot:
 
     def pixel(self, x, y):
         return self.shot.pixel(self.left + x, self.top + y)
+
+
+def parent_watch(pid):
+    """Hold the original process handle so PID reuse cannot keep capture alive."""
+    if pid is None:
+        return lambda: True
+    if sys.platform != "win32":
+        import os
+        return lambda: os.getppid() == pid
+    kernel = ctypes.windll.kernel32
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = kernel.OpenProcess(0x00100000, False, pid)  # SYNCHRONIZE
+    if not handle:
+        return lambda: False
+    atexit.register(kernel.CloseHandle, handle)
+    return lambda: kernel.WaitForSingleObject(handle, 0) == 258  # WAIT_TIMEOUT
 
 
 def candidates(shot):
