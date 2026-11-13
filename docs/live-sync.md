@@ -264,14 +264,13 @@ reports, exact names in partial and completion feed entries, known character
 links versus an unknown sender's plain name, and repeated uploads from both sides
 without duplicate feed entries or quantity changes.
 
-## Recovery and source precedence (addon 0.18.0)
+## Recovery and source precedence
 
-Successful addon gear, profession, recipe, talent and quest-log captures take
-precedence over Blizzard session/fetch timestamps. Blizzard supplies sections
-never captured; levels use the highest observed value. Empty legacy talent
-captures still fall back to Blizzard when it has spent points. Capture timestamps
-remain unchanged and visible: if addon reporting stops, its last observed state
-may be old, including when playing on another computer without the addon.
+Which source a character page shows (the game or Blizzard) is one rule for
+every part: the newer one, except that an empty read never hides the other
+source's data, and recipes and turned-in quests combine both. Details and how
+to check it: docs/addon.md, "Which data wins". (Addon 0.18.0 briefly made every
+in-game read win; that hid Blizzard's professions behind empty in-game reads.)
 
 Quest history and the current log are reconciled every 60 seconds as well as on
 login/events. Only positive completion confirmations are added. API failures,

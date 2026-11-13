@@ -370,30 +370,45 @@ before that, so the window catches up at the next `/reload`.
 
 ## Which data wins
 
-Per character and per part, newest wins (`convex/profile.ts`, used by the
-roster, the character pages, guild crafting, item panels and the addon's
-guild data). Blizzard's profile describes the character as of their last
-session, so its time is `lastLoginAt`:
+Per character and per part, one rule (`decide` in `convex/profile.ts`, used
+by the roster, the character pages, guild crafting, item panels and the
+addon's guild data). Blizzard's profile describes the character as of their
+last session, so its time is `lastLoginAt`:
 
-- Level: the higher of the two (levels never drop; `lastLoginAt` is the start
-  of the session, so a level gained later in it can be Blizzard's).
-- Gear and item level, the profession list with skill: the addon's while its
-  read is newer than `lastLoginAt`.
-- Known recipes, per profession: the addon's read while newer, added to
-  Blizzard's list (recipes are only lost with the profession). A profession
-  no longer known shows none.
-- Quests in progress: the addon's quest log while newer than `lastLoginAt`,
-  else Blizzard's list (ids only).
-- Talents: the addon's while newer than the last time Blizzard's talents
-  changed (`talentsChangedAt`, set by the hourly sync); an empty list from the
-  addon doesn't replace Blizzard's points.
-- Anything the addon never read stays Blizzard's.
+- Gear (and item level), talents, the profession list with skill, the quest
+  log: if only one source has the part, that one. If both do, the newer: the
+  addon's read time against `lastLoginAt`.
+- Empty (no gear, no talent points, no professions, an empty quest log) shows
+  only when both sources say empty. Either can come back empty by mistake:
+  Forever's `GetProfessions` returns nothing right after login and at logout,
+  and Blizzard has empty responses. So one empty source never hides the
+  other's data, and a real removal (unlearning, a respec, abandoning quests)
+  shows once Blizzard agrees, after the player logs out and the next sync.
+- Under level 10 Blizzard has no profile, so everything is the addon's (the
+  character page says so).
+- Known recipes: Blizzard's and the addon's together, per profession in the
+  list shown (recipes are only lost with the profession). Uploads keep every
+  recipe read; the profile drops them only with their profession.
+- Turned-in quests: everything either source has seen (both lists only grow).
+- Level: the higher of the two (levels never drop).
 
-So: no addon, Blizzard's data as before. `/reload` after a level, a gear
-swap or opening a profession: the game's (the pages say "From the game, 5
-minutes ago"; the roster's Last synced shows the controller icon and the
-newest in-game time). Play elsewhere without the app and log out: Blizzard's
-is newer and takes over.
+Both sides also protect against failed reads before they reach the rule: the
+addon never replaces a non-empty profession list with an empty one (and reads
+again 5 seconds after login), and the upload keeps the stored list when an
+older addon sends an empty one.
+
+Checking it: `profile.test.ts` runs every part through every case (missing,
+empty, older, newer, from either source). Maintainers see a "Data sources"
+panel at the bottom of each character page (Battle.net account ids in the
+`MAINTAINER_BATTLENET_IDS` Convex env var, comma-separated; everyone on a
+local backend), and after a deploy:
+
+```sh
+npx convex run sources:audit --deployment <name>   # pass continueCursor back to page
+```
+
+lists characters that show empty while a source has data (should never
+happen) and parts where one source is empty and the other isn't.
 
 Addon data is player-provided; Blizzard's can't be edited by the player.
 

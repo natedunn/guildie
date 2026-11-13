@@ -276,7 +276,10 @@ local function capture(reason, recipes)
         equipment.capturedAt = now
         character.equipment = equipment
     end
-    if okSkills and skills then
+    -- An empty read never replaces a non-empty one (not loaded yet, at login
+    -- or logout); a character that never had any sends the empty list.
+    local hadSkills = previous.professions and previous.professions.skills and #previous.professions.skills > 0
+    if okSkills and skills and (#skills > 0 or not hadSkills) then
         character.professions = { capturedAt = now, skills = mergeSkills(previous.professions, skills, complete) }
     end
     if okProf and prof and #prof.skills > 0 then
@@ -294,8 +297,9 @@ local function capture(reason, recipes)
     if recipes and recipes.profession and recipes.known then
         character.recipes = mergeRecipes(character.recipes, recipes.profession, recipes.known, now)
     end
-    -- An unlearned profession takes its recipes with it.
-    if character.recipes and character.professions then
+    -- An unlearned profession takes its recipes with it (an empty list is
+    -- an older addon's failed read, not every profession unlearned).
+    if character.recipes and character.professions and #character.professions.skills > 0 then
         local has = byName(character.professions.skills)
         local kept = {}
         for _, section in ipairs(character.recipes) do
@@ -440,6 +444,11 @@ frame:SetScript("OnEvent", function(_, event, questID)
     if event == "QUEST_TURNED_IN" then recordQuestTurnIn(questID) end
     if event == "PLAYER_ENTERING_WORLD" and type(QueryQuestsCompleted) == "function" then
         pcall(QueryQuestsCompleted)
+    end
+    -- Some data (professions on Forever) isn't there yet at login: read again
+    -- once it has settled.
+    if event == "PLAYER_ENTERING_WORLD" and C_Timer then
+        C_Timer.After(5, function() capture("PLAYER_ENTERING_WORLD+5") end)
     end
     -- The bank answers only while it's open: track that right away.
     if event == "BANKFRAME_OPENED" then ns.bankOpen = true end

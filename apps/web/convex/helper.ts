@@ -225,7 +225,14 @@ export const ingest = mutation({
 				capturedAt: c.professions.capturedAt,
 				list: c.professions.list,
 			};
-			const professions = newer(incomingProfessions, existing?.professions);
+			// An empty list never replaces a non-empty one: in game it's more
+			// likely a read before the data loaded (Forever's GetProfessions
+			// returns nothing right after login, and older addons sent that).
+			// The site shows Blizzard's when only one source is empty (profile.ts).
+			const professions =
+				incomingProfessions && incomingProfessions.list.length === 0 && existing?.professions?.list.length
+					? existing.professions
+					: newer(incomingProfessions, existing?.professions);
 			const proficiencies = newer(c.proficiencies, existing?.proficiencies);
 			const quests = newer(c.quests, existing?.quests);
 
@@ -247,10 +254,10 @@ export const ingest = mutation({
 					unmatched: missing,
 				});
 			}
-			// Professions the character no longer has take their recipes with them.
-			const keptRecipes = [...recipes.values()].filter(
-				(r) => !professions || professions.list.some((p) => p.id === r.professionId),
-			);
+			// Recipes are kept for every profession: the profile shows them only
+			// for professions in the list it shows (profile.ts), and an empty or
+			// failed profession read must not delete them.
+			const keptRecipes = [...recipes.values()];
 
 			const snapshot: SnapshotFields = {
 				userId: row.userId,

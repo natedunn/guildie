@@ -1,9 +1,25 @@
 import type { Doc } from "./_generated/dataModel";
 
-// Successful addon captures are authoritative for the sections they cover.
-// Blizzard fills uncaptured sections; fetch/session timestamps are not proof
-// that an API response contains newer game state. Keep each capture's age visible.
-// Level remains monotonic. Empty legacy talent reads still fall back to Blizzard.
+// A character as we show it: Blizzard's profile merged with the latest
+// in-game snapshot from the Guildie addon. Kept free of Convex and value
+// imports so `node --test` can run it (profile.test.ts). The rules, one per
+// section, all through `decide` (docs/addon.md, "Which data wins"):
+//
+// - Gear (and item level), talents, the profession list with skill, the
+//   quest log: when only one source has the section, that one. When both do,
+//   the newer: the addon's read time against Blizzard's `lastLoginAt` (its
+//   profile describes the character as of that session, so a session played
+//   without the app makes Blizzard's newer).
+// - An empty section (no gear, no talent points, no professions, an empty
+//   quest log) is shown only when both sources say empty. Either source can
+//   come back empty by mistake (Forever's GetProfessions returns nothing right
+//   after login; Blizzard has empty responses), so one empty never hides the
+//   other's data. A real removal shows once both agree, after the player logs
+//   out and Blizzard's profile catches up.
+// - Characters Blizzard has no profile for (under level 10): the addon's.
+// - Known recipes: Blizzard's and the addon's together (recipes are only lost
+//   with their profession), for each profession in the list shown.
+// - Level: the higher of the two (levels never drop).
 
 export type Source = { kind: "addon" | "blizzard"; at?: number };
 
@@ -12,7 +28,6 @@ type Character = Pick<
 	| "level"
 	| "lastLoginAt"
 	| "profileSyncedAt"
-	| "talentsChangedAt"
 	| "averageItemLevel"
 	| "equipment"
 	| "professions"
@@ -45,8 +60,41 @@ export function averageItemLevel(items: Item[]) {
 	return Math.floor(total / 17);
 }
 
+/** Which source a section shows, and why (for the maintainer debug panel and the audit). */
+export type Decision = {
+	shown: "addon" | "blizzard" | "none";
+	reason: "none" | "only" | "newer" | "other-empty" | "both-empty";
+	addon?: { at: number; count: number };
+	blizzard?: { at?: number; count: number };
+};
+
+type Side = { at: number; count: number } | undefined;
+
+/**
+ * The one rule every section goes through: only one source, that one; both,
+ * the newer (ties go to Blizzard), unless the newer is empty and the other
+ * isn't. Blizzard's time is `lastLoginAt` (0 when unknown).
+ */
+export function decide(addon: Side, blizzard: Side, blizzardAt: number | undefined): Decision {
+	const sides = {
+		...(addon ? { addon } : {}),
+		...(blizzard ? { blizzard: { at: blizzardAt, count: blizzard.count } } : {}),
+	};
+	if (!addon && !blizzard) return { shown: "none", reason: "none", ...sides };
+	if (!blizzard) return { shown: "addon", reason: "only", ...sides };
+	if (!addon) return { shown: "blizzard", reason: "only", ...sides };
+	const newer = addon.at > (blizzardAt ?? 0) ? "addon" : "blizzard";
+	const other = newer === "addon" ? "blizzard" : "addon";
+	const count = { addon: addon.count, blizzard: blizzard.count };
+	if (count[newer] > 0) return { shown: newer, reason: "newer", ...sides };
+	if (count[other] > 0) return { shown: other, reason: "other-empty", ...sides };
+	return { shown: newer, reason: "both-empty", ...sides };
+}
+
+const points = (trees: { points: number }[]) => trees.reduce((sum, t) => sum + t.points, 0);
+
 export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
-	const blizzardAt = c.lastLoginAt ?? 0;
+	const blizzardAt = c.lastLoginAt;
 	const blizzard: Source = { kind: "blizzard", at: c.lastLoginAt };
 	const fromAddon: number[] = [];
 	const addon = (at: number): Source => {
@@ -56,15 +104,23 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 
 	let level = c.level;
 	let levelSource = blizzard;
-	if (snap?.level !== undefined && (snap.level > c.level || (snap.level === c.level && snap.capturedAt > blizzardAt))) {
+	if (
+		snap?.level !== undefined &&
+		(snap.level > c.level || (snap.level === c.level && snap.capturedAt > (blizzardAt ?? 0)))
+	) {
 		level = snap.level;
 		levelSource = addon(snap.capturedAt);
 	}
 
+	const gearDecision = decide(
+		snap?.equipment && { at: snap.equipment.capturedAt, count: snap.equipment.items.length },
+		c.equipment && { at: blizzardAt ?? 0, count: c.equipment.length },
+		blizzardAt,
+	);
 	let equipment = c.equipment;
 	let itemLevel = c.averageItemLevel;
 	let gearSource = blizzard;
-	if (snap?.equipment) {
+	if (gearDecision.shown === "addon" && snap?.equipment) {
 		equipment = snap.equipment.items;
 		itemLevel =
 			snap.equipment.averageItemLevel !== undefined
@@ -73,32 +129,47 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 		gearSource = addon(snap.equipment.capturedAt);
 	}
 
+	const professionDecision = decide(
+		snap?.professions && { at: snap.professions.capturedAt, count: snap.professions.list.length },
+		c.professions && { at: blizzardAt ?? 0, count: c.professions.length },
+		blizzardAt,
+	);
 	const fromBlizzard = new Map((c.professions ?? []).map((p) => [p.id, p]));
 	let professions: Profession[] = (c.professions ?? []).map((p) => ({ ...p }));
 	let professionsSource = blizzard;
-	if (snap?.professions) {
+	if (professionDecision.shown === "addon" && snap?.professions) {
 		professions = snap.professions.list.map((p) => ({ ...p, knownRecipes: fromBlizzard.get(p.id)?.knownRecipes }));
 		professionsSource = addon(snap.professions.capturedAt);
 	}
+	// Recipes: Blizzard's and the game's together, whichever list is shown.
+	// A profession not in that list takes its recipes with it.
 	for (const r of snap?.recipes ?? []) {
-		// A profession no longer known takes its recipes with it.
 		const p = professions.find((x) => x.id === r.professionId);
 		if (!p) continue;
 		p.knownRecipes = [...new Set([...(p.knownRecipes ?? []), ...r.recipeIds])];
 		p.recipesSource = addon(r.capturedAt);
 	}
 
+	const talentDecision = decide(
+		snap ? { at: snap.capturedAt, count: points(snap.talentTrees) } : undefined,
+		c.talentTrees && { at: blizzardAt ?? 0, count: points(c.talentTrees) },
+		blizzardAt,
+	);
 	let talentTrees = c.talentTrees;
-	let talentSource: Source = { kind: "blizzard", at: c.profileSyncedAt };
-	const blizzardHasTalents = (c.talentTrees ?? []).some((t) => t.points > 0);
-	if (snap && (snap.talentTrees.length > 0 || !blizzardHasTalents)) {
+	let talentSource: Source = blizzard;
+	if (talentDecision.shown === "addon" && snap) {
 		talentTrees = snap.talentTrees;
 		talentSource = addon(snap.capturedAt);
 	}
 
+	const questDecision = decide(
+		snap?.quests && { at: snap.quests.capturedAt, count: snap.quests.list.length },
+		c.quests && { at: blizzardAt ?? 0, count: c.quests.ids.length },
+		blizzardAt,
+	);
 	let quests: QuestProgress[] | undefined = c.quests?.ids.map((id) => ({ id }));
 	let questsSource: Source | undefined = c.quests ? blizzard : undefined;
-	if (snap?.quests) {
+	if (questDecision.shown === "addon" && snap?.quests) {
 		quests = snap.quests.list;
 		questsSource = addon(snap.quests.capturedAt);
 	}
@@ -127,8 +198,50 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 			talents: talentSource,
 			quests: questsSource,
 		},
+		/** Per section, what each source had and which one is shown (debug panel, audit). */
+		decisions: {
+			gear: gearDecision,
+			professions: professionDecision,
+			talents: talentDecision,
+			quests: questDecision,
+		},
 		synced,
 	};
+}
+
+export type Finding = { slug: string; section: string; problem: string; decision?: Decision };
+
+/** Problems with what one character shows. Exported for tests. */
+export function auditCharacter(
+	character: Parameters<typeof mergeProfile>[0] & { slug: string },
+	snapshot: Parameters<typeof mergeProfile>[1],
+): Finding[] {
+	const findings: Finding[] = [];
+	const profile = mergeProfile(character, snapshot);
+	for (const [section, d] of Object.entries(profile.decisions)) {
+		const has = { addon: d.addon?.count ?? 0, blizzard: d.blizzard?.count ?? 0 };
+		const shownCount = d.shown === "none" ? 0 : has[d.shown];
+		// The rule's guarantee: never empty while a source has data.
+		if (shownCount === 0 && (has.addon > 0 || has.blizzard > 0)) {
+			findings.push({ slug: character.slug, section, problem: "shows empty while a source has data", decision: d });
+		} else if (d.addon && d.blizzard && (has.addon === 0) !== (has.blizzard === 0)) {
+			// Worth a look: one source empty, the other not (a failed read somewhere).
+			findings.push({
+				slug: character.slug,
+				section,
+				problem: `${has.addon === 0 ? "addon" : "Blizzard"} empty, the other has ${Math.max(has.addon, has.blizzard)}`,
+				decision: d,
+			});
+		}
+	}
+	// Recipes read in game for a profession the shown list has: they must show.
+	for (const r of snapshot?.recipes ?? []) {
+		const p = profile.professions.find((x) => x.id === r.professionId);
+		if (p && r.recipeIds.some((id) => !p.knownRecipes?.includes(id))) {
+			findings.push({ slug: character.slug, section: "recipes", problem: `${r.profession}: game recipes not shown` });
+		}
+	}
+	return findings;
 }
 
 export type Profile = ReturnType<typeof mergeProfile>;

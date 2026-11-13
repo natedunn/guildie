@@ -420,11 +420,13 @@ export const applyProfile = internalMutation({
 		if (questIds) patch.quests = { syncedAt: now, ids: questIds };
 		await ctx.db.patch(characterId, patch);
 		if (completedQuestIds) {
-			const ids = [...new Set(completedQuestIds)].sort((a, b) => a - b);
 			const row = await ctx.db
 				.query("completedQuests")
 				.withIndex("by_character", (q) => q.eq("characterId", characterId))
 				.unique();
+			// Turned-in quests only grow: Blizzard's list adds to what we have,
+			// so an empty or partial response can't take any away.
+			const ids = [...new Set([...(row?.ids ?? []), ...completedQuestIds])].sort((a, b) => a - b);
 			if (!row) await ctx.db.insert("completedQuests", { characterId, ids, syncedAt: now });
 			else if (row.ids.join() !== ids.join()) await ctx.db.patch(row._id, { ids, syncedAt: now });
 			else await ctx.db.patch(row._id, { syncedAt: now });

@@ -15,6 +15,12 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie, Addon:** Characters' professions show again. A failed read in game was replacing them with an empty list, and it also deleted the recipes the addon had read: open each profession window once after updating to read them again.
+- **Guildie:** When the game and Blizzard disagree, the newer one shows again, so playing without the Guildie app no longer leaves old gear, talents or quests on your page. An empty read from either side never hides the other's data.
+- **Guildie:** Characters under level 10 say that their details come only from the Guildie app in game.
+
 ### Improvements
 
 - **Guildie, Addon:** Gear suggestions are more sensible: an upgrade has to add at least a point of your main stat, white and grey armor is only suggested for an empty slot (and says "empty slot"), armor outside your preferred types (or cloth on a shaman, leather on a warrior in mail) is a "maybe" at most and counts for less as you level, items you already wear aren't suggested again, and hunters no longer get thrown weapons unless they choose them in their preferences.
