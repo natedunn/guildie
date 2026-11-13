@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **App, Addon:** Guild data reaches the game again. For about a day the app couldn't download it, so tooltips kept showing old requests, reagents and upgrades, and "who can learn it" never appeared.
+
 ## 0.3.29
 
 ### New

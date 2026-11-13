@@ -13,7 +13,7 @@ import { type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
-import { type AddonRecipes, addonRecipes } from "./shared/recipeStatus";
+import { addonRecipes, type PackedAddonRecipes, packAddonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
@@ -576,9 +576,10 @@ export type GuildData = {
 	/**
 	 * Recipe items and guild crafters (addon 0.14.0+; older addons ignore
 	 * it): whether a pattern is worth sending someone, judged in game
-	 * (shared/recipeStatus.ts addonRecipes, Tooltip.lua recipeRows).
+	 * (shared/recipeStatus.ts addonRecipes, Tooltip.lua recipeRows). Packed
+	 * (items as pairs) inside Convex; the HTTP route unpacks it.
 	 */
-	recipes: AddonRecipes;
+	recipes: PackedAddonRecipes;
 };
 
 /** The token's guilds (those its claimed characters are in) and their members. */
@@ -674,7 +675,7 @@ export const guildDataBase = internalQuery({
 			characters,
 			requests: requests.byItem,
 			myRequests: requests.mine,
-			recipes: addonRecipes(taught, recipeCharacters),
+			recipes: packAddonRecipes(addonRecipes(taught, recipeCharacters)),
 		};
 	},
 });
