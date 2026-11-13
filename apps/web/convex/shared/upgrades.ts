@@ -22,13 +22,18 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 //    replaces. Trade-off: the same gain, but it gives up some of one of
 //    those stats for more of another (worth it only by the weights, which
 //    the player can make steeper or flatter: customWeights). Maybe: a
-//    smaller gain (from `maybe`), only the second spec, or usable within
-//    `levelsAhead` levels ("at 24").
+//    smaller gain (from `maybe`), only the second spec, usable within
+//    `levelsAhead` levels ("at 24"), or armor of a type they don't want
+//    (`offTypeFactors`). Every one adds at least `minGain` points.
+// 5. Plain armor (armor and no stats: white and grey items) only for an empty
+//    slot, as "empty slot": anything worn there has stats it would lose.
 //
 // The player's choices steer it: their stat priority picks the spec
-// (specsFor), and a preferred armor or weapon type makes other types of
-// that kind count less (`preferBestFactor`) or, strict, not at all
-// (`preferred`).
+// (specsFor), and preferred armor and weapon types make other types count
+// less (`offTypeFactors` for armor, `preferBestFactor` for weapons) or,
+// strict, not at all (`preferred`). Weapon types a class can equip but
+// shouldn't use (a hunter's thrown weapons) only count when they choose them
+// (`unlessChosen`).
 //
 // The addon runs the same rules in Lua (apps/addon/Guildie/Upgrades.lua) with
 // what helper.ts puts in GuildieData.lua: `upgradeRules()` once and each
@@ -53,6 +58,13 @@ export type Rules = {
 	 */
 	preferStep?: number;
 	minBase: number;
+	/** Least gain over what they wear, in main-stat points. Missing (older GuildieData.lua): 0. */
+	minGain?: number;
+	/**
+	 * [from level, factor], lowest level first: what armor of a type they
+	 * don't want counts (THRESHOLDS.offTypeFactors). Missing: preferBestFactor.
+	 */
+	offTypeFactors?: readonly (readonly [number, number])[];
 	/** Stat -> plain stat points per point, for the raw total (missing: 1). */
 	points: Record<string, number>;
 	/**
@@ -85,7 +97,11 @@ export type UpgradeMember = {
 	keys?: Record<number, Record<string, number>>;
 	/** Wears a two-hander. */
 	th?: boolean;
-	/** Item ids worn in rings, trinkets and weapon slots (Unique items can't be worn twice). */
+	/**
+	 * Item ids they wear: never suggested to them again (a second ring,
+	 * trinket or one-hander aside), and Unique items can't be worn twice.
+	 * Older GuildieData.lua files: rings, trinkets and weapons only.
+	 */
 	worn?: number[];
 	/**
 	 * The player's preferred body armor type (armor subclass, cloth 1 ... plate 4):
@@ -127,12 +143,19 @@ export type Verdict = {
 	second?: boolean;
 	/** Inventory slot(s) compared against. */
 	against: number[];
+	/** Body armor of a type they don't want (armor subclass, cloth 1 ... plate 4): why it's only a maybe. */
+	off?: number;
 };
 
-export type VerdictKind = "upgrade" | "tradeoff" | "maybe";
+/** "empty": plain armor (no stats) for a slot they have nothing in. */
+export type VerdictKind = "upgrade" | "tradeoff" | "maybe" | "empty";
 
-/** Upgrades, then trade-offs, then maybes. */
-export const kindRank = (kind: VerdictKind) => (kind === "upgrade" ? 0 : kind === "tradeoff" ? 1 : 2);
+const KIND_RANK: Record<VerdictKind, number> = { upgrade: 0, tradeoff: 1, maybe: 2, empty: 3 };
+/** Upgrades, then trade-offs, then maybes, then empty slots. */
+export const kindRank = (kind: VerdictKind) => KIND_RANK[kind];
+
+/** Armor type names for verdict notes ("maybe (Enhancement, cloth)"). */
+export const ARMOR_TYPE_NAMES: Record<number, string> = { 1: "cloth", 2: "leather", 3: "mail", 4: "plate" };
 
 export function upgradeRules(): Rules {
 	const specs: Rules["specs"] = {};
@@ -468,6 +491,20 @@ function bestArmor(rules: ClassRules, level: number) {
 	return best;
 }
 
+/** The best body armor type a class ever wears (plate for warriors, mail for shamans). */
+function topArmor(rules: ClassRules) {
+	let top = 1;
+	for (const sub of BODY_ARMOR) if (rules.armor[sub] !== undefined) top = sub;
+	return top;
+}
+
+/** What armor of a type they don't want counts at a level (offTypeFactors). */
+export function offTypeFactor(rules: Pick<Rules, "offTypeFactors" | "preferBestFactor">, level: number) {
+	let factor = rules.preferBestFactor;
+	for (const [from, f] of rules.offTypeFactors ?? []) if (level >= from) factor = f;
+	return factor;
+}
+
 /** True when it's body armor (cloth to plate) other than a cloak. */
 const isBodyArmor = (item: ItemInfo) =>
 	item.cls === 4 && item.invType !== "CLOAK" && BODY_ARMOR.includes(item.subclass ?? 0);
@@ -503,18 +540,20 @@ function excluded(item: ItemInfo, p: GearPrefs | undefined) {
 }
 
 /**
- * An item's worth to a spec. `stat`: the stats' part alone; `total`: the
+ * An item's worth to a spec. `stat`: the stats' part alone (before any
+ * armor or weapon type discount); `total`: the
  * item's raw stat points (what `minFit` compares with; `points` scales Attack
  * Power and the like down to plain stat points). `offHand`: as a
  * weapon in the off hand (OFFHAND_DPS instead of DPS). `prefs`: the player's
- * preferred armor and weapon types; other types count less.
+ * preferred armor and weapon types; other types count less. `off`: body
+ * armor of a type they don't want (its subclass): a "maybe" at most.
  */
 export function scoreItem(
 	item: ItemInfo,
 	w: Weights,
 	level: number,
 	classRules: ClassRules,
-	rules: Pick<Rules, "preferBestFrom" | "preferBestFactor" | "preferStep" | "points">,
+	rules: Pick<Rules, "preferBestFrom" | "preferBestFactor" | "preferStep" | "offTypeFactors" | "points">,
 	offHand = false,
 	prefs?: GearPrefs,
 ) {
@@ -535,22 +574,32 @@ export function scoreItem(
 		score += (w[dpsKey] ?? 0) * item.dps;
 	}
 	const pref = preferred(item, prefs);
-	const belowBest =
-		pref === undefined &&
-		isBodyArmor(item) &&
-		level >= rules.preferBestFrom &&
-		(item.subclass ?? 0) < bestArmor(classRules, level);
-	if (pref === false || belowBest) {
-		score *= rules.preferBestFactor;
-		stat *= rules.preferBestFactor;
+	const armor = isBodyArmor(item);
+	const sub = item.subclass ?? 0;
+	let factor = 1;
+	let off: number | undefined;
+	if (pref === false) {
+		// Not on their list: armor by level (offTypeFactors), weapons a fixed share.
+		if (armor) {
+			factor = offTypeFactor(rules, level);
+			off = sub;
+		} else factor = rules.preferBestFactor;
 	} else if (pref !== undefined && pref > 0) {
 		// Further down their list: a little less, never below another type.
-		let factor = 1 - (rules.preferStep ?? 0) * pref;
+		factor = 1 - (rules.preferStep ?? 0) * pref;
 		if (factor < rules.preferBestFactor) factor = rules.preferBestFactor;
-		score *= factor;
-		stat *= factor;
+	} else if (pref === undefined && armor && sub < bestArmor(classRules, level)) {
+		// No list: below the best they can wear. Two or more types below the
+		// class's best (cloth on a shaman) as if not on a list; one below
+		// (leather on a level 45 shaman) a little less, from preferBestFrom.
+		if (topArmor(classRules) - sub >= 2) {
+			factor = offTypeFactor(rules, level);
+			off = sub;
+		} else if (level >= rules.preferBestFrom) factor = rules.preferBestFactor;
 	}
-	return { score, stat, total };
+	// The score only: whether the stats suit the spec (`stat`, minFit) doesn't depend on the type.
+	if (factor !== 1) score *= factor;
+	return off !== undefined ? { score, stat, total, off } : { score, stat, total };
 }
 
 /** Whether a spec has a use for the item at all. */
@@ -621,15 +670,29 @@ function gainFor(item: ItemInfo, m: UpgradeMember, specKey: string, slots: Recor
 	const options = [false];
 	// A one-hander can go in the off hand for those who dual wield.
 	if (item.invType === "WEAPON" && cls.dualWield !== undefined && cls.dualWield <= m.level && !m.th) options.push(true);
-	let best: { gain: number; against: number[] } | undefined;
+	let best: { gain: number; net: number; against: number[]; off?: number; empty: boolean } | undefined;
 	for (const offHand of options) {
 		const s = scoreItem(item, spec.w, m.level, cls, rules, offHand, m);
 		if (!suits(s, rules)) continue;
 		const { base, against } = baseline(item, slots, m.th, offHand);
 		const gain = (s.score - base) / Math.max(base, rules.minBase);
-		if (!best || gain > best.gain) best = { gain, against };
+		const empty = against.every((slot) => slots[slot] === undefined);
+		if (!best || gain > best.gain) best = { gain, net: s.score - base, against, off: s.off, empty };
 	}
 	return best;
+}
+
+/** Armor with no stats at all (white and grey items): only for an empty slot. */
+const plainArmor = (item: ItemInfo) => item.cls === 4 && Object.keys(item.stats).length === 0;
+
+/** Where a second copy can go next to a worn one: rings, trinkets, one-handers. */
+const PAIRED = new Set(["FINGER", "TRINKET", "WEAPON"]);
+
+/** A weapon type the class only uses when the player chooses it (ClassRules.unlessChosen). */
+function unchosen(item: ItemInfo, m: UpgradeMember, cls: ClassRules | undefined) {
+	if (item.cls !== 2 || item.subclass === undefined || !cls?.unlessChosen?.includes(item.subclass)) return false;
+	const chosen = m.weaponPrefs ?? (m.weaponPref !== undefined ? [m.weaponPref] : []);
+	return !chosen.includes(item.subclass);
 }
 
 /**
@@ -660,29 +723,40 @@ function loses(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, ag
 /** Upgrade, trade-off, maybe, or nothing, for one guildmate. */
 export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: number): Verdict | undefined {
 	if (itemId !== undefined && m.dismissed?.includes(itemId)) return undefined;
+	if (itemId !== undefined && !PAIRED.has(item.invType) && m.worn?.includes(itemId)) return undefined;
 	const at = usableAt(item, m, rules, itemId);
-	if (at === undefined || excluded(item, m)) return undefined;
+	if (at === undefined || excluded(item, m) || unchosen(item, m, rules.classes[m.classId])) return undefined;
 	const later = at > m.level ? at : undefined;
+	const extra = { ...(later ? { at: later } : {}) };
 	const main = gainFor(item, m, m.spec, m.slots, rules);
-	if (main && main.gain >= rules.maybe) {
+	if (plainArmor(item)) {
+		// Whatever they wear there has stats this would lose: only for nothing at all.
+		if (!main?.empty || main.net <= 0) return undefined;
+		const off = main.off !== undefined ? { off: main.off } : {};
+		return { kind: "empty", gain: main.gain, spec: m.spec, against: main.against, ...extra, ...off };
+	}
+	const minGain = rules.minGain ?? 0;
+	if (main && main.gain >= rules.maybe && main.net >= minGain) {
 		const kind =
-			main.gain >= rules.upgrade && !later
+			main.gain >= rules.upgrade && !later && main.off === undefined
 				? loses(item, m, rules.specs[m.spec]?.stats, main.against)
 					? "tradeoff"
 					: "upgrade"
 				: "maybe";
-		return { kind, gain: main.gain, spec: m.spec, against: main.against, ...(later ? { at: later } : {}) };
+		const off = main.off !== undefined ? { off: main.off } : {};
+		return { kind, gain: main.gain, spec: m.spec, against: main.against, ...extra, ...off };
 	}
 	if (m.spec2 && m.slots2) {
 		const second = gainFor(item, m, m.spec2, m.slots2, rules);
-		if (second && second.gain >= rules.maybe) {
+		if (second && second.gain >= rules.maybe && second.net >= minGain) {
 			return {
 				kind: "maybe",
 				gain: second.gain,
 				spec: m.spec2,
 				second: true,
 				against: second.against,
-				...(later ? { at: later } : {}),
+				...extra,
+				...(second.off !== undefined ? { off: second.off } : {}),
 			};
 		}
 	}
@@ -842,9 +916,7 @@ export function upgradeMember(
 	const prefs = gearPrefs(c.classId, c.gearPreference, rules);
 	if (!specs) return undefined;
 	const main = c.equipment.find((i) => i.slot === "MAIN_HAND");
-	const worn = c.equipment
-		.filter((i) => [11, 12, 13, 14, 16, 17].includes(SLOT_NUMBERS[i.slot] ?? 0))
-		.map((i) => i.itemId);
+	const worn = [...new Set(c.equipment.filter((i) => SLOT_NUMBERS[i.slot]).map((i) => i.itemId))];
 	const keys = wornKeys(c.equipment, rules.specs[specs.spec]?.stats);
 	return {
 		name: c.name,
@@ -929,6 +1001,7 @@ export function explain(item: ItemInfo, verdict: Verdict, worn: WornItem[], rule
 		: " (nothing worn there)";
 	const notes = [
 		verdict.second ? rules.specs[verdict.spec]?.name : undefined,
+		verdict.off !== undefined ? `${ARMOR_TYPE_NAMES[verdict.off] ?? "armor"} isn't their armor type` : undefined,
 		verdict.at ? `at lvl ${verdict.at}` : undefined,
 	].filter(Boolean);
 	return `${what}${over}${notes.length ? `; ${notes.join(", ")}` : ""}`;

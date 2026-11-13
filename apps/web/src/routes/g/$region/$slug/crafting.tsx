@@ -499,8 +499,14 @@ const GROUPS: { kind: GroupKind; title: string; hint: string; others: string }[]
 	{
 		kind: "maybe",
 		title: "Maybe",
-		hint: "Small gains, your second spec, or a few levels from now",
+		hint: "Small gains, your second spec, a few levels from now, or an armor type you don't want",
 		others: VERDICT_HINTS.maybe,
+	},
+	{
+		kind: "empty",
+		title: "Empty slots",
+		hint: "Plain armor with no stats, for a slot you have nothing in",
+		others: VERDICT_HINTS.empty,
 	},
 	{
 		kind: "removed",

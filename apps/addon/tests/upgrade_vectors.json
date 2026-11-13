@@ -10,6 +10,8 @@
 		"preferBestFactor": 0.8,
 		"preferStep": 0.05,
 		"minBase": 1,
+		"minGain": 1,
+		"offTypeFactors": [[1, 0.7], [20, 0.6], [40, 0.5], [60, 0.3]],
 		"points": {
 			"ATTACK_POWER": 0.5,
 			"EXTRA_ARMOR": 0.1
@@ -95,6 +97,7 @@
 					"AGILITY": 1,
 					"STAMINA": 0.5,
 					"INTELLECT": 0.3,
+					"ARMOR": 0.02,
 					"RANGED_DPS": 3,
 					"DPS": 0.5
 				}
@@ -129,9 +132,11 @@
 					"0": 1,
 					"1": 1,
 					"2": 1,
-					"15": 1
+					"15": 1,
+					"16": 1
 				},
-				"dualWield": 20
+				"dualWield": 20,
+				"unlessChosen": [16]
 			},
 			"8": {
 				"armor": {
@@ -307,6 +312,16 @@
 			},
 			"armor": 90
 		},
+		"mailAgiGloves": {
+			"invType": "HAND",
+			"cls": 4,
+			"subclass": 3,
+			"stats": {
+				"AGILITY": 6,
+				"STAMINA": 4
+			},
+			"armor": 90
+		},
 		"thinStrGloves": {
 			"invType": "HAND",
 			"cls": 4,
@@ -325,6 +340,46 @@
 				"AGILITY": 7,
 				"STAMINA": 2
 			}
+		},
+		"clothAgiShoulders": {
+			"invType": "SHOULDER",
+			"cls": 4,
+			"subclass": 1,
+			"stats": {
+				"AGILITY": 6,
+				"STAMINA": 4
+			},
+			"armor": 25
+		},
+		"plainClothHelm": {
+			"invType": "HEAD",
+			"cls": 4,
+			"subclass": 1,
+			"stats": {},
+			"armor": 30
+		},
+		"plainLeatherHelm": {
+			"invType": "HEAD",
+			"cls": 4,
+			"subclass": 2,
+			"stats": {},
+			"armor": 60
+		},
+		"tinyIntGloves": {
+			"invType": "HAND",
+			"cls": 4,
+			"subclass": 1,
+			"stats": {
+				"INTELLECT": 4
+			},
+			"armor": 10
+		},
+		"throwingKnife": {
+			"invType": "THROWN",
+			"cls": 2,
+			"subclass": 16,
+			"stats": {},
+			"dps": 20
 		}
 	},
 	"members": {
@@ -340,7 +395,7 @@
 				"5": 20,
 				"10": 8,
 				"11": 12,
-				"12": 6
+				"12": 5
 			},
 			"slots2": {
 				"1": 5,
@@ -349,7 +404,7 @@
 				"11": 2,
 				"12": 2
 			},
-			"worn": [5001]
+			"worn": [5001, 5003]
 		},
 		"Miller": {
 			"name": "Miller",
@@ -530,6 +585,30 @@
 			},
 			"dismissed": [6001]
 		},
+		"Thrower": {
+			"name": "Thrower",
+			"classId": 3,
+			"level": 39,
+			"spec": "HUNTER:0",
+			"seen": 2000000,
+			"slots": {
+				"5": 8,
+				"16": 10,
+				"18": 40
+			},
+			"weaponPref": 2,
+			"weaponPrefs": [2, 16]
+		},
+		"Cub": {
+			"name": "Cub",
+			"classId": 3,
+			"level": 12,
+			"spec": "HUNTER:0",
+			"seen": 2000000,
+			"slots": {
+				"5": 2
+			}
+		},
 		"Bowman": {
 			"name": "Bowman",
 			"classId": 3,
@@ -556,7 +635,8 @@
 				"spec": "DRUID:1",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": null
 			}
 		},
 		{
@@ -566,16 +646,17 @@
 			"expect": null
 		},
 		{
-			"name": "leather agility gloves: warrior, small agility use",
+			"name": "leather agility gloves: a warrior in mail, a maybe at most",
 			"item": "leatherAgiGloves",
 			"member": "Miller",
 			"expect": {
-				"kind": "upgrade",
-				"gain": 2.9,
+				"kind": "maybe",
+				"gain": 1.3399999999999999,
 				"spec": "WARRIOR:0",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": 2
 			}
 		},
 		{
@@ -588,7 +669,8 @@
 				"spec": "MAGE:2",
 				"at": null,
 				"second": false,
-				"against": [1]
+				"against": [1],
+				"off": null
 			}
 		},
 		{
@@ -601,7 +683,8 @@
 				"spec": "DRUID:2",
 				"at": null,
 				"second": true,
-				"against": [1]
+				"against": [1],
+				"off": null
 			}
 		},
 		{
@@ -614,7 +697,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [16, 17]
+				"against": [16, 17],
+				"off": null
 			}
 		},
 		{
@@ -627,7 +711,8 @@
 				"spec": "WARRIOR:0",
 				"at": 25,
 				"second": false,
-				"against": [16, 17]
+				"against": [16, 17],
+				"off": null
 			}
 		},
 		{
@@ -643,12 +728,13 @@
 			"member": "Brisket",
 			"itemId": 5002,
 			"expect": {
-				"kind": "maybe",
-				"gain": 0.1333333333333333,
+				"kind": "upgrade",
+				"gain": 0.36,
 				"spec": "DRUID:1",
 				"at": null,
 				"second": false,
-				"against": [12]
+				"against": [12],
+				"off": null
 			}
 		},
 		{
@@ -657,25 +743,19 @@
 			"member": "Arrow",
 			"expect": {
 				"kind": "maybe",
-				"gain": 0.5,
+				"gain": 1,
 				"spec": "HUNTER:0",
 				"at": 40,
 				"second": false,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
-			"name": "leather on a level 45 warrior is worth less",
+			"name": "leather on a level 45 warrior: two types below plate, too little left",
 			"item": "leatherChest",
 			"member": "Rage",
-			"expect": {
-				"kind": "upgrade",
-				"gain": 0.18400000000000016,
-				"spec": "WARRIOR:1",
-				"at": null,
-				"second": false,
-				"against": [5]
-			}
+			"expect": null
 		},
 		{
 			"name": "mail on a level 45 warrior, too",
@@ -687,7 +767,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
@@ -700,7 +781,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [17]
+				"against": [17],
+				"off": null
 			}
 		},
 		{
@@ -719,7 +801,8 @@
 				"spec": "HUNTER:0",
 				"at": null,
 				"second": false,
-				"against": [18]
+				"against": [18],
+				"off": null
 			}
 		},
 		{
@@ -739,12 +822,13 @@
 			"item": "plainCloak",
 			"member": "Frosty",
 			"expect": {
-				"kind": "upgrade",
+				"kind": "empty",
 				"gain": 0.4,
 				"spec": "MAGE:2",
 				"at": null,
 				"second": false,
-				"against": [15]
+				"against": [15],
+				"off": null
 			}
 		},
 		{
@@ -757,7 +841,8 @@
 				"spec": "DRUID:2",
 				"at": null,
 				"second": true,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
@@ -770,7 +855,8 @@
 				"spec": "DRUID:1",
 				"at": null,
 				"second": false,
-				"against": [16, 17]
+				"against": [16, 17],
+				"off": null
 			}
 		},
 		{
@@ -783,21 +869,15 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
-			"name": "prefers mail: leather still counts less",
+			"name": "prefers mail: leather counts by level, too little left",
 			"item": "leatherChest",
 			"member": "Chainmail",
-			"expect": {
-				"kind": "upgrade",
-				"gain": 0.18400000000000016,
-				"spec": "WARRIOR:1",
-				"at": null,
-				"second": false,
-				"against": [5]
-			}
+			"expect": null
 		},
 		{
 			"name": "mail only: leather left out",
@@ -821,7 +901,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [17]
+				"against": [17],
+				"off": null
 			}
 		},
 		{
@@ -834,7 +915,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [16, 17]
+				"against": [16, 17],
+				"off": null
 			}
 		},
 		{
@@ -847,7 +929,8 @@
 				"spec": "HUNTER:0",
 				"at": null,
 				"second": false,
-				"against": [17]
+				"against": [17],
+				"off": null
 			}
 		},
 		{
@@ -860,7 +943,8 @@
 				"spec": "HUNTER:0",
 				"at": null,
 				"second": false,
-				"against": [18]
+				"against": [18],
+				"off": null
 			}
 		},
 		{
@@ -873,7 +957,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
@@ -886,7 +971,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [5]
+				"against": [5],
+				"off": null
 			}
 		},
 		{
@@ -905,7 +991,8 @@
 				"spec": "WARRIOR:1",
 				"at": null,
 				"second": false,
-				"against": [16, 17]
+				"against": [16, 17],
+				"off": null
 			}
 		},
 		{
@@ -930,7 +1017,8 @@
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": null
 			}
 		},
 		{
@@ -943,20 +1031,22 @@
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": null
 			}
 		},
 		{
 			"name": "gives up Strength for Agility: a trade-off",
-			"item": "leatherAgiGloves",
+			"item": "mailAgiGloves",
 			"member": "Sturdy",
 			"expect": {
 				"kind": "tradeoff",
-				"gain": 0.5599999999999999,
+				"gain": 0.68,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": null
 			}
 		},
 		{
@@ -969,7 +1059,8 @@
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
-				"against": [11]
+				"against": [11],
+				"off": null
 			}
 		},
 		{
@@ -982,7 +1073,8 @@
 				"spec": "MAGE:2:INTELLECT,SPELL_DAMAGE_DONE,STAMINA",
 				"at": null,
 				"second": false,
-				"against": [1]
+				"against": [1],
+				"off": null
 			}
 		},
 		{
@@ -995,7 +1087,8 @@
 				"spec": "MAGE:2",
 				"at": null,
 				"second": false,
-				"against": [1]
+				"against": [1],
+				"off": null
 			}
 		},
 		{
@@ -1016,7 +1109,132 @@
 				"spec": "DRUID:1",
 				"at": null,
 				"second": false,
-				"against": [10]
+				"against": [10],
+				"off": null
+			}
+		},
+		{
+			"name": "already worn: not suggested again",
+			"item": "clothIntHead",
+			"member": "Brisket",
+			"itemId": 5003,
+			"expect": null
+		},
+		{
+			"name": "already worn, a ring: a second copy can still go in the other slot",
+			"item": "agiRingPlain",
+			"member": "Brisket",
+			"itemId": 5001,
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.6399999999999999,
+				"spec": "DRUID:1",
+				"at": null,
+				"second": false,
+				"against": [12],
+				"off": null
+			}
+		},
+		{
+			"name": "too small a gain: under minGain points",
+			"item": "tinyIntGloves",
+			"member": "Frosty",
+			"expect": null
+		},
+		{
+			"name": "no preference: cloth on a hunter is a maybe at most",
+			"item": "clothAgiShoulders",
+			"member": "Cub",
+			"expect": {
+				"kind": "maybe",
+				"gain": 5.949999999999999,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [3],
+				"off": 1
+			}
+		},
+		{
+			"name": "no preference: cloth on a level 39 hunter counts less still",
+			"item": "clothAgiShoulders",
+			"member": "Arrow",
+			"expect": {
+				"kind": "maybe",
+				"gain": 5.1,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [3],
+				"off": 1
+			}
+		},
+		{
+			"name": "leather then mail: cloth is a maybe at most",
+			"item": "clothAgiShoulders",
+			"member": "LeatherThenMail",
+			"expect": {
+				"kind": "maybe",
+				"gain": 3.8500000000000005,
+				"spec": "WARRIOR:1",
+				"at": null,
+				"second": false,
+				"against": [3],
+				"off": 1
+			}
+		},
+		{
+			"name": "plain armor for an empty slot: empty slot",
+			"item": "plainLeatherHelm",
+			"member": "Cub",
+			"expect": {
+				"kind": "empty",
+				"gain": 1.2,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [1],
+				"off": null
+			}
+		},
+		{
+			"name": "plain armor over something worn: nothing",
+			"item": "plainClothHelm",
+			"member": "Frosty",
+			"expect": null
+		},
+		{
+			"name": "plain armor of a type they don't want, empty slot",
+			"item": "plainClothHelm",
+			"member": "Miller",
+			"expect": {
+				"kind": "empty",
+				"gain": 0.36,
+				"spec": "WARRIOR:0",
+				"at": null,
+				"second": false,
+				"against": [1],
+				"off": 1
+			}
+		},
+		{
+			"name": "thrown weapon for a hunter: left out",
+			"item": "throwingKnife",
+			"member": "Arrow",
+			"expect": null
+		},
+		{
+			"name": "thrown weapon for a hunter who lists it",
+			"item": "throwingKnife",
+			"member": "Thrower",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.425,
+				"spec": "HUNTER:0",
+				"at": null,
+				"second": false,
+				"against": [18],
+				"off": null
 			}
 		}
 	],
@@ -1052,9 +1270,10 @@
 			"level": 45,
 			"offHand": false,
 			"expect": {
-				"score": 11.840000000000002,
-				"stat": 10.240000000000002,
-				"total": 16
+				"score": 7.4,
+				"stat": 12.8,
+				"total": 16,
+				"off": 2
 			}
 		},
 		{
@@ -1104,6 +1323,70 @@
 				"stat": 14.5,
 				"total": 13
 			}
+		},
+		{
+			"item": "clothAgiShoulders",
+			"spec": "HUNTER:0",
+			"classId": 3,
+			"level": 12,
+			"offHand": false,
+			"expect": {
+				"score": 5.949999999999999,
+				"stat": 8,
+				"total": 10,
+				"off": 1
+			}
+		},
+		{
+			"item": "clothAgiShoulders",
+			"spec": "HUNTER:0",
+			"classId": 3,
+			"level": 39,
+			"offHand": false,
+			"expect": {
+				"score": 5.1,
+				"stat": 8,
+				"total": 10,
+				"off": 1
+			}
+		},
+		{
+			"item": "clothAgiShoulders",
+			"spec": "HUNTER:0",
+			"classId": 3,
+			"level": 60,
+			"offHand": false,
+			"expect": {
+				"score": 2.55,
+				"stat": 8,
+				"total": 10,
+				"off": 1
+			}
+		},
+		{
+			"item": "leatherChest",
+			"spec": "WARRIOR:1",
+			"classId": 1,
+			"level": 30,
+			"offHand": false,
+			"expect": {
+				"score": 8.88,
+				"stat": 12.8,
+				"total": 16,
+				"off": 2
+			}
+		},
+		{
+			"item": "leatherAgiGloves",
+			"spec": "DRUID:1",
+			"classId": 11,
+			"level": 45,
+			"offHand": false,
+			"expect": {
+				"score": 11.4,
+				"stat": 8.4,
+				"total": 10
+			}
 		}
 	],
 	"usable": [
@@ -1133,7 +1416,7 @@
 			"expect": 1
 		}
 	],
-	"suggestMembers": ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy"],
+	"suggestMembers": ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy", "Cub"],
 	"suggest": [
 		{
 			"name": "agility gloves, everyone",
@@ -1141,7 +1424,7 @@
 			"now": 2003600,
 			"skip": [],
 			"max": 3,
-			"expect": ["Arrow:upgrade", "Rage:upgrade", "Miller:upgrade"]
+			"expect": ["Arrow:upgrade", "Brisket:upgrade", "Rage:maybe"]
 		},
 		{
 			"name": "own characters skipped",
@@ -1149,7 +1432,7 @@
 			"now": 2003600,
 			"skip": ["Arrow"],
 			"max": 3,
-			"expect": ["Rage:upgrade", "Miller:upgrade", "Brisket:upgrade"]
+			"expect": ["Brisket:upgrade", "Rage:maybe", "Miller:maybe"]
 		},
 		{
 			"name": "inactive members skipped",
@@ -1165,7 +1448,7 @@
 			"now": 2003600,
 			"skip": [],
 			"max": 3,
-			"expect": ["Brisket:upgrade", "Frosty:upgrade", "Miller:upgrade"]
+			"expect": ["Brisket:empty", "Arrow:empty", "Cub:empty"]
 		},
 		{
 			"name": "two-hander: upgrades before maybes",
@@ -1176,12 +1459,28 @@
 			"expect": ["Sturdy:upgrade", "Rage:upgrade", "Miller:maybe"]
 		},
 		{
-			"name": "upgrades before trade-offs",
+			"name": "agility gloves: upgrades before maybes",
 			"item": "leatherAgiGloves",
 			"now": 2003600,
 			"skip": [],
 			"max": 6,
-			"expect": ["Arrow:upgrade", "Rage:upgrade", "Miller:upgrade", "Brisket:upgrade", "Sturdy:tradeoff"]
+			"expect": ["Arrow:upgrade", "Brisket:upgrade", "Rage:maybe", "Miller:maybe"]
+		},
+		{
+			"name": "plain helm: empty slots only",
+			"item": "plainLeatherHelm",
+			"now": 2003600,
+			"skip": [],
+			"max": 6,
+			"expect": ["Arrow:empty", "Cub:empty", "Miller:empty", "Sturdy:empty", "Rage:empty"]
+		},
+		{
+			"name": "mail gloves: trade-offs after upgrades",
+			"item": "mailAgiGloves",
+			"now": 2003600,
+			"skip": [],
+			"max": 6,
+			"expect": ["Rage:upgrade", "Miller:upgrade", "Sturdy:tradeoff", "Arrow:maybe"]
 		}
 	]
 }

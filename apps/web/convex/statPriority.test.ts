@@ -158,7 +158,7 @@ test("a custom priority changes the verdict: Intellect gloves for an Enhancement
 		{ left: "+4 Strength" },
 		{ left: "+6 Intellect" },
 	])!;
-	assert.equal(judge(intGloves, shaman(), r)?.kind, "maybe", "talents' weights: a small gain");
+	assert.equal(judge(intGloves, shaman(), r), undefined, "talents' weights: under a point more, not worth a line");
 	const custom = judge(intGloves, shaman({ stats: ["STRENGTH", "INTELLECT", "AGILITY"] }), r);
 	assert.equal(custom?.kind, "tradeoff", "Strength, Intellect, Agility: worth it, but 2 Strength is given up");
 	assert.equal(r.specs[custom!.spec].name, "Str/Int/Agi");

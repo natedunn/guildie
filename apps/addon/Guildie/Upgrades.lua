@@ -37,6 +37,26 @@ local function bestArmor(cls, level)
     return best
 end
 
+-- The best body armor type a class ever wears (topArmor in upgrades.ts).
+local function topArmor(cls)
+    local top = 1
+    for sub = 1, 4 do
+        if cls.armor[sub] then top = sub end
+    end
+    return top
+end
+
+--- What armor of a type they don't want counts at a level: rules.offTypeFactors,
+--- { { fromLevel, factor }, ... } lowest first (missing in older GuildieData.lua:
+--- preferBestFactor).
+function U.offTypeFactor(rules, level)
+    local factor = rules.preferBestFactor
+    for _, step in ipairs(rules.offTypeFactors or {}) do
+        if level >= step[1] then factor = step[2] end
+    end
+    return factor
+end
+
 local function isBodyArmor(item)
     return item.cls == 4 and item.invType ~= "CLOAK" and BODY_ARMOR[item.subclass or 0] == true
 end
@@ -92,7 +112,9 @@ local function sortedKeys(t)
     return keys
 end
 
---- score, stat part, raw stat total (see scoreItem in upgrades.ts).
+--- score, stat part, raw stat total, and the armor subclass when it's body
+--- armor of a type they don't want (a "maybe" at most), else nil (see
+--- scoreItem in upgrades.ts).
 function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
     local stat, total = 0, 0
     -- Same order as the site's, so the sums match to the last bit.
@@ -109,19 +131,34 @@ function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
         score = score + (w[key] or 0) * item.dps
     end
     local pref = U.preferred(item, prefs)
-    local belowBest = pref == nil and isBodyArmor(item) and level >= rules.preferBestFrom
-        and (item.subclass or 0) < bestArmor(cls, level)
-    if pref == false or belowBest then
-        score = score * rules.preferBestFactor
-        stat = stat * rules.preferBestFactor
+    local armor = isBodyArmor(item)
+    local sub = item.subclass or 0
+    local factor, off = 1, nil
+    if pref == false then
+        -- Not on their list: armor by level (offTypeFactors), weapons a fixed share.
+        if armor then
+            factor = U.offTypeFactor(rules, level)
+            off = sub
+        else
+            factor = rules.preferBestFactor
+        end
     elseif pref ~= nil and pref > 0 then
         -- Further down their list: a little less, never below another type.
-        local factor = 1 - (rules.preferStep or 0) * pref
+        factor = 1 - (rules.preferStep or 0) * pref
         if factor < rules.preferBestFactor then factor = rules.preferBestFactor end
-        score = score * factor
-        stat = stat * factor
+    elseif pref == nil and armor and sub < bestArmor(cls, level) then
+        -- No list: two or more types below the class's best as if not on a
+        -- list; one below a little less, from preferBestFrom.
+        if topArmor(cls) - sub >= 2 then
+            factor = U.offTypeFactor(rules, level)
+            off = sub
+        elseif level >= rules.preferBestFrom then
+            factor = rules.preferBestFactor
+        end
     end
-    return score, stat, total
+    -- The score only: whether the stats suit the spec (stat, minFit) doesn't depend on the type.
+    if factor ~= 1 then score = score * factor end
+    return score, stat, total, off
 end
 
 function U.suits(score, stat, total, rules)
@@ -193,15 +230,29 @@ local function gainFor(item, m, specKey, slots, rules)
     end
     local best
     for _, offHand in ipairs(options) do
-        local score, stat, total = U.scoreItem(item, spec.w, m.level, cls, rules, offHand, m)
+        local score, stat, total, off = U.scoreItem(item, spec.w, m.level, cls, rules, offHand, m)
         if U.suits(score, stat, total, rules) then
             local base, against = U.baseline(item, slots, m.th, offHand)
             local gain = (score - base) / math.max(base, rules.minBase)
-            if not best or gain > best.gain then best = { gain = gain, against = against } end
+            local empty = true
+            for _, slot in ipairs(against) do
+                if slots[slot] ~= nil then empty = false end
+            end
+            if not best or gain > best.gain then
+                best = { gain = gain, net = score - base, against = against, off = off, empty = empty }
+            end
         end
     end
     return best
 end
+
+-- Armor with no stats at all (white and grey items): only for an empty slot.
+local function plainArmor(item)
+    return item.cls == 4 and next(item.stats or {}) == nil
+end
+
+-- Where a second copy can go next to a worn one: rings, trinkets, one-handers.
+local PAIRED = { FINGER = true, TRINKET = true, WEAPON = true }
 
 --- A priority stat's amount on an item: armor for ARMOR; spell power counts
 --- toward spell damage and healing (keyValue in upgrades.ts).
@@ -229,28 +280,48 @@ local function loses(item, m, stats, against)
     return false
 end
 
-local KIND_RANK = { upgrade = 0, tradeoff = 1, maybe = 2 }
+-- A weapon type the class only uses when the player chooses it
+-- (unlessChosen in the class rules: a hunter's thrown weapons).
+local function unchosen(item, m, cls)
+    if item.cls ~= 2 or not item.subclass or not cls or not contains(cls.unlessChosen, item.subclass) then
+        return false
+    end
+    local chosen = m.weaponPrefs or (m.weaponPref and { m.weaponPref }) or {}
+    return not contains(chosen, item.subclass)
+end
 
---- { kind = "upgrade"|"tradeoff"|"maybe", gain, spec, at?, second?, against } or nil.
+local KIND_RANK = { upgrade = 0, tradeoff = 1, maybe = 2, empty = 3 }
+
+--- { kind = "upgrade"|"tradeoff"|"maybe"|"empty", gain, spec, at?, second?, against, off? } or nil.
 function U.judge(item, m, rules, itemID)
     -- Removed by the player on the site (optional: older GuildieData.lua files lack it).
     if itemID and contains(m.dismissed, itemID) then return nil end
+    if itemID and not PAIRED[item.invType] and contains(m.worn, itemID) then return nil end
     local at = U.usableAt(item, m, rules, itemID)
-    if not at or excluded(item, m) then return nil end
+    if not at or excluded(item, m) or unchosen(item, m, rules.classes[m.classId]) then return nil end
     local later = at > m.level and at or nil
     local main = gainFor(item, m, m.spec, m.slots or {}, rules)
-    if main and main.gain >= rules.maybe then
+    if plainArmor(item) then
+        -- Whatever they wear there has stats this would lose: only for nothing at all.
+        if not main or not main.empty or main.net <= 0 then return nil end
+        return { kind = "empty", gain = main.gain, spec = m.spec, against = main.against, at = later, off = main.off }
+    end
+    local minGain = rules.minGain or 0
+    if main and main.gain >= rules.maybe and main.net >= minGain then
         local kind = "maybe"
-        if main.gain >= rules.upgrade and not later then
+        if main.gain >= rules.upgrade and not later and main.off == nil then
             local spec = rules.specs[m.spec]
             kind = loses(item, m, spec and spec.stats, main.against) and "tradeoff" or "upgrade"
         end
-        return { kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later }
+        return { kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later, off = main.off }
     end
     if m.spec2 and m.slots2 then
         local second = gainFor(item, m, m.spec2, m.slots2, rules)
-        if second and second.gain >= rules.maybe then
-            return { kind = "maybe", gain = second.gain, spec = m.spec2, second = true, against = second.against, at = later }
+        if second and second.gain >= rules.maybe and second.net >= minGain then
+            return {
+                kind = "maybe", gain = second.gain, spec = m.spec2, second = true, against = second.against,
+                at = later, off = second.off,
+            }
         end
     end
     return nil
@@ -442,7 +513,8 @@ end
 --- Rows under the tooltip's Guildie header, one per person, upgrades first:
 --- { left = "Brisket", right = "upgrade (Feral)" }, { left = "Pip", right =
 --- "trade-off (Str/Int/Agi)" }, { left = "Miller", right = "maybe (lvl 24)" },
---- or nil. `color(name, classId)` colors a name.
+--- { left = "Todd", right = "maybe (Enhancement, cloth)" }, { left = "Skurg",
+--- right = "empty slot (Arms)" }, or nil. `color(name, classId)` colors a name.
 function U.lines(item, itemID, color)
     local data = upgradeData()
     if not data or not item or item.soulbound then return nil end
@@ -453,14 +525,17 @@ function U.lines(item, itemID, color)
     local now = (GetServerTime and GetServerTime()) or time()
     local picks = U.suggest(item, data.members, data.rules, { now = now, skip = skip, itemID = itemID, max = 3 })
     if #picks == 0 then return nil end
-    local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe" }
+    local LABELS = { upgrade = "upgrade", tradeoff = "trade-off", maybe = "maybe", empty = "empty slot" }
+    local ARMOR_NAMES = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate" }
     local rows = {}
     for _, p in ipairs(picks) do
         local v = p.verdict
         local spec = data.rules.specs[v.spec]
-        -- "(Feral)", "(lvl 24)", or "(Restoration, lvl 24)" when it's for their second spec.
+        -- "(Feral)", "(lvl 24)", "(Restoration, lvl 24)" when it's for their second
+        -- spec, "(Enhancement, cloth)" for an armor type they don't want.
         local notes = {}
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
+        if v.off and ARMOR_NAMES[v.off] then table.insert(notes, ARMOR_NAMES[v.off]) end
         if v.at then table.insert(notes, "lvl " .. v.at) end
         local right = (LABELS[v.kind] or "maybe") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
         -- Already in order (suggest): upgrades, trade-offs, maybes.
