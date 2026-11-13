@@ -25,6 +25,7 @@ import {
 	matsState,
 	nextStatus,
 	ongoingUntil,
+	remainingQuantity,
 	rosterCharacters,
 	shouldExpire,
 	sumInventory,
@@ -764,7 +765,7 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 		byItem[key].push({
 			requestId: r._id,
 			kind: r.kind,
-			...(r.ongoing ? { ongoing: true as const } : { quantity: r.quantity }),
+			...(r.ongoing ? { ongoing: true as const } : { quantity: remainingQuantity(r) }),
 			name: r.character.name,
 			classId: r.character.classId,
 			...(r.claim ? { claimedBy: { name: r.claim.character.name, classId: r.claim.character.classId } } : {}),
