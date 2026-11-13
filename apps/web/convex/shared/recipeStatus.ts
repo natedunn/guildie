@@ -124,6 +124,24 @@ export type AddonRecipes = {
 	}[];
 };
 
+/**
+ * AddonRecipes as Convex functions return it: `items` as [item id, row]
+ * pairs, since Convex objects are capped at 1,024 fields and there are about
+ * 1,800 recipe items. The guild-data HTTP route (src/routes/api/helper/
+ * guild-data.ts) turns it back into AddonRecipes with unpackAddonRecipes.
+ */
+export type PackedAddonRecipes = Omit<AddonRecipes, "items"> & {
+	items: [itemId: string, AddonRecipes["items"][string]][];
+};
+
+export function packAddonRecipes(r: AddonRecipes): PackedAddonRecipes {
+	return { ...r, items: Object.entries(r.items) };
+}
+
+export function unpackAddonRecipes(r: PackedAddonRecipes): AddonRecipes {
+	return { ...r, items: Object.fromEntries(r.items) };
+}
+
 export function addonRecipes(
 	items: (RecipeItemInfo & { itemId: number; profession: string })[],
 	characters: {
