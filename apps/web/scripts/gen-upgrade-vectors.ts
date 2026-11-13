@@ -18,6 +18,13 @@ const rules = {
 	preferBestFactor: 0.8,
 	preferStep: 0.05,
 	minBase: 1,
+	minGain: 1,
+	offTypeFactors: [
+		[1, 0.7],
+		[20, 0.6],
+		[40, 0.5],
+		[60, 0.3],
+	],
 	points: { ATTACK_POWER: 0.5, EXTRA_ARMOR: 0.1 },
 	specs: {
 		"DRUID:1": { name: "Feral", w: { AGILITY: 1, STRENGTH: 0.9, STAMINA: 0.6, ARMOR: 0.05, ATTACK_POWER: 0.4 } },
@@ -39,7 +46,10 @@ const rules = {
 			w: { STRENGTH: 1, AGILITY: 0.8, STAMINA: 0.6, ARMOR: 0.02, ATTACK_POWER: 0.45, DPS: 4.5, OFFHAND_DPS: 1.4 },
 		},
 		"MAGE:2": { name: "Frost", w: { INTELLECT: 1, SPIRIT: 0.5, STAMINA: 0.6, SPELL_POWER: 1.3, ARMOR: 0.02 } },
-		"HUNTER:0": { name: "Beast Mastery", w: { AGILITY: 1, STAMINA: 0.5, INTELLECT: 0.3, RANGED_DPS: 3, DPS: 0.5 } },
+		"HUNTER:0": {
+			name: "Beast Mastery",
+			w: { AGILITY: 1, STAMINA: 0.5, INTELLECT: 0.3, ARMOR: 0.02, RANGED_DPS: 3, DPS: 0.5 },
+		},
 	},
 	classes: {
 		"1": {
@@ -47,7 +57,12 @@ const rules = {
 			weapons: { "0": 1, "1": 1, "2": 1, "7": 1, "8": 1, "15": 1 },
 			dualWield: 20,
 		},
-		"3": { armor: { "1": 1, "2": 1, "3": 40 }, weapons: { "0": 1, "1": 1, "2": 1, "15": 1 }, dualWield: 20 },
+		"3": {
+			armor: { "1": 1, "2": 1, "3": 40 },
+			weapons: { "0": 1, "1": 1, "2": 1, "15": 1, "16": 1 },
+			dualWield: 20,
+			unlessChosen: [16],
+		},
 		"8": { armor: { "1": 1 }, weapons: { "10": 1, "15": 1, "19": 1 } },
 		"11": { armor: { "1": 1, "2": 1, "8": 1 }, weapons: { "4": 1, "5": 1, "10": 1, "15": 1 } },
 	},
@@ -89,8 +104,14 @@ const items: Record<string, any> = {
 	apMace: { invType: "2HWEAPON", cls: 2, subclass: 5, stats: { ATTACK_POWER: 32, EXTRA_ARMOR: 60 }, dps: 27.7 },
 	spiritRobe: { invType: "ROBE", cls: 4, subclass: 1, stats: { SPIRIT: 9, INTELLECT: 3 }, armor: 40 },
 	strMailGloves: { invType: "HAND", cls: 4, subclass: 3, stats: { STRENGTH: 6, AGILITY: 2 }, armor: 90 },
+	mailAgiGloves: { invType: "HAND", cls: 4, subclass: 3, stats: { AGILITY: 6, STAMINA: 4 }, armor: 90 },
 	thinStrGloves: { invType: "HAND", cls: 4, subclass: 3, stats: { STRENGTH: 9, STAMINA: 3 }, armor: 40 },
 	agiRingPlain: { invType: "FINGER", cls: 4, subclass: 0, stats: { AGILITY: 7, STAMINA: 2 } },
+	clothAgiShoulders: { invType: "SHOULDER", cls: 4, subclass: 1, stats: { AGILITY: 6, STAMINA: 4 }, armor: 25 },
+	plainClothHelm: { invType: "HEAD", cls: 4, subclass: 1, stats: {}, armor: 30 },
+	plainLeatherHelm: { invType: "HEAD", cls: 4, subclass: 2, stats: {}, armor: 60 },
+	tinyIntGloves: { invType: "HAND", cls: 4, subclass: 1, stats: { INTELLECT: 4 }, armor: 10 },
+	throwingKnife: { invType: "THROWN", cls: 2, subclass: 16, stats: {}, dps: 20 },
 };
 const SEEN = 2_000_000;
 const members: Record<string, any> = {
@@ -101,9 +122,9 @@ const members: Record<string, any> = {
 		spec: "DRUID:1",
 		spec2: "DRUID:2",
 		seen: SEEN,
-		slots: { 1: 10, 5: 20, 10: 8, 11: 12, 12: 6 },
+		slots: { 1: 10, 5: 20, 10: 8, 11: 12, 12: 5 },
 		slots2: { 1: 5, 5: 4, 10: 3, 11: 2, 12: 2 },
-		worn: [5001],
+		worn: [5001, 5003],
 	},
 	Miller: {
 		name: "Miller",
@@ -201,6 +222,19 @@ const members: Record<string, any> = {
 		slots: { 10: 8 },
 		dismissed: [6001],
 	},
+	// Lists thrown weapons, which hunters otherwise never get (unlessChosen).
+	Thrower: {
+		name: "Thrower",
+		classId: 3,
+		level: 39,
+		spec: "HUNTER:0",
+		seen: SEEN,
+		slots: { 5: 8, 18: 40, 16: 10 },
+		weaponPref: 2,
+		weaponPrefs: [2, 16],
+	},
+	// A low-level hunter with no head or shoulders.
+	Cub: { name: "Cub", classId: 3, level: 12, spec: "HUNTER:0", seen: SEEN, slots: { 5: 2 } },
 	Bowman: {
 		name: "Bowman",
 		classId: 3,
@@ -214,12 +248,20 @@ const members: Record<string, any> = {
 };
 const verdictOut = (v: any) =>
 	v
-		? { kind: v.kind, gain: v.gain, spec: v.spec, at: v.at ?? null, second: v.second ?? false, against: v.against }
+		? {
+				kind: v.kind,
+				gain: v.gain,
+				spec: v.spec,
+				at: v.at ?? null,
+				second: v.second ?? false,
+				against: v.against,
+				off: v.off ?? null,
+			}
 		: null;
 const judgeCases: [string, string, string, number?][] = [
 	["leather agility gloves: feral upgrade", "leatherAgiGloves", "Brisket"],
 	["leather agility gloves: mage can't wear leather", "leatherAgiGloves", "Frosty"],
-	["leather agility gloves: warrior, small agility use", "leatherAgiGloves", "Miller"],
+	["leather agility gloves: a warrior in mail, a maybe at most", "leatherAgiGloves", "Miller"],
 	["cloth int head: mage upgrade", "clothIntHead", "Frosty"],
 	["cloth int head: feral doesn't suit, resto second spec", "clothIntHead", "Brisket"],
 	["two-hander vs main hand plus off hand", "greatsword", "Rage"],
@@ -227,7 +269,7 @@ const judgeCases: [string, string, string, number?][] = [
 	["unique ring already worn", "agiRing", "Brisket", 5001],
 	["ring vs the weaker ring", "agiRing", "Brisket", 5002],
 	["mail at 40: hunter at 39 is a maybe at 40", "mailChest", "Arrow"],
-	["leather on a level 45 warrior is worth less", "leatherChest", "Rage"],
+	["leather on a level 45 warrior: two types below plate, too little left", "leatherChest", "Rage"],
 	["mail on a level 45 warrior, too", "mailChest", "Rage"],
 	["one-hander can go in the off hand for dual wielders", "dagger", "Rage"],
 	["shield with a two-hander means losing it", "shield", "Miller"],
@@ -238,7 +280,7 @@ const judgeCases: [string, string, string, number?][] = [
 	["spirit robe only fits the second spec", "spiritRobe", "Brisket"],
 	["attack power and bonus armor count as fewer stat points", "apMace", "Brisket"],
 	["prefers mail: mail on a level 45 warrior counts in full", "mailChest", "Chainmail"],
-	["prefers mail: leather still counts less", "leatherChest", "Chainmail"],
+	["prefers mail: leather counts by level, too little left", "leatherChest", "Chainmail"],
 	["mail only: leather left out", "leatherChest", "MailOnly"],
 	["daggers only: a greatsword left out", "greatsword", "MailOnly"],
 	["daggers only: a dagger is fine", "dagger", "MailOnly"],
@@ -253,12 +295,23 @@ const judgeCases: [string, string, string, number?][] = [
 	["maces, swords, bows only: a bow first among ranged", "bow", "MacesSwordsBows"],
 	["more of every priority stat: an upgrade", "strMailGloves", "Sturdy"],
 	["less armor than worn: a trade-off", "thinStrGloves", "Sturdy"],
-	["gives up Strength for Agility: a trade-off", "leatherAgiGloves", "Sturdy"],
+	["gives up Strength for Agility: a trade-off", "mailAgiGloves", "Sturdy"],
 	["ring vs the weaker ring: its Strength is given up", "agiRingPlain", "Sturdy"],
 	["spell power counts as spell damage: an upgrade", "clothIntHead", "Sparky"],
 	["no priority stats known: an upgrade as before", "clothIntHead", "Frosty"],
 	["removed by the player: never suggested", "leatherAgiGloves", "Picky", 6001],
 	["removed something else: still an upgrade", "leatherAgiGloves", "Picky", 6002],
+	["already worn: not suggested again", "clothIntHead", "Brisket", 5003],
+	["already worn, a ring: a second copy can still go in the other slot", "agiRingPlain", "Brisket", 5001],
+	["too small a gain: under minGain points", "tinyIntGloves", "Frosty"],
+	["no preference: cloth on a hunter is a maybe at most", "clothAgiShoulders", "Cub"],
+	["no preference: cloth on a level 39 hunter counts less still", "clothAgiShoulders", "Arrow"],
+	["leather then mail: cloth is a maybe at most", "clothAgiShoulders", "LeatherThenMail"],
+	["plain armor for an empty slot: empty slot", "plainLeatherHelm", "Cub"],
+	["plain armor over something worn: nothing", "plainClothHelm", "Frosty"],
+	["plain armor of a type they don't want, empty slot", "plainClothHelm", "Miller"],
+	["thrown weapon for a hunter: left out", "throwingKnife", "Arrow"],
+	["thrown weapon for a hunter who lists it", "throwingKnife", "Thrower"],
 ];
 const cases = judgeCases.map(([name, item, member, itemId]) => ({
 	name,
@@ -275,6 +328,11 @@ const scoreCases: [string, string, number, boolean][] = [
 	["apMace", "WARRIOR:1", 45, false],
 	["bow", "HUNTER:0", 39, false],
 	["clothIntHead", "MAGE:2", 30, false],
+	["clothAgiShoulders", "HUNTER:0", 12, false],
+	["clothAgiShoulders", "HUNTER:0", 39, false],
+	["clothAgiShoulders", "HUNTER:0", 60, false],
+	["leatherChest", "WARRIOR:1", 30, false],
+	["leatherAgiGloves", "DRUID:1", 45, false],
 ];
 const scores = scoreCases.map(([item, spec, level, offHand]) => {
 	const classId = { DRUID: 11, WARRIOR: 1, HUNTER: 3, MAGE: 8 }[spec.split(":")[0]]!;
@@ -295,14 +353,16 @@ const usable = [
 	["dagger", "Brisket"],
 ].map(([item, member]) => ({ item, member, expect: usableAt(items[item], members[member], rules) ?? null }));
 // Who the suggest cases rank (the members with preferences have judge cases of their own).
-const suggestMembers = ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy"];
+const suggestMembers = ["Brisket", "Miller", "Rage", "Frosty", "Arrow", "Stale", "Sturdy", "Cub"];
 const suggestCases = [
 	{ name: "agility gloves, everyone", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "own characters skipped", item: "leatherAgiGloves", now: SEEN + 3600, skip: ["Arrow"], max: 3 },
 	{ name: "inactive members skipped", item: "plainCloak", now: SEEN + 20 * 86400, skip: [], max: 3 },
 	{ name: "plain cloak", item: "plainCloak", now: SEEN + 3600, skip: [], max: 3 },
 	{ name: "two-hander: upgrades before maybes", item: "greatsword", now: SEEN + 3600, skip: [], max: 3 },
-	{ name: "upgrades before trade-offs", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
+	{ name: "agility gloves: upgrades before maybes", item: "leatherAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
+	{ name: "plain helm: empty slots only", item: "plainLeatherHelm", now: SEEN + 3600, skip: [], max: 6 },
+	{ name: "mail gloves: trade-offs after upgrades", item: "mailAgiGloves", now: SEEN + 3600, skip: [], max: 6 },
 ].map((c) => ({
 	...c,
 	expect: suggest(

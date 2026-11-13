@@ -75,16 +75,18 @@ test("shared vectors: judge", function()
             eq(v.at, c.expect.at, c.name .. " at")
             eq(v.second or false, c.expect.second, c.name .. " second")
             eq(list(v.against), list(c.expect.against), c.name .. " against")
+            eq(v.off, c.expect.off, c.name .. " off")
         end
     end
 end)
 
 test("shared vectors: scores, usable levels, suggestions", function()
     for _, c in ipairs(vectors.scores) do
-        local score, stat, total = U.scoreItem(vectors.items[c.item], rules.specs[c.spec].w, c.level, rules.classes[c.classId], rules, c.offHand)
+        local score, stat, total, off = U.scoreItem(vectors.items[c.item], rules.specs[c.spec].w, c.level, rules.classes[c.classId], rules, c.offHand)
         close(score, c.expect.score, c.item .. " score")
         close(stat, c.expect.stat, c.item .. " stat")
         eq(total, c.expect.total, c.item .. " total")
+        eq(off, c.expect.off, c.item .. " off")
     end
     for _, c in ipairs(vectors.usable) do
         eq(U.usableAt(vectors.items[c.item], vectors.members[c.member], rules), c.expect, c.item .. " for " .. c.member)
@@ -214,9 +216,10 @@ test("tooltip line: upgrades first, class colors, own characters and soulbound i
     _G.GuildieData = guildData({ vectors.members.Brisket, vectors.members.Miller, vectors.members.Frosty, alt })
     local added = hover(GLOVES)
     eq(#added, 2, "a row each")
-    eq(plain(added[1]), "Miller | upgrade (Arms)")
-    eq(plain(added[2]), "Brisket | upgrade (Feral)")
-    assert(added[2]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[2])
+    eq(plain(added[1]), "Brisket | upgrade (Feral)")
+    -- Leather on a warrior who wears mail: a maybe at most, and why.
+    eq(plain(added[2]), "Miller | maybe (Arms, leather)")
+    assert(added[1]:find("|cffff7c0aBrisket|r", 1, true), "druid orange: " .. added[1])
     -- Soulbound to the viewer: can't be traded, so no suggestions.
     local bound = {}
     for k, v in pairs(GLOVES) do bound[k] = v end
@@ -247,10 +250,15 @@ end)
 
 test("trade-offs: after upgrades, when a priority stat is given up", function()
     wow.state.time = vectors.members.Brisket.seen + 60
-    stubItems({ GLOVES })
+    local mailGloves = {
+        id = 4254, name = "Chain Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 3,
+        stats = { ITEM_MOD_AGILITY_SHORT = 6, ITEM_MOD_STAMINA_SHORT = 4, RESISTANCE0_NAME = 90 },
+        lines = { "Binds when equipped", "Hands", "90 Armor", "+6 Agility", "+4 Stamina" },
+    }
+    stubItems({ mailGloves })
     -- Sturdy wears Strength gloves; the Agility gloves give it up.
     _G.GuildieData = guildData({ vectors.members.Sturdy, vectors.members.Miller })
-    local added = hover(GLOVES)
+    local added = hover(mailGloves)
     eq(#added, 2)
     eq(plain(added[1]), "Miller | upgrade (Arms)")
     eq(plain(added[2]), "Sturdy | trade-off (Str/Agi/Sta)")
@@ -293,6 +301,26 @@ test("say why tooltips have nothing: on by default, and can be turned off", func
     eq(plain(hover(GLOVES)[1]), "Brisket | upgrade (Feral)")
     _G.GuildieData = nil
     eq(plain(hover(cloak)[1]), "No guild data yet (needs the Guildie app)")
+end)
+
+test("tooltip line: plain armor for an empty slot, and an armor type they don't want", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    local cap = {
+        id = 9, name = "Plain Leather Cap", equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 2,
+        stats = { RESISTANCE0_NAME = 60 },
+    }
+    local hood = {
+        id = 10, name = "Plain Hood", equipLoc = "INVTYPE_HEAD", classID = 4, subclassID = 1,
+        stats = { RESISTANCE0_NAME = 30 },
+    }
+    stubItems({ cap, hood })
+    -- Cub has no helm; Frosty wears one, so plain armor isn't for Frosty.
+    _G.GuildieData = guildData({ vectors.members.Cub, vectors.members.Frosty })
+    local rows = hover(cap)
+    eq(#rows, 1)
+    eq(plain(rows[1]), "Cub | empty slot (Beast Mastery)")
+    _G.GuildieData = guildData({ vectors.members.Miller, vectors.members.Frosty })
+    eq(plain(hover(hood)[1]), "Miller | empty slot (Arms, cloth)")
 end)
 
 test("tooltip line: maybe (lvl 24) and second spec; nothing when nobody qualifies", function()

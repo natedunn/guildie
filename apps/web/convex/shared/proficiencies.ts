@@ -59,7 +59,17 @@ const W = WEAPON_SUBCLASS;
  * held-in-off-hand items (armor subclass Miscellaneous) are for everyone.
  * This shape goes into GuildieData.lua (`upgrades.rules.classes`).
  */
-export type ClassRules = { armor: Record<number, number>; weapons: Record<number, number>; dualWield?: number };
+export type ClassRules = {
+	armor: Record<number, number>;
+	weapons: Record<number, number>;
+	dualWield?: number;
+	/**
+	 * Weapon types the class can equip but that don't do its job: suggested
+	 * only to players who list them among their preferred weapon types
+	 * (UNLESS_CHOSEN).
+	 */
+	unlessChosen?: number[];
+};
 
 /** What an override changes. */
 export type ProficiencyKey = { kind: "armor" | "weapon"; subclass: number } | { kind: "dualWield" };
@@ -171,8 +181,23 @@ export function buildRules(overrides: Override[] = OVERRIDES): Record<number, Cl
 const sortKeys = (m: Record<number, number>) =>
 	Object.fromEntries(Object.entries(m).sort(([a], [b]) => Number(a) - Number(b)));
 
-/** What each class can wear and wield (game data plus OVERRIDES). */
+/**
+ * Weapon types a class can equip that gear suggestions leave out unless the
+ * player prefers them (ClassRules.unlessChosen). Not an override: the class
+ * really has the skill (the audit sees it), and players can still choose it.
+ */
+export const UNLESS_CHOSEN: Record<number, number[]> = {
+	// Hunters have Thrown, but Auto Shot and their shots only work with a bow,
+	// gun or crossbow: a thrown weapon in the ranged slot turns them off.
+	3: [WEAPON_SUBCLASS.THROWN],
+};
+
+/** What each class can wear and wield (game data plus OVERRIDES), with UNLESS_CHOSEN. */
 export const CLASS_RULES: Record<number, ClassRules> = buildRules();
+for (const [id, types] of Object.entries(UNLESS_CHOSEN)) {
+	const cls = CLASS_RULES[Number(id)];
+	if (cls) cls.unlessChosen = types;
+}
 
 // ---- Types, for showing them ------------------------------------------------------
 

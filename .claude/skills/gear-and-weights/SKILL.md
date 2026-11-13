@@ -29,7 +29,8 @@ rules: TypeScript on the site, Lua in the addon. Overview: docs/addon.md,
 
 For each guildmate seen in the last `activeDays`: skip if they can't use it
 (class, armor/weapon type at their level, more than `levelsAhead` levels
-away, Unique already worn). Spec = tree with most points (under
+away, already worn or Unique already worn, an `unlessChosen` weapon type they
+didn't list). Spec = tree with most points (under
 `minSpecPoints`: `DEFAULT_TREE`); a second tree with 10+ is the second spec.
 Score = Σ weight × stat + armor and DPS terms; items whose stats are mostly
 useless to the spec (`minFit`) don't suit it. Compare with what they wear in
@@ -37,7 +38,11 @@ that slot (weaker ring/trinket, main+off hand for a two-hander). **Upgrade:**
 gain ≥ `upgrade` (15%), usable now, main spec, none of the spec's priority
 stats (`stats`) lower than worn (member `keys`). **Trade-off:** the same but
 some priority stat is given up. **Maybe:** gain ≥ `maybe`
-(3%), second spec, or usable within `levelsAhead`.
+(3%), second spec, usable within `levelsAhead`, or body armor of a type they
+don't want (`off`: not on their loose list, or with no list two+ types below
+the class's best; scored × `offTypeFactors` by level). Every verdict needs a
+net gain of `minGain` points. **Empty slot:** plain armor (no stats) only
+where nothing is worn.
 
 ## Tuning weights (the common change)
 

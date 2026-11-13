@@ -24,7 +24,10 @@ same rules in Lua (`apps/addon/Guildie/Upgrades.lua`); shared test cases
    DPS.
 4. **Compared with what?** The same score for what they wear in that slot.
 5. **Verdict:** 15% better or more is an **Upgrade**; 3% to 15% is a
-   **Maybe**. Bigger gains are listed first.
+   **Maybe**. Either way it has to add at least one point of their main stat.
+   Armor of a type they don't want is a **Maybe** at most, and plain armor
+   (white and grey items, no stats) is only shown for an **Empty slot**.
+   Bigger gains are listed first.
 
 ## Step by step
 
@@ -44,7 +47,11 @@ An item is out if:
 
 - it lists classes and theirs isn't one ("Classes: Rogue"),
 - their class can never use its armor or weapon type,
-- it's Unique and they already wear one, or
+- they already wear it (a second ring, trinket or one-hander aside), or it's
+  Unique and they wear one,
+- it's a weapon type their class has but doesn't use, unless they list it
+  among their preferred weapon types (`unlessChosen`: a hunter's thrown
+  weapons, which turn off Auto Shot and their shots), or
 - it needs a level more than **3** above theirs.
 
 If they can use it within 3 levels, it can only be a **Maybe**, shown as
@@ -88,9 +95,21 @@ Two adjustments:
   less than **30%** of the item's raw stat total, it doesn't suit the spec at
   all (Agility gear for a Mage scores 0, so it's never suggested). Attack
   Power counts as half a point and Bonus Armor as a tenth for that total.
-- **Lighter armor after 40:** from level **40**, body armor lighter than the
-  best type the class can wear counts **80%** (leather for a level 45
-  Warrior).
+- **Armor types they don't want:** body armor lighter than the best type
+  the class can wear now, when they haven't listed armor types:
+  - two or more types below the class's best (cloth on a Shaman or Hunter,
+    leather on a Warrior already in mail): counts less the higher their
+    level (`offTypeFactors`), and is a **Maybe** at most, labeled with the
+    type ("maybe (Enhancement, cloth)"):
+
+    | Level  | 1–19 | 20–39 | 40–49 | 50–59 | 60  |
+    | ------ | ---- | ----- | ----- | ----- | --- |
+    | Counts | 70%  | 60%   | 50%   | 40%   | 30% |
+
+  - one type below (leather on a level 45 Shaman, cloth on a Druid): from
+    level **40**, counts **80%** (`preferBestFactor`).
+
+  A player's own list of armor types replaces this (see [Gear types](#gear-types)).
 
 ### 5. Compared with what they wear
 
@@ -103,7 +122,8 @@ in:
   (they'd give it up).
 - **One-handers:** the main hand, or the off hand for classes that dual wield
   (whichever gains more).
-- **Empty slot:** counts as a score of 1, so anything useful is a big gain.
+- **Empty slot:** counts as a score of 1, so anything useful is a big gain
+  (the one-point minimum below keeps that honest).
 
 If Guildie doesn't know a worn item's stats, it estimates its score from its
 item level, quality and slot.
@@ -115,14 +135,25 @@ gain = (new score − worn score) / worn score
 Because every stat counts, stats you'd lose are included: a ring with more
 Agility but no Stamina is weighed against both.
 
+The gain must also be at least **1 point** of their main stat
+(`minGain`): new score − worn score ≥ 1. A percentage alone overstates tiny
+numbers: 23 armor is worth half an Agility point to a Hunter, which is +46%
+over an empty slot.
+
 ### 6. The verdict and the order
 
-| Verdict       | When                                                                                     |
-| ------------- | ---------------------------------------------------------------------------------------- |
-| **Upgrade**   | Gain of 15% or more, usable now, main spec, and none of their priority stats goes down   |
-| **Trade-off** | The same gain, but it has less of one of their priority stats than what it would replace |
-| **Maybe**     | Gain of 3% to 15%; or only their second spec; or usable within 3 levels                  |
-| Nothing       | Under 3%                                                                                 |
+| Verdict        | When                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------- |
+| **Upgrade**    | Gain of 15% or more, usable now, main spec, and none of their priority stats goes down                    |
+| **Trade-off**  | The same gain, but it has less of one of their priority stats than what it would replace                  |
+| **Maybe**      | Gain of 3% to 15%; or only their second spec; or usable within 3 levels; or an armor type they don't want |
+| **Empty slot** | Plain armor (no stats: white and grey items) for a slot they have nothing in                              |
+| Nothing        | Under 3%, or under 1 point; plain armor over anything they wear                                           |
+
+Plain armor only has armor, so whatever they wear in that slot almost always
+has stats it would lose; it's only worth wearing over nothing. Plain weapons
+still compare by DPS: a white two-hander or throwing knife can really beat
+what someone holds.
 
 Priority stats are the spec's `stats` (a tree's three, or the first five of
 a player's own three to ten: `TRADEOFF_STATS`; the rest still count in the
@@ -133,7 +164,8 @@ tell the two apart, members carry their priority stats on what they wear
 spell damage and healing). Unknown worn items count as none. Older addons
 and older guild data without `keys` or `stats` say Upgrade as before.
 
-The list puts every Upgrade before every Trade-off before every Maybe, then
+The list puts every Upgrade before every Trade-off before every Maybe before
+every Empty slot, then
 sorts by gain (biggest first), then by name. The Crafting page's Upgrades
 for me groups them that way. The addon tooltip shows the top 3; the site's item
 panel shows the top 5, each with why ("+6 Agility, +4 Stamina over Embossed
@@ -207,15 +239,19 @@ addons from before lists read), the whole list as `armorPrefs`/`weaponPrefs`
 when there's more than one, and `armorStrict`/`weaponStrict` (`gearPrefs` in
 `shared/upgrades.ts`; types the class can't use are dropped):
 
-- **Prefer these:** other types of that kind count `preferBestFactor` (0.8),
-  for the items suggested and for what they wear. An armor preference
-  replaces "the best type they can wear from level 40".
+- **Prefer these:** armor of a type not on the list counts by their level
+  (`offTypeFactors`, the table above: 70% under 20 down to 30% at 60) and is
+  a **Maybe** at most; weapons of another type count `preferBestFactor`
+  (0.8). Both for the items suggested and for what they wear. An armor
+  preference replaces the class-based armor rule above.
 - **Order:** each step down the list counts `preferStep` (0.05) less: the
   second type 0.95, the third 0.9, never below another type's 0.8.
 - **Only these:** other types aren't suggested at all.
 - A weapon type counts within its group: melee, or ranged (bows, guns,
   crossbows, thrown, wands). A hunter who picks Bows still gets melee
   weapons suggested as before.
+- Listing a type the class otherwise never gets (`unlessChosen`, a hunter's
+  Thrown) turns it on for them.
 
 The addon runs the same rule (`U.preferred` in `Upgrades.lua`); the shared
 vectors have cases for it. Older addons ignore the fields.

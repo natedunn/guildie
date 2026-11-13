@@ -489,4 +489,26 @@ export const THRESHOLDS = {
 	preferStep: 0.05,
 	/** Gains are relative to what they wear, but never to less than this (an empty slot). */
 	minBase: 1,
+	/**
+	 * A suggestion also has to add at least this much over what they wear, in
+	 * points of the spec's main stat (half an Agility point is +46% over an
+	 * empty slot, but not worth a line).
+	 */
+	minGain: 1,
+	/**
+	 * Body armor of a type they don't want: not on their (loose) list of
+	 * preferred types, or, with no list, two or more types below the class's
+	 * best (cloth on a shaman, leather on a warrior in mail). From each level
+	 * (first number) its score counts this much, and it's a "maybe" at most:
+	 * a cloth piece with real stats can help a low-level shaman, hardly ever a
+	 * level 60 one. One type below the best they can wear, with no list, is
+	 * `preferBestFactor` from `preferBestFrom`.
+	 */
+	offTypeFactors: [
+		[1, 0.7],
+		[20, 0.6],
+		[40, 0.5],
+		[50, 0.4],
+		[60, 0.3],
+	],
 } as const;

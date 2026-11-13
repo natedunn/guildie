@@ -38,6 +38,7 @@ test("shared vectors: judge", () => {
 		assert.equal(v.at ?? null, c.expect.at, c.name);
 		assert.equal(v.second ?? false, c.expect.second, c.name);
 		assert.deepEqual(v.against, c.expect.against, c.name);
+		assert.equal(v.off ?? null, c.expect.off, c.name);
 	}
 });
 
@@ -54,6 +55,7 @@ test("shared vectors: scores, usable levels, suggestions", () => {
 		close(s.score, c.expect.score, `${c.item} score`);
 		close(s.stat, c.expect.stat, `${c.item} stat`);
 		assert.equal(s.total, c.expect.total, `${c.item} total`);
+		assert.equal(s.off, c.expect.off, `${c.item} off`);
 	}
 	for (const c of vectors.usable) {
 		assert.equal(
@@ -226,11 +228,12 @@ test("real weights: plausible picks", () => {
 		{ left: "+4 Stamina" },
 	])!;
 	const picks = suggest(agiGloves, [feral, rogue, mage, warrior], r, { now: 0 });
-	// Biggest gain over what they wear first: the warrior's gloves were worth least to him.
+	// Biggest gain first; leather on a warrior who wears mail is a maybe at most.
 	assert.deepEqual(
 		picks.map((p) => `${p.member.name}:${p.verdict.kind}`),
-		["Thalon:upgrade", "Tir:upgrade", "Brisket:upgrade"],
+		["Tir:upgrade", "Brisket:upgrade", "Thalon:maybe"],
 	);
+	assert.equal(picks[2].verdict.off, 2, "leather");
 	const brisket = picks.find((p) => p.member.name === "Brisket")!;
 	assert.equal(
 		explain(agiGloves, brisket.verdict, [gloves[0]], r),
@@ -251,6 +254,103 @@ test("real weights: plausible picks", () => {
 	const mail = itemInfoFromTooltip([{ left: "Hands", right: "Mail" }, { left: "140 Armor" }, { left: "+2 Agility" }])!;
 	const why = explain(mail, { kind: "upgrade", gain: 1, spec: warrior.spec, against: [10] }, [gloves[0]], r);
 	assert.equal(why, "+100 Armor over Embossed Leather Gloves");
+});
+
+test("real weights: white and grey armor, armor types, a hunter's thrown weapons", () => {
+	const r = upgradeRules();
+	const item = (lines: { left: string; right?: string }[]) => itemInfoFromTooltip(lines)!;
+	const worn = (slot: string, itemId: number, lines: { left: string; right?: string }[]) => ({
+		slot,
+		itemId,
+		name: `Worn ${itemId}`,
+		quality: "UNCOMMON",
+		info: itemInfoFromTooltip(lines),
+	});
+	const member = (
+		classId: number,
+		level: number,
+		tree: string,
+		equipment: ReturnType<typeof worn>[],
+		gearPreference?: Parameters<typeof upgradeMember>[0]["gearPreference"],
+	) =>
+		upgradeMember(
+			{
+				name: "X",
+				classId,
+				level,
+				seenMs: 0,
+				talentTrees: [{ name: tree, points: 15, talents: [] }],
+				equipment,
+				gearPreference,
+			},
+			r,
+		)!;
+
+	// Canvas Shoulderpads (grey, 23 armor): only for an empty slot, and labeled so.
+	const canvas = item([{ left: "Shoulder", right: "Cloth" }, { left: "23 Armor" }]);
+	const bareHunter = member(3, 16, "Beast Mastery", []);
+	assert.equal(judge(canvas, bareHunter, r)?.kind, "empty");
+	const shoulders = worn("SHOULDER", 7, [
+		{ left: "Shoulder", right: "Leather" },
+		{ left: "40 Armor" },
+		{ left: "+1 Agility" },
+	]);
+	assert.equal(judge(canvas, member(3, 16, "Beast Mastery", [shoulders]), r), undefined, "over anything worn: no");
+
+	// Barbaric Cloth Gloves on a level 16 Arms warrior: cloth is three types below plate.
+	const barbaric = item([
+		{ left: "Hands", right: "Cloth" },
+		{ left: "17 Armor" },
+		{ left: "+1 Strength" },
+		{ left: "+1 Stamina" },
+		{ left: "+2 Spirit" },
+	]);
+	const v = judge(barbaric, member(1, 16, "Arms", []), r);
+	assert.equal(v?.kind, "maybe");
+	assert.equal(v?.off, 1);
+
+	// Todd: Enhancement at 26, leather then mail (loose). Caster cloth no longer passes as an upgrade.
+	const todd = member(
+		7,
+		26,
+		"Enhancement",
+		[
+			worn("SHOULDER", 10657, [
+				{ left: "Shoulder", right: "Cloth" },
+				{ left: "30 Armor" },
+				{ left: "+4 Intellect" },
+				{ left: "+2 Stamina" },
+			]),
+			worn("HEAD", 279391, [{ left: "Head", right: "Cloth" }, { left: "28 Armor" }]),
+		],
+		{ armor: { types: [2, 3], strict: false } },
+	);
+	const invokers = item([
+		{ left: "Shoulder", right: "Cloth" },
+		{ left: "33 Armor" },
+		{ left: "+5 Intellect" },
+		{ left: "Equip: Increases damage and healing done by magical spells and effects by up to 7." },
+	]);
+	assert.notEqual(judge(invokers, todd, r)?.kind, "upgrade");
+	// His own white headband isn't suggested back to him.
+	assert.equal(judge(item([{ left: "Head", right: "Cloth" }, { left: "28 Armor" }]), todd, r, 279391), undefined);
+	// A leather helm with his stats: an upgrade.
+	const helm = item([
+		{ left: "Head", right: "Leather" },
+		{ left: "70 Armor" },
+		{ left: "+8 Strength" },
+		{ left: "+10 Stamina" },
+	]);
+	assert.equal(judge(helm, todd, r)?.kind, "upgrade");
+
+	// Hunters: thrown weapons only when they choose them.
+	const knife = item([{ left: "Thrown", right: "Thrown" }, { left: "(6.3 damage per second)" }]);
+	const hunter = member(3, 16, "Beast Mastery", []);
+	assert.equal(judge(knife, hunter, r), undefined);
+	const thrower = member(3, 16, "Beast Mastery", [], { weapon: { types: [2, 16], strict: false } });
+	assert.ok(judge(knife, thrower, r), "listed: judged like any ranged weapon");
+	// Warriors pull with them.
+	assert.equal(judge(knife, member(1, 16, "Arms", []), r)?.kind, "upgrade");
 });
 
 test("worn gear: two-hander flag, unique ids, estimates for unknown items", () => {
@@ -278,7 +378,7 @@ test("worn gear: two-hander flag, unique ids, estimates for unknown items", () =
 	)!;
 	assert.equal(m.seen, 1_794_000_000);
 	assert.equal(m.th, true);
-	assert.deepEqual(m.worn, [10, 11]);
+	assert.deepEqual(m.worn, [10, 11, 12], "everything worn: never suggested again");
 	assert.equal(m.slots[16], 10);
 	assert.ok(m.slots[11] > 0, "unknown ring estimated from item level");
 	assert.equal(m.slots[4], undefined, "shirts don't count");
