@@ -80,7 +80,7 @@ test("captures level, XP, guild, gear and professions on login", function()
     wow.load(state)
     wow.fire("PLAYER_ENTERING_WORLD")
     local p = payload(state.db)
-    eq(p.version, 6, "version")
+    eq(p.version, 7, "version")
     eq(state.db.addonVersion, "0.10.1", "the addon's own version, for the app")
     eq(#p.characters, 1, "characters")
     local c = p.characters[1]
@@ -367,6 +367,60 @@ test("modern clients: C_TooltipInfo and GetProfessions", function()
     eq(c.professions.skills[1].id, 197, "skill line id")
     eq(c.professions.skills[3].name, "Cooking")
     assert(ns.current())
+end)
+
+test("addons: loaded ones only, plain titles, no Blizzard_; only the latest character carries them", function()
+    local state = lich({
+        addons = {
+            { name = "Questie", title = "|cff00ff00Questie|r", version = "9.1.0" },
+            { name = "Details", title = "|TInterface\\Icon:16|t Details! Damage Meter", version = "|cffffffffv1.2|r" },
+            { name = "Bagnon", title = "Bagnon", loaded = false },
+            { name = "Blizzard_Debug", title = "Debug" },
+            { name = "Guildie", title = "Guildie" },
+        },
+        db = {
+            version = 6,
+            characters = {
+                ["Player-4904-00000001"] = {
+                    guid = "Player-4904-00000001", name = "Alt", level = 10, classToken = "MAGE", capturedAt = 1794200000,
+                    talents = {}, addons = { capturedAt = 1794200000, list = { { name = "Old" } } },
+                },
+            },
+        },
+    })
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local byGuid = {}
+    for _, c in ipairs(payload(state.db).characters) do byGuid[c.guid] = c end
+    local addons = byGuid["Player-4904-004E2B22"].addons
+    eq(addons.capturedAt, state.time, "capturedAt")
+    eq(#addons.list, 3, "loaded, non-Blizzard addons")
+    eq(addons.list[1].name, "Details", "sorted by folder name")
+    eq(addons.list[1].title, "Details! Damage Meter", "texture stripped")
+    eq(addons.list[1].version, "v1.2", "version without color codes")
+    eq(addons.list[2].name, "Guildie")
+    eq(addons.list[3].title, "Questie", "color codes stripped")
+    eq(byGuid["Player-4904-00000001"].addons, nil, "an older character's list is dropped")
+end)
+
+test("addons: a client that can't list them keeps the last list", function()
+    local state = lich({
+        addons = false,
+        db = {
+            version = 7,
+            characters = {
+                ["Player-4904-004E2B22"] = {
+                    guid = "Player-4904-004E2B22", name = "Lich", level = 23, classToken = "PRIEST", capturedAt = 1794200000,
+                    talents = {}, addons = { capturedAt = 1794200000, list = { { name = "Questie" } } },
+                },
+            },
+        },
+    })
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local c = payload(state.db).characters[1]
+    eq(c.addons.capturedAt, 1794200000)
+    eq(c.addons.list[1].name, "Questie")
 end)
 
 test("encoder: escapes, NaN, empty lists", function()

@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie, Addon:** Share the addons you run, if you want to. Choose No one (the default), Guild or Public under Settings → Account → Privacy or on your character's new Addons tab. Your guild gets an Addons page showing what members run, most used first. Only enabled addons are listed. Your list shows up after your next /reload or logout in game.
+
 ### Improvements
 
 - **Guildie, Addon:** Gear suggestions are more sensible: an upgrade has to add at least a point of your main stat, white and grey armor is only suggested for an empty slot (and says "empty slot"), armor outside your preferred types (or cloth on a shaman, leather on a warrior in mail) is a "maybe" at most and counts for less as you level, items you already wear aren't suggested again, and hunters no longer get thrown weapons unless they choose them in their preferences.

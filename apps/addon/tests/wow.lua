@@ -131,7 +131,26 @@ function wow.reset(state)
         return f
     end
     _G.GetTime = function() return 0 end
-    _G.C_AddOns = { GetAddOnMetadata = function(_, field) if field == "Version" then return state.addonVersion or "0.10.1" end end }
+    -- state.addons: { { name, title, version, loaded = false }, ... } (the AddOns folder),
+    -- or false for a client without the list. Index 0 is never asked for.
+    local function addonAt(i) return state.addons and state.addons[i] end
+    _G.C_AddOns = {
+        GetAddOnMetadata = function(which, field)
+            if type(which) == "number" then
+                local a = addonAt(which)
+                return a and field == "Version" and a.version or nil
+            end
+            if field == "Version" then return state.addonVersion or "0.10.1" end
+        end,
+    }
+    if state.addons ~= false then
+        C_AddOns.GetNumAddOns = function() return #(state.addons or {}) end
+        C_AddOns.GetAddOnInfo = function(i)
+            local a = addonAt(i)
+            if a then return a.name, a.title, "", a.loaded ~= false, a.loaded == false and "DISABLED" or nil end
+        end
+        C_AddOns.IsAddOnLoaded = function(i) local a = addonAt(i) return a ~= nil and a.loaded ~= false end
+    end
     _G.InCombatLockdown = function() return state.combat or false end
     _G.ReloadUI = function() state.reloads = (state.reloads or 0) + 1 end
     _G.GetServerTime = function() return state.time end

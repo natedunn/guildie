@@ -91,8 +91,8 @@ used); the account page lists them with Disconnect.
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
-  `{ "version": 6, "characters": [ ... ] }` (versions 1, talents and level
-  only, 2, without `inventory`, 3, without `quests`, 4, without `completedQuestIds`, and 5, without `deliveries`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
+  `{ "version": 7, "characters": [ ... ] }` (versions 1, talents and level
+  only, 2, without `inventory`, 3, without `quests`, 4, without `completedQuestIds`, 5, without `deliveries`, and 6, without `addons`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
   One upload per 5 s per token, at most 50 characters. A character, version 2:
 
   ```jsonc
@@ -125,6 +125,10 @@ used); the account page lists them with Disconnect.
       "list": [ { "id": 166, "title": "The Defias Brotherhood", "level": 22, "tag": "Dungeon",
                   "zone": "The Deadmines", "objectives": [ { "text": "Edwin VanCleef's head: 0/1", "done": false } ] },
                 { "id": 214, "title": "Red Silk Bandanas", "level": 17, "complete": true } ]
+    },
+    "addons": {                               // version 7, on the character read last only
+      "capturedAt": 1794336950,
+      "list": [ { "name": "Questie", "title": "Questie", "version": "9.1.0" } ]
     }
   }
   ```
@@ -167,6 +171,9 @@ What the site does with it (`helper:ingest`):
 - Bags and bank go to their own table (`inventories`, newer read wins per
   part), never into `addonSnapshots`, and re-check the player's open craft
   requests.
+- The addons running (`addons`, payload 7) are account-wide: the newest list
+  in the upload goes to `playerAddons`, and only if the player shares it
+  (below). Otherwise it's dropped.
 
 A character is accepted only if the token's owner claimed it: matched by
 Blizzard's character id (the hex number at the end of the in-game GUID), or by
@@ -486,12 +493,34 @@ dungeon and raid quests by dungeon, so people can see who to group with.
   their last read. Like bags, changes update the saved read; the payload
   catches up at the next full read (at the latest, `/reload` or logout).
 
+### Addons the player runs (payload 7)
+
+The addon lists the addons loaded for the current character
+(`C_AddOns.GetNumAddOns`/`GetAddOnInfo`/`IsAddOnLoaded`, or the old globals):
+disabled ones aren't loaded, so they're left out, as are `Blizzard_*`. Each
+has its folder name, its `.toc` title and `Version` with color codes and
+textures removed, at most 200. Only the character read last carries the
+list; the others' copies are dropped on each read.
+
+Sharing is opt in, per player (Settings → Account → Privacy, or the
+character's Addons tab): **No one** (the default; nothing is kept, and
+choosing it deletes the stored list), **Guild** (members of the guild of the
+character or guild page being looked at) or **Public** (anyone who can see
+the character or guild). The list shows on the player's characters (Addons
+tab) and on each guild's Addons page, summed up by addon
+(`convex/addons.ts`, rules in `convex/shared/addons.ts`). The player always
+sees their own.
+
 ## Verified in game
 
 - Talent reading (names and ranks) in WoW: Forever.
 - The GUID's number equals Blizzard's character id, so uploads match on id.
 
 ## Not verified yet
+
+- The addon list (payload 7): that `C_AddOns.GetAddOnInfo` and
+  `IsAddOnLoaded` take an index in Forever, and that `GetNumAddOns` leaves
+  out Blizzard's own addons (we skip `Blizzard_*` anyway).
 
 - The 0.4.0 reads in Forever: gear tooltips (`C_TooltipInfo` or the hidden
   tooltip), `GetAverageItemLevel`, `GetProfessions` vs `GetSkillLineInfo`,

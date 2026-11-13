@@ -13,8 +13,9 @@
 local ADDON, ns = ...
 -- The payload's format. 2 added guild, XP, gear, professions and recipes;
 -- 3 (0.8.0) bags and the last bank read; 4 (0.10.0) the quest log. The site
--- accepts all six. 5 adds retained quest completion IDs; 6 adds delivery receipts.
-local VERSION = 6
+-- accepts all seven. 5 adds retained quest completion IDs; 6 adds delivery receipts;
+-- 7 the addons running (on the latest character only: they're account-wide).
+local VERSION = 7
 
 GuildieDB = GuildieDB or {}
 
@@ -265,6 +266,7 @@ local function capture(reason, recipes)
         completedQuestIds = completedQuestIDs(previous.completedQuestIds),
         deliveries = previous.deliveries,
         deliverySequence = previous.deliverySequence,
+        addons = previous.addons,
     }
     -- When the level last went up (game time): the guild's feed shows it.
     if character.level and previous.level and character.level > previous.level then
@@ -302,6 +304,15 @@ local function capture(reason, recipes)
             if has[section.profession] then table.insert(kept, section) end
         end
         character.recipes = kept
+    end
+    -- The addons running now. Account-wide on Guildie, so only the character
+    -- read last carries a list (the newest wins there anyway).
+    local okAddons, addons = pcall(ns.readAddons)
+    if okAddons and addons then
+        character.addons = { capturedAt = now, list = addons }
+        for otherGuid, other in pairs(GuildieDB.characters) do
+            if otherGuid ~= guid then other.addons = nil end
+        end
     end
     if ns.reconcileDeliveries then ns.reconcileDeliveries(character) end
     GuildieDB.characters[guid] = character

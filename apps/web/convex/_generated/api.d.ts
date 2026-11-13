@@ -10,6 +10,7 @@
 
 import type * as addonPayload from "../addonPayload.js";
 import type * as addonView from "../addonView.js";
+import type * as addons from "../addons.js";
 import type * as auth from "../auth.js";
 import type * as authBattlenet from "../authBattlenet.js";
 import type * as authGateway from "../authGateway.js";
@@ -39,6 +40,7 @@ import type * as recipes from "../recipes.js";
 import type * as requests from "../requests.js";
 import type * as sample from "../sample.js";
 import type * as search from "../search.js";
+import type * as shared_addons from "../shared/addons.js";
 import type * as shared_dungeonQuests from "../shared/dungeonQuests.js";
 import type * as shared_dungeonResources from "../shared/dungeonResources.js";
 import type * as shared_dungeons from "../shared/dungeons.js";
@@ -48,6 +50,8 @@ import type * as shared_mcpText from "../shared/mcpText.js";
 import type * as shared_proficiencies from "../shared/proficiencies.js";
 import type * as shared_questLevels from "../shared/questLevels.js";
 import type * as shared_quests from "../shared/quests.js";
+import type * as shared_recipeResearch from "../shared/recipeResearch.js";
+import type * as shared_recipeStatus from "../shared/recipeStatus.js";
 import type * as shared_requests from "../shared/requests.js";
 import type * as shared_search from "../shared/search.js";
 import type * as shared_statPriority from "../shared/statPriority.js";
@@ -69,6 +73,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   addonPayload: typeof addonPayload;
   addonView: typeof addonView;
+  addons: typeof addons;
   auth: typeof auth;
   authBattlenet: typeof authBattlenet;
   authGateway: typeof authGateway;
@@ -98,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   requests: typeof requests;
   sample: typeof sample;
   search: typeof search;
+  "shared/addons": typeof shared_addons;
   "shared/dungeonQuests": typeof shared_dungeonQuests;
   "shared/dungeonResources": typeof shared_dungeonResources;
   "shared/dungeons": typeof shared_dungeons;
@@ -107,6 +113,8 @@ declare const fullApi: ApiFromModules<{
   "shared/proficiencies": typeof shared_proficiencies;
   "shared/questLevels": typeof shared_questLevels;
   "shared/quests": typeof shared_quests;
+  "shared/recipeResearch": typeof shared_recipeResearch;
+  "shared/recipeStatus": typeof shared_recipeStatus;
   "shared/requests": typeof shared_requests;
   "shared/search": typeof shared_search;
   "shared/statPriority": typeof shared_statPriority;

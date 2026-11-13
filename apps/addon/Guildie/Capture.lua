@@ -532,3 +532,42 @@ function ns.readCompletedQuestIDs()
         end
     end
 end
+
+-- Addon titles and versions can carry color codes and inline textures.
+local function plainText(text, max)
+    if type(text) ~= "string" then return nil end
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|", ""):gsub("%c", "")
+    text = text:match("^%s*(.-)%s*$")
+    if text == "" then return nil end
+    return text:sub(1, max)
+end
+ns.plainText = plainText
+
+local MAX_ADDONS = 200
+
+--- The addons running for this character (loaded ones: disabled addons
+--- aren't), for the player's Addons list on Guildie. The site keeps it only
+--- if the player chose to share it. nil when the client can't list them.
+function ns.readAddons()
+    local api = C_AddOns or {}
+    local count = api.GetNumAddOns or GetNumAddOns
+    local info = api.GetAddOnInfo or GetAddOnInfo
+    local loaded = api.IsAddOnLoaded or IsAddOnLoaded
+    local meta = api.GetAddOnMetadata or GetAddOnMetadata
+    if type(count) ~= "function" or type(info) ~= "function" or type(loaded) ~= "function" then return nil end
+    local list = {}
+    for i = 1, count() do
+        local name, title = info(i)
+        if type(name) == "string" and not name:find("^Blizzard_") and loaded(i) then
+            local version = meta and plainText(meta(i, "Version"), 40)
+            table.insert(list, {
+                name = plainText(name, 64),
+                title = plainText(title, 100),
+                version = version,
+            })
+            if #list >= MAX_ADDONS then break end
+        end
+    end
+    table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
+    return list
+end

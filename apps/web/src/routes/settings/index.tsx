@@ -2,11 +2,12 @@ import { api } from "@convex/_generated/api";
 import { className } from "@convex/shared/wow";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { convexQuery } from "@convex-dev/react-query";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useState } from "react";
+import { AddonShareControl } from "@/components/addon-list";
 import { AiConnections } from "@/components/ai-connections";
 import { ClassText } from "@/components/class-name";
 import { SectionTitle } from "@/components/page-header";
@@ -15,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { startClaim } from "@/lib/claim";
 import { desktop, useInDesktopApp } from "@/lib/desktop";
+import { ago } from "@/lib/format";
 
 // Settings → Account: who you are, your characters, privacy, sign out.
 export const Route = createFileRoute("/settings/")({
@@ -70,6 +72,7 @@ function Account() {
 			<section id="privacy" className="mt-10 scroll-mt-4">
 				<SectionTitle>Privacy</SectionTitle>
 				<BattletagSetting hidden={!!viewer.hideBattletag} />
+				<AddonsSetting />
 			</section>
 
 			<AiConnections />
@@ -147,6 +150,23 @@ function BattletagSetting({ hidden }: { hidden: boolean }) {
 				</span>
 			</span>
 		</label>
+	);
+}
+
+/** Who sees the addons I run in game (convex/addons.ts): nobody until I choose. */
+function AddonsSetting() {
+	const { data } = useQuery(convexQuery(api.addons.mine, {}));
+	if (!data) return null;
+	return (
+		<div className="surface-card mt-3 px-3.5 py-3 text-[0.8125rem]">
+			Share my addons
+			<span className="block text-muted-foreground">
+				The addons you have turned on in game, read by the Guildie addon and shown on each of your characters and on
+				your guilds' Addons page. Disabled addons aren't included.
+				{data.count !== undefined && ` ${data.count} addons as of ${ago(data.capturedAt) ?? "the last sync"}.`}
+			</span>
+			<AddonShareControl share={data.share} className="mt-2.5" />
+		</div>
 	);
 }
 

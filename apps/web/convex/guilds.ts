@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
+import { characterAddons } from "./addons";
 import { pickProfile } from "./helper";
 import { preferencesOf } from "./preferences";
 import { vRegion, vVisibility } from "./schema";
@@ -170,7 +171,9 @@ export const character = query({
 			.first();
 		if (!character) return null;
 		const guild = await ctx.db.get(character.guildId);
-		if (!guild || !(await access(ctx, guild)).canView) return null;
+		if (!guild) return null;
+		const viewer = await access(ctx, guild);
+		if (!viewer.canView) return null;
 		const profile = await pickProfile(ctx, character);
 		// The player who claimed it may have chosen its stat priority; only they can change it.
 		const claims = await ctx.db
@@ -209,6 +212,14 @@ export const character = query({
 			gearPreference: prefs.gearPreference,
 			/** The viewer claimed this character: they can choose its stat priority. */
 			canEdit: mine !== undefined,
+			/**
+			 * Its player's addons (account-wide), if they share them with this
+			 * viewer; for the player, always (with their choice). Null: no Addons tab.
+			 */
+			addons: await characterAddons(ctx, mine?.userId ?? claims[0]?.userId, {
+				isOwner: mine !== undefined,
+				isMember: viewer.isMember,
+			}),
 			talentLayouts: layouts
 				.map(({ specId, name, nodes }) => ({
 					specId,

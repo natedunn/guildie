@@ -101,7 +101,7 @@ assert(count() == 4, "switching transport neither consumes nor duplicates receip
 wow.fire("PLAYER_LOGOUT")
 local saved = GuildieDB
 local payload = wow.decode(saved.payload)
-assert(payload.version == 6 and #payload.characters[1].deliveries == 4)
+assert(payload.version == 7 and #payload.characters[1].deliveries == 4)
 for i, receipt in ipairs(payload.characters[1].deliveries) do
     local liveReceipt = livePayload.characters[1].deliveries[i]
     for key, value in pairs(receipt) do
