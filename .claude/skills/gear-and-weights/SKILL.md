@@ -111,6 +111,11 @@ The two implementations must match exactly:
   the member (`armorPref`, `weaponPref`, ordered `armorPrefs`/`weaponPrefs`, `...Strict`; `gearPrefs`) and are
   read by `scoreItem` and `judge` in both TS and Lua (`preferred`): a rule
   change, so it goes through the vectors and needs an addon release.
+- "For you" (the tooltip's "You | upgrade +35%" row) is addon-only: the
+  site sends your own characters as `upgrades.mine` (helper.ts), and
+  `U.liveMember` rescores what you wear now with the same `scoreItem` before
+  `judge`; `U.forYou` words the verdict. No TS twin, so it's tested in
+  `upgrades_test.lua`, not the shared vectors.
 - Trading is the callers' part, not `judge`/`suggest`: `untradeable()` in
   `itemInfo.ts` (Binds when picked up, Soulbound, Quest Item) and
   `U.untradeable` in `Upgrades.lua`. Items it flags are never suggested for
