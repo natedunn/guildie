@@ -361,13 +361,20 @@ by the GUID's id, else by name, and compares it with its last read:
 - Recipes: for professions whose window was read, more than Guildie's count
   ("4 new Tailoring recipes"); fewer is a filtered window, not news.
 
-States: "Up to date with Guildie", "N changes not on Guildie yet:" and the
-lines, "Guildie doesn't know this character yet" (no entry: not claimed, or
-not synced yet), "No data from the Guildie app yet" (no `GuildieData`).
-What happens next depends on whether anything changed since this UI loaded:
-if so it uploads at logout or `/reload`; if not, the game already wrote it at
-the last `/reload` and the app uploads it, but `GuildieData.lua` was read
-before that, so the window catches up at the next `/reload`.
+The window's answer (`S.summary`), worded around what the addon can know
+(`GuildieData.lua` only refreshes at login or `/reload`):
+
+- "Waiting for the Guildie app" (no `GuildieData`), "Not on Guildie yet" (no
+  entry: not claimed, or not synced yet).
+- With live sync on, a live problem first ("Live sync stopped/paused/waiting"
+  with its fix). Otherwise changes since the last reload are "Live sync on":
+  the app picks them up as you play, and the window confirms them at reload.
+- With reload sync: "N changes to upload" (changed since this UI loaded; they
+  upload at logout or `/reload`), or "Saved for upload" (the last `/reload`
+  wrote them for the app, but `GuildieData.lua` was read before that).
+- "Up to date", or "Check not loaded" when the comparison is old or incomplete.
+
+The changes themselves are under Show details (open when there's a problem).
 
 ## Which data wins
 

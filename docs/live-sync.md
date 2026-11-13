@@ -7,9 +7,10 @@ is opt-in on both sides and does not provide server-side live health or location
 
 ## Player controls
 
-In WoW, open **Options → AddOns → Guildie**:
+In WoW, open the Guildie window (minimap button or `/guildie`) → **Settings**:
 
-- Enable experimental sync (off initially, remembered across logins).
+- Sync: choose **Live, as you play** (off initially, remembered across logins)
+  or **When you reload or log out**.
 - Choose the default amber palette or grayscale for troubleshooting.
 - Choose small or larger cells. The addon snaps to physical pixels when the
   client exposes screen dimensions; the intended sizes are 32×32 and 64×64.

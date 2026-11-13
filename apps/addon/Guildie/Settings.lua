@@ -49,58 +49,64 @@ root:SetScript("OnEvent", function()
 end)
 function ns.openSettings() ns.openWindow("settings") end
 
--- Reusable rows inside the modal's scrolling Settings page.
+-- The Settings page: three sections (Sync, Live square, Display), each a
+-- gold title over its rows. The sync method is one choice; rows that only
+-- apply to one method show only with it.
 function ns.buildSettingsRows(parent, width, changed)
     local rows, updates, controls = {}, {}, {}
-    local function label(value, heading)
-        local text = parent:CreateFontString(nil, "ARTWORK", heading and "GameFontNormal" or "GameFontHighlightSmall")
-        text:SetWidth(width)
-        text:SetJustifyH("LEFT")
-        text:SetText(value)
-        rows[#rows + 1] = {el = text, gap = heading and 22 or 8}
+    local function live() return ns.livePixels.get().enabled == true end
+    local function section(title, visible)
+        rows[#rows + 1] = {el = ns.sectionTitle(parent, title, width), height = 22, gap = #rows == 0 and 0 or 24, visible = visible}
     end
-    local function checkbox(title, key, get, set)
-        local control = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    local function note(value, visible, indent)
+        local text = parent:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+        text:SetWidth(width - (indent or 0))
+        text:SetJustifyH("LEFT")
+        if text.SetWordWrap then text:SetWordWrap(true) end
+        text:SetText(value)
+        rows[#rows + 1] = {el = text, gap = 2, visible = visible, dx = indent}
+    end
+    local function toggle(template, title, key, get, set, visible, indent)
+        local ok, control = pcall(CreateFrame, "CheckButton", nil, parent, template)
+        if not ok then control = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate") end
         local text = control:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
         text:SetPoint("LEFT", control, "RIGHT", 4, 0)
-        text:SetWidth(width - 40)
+        text:SetWidth(width - 40 - (indent or 0))
         text:SetJustifyH("LEFT")
         text:SetText(title)
-        control:SetHitRectInsets(0, -(width - 32), 0, 0)
+        control:SetHitRectInsets(0, -(width - 32 - (indent or 0)), 0, 0)
         control:SetScript("OnClick", function(self) set(self:GetChecked() == true); changed() end)
-        rows[#rows + 1] = {el = control, height = 32, gap = 8, dx = -4}
+        rows[#rows + 1] = {el = control, height = 26, gap = 6, dx = (indent or 0) - 4, visible = visible}
         updates[#updates + 1] = function() control:SetChecked(get()) end
         controls[key] = control
     end
-    local function preference(title, key)
-        checkbox(title, key, function() return ns.settings()[key] end, function(on)
+    local function preference(title, key, visible, indent)
+        toggle("UICheckButtonTemplate", title, key, function() return ns.settings()[key] end, function(on)
             ns.settings()[key] = on
             if key == "showMinimap" then ns.updateMinimapButton() end
-        end)
+        end, visible, indent)
     end
-    label("General", true)
-    preference("Show minimap button", "showMinimap")
-    preference("Explain empty tooltips", "sayWhyEmpty")
-    preference("Reload while AFK (experimental)", "reloadWhenAfk")
-    label("Saves for the app by reloading while AFK and out of combat, at most every 20 minutes.")
-    label("Experimental pixel sync", true)
-    label("The Guildie app reads character data from the colored square on your screen. Keep the whole square visible and unobstructed. Move it to a free corner, or use Edit Mode for a custom position.")
-    checkbox("Enable experimental pixel sync", "syncEnabled", function() return ns.livePixels.get().enabled == true end,
-        function(on) ns.livePixels.set("enabled", on) end)
-    label("Reload once after enabling or disabling so the app can read your choice. Keep the app running. Bank and recipe data still require opening their windows.")
-    checkbox("Show on-screen sync warning", "showSyncWarning", function() return ns.settings().showSyncWarning ~= false end,
-        function(on) ns.settings().showSyncWarning = on; ns.refreshSyncWarning() end)
-    label("Dismiss the on-screen warning with its close button. Sync details and warnings remain available on the Status tab.")
-    checkbox("Larger square", "large", function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
-        function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end)
-    checkbox("Grayscale (troubleshooting)", "gray", function() return ns.livePixels.get().theme == "gray" end,
-        function(on) ns.livePixels.set("theme", on and "gray" or "amber") end)
+
+    section("Sync")
+    note("How your character gets to Guildie. The Guildie app must be running either way.")
+    toggle("UIRadioButtonTemplate", "Live, as you play", "methodLive", live, function() ns.livePixels.set("enabled", true) end)
+    note("The app reads a small square in a corner of your screen. Experimental.", nil, 24)
+    toggle("UIRadioButtonTemplate", "When you reload or log out", "methodReload", function() return not live() end,
+        function() ns.livePixels.set("enabled", false) end)
+    preference("Also reload while AFK", "reloadWhenAfk", function() return not live() end, 24)
+    note("Out of combat, at most every 20 minutes.", function() return not live() end, 52)
+    note("Reload once after switching so the app picks up your choice.")
+    -- The old checkbox's name, for anything still pointing at it.
+    controls.syncEnabled = controls.methodLive
+
+    section("Live square", live)
+    note("Keep the whole square on screen and uncovered. Bank and recipes still need their windows opened.", live)
     local group = CreateFrame("Frame", nil, parent)
-    group:SetSize(width, 28)
-    for i, spec in ipairs({{"Move to top left", "top"}, {"Move to bottom left", "bottom"}, {"Open Edit Mode", "edit"}}) do
+    group:SetSize(width, 26)
+    for i, spec in ipairs({{"Top left", "top"}, {"Bottom left", "bottom"}, {"Move in Edit Mode", "edit"}}) do
         local button = CreateFrame("Button", nil, group, "UIPanelButtonTemplate")
-        button:SetPoint("TOPLEFT", (i - 1) * (width / 3), 0)
-        button:SetSize(width / 3 - 8, 28)
+        button:SetPoint("TOPLEFT", (i - 1) * 132, 0)
+        button:SetSize(i == 3 and 150 or 124, 24)
         button:SetText(spec[1])
         local action = spec[2]
         button:SetScript("OnClick", function()
@@ -111,7 +117,17 @@ function ns.buildSettingsRows(parent, width, changed)
         end)
         updates[#updates + 1] = function() button:SetEnabled(not (InCombatLockdown and InCombatLockdown())) end
     end
-    rows[#rows + 1] = {el = group, gap = 16, height = 28}
-    label("Pixel output alone does not confirm a sync. Status compares actual data with the last server update loaded at login or reload; check the app for live capture and upload errors.")
+    rows[#rows + 1] = {el = group, gap = 10, height = 26, visible = live}
+    toggle("UICheckButtonTemplate", "Larger square", "large", function() return (ns.livePixels.get().size or 1.6) > 1.6 end,
+        function(on) ns.livePixels.set("size", on and 3.2 or 1.6) end, live)
+    toggle("UICheckButtonTemplate", "Warn on screen when live sync stops", "showSyncWarning",
+        function() return ns.settings().showSyncWarning ~= false end,
+        function(on) ns.settings().showSyncWarning = on; ns.refreshSyncWarning() end, live)
+    toggle("UICheckButtonTemplate", "Grayscale square (troubleshooting)", "gray", function() return ns.livePixels.get().theme == "gray" end,
+        function(on) ns.livePixels.set("theme", on and "gray" or "amber") end, live)
+
+    section("Display")
+    preference("Minimap button", "showMinimap")
+    preference("Explain empty item tooltips", "sayWhyEmpty")
     return rows, function() for _, update in ipairs(updates) do update() end end, controls
 end
