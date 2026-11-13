@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, Addon:** Fixed item requests count down as deliveries are received, and help suggestions use the amount still needed.
+
 ## 0.3.31
 
 ### Fixes

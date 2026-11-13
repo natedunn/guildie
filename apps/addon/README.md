@@ -145,6 +145,13 @@ The addon observes successful mail collections and completed trades for cached
 item requests, and retains the records for live or reload/logout upload. It
 never performs those actions. Sender reports mark claimed requests sent;
 recipient reports advance received quantities and close fixed-amount requests.
+Live capture is optional: with it off, the desktop app uploads the same
+receipts after `/reload` or logout. Receipt IDs survive both paths and reloads;
+the server counts each receipt once, even if live and file uploads overlap.
+Sender reports do not reduce the remaining quantity. The original target is
+preserved, and the remaining amount is derived from recipient receipts, floored
+at zero. Tooltips show this server remainder after refreshed GuildieData loads
+at login or `/reload`; the addon does not subtract local receipts a second time.
 Crafts, enchants, COD, returns and uncertain matches keep manual completion.
 A request must be in the loaded GuildieData, including its request ID. Tracking
 retains at most 200 matching events per character for 30 days; it cannot recover
