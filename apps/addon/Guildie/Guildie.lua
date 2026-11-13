@@ -303,6 +303,7 @@ local function capture(reason, recipes)
         end
         character.recipes = kept
     end
+    if ns.reconcileDeliveries then ns.reconcileDeliveries(character) end
     GuildieDB.characters[guid] = character
     -- What the helper uploads, as-is: { version, characters = [ ... ] }.
     local list = {}
@@ -467,3 +468,17 @@ SlashCmdList.GUILDIE = function()
     capture("slash")
     if ns.toggleWindow then ns.toggleWindow() end
 end
+
+-- Reconcile missed quest events without relying on a custom quest UI. Never
+-- infer completion from a quest disappearing. Legacy queries finish via event.
+local reconcileTicker
+local reconcile = CreateFrame("Frame")
+reconcile:RegisterEvent("PLAYER_ENTERING_WORLD")
+reconcile:SetScript("OnEvent", function()
+    if not reconcileTicker and C_Timer and C_Timer.NewTicker then
+        reconcileTicker = C_Timer.NewTicker(60, function()
+            if type(QueryQuestsCompleted) == "function" then pcall(QueryQuestsCompleted) end
+            captureQuests()
+        end)
+    end
+end)

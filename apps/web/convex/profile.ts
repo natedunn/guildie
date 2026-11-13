@@ -1,28 +1,9 @@
 import type { Doc } from "./_generated/dataModel";
 
-// A character as we show it: Blizzard's profile merged with the latest
-// in-game snapshot from the Guildie addon, newest wins per field. Kept free of
-// Convex and value imports so `node --test` can run it (profile.test.ts).
-//
-// Blizzard's profile only changes when the character logs out, and then
-// describes them as of that session, so its time is `lastLoginAt`. The addon's
-// sections each carry the game time they were read. For each field:
-//
-// - level: the higher of the two (levels never drop). `lastLoginAt` is when
-//   the session started, so a level gained later in that session can be
-//   Blizzard's while an addon read from earlier in it still looks newer;
-// - gear and item level, the profession list with skill, and each
-//   profession's known recipes: the addon's section when it's newer. Newer
-//   addon recipes add to Blizzard's (recipes are only lost with the
-//   profession), so a recipe the catalog couldn't match isn't lost;
-// - talents: as before, the addon's while newer than the last change seen
-//   from Blizzard (`talentsChangedAt`), except an empty list when Blizzard
-//   has points spent: more likely a read that failed in game than a reset;
-// - quests in progress: the addon's quest log when it's newer (with the
-//   game's titles, levels, objectives and complete state), else Blizzard's
-//   list (ids only; titles come from the quests catalog).
-//
-// Anything the addon never captured stays Blizzard's.
+// Successful addon captures are authoritative for the sections they cover.
+// Blizzard fills uncaptured sections; fetch/session timestamps are not proof
+// that an API response contains newer game state. Keep each capture's age visible.
+// Level remains monotonic. Empty legacy talent reads still fall back to Blizzard.
 
 export type Source = { kind: "addon" | "blizzard"; at?: number };
 
@@ -83,7 +64,7 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 	let equipment = c.equipment;
 	let itemLevel = c.averageItemLevel;
 	let gearSource = blizzard;
-	if (snap?.equipment && snap.equipment.capturedAt > blizzardAt) {
+	if (snap?.equipment) {
 		equipment = snap.equipment.items;
 		itemLevel =
 			snap.equipment.averageItemLevel !== undefined
@@ -95,12 +76,11 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 	const fromBlizzard = new Map((c.professions ?? []).map((p) => [p.id, p]));
 	let professions: Profession[] = (c.professions ?? []).map((p) => ({ ...p }));
 	let professionsSource = blizzard;
-	if (snap?.professions && snap.professions.capturedAt > blizzardAt) {
+	if (snap?.professions) {
 		professions = snap.professions.list.map((p) => ({ ...p, knownRecipes: fromBlizzard.get(p.id)?.knownRecipes }));
 		professionsSource = addon(snap.professions.capturedAt);
 	}
 	for (const r of snap?.recipes ?? []) {
-		if (r.capturedAt <= blizzardAt) continue;
 		// A profession no longer known takes its recipes with it.
 		const p = professions.find((x) => x.id === r.professionId);
 		if (!p) continue;
@@ -111,18 +91,14 @@ export function mergeProfile(c: Character, snap: Snapshot | null | undefined) {
 	let talentTrees = c.talentTrees;
 	let talentSource: Source = { kind: "blizzard", at: c.profileSyncedAt };
 	const blizzardHasTalents = (c.talentTrees ?? []).some((t) => t.points > 0);
-	if (
-		snap &&
-		snap.capturedAt > (c.talentsChangedAt ?? c.profileSyncedAt ?? 0) &&
-		(snap.talentTrees.length > 0 || !blizzardHasTalents)
-	) {
+	if (snap && (snap.talentTrees.length > 0 || !blizzardHasTalents)) {
 		talentTrees = snap.talentTrees;
 		talentSource = addon(snap.capturedAt);
 	}
 
 	let quests: QuestProgress[] | undefined = c.quests?.ids.map((id) => ({ id }));
 	let questsSource: Source | undefined = c.quests ? blizzard : undefined;
-	if (snap?.quests && snap.quests.capturedAt > blizzardAt) {
+	if (snap?.quests) {
 		quests = snap.quests.list;
 		questsSource = addon(snap.quests.capturedAt);
 	}

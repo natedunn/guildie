@@ -263,3 +263,43 @@ Extend the PC pass: verify sender/recipient orientation in both mail and trade
 reports, exact names in partial and completion feed entries, known character
 links versus an unknown sender's plain name, and repeated uploads from both sides
 without duplicate feed entries or quantity changes.
+
+## Recovery and source precedence (addon 0.18.0)
+
+Successful addon gear, profession, recipe, talent and quest-log captures take
+precedence over Blizzard session/fetch timestamps. Blizzard supplies sections
+never captured; levels use the highest observed value. Empty legacy talent
+captures still fall back to Blizzard when it has spent points. Capture timestamps
+remain unchanged and visible: if addon reporting stops, its last observed state
+may be old, including when playing on another computer without the addon.
+
+Quest history and the current log are reconciled every 60 seconds as well as on
+login/events. Only positive completion confirmations are added. API failures,
+missing bank access and unopened recipe windows retain existing reads.
+
+Delivery reports have stable IDs and are deduplicated server-side. Pending reports
+live in SavedVariables separately from the 200-event transmission window. They
+are removed only when the downloaded per-character delivery IDs acknowledge
+server ingestion, loaded on login/reload. This acknowledges durable ingestion
+and scheduled processing, not request fulfillment. More than 200 pending events
+advance in batches across reloads. Server matching still refuses ambiguous,
+expired (over 30 days), or no-longer-active requests; manual completion remains
+available. No claim of guaranteed automatic matching is made.
+
+The desktop app commits complete live snapshots to `sync-outbox` under userData
+before uploading, scoped by a hash of site and token. Atomic replacement and
+file flushing protect received captures across normal shutdown/app crashes.
+Compaction removes an older snapshot only when a newer one covers its characters,
+section timestamps and event IDs. Only wholly accepted uploads remove queued
+snapshots; failed/partial uploads retry. Explicit sign-out/account replacement
+purges the old token's queue; turning off capture does not discard received data.
+The queue has a 64 MiB limit: it refuses new captures with a visible sync issue
+rather than deleting existing pending captures. Rejected captures move to the back of the queue so other characters can
+continue uploading; inspect claims/addon version to resolve persistent failures.
+
+The HUD banner now appears only for a local encoding error or stalled pixel
+output, remains dismissible, and is not driven by cached server comparisons.
+Status retains comparison details; app Settings → Addon shows upload/storage
+errors. The addon cannot detect external occlusion or confirm live receipt.
+A game crash before transmission or a SavedVariables write can still lose an
+event. Full machine/power-loss durability is not guaranteed.

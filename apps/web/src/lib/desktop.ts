@@ -62,6 +62,7 @@ export type AddonInfo = {
 };
 
 export type DesktopStatus = {
+	syncIssue?: string;
 	livePixelsEnabled?: boolean;
 	livePixelsAvailable?: boolean;
 	livePixels?: "waiting" | "waiting-game" | "searching" | "calibrating" | "receiving" | "stale" | "stopped" | "failed";

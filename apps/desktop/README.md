@@ -232,3 +232,8 @@ verification checklist are in [the experiment guide](../../experiments/live-pixe
 The app owns capture for that run, uses its existing authenticated snapshot uploader,
 and shows capture state in the tray. This does not change the web bridge or enable
 capture in ordinary launches. The legacy standalone experimental addon is not bundled; automatic capture uses the bundled helper.
+
+Live captures are durably queued under userData/sync-outbox before upload, scoped
+to the site and saved token. Normal quit preserves the queue; explicit sign-out
+purges it. Optional status.syncIssue reports upload/storage problems. See
+../../docs/live-sync.md for limits and recovery behavior.

@@ -114,3 +114,17 @@ assert(count() == 4, "retained across reload")
 assert(ns.current().deliveries[1].id == originalId, "reload preserves the deduplication key")
 assert(ns.livePixels.get().enabled ~= true, "reload/logout path stays available without live export")
 print("Delivery capture passed")
+
+-- More than one wire window survives until the server acknowledges each event.
+local c = ns.current()
+GuildieDB.deliveryOutbox = {}
+c.deliveries = {}
+for i = 1, 205 do c.deliveries[i] = {id = "event-" .. i, at = 1} end
+ns.reconcileDeliveries(c)
+assert(#c.deliveries == 200)
+assert(#GuildieDB.deliveryOutbox[c.guid] == 205, "no eviction by age or window size")
+GuildieData = {characters = {[c.name] = {details = {deliveryIds = {"event-1", "event-2"}}}}}
+ns.reconcileDeliveries(c)
+assert(#GuildieDB.deliveryOutbox[c.guid] == 203)
+assert(c.deliveries[1].id == "event-3")
+assert(c.deliveries[200].id == "event-202", "acknowledgements advance wire window")

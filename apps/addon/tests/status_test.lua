@@ -218,8 +218,7 @@ test("pixel enablement cannot hide outdated data; errors and stale comparisons w
     has(w.method:GetText(), "pixel")
     has(w.warning:GetText(), "differs")
     ns.refreshSyncWarning()
-    eq(GuildieSyncWarning:IsShown(), true)
-    has(GuildieSyncWarning.text:GetText(), "unobstructed")
+    eq(GuildieSyncWarning:IsShown(), false, "cached differences are not live failures")
     ns.livePixels.set("enabled", false)
     eq(GuildieSyncWarning:IsShown(), false)
     local stale = S.check(me(), {generatedAt = (NOW - 3600) * 1000, characters = {Lich = entry()}}, GUID, "Lich")
@@ -259,6 +258,9 @@ test("dismissing sync warning persists without disabling export", function()
     local ns = wow.load({db = db, time = NOW, guid = GUID})
     ns.livePixels.set("enabled", true)
     ns.refreshSyncWarning()
+    eq(_G.GuildieSyncWarning:IsShown(), false, "healthy export has no permanent banner")
+    ns.livePixels.health = function() return {enabled = true, error = "Export failed"} end
+    ns.refreshSyncWarning()
     local banner = _G.GuildieSyncWarning
     eq(banner:IsShown(), true)
     banner.close.scripts.OnClick()
@@ -270,6 +272,7 @@ test("dismissing sync warning persists without disabling export", function()
     ns.refreshSyncWarning()
     eq(_G.GuildieSyncWarning:IsShown(), false, "dismissal survives reload")
     ns.settings().showSyncWarning = true
+    ns.livePixels.health = function() return {enabled = true, error = "Export failed"} end
     ns.refreshSyncWarning()
     eq(_G.GuildieSyncWarning:IsShown(), true, "preference restores warning")
     ns.livePixels.set("enabled", false)

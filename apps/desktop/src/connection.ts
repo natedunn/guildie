@@ -5,6 +5,7 @@
 // the pairing flow the helper uses.
 
 import { hostname } from "node:os";
+import { join } from "node:path";
 import {
 	Api,
 	isTokenShaped,
@@ -15,12 +16,13 @@ import {
 	SyncEngine,
 	savedLivePixelsEnabled,
 } from "@guildie/sync";
-import { net } from "electron";
+import { app, net } from "electron";
 import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
 import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
 
 export type Status = {
+	syncIssue?: string;
 	livePixelsEnabled?: boolean;
 	livePixelsAvailable?: boolean;
 	livePixels?: PixelStatus;
@@ -87,17 +89,23 @@ export class Connection {
 		// Electron's network stack: the system's proxy and certificates, and
 		// *.localhost's self-signed certificate (see main.ts).
 		this.api = new Api(origin, saved?.token, (url, init) => net.fetch(url, init));
-		this.sync = new SyncEngine(this.api, settings.wow, {
-			log,
-			onUnauthorized: async () => {
-				await this.disconnect(false);
-				this.onNotice("Guildie", "This computer was disconnected from Guildie. Sign in again to keep uploading.");
+		this.sync = new SyncEngine(
+			this.api,
+			settings.wow,
+			{
+				log,
+				onUnauthorized: async () => {
+					await this.disconnect(false);
+					this.onNotice("Guildie", "This computer was disconnected from Guildie. Sign in again to keep uploading.");
+				},
+				onIssue: () => this.emit(),
+				onUpload: () => this.emit(),
+				onGuildData: () => this.emit(),
+				onUnmatched: (names) =>
+					this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
 			},
-			onUpload: () => this.emit(),
-			onGuildData: () => this.emit(),
-			onUnmatched: (names) =>
-				this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
-		});
+			join(app.getPath("userData"), "sync-outbox"),
+		);
 		if (pixelConfig)
 			this.pixels = new LivePixels(
 				pixelConfig,
@@ -114,6 +122,7 @@ export class Connection {
 
 	get status(): Status {
 		return {
+			syncIssue: this.sync.issue,
 			livePixelsEnabled: this.pixelsEnabled,
 			livePixelsAvailable: !!this.pixels,
 			livePixels: this.pixelStatus,
@@ -168,7 +177,7 @@ export class Connection {
 	stop() {
 		clearInterval(this.timer);
 		this.pixels?.stop();
-		this.sync.reset();
+		this.sync.reset(false);
 	}
 
 	setLivePixels(enabled: unknown) {
@@ -234,6 +243,7 @@ export class Connection {
 		if (token === this.api.token && this.account) return;
 		const me = await new Api(this.origin, token, (url, init) => net.fetch(url, init)).me();
 		if (!me) throw new Error("Guildie didn't accept that token.");
+		this.sync.reset();
 		this.api.token = token;
 		this.account = me.battletag ?? account ?? "you";
 		if (!saveToken(this.origin, token, this.account))
