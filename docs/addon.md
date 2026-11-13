@@ -207,7 +207,7 @@ mounted in `__root.tsx`):
   from the first render when the user agent says so, and once mounted when only
   the bridge does (app builds before 0.2).
 
-## Guild data in game (requests, reagent and gear-upgrade tooltips)
+## Guild data in game (requests, recipe, reagent and gear-upgrade tooltips)
 
 The other direction: the helper downloads `GET /api/helper/guild-data` every
 15 minutes (and on connect, on "Upload now", and right after any upload the
@@ -231,7 +231,7 @@ your last login or reload.
 - Tooltips end with a Guildie block: a blank line, a gold "Guildie" header
   with the addon's icon, then one indented row per person, in two columns:
   the class-colored name, and what Guildie knows in muted grey. Requests
-  first, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
+  first, then recipe items, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
   so other addons' lines (added at load) come before the block. Reagent
   rows, skipping your own characters, up to 8 (all the site sends):
   "Brenna | might want (Tailoring, Alchemy)", then "+2 more". With "Say
@@ -264,8 +264,45 @@ your last login or reload.
   date with Guildie". About 0.5 KB per character.
 - Guild requests (addon 0.8.0): `requests` and `myRequests`; see "Guild
   requests".
+- Recipe items (addon 0.14.0): `recipes`; see "Recipe items".
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.
+
+## Recipe items
+
+Is a pattern (plans, formula, schematic...) worth sending someone? For each
+guild character with its profession, one of four states, most useful first:
+**can learn it** now, **later** (skill below what it needs), **has one**
+already (in bags or bank, not learned), or **knows it**. The rule is
+`apps/web/convex/shared/recipeStatus.ts` (tested), mirrored in
+`Guildie/Tooltip.lua` `recipeRows` (`tests/recipes_test.lua`).
+
+- **Catalog:** `recipeItems` (`apps/web/convex/recipeItems.ts`), weekly after
+  the recipe catalog: Blizzard's item search for item class 9 (paged by id,
+  the search caps at 1,000; "Book" class tomes skipped), then each item for
+  its skill requirement (`preview_item.requirements.skill`: profession id and
+  level) and what it teaches. Matched to `recipes` by the crafted item
+  (`preview_item.recipe.item`) within the profession, else by name
+  ("Formula: Enchant Bracer - Minor Health" or the item's spell name against
+  the recipe name). Unmatched items are kept without `recipeId` and not shown.
+- **Known recipes and skill:** the merged profile (Blizzard plus newer addon
+  reads), as everywhere else.
+- **Has one:** the one part of a character's bags and bank guildmates see:
+  recipe items for a profession they have that they haven't learned
+  (`heldUnlearned`). Members of the guild only; nothing else in their
+  inventory is shared.
+- **On the site:** the item panel's "Who can learn it" (guild pages), the
+  Crafting page's "Who can learn" tab (`crafting.guildRecipeItems`, search by
+  name, "Only ones someone needs" on by default), and under recipe items on
+  Inventory (across the player's guilds, their own characters included).
+- **In game:** `recipes = { items = { [itemId] = { profession, skill (0:
+  unknown), recipeId } }, crafters = { { name, classId, skills = {
+  Tailoring = 120 } (-1: unknown), known = { recipeIds it teaches },
+  has = { itemIds } } } }`. Rows: "Cy | can learn it", "Bo | at 25 (has 5)",
+  "Di | has one already" (up to 8, then "+N more could use it"), then "Known
+  by Ada, Ben, Cat +2". The character you're on is left out (the game's own
+  tooltip says "Already known" or the requirement in red); your other
+  characters are listed. Nothing for recipe items that bind on pickup.
 
 ## Up to date with Guildie
 

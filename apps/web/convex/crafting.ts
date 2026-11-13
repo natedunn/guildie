@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type QueryCtx, query } from "./_generated/server";
 import { access, itemRow } from "./guilds";
 import { pickProfile } from "./helper";
+import { learners, recipeItem, recipeItemsFor } from "./recipeItems";
 import { activeIn, membership } from "./requests";
 import { vRegion } from "./schema";
 import { type ItemInfo, itemInfoFromTooltip, untradeable } from "./shared/itemInfo";
@@ -118,6 +119,55 @@ export const guildCrafting = query({
 			out.push({ ...(await recipeView(ctx, recipe, items)), crafters: who });
 		}
 		return out.sort((a, b) => a.profession.localeCompare(b.profession) || a.name.localeCompare(b.name));
+	},
+});
+
+/**
+ * Recipe items (patterns, plans, formulas...) for the professions the guild
+ * has, each with who has the profession and where they stand: could learn it
+ * now, later (skill too low), already has one, or knows it. Characters come
+ * once (`characters`); rows point into it. "Has one" reads members' bags, so
+ * only members see it.
+ */
+export const guildRecipeItems = query({
+	args: { region: vRegion, slug: v.string() },
+	handler: async (ctx, { region, slug }) => {
+		const guild = await guildByKey(ctx, region, slug);
+		if (!guild) return null;
+		const allowed = await access(ctx, guild);
+		if (!allowed.canView) return null;
+		const members = await ctx.db
+			.query("characters")
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
+			.collect();
+		const professions = (await Promise.all(members.map((m) => pickProfile(ctx, m)))).map((p) => p.professions);
+		const items = await recipeItemsFor(
+			ctx,
+			professions.flatMap((list) => list.map((p) => p.id)),
+		);
+		const who = await learners(ctx, members, professions, items, allowed.isMember);
+		const index = new Map(members.map((m, i) => [m.slug, i]));
+		return {
+			characters: members.map((m) => ({ name: m.name, slug: m.slug, classId: m.classId })),
+			items: items
+				.map((item) => ({
+					itemId: item.itemId,
+					name: item.name,
+					quality: item.quality,
+					icon: item.icon,
+					profession: item.profession,
+					skill: item.skill,
+					who: (who.get(item.itemId) ?? []).map((l) => ({
+						i: index.get(l.slug) as number,
+						state: l.state,
+						skill: l.skill,
+					})),
+				}))
+				.sort(
+					(a, b) =>
+						a.profession.localeCompare(b.profession) || (a.skill ?? 0) - (b.skill ?? 0) || a.name.localeCompare(b.name),
+				),
+		};
 	},
 });
 
@@ -435,7 +485,8 @@ export const itemDetail = query({
 				.first();
 			guild = character ? await ctx.db.get(character.guildId) : null;
 		}
-		if (guild && !(await access(ctx, guild)).canView) guild = null;
+		const allowed = guild ? await access(ctx, guild) : null;
+		if (guild && !allowed?.canView) guild = null;
 		const members = guild
 			? await ctx.db
 					.query("characters")
@@ -477,8 +528,29 @@ export const itemDetail = query({
 		}
 		usedIn.sort((a, b) => a.profession.localeCompare(b.profession) || a.name.localeCompare(b.name));
 
+		// A pattern, plans, formula...: who in the guild could use it.
+		const taught = await recipeItem(ctx, itemId);
+		let learn = null;
+		if (taught && guild) {
+			const who = await learners(
+				ctx,
+				members,
+				profiles.map((p) => p.professions),
+				[taught],
+				!!allowed?.isMember,
+			);
+			const recipe = await recipeRow(ctx, taught.recipeId);
+			learn = {
+				profession: taught.profession,
+				skill: taught.skill,
+				recipeName: recipe?.name,
+				who: who.get(itemId) ?? [],
+			};
+		}
+
 		return {
 			itemId,
+			learn,
 			item: item
 				? { name: item.name, quality: item.quality, icon: item.icon, kind: item.kind, tooltip: item.tooltip }
 				: null,

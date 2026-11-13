@@ -9,6 +9,7 @@ import { Link, useNavigate, useRouterState, useSearch } from "@tanstack/react-ro
 import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
+import { LearnerList } from "@/components/recipe-learners";
 import { RequestButton, RequestRow } from "@/components/requests";
 import { buttonVariants } from "@/components/ui/button";
 import { UpgradeWhy } from "@/components/upgrade-why";
@@ -17,8 +18,9 @@ import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
 // The item panel: click any item and it slides in from the right over the
 // page you're on (`?item=<id>`, so Back closes it). What the item is, who in
-// the guild can make it, who it might be an upgrade for, and what it's used
-// for, and the guild's requests for it (members); Wowhead is one click on.
+// the guild can make it, who it might be an upgrade for, who could learn it
+// (recipe items), and what it's used for, and the guild's requests for it
+// (members); Wowhead is one click on.
 
 /** The guild the page is about, so the panel can list its crafters. */
 function useGuildContext() {
@@ -103,6 +105,31 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 					<div className="item-tooltip rounded-md border px-3 py-2">
 						<ItemTooltipBody item={{ itemId, name: item.name, quality: item.quality, tooltip: item.tooltip }} />
 					</div>
+				)}
+
+				{data?.learn && data.guild && (
+					<Section title="Who can learn it">
+						{data.learn.who.length === 0 ? (
+							<p className="text-[13px] text-muted-foreground">
+								Nobody in {data.guild.name} has {data.learn.profession}.
+							</p>
+						) : (
+							<LearnerList
+								who={data.learn.who.map((w) => ({
+									...w,
+									mine: member?.characters.some((c) => c.slug === w.slug),
+								}))}
+								region={data.guild.region}
+								profession={data.learn.profession}
+								need={data.learn.skill}
+							/>
+						)}
+						<p className="text-xs text-muted-foreground">
+							Teaches {data.learn.recipeName ?? "a recipe"}
+							{data.learn.skill ? ` at ${data.learn.profession} ${data.learn.skill}` : ""}. From what Guildie last read
+							of their professions{member ? " and bags" : ""}.
+						</p>
+					</Section>
 				)}
 
 				{member && (

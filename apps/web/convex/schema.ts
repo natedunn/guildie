@@ -403,6 +403,28 @@ export default defineSchema({
 		.searchIndex("search_name", { searchField: "name" }),
 
 	/**
+	 * Recipe items (patterns, plans, formulas...) and what they teach, from
+	 * Blizzard's static data (recipeItems.ts, weekly after the recipes).
+	 * `recipeId`: the recipe in `recipes` it teaches, unset when we couldn't
+	 * match it. `skill`: the profession skill it needs to learn.
+	 */
+	recipeItems: defineTable({
+		itemId: v.number(),
+		name: v.string(),
+		/** Blizzard's quality type ("UNCOMMON") and icon URL, so lists need no items lookups. */
+		quality: v.string(),
+		icon: v.optional(v.string()),
+		professionId: v.number(),
+		profession: v.string(),
+		skill: v.optional(v.number()),
+		recipeId: v.optional(v.number()),
+		syncedAt: v.number(),
+	})
+		.index("by_itemId", ["itemId"])
+		.index("by_recipeId", ["recipeId"])
+		.index("by_professionId", ["professionId"]),
+
+	/**
 	 * Forever items we show: equipped gear, crafted items and reagents. Name,
 	 * quality, icon and tooltip from Blizzard's static data (items.ts).
 	 */
@@ -544,7 +566,9 @@ export default defineSchema({
 	 * Each character's bags and last bank read, from the Guildie addon (payload
 	 * version 3). Private: only its own player sees it (Inventory,
 	 * convex/inventory.ts), and it tells them, for their own craft requests,
-	 * whether they have the reagents (convex/requests.ts). Item id → count.
+	 * whether they have the reagents (convex/requests.ts). The one thing
+	 * guildmates see: recipe items held unlearned for a profession the
+	 * character has (recipeItems.ts heldUnlearned). Item id → count.
 	 */
 	inventories: defineTable({
 		userId: v.id("users"),
