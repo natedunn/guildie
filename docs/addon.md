@@ -101,6 +101,7 @@ used); the account page lists them with Disconnect.
     "xp": 1200, "xpMax": 15000, "classToken": "PRIEST", "raceToken": "NightElf",
     "capturedAt": 1794336950,                 // game server time, seconds
     "levelAt": 1794330000,                    // optional: when `level` was reached (seen in game)
+    "talentsAt": 1794330000,                  // optional (0.19+): when `talents` were last read; a failed read keeps both
     "guild": { "name": "Unbound", "rank": "Member", "rankIndex": 5 },
     "talents": [ { "id": 134214, "rank": 5, "name": "Wand Specialization" } ],
     "equipment": {
@@ -360,40 +361,69 @@ by the GUID's id, else by name, and compares it with its last read:
 - Recipes: for professions whose window was read, more than Guildie's count
   ("4 new Tailoring recipes"); fewer is a filtered window, not news.
 
-States: "Up to date with Guildie", "N changes not on Guildie yet:" and the
-lines, "Guildie doesn't know this character yet" (no entry: not claimed, or
-not synced yet), "No data from the Guildie app yet" (no `GuildieData`).
-What happens next depends on whether anything changed since this UI loaded:
-if so it uploads at logout or `/reload`; if not, the game already wrote it at
-the last `/reload` and the app uploads it, but `GuildieData.lua` was read
-before that, so the window catches up at the next `/reload`.
+The window's answer (`S.summary`), worded around what the addon can know
+(`GuildieData.lua` only refreshes at login or `/reload`):
+
+- "Waiting for the Guildie app" (no `GuildieData`), "Not on Guildie yet" (no
+  entry: not claimed, or not synced yet).
+- With live sync on, a live problem first ("Live sync stopped/paused/waiting"
+  with its fix). Otherwise changes since the last reload are "Live sync on":
+  the app picks them up as you play, and the window confirms them at reload.
+- With reload sync: "N changes to upload" (changed since this UI loaded; they
+  upload at logout or `/reload`), or "Saved for upload" (the last `/reload`
+  wrote them for the app, but `GuildieData.lua` was read before that).
+- "Up to date", or "Check not loaded" when the comparison is old or incomplete.
+
+The changes themselves are under Show details (open when there's a problem).
 
 ## Which data wins
 
-Per character and per part, newest wins (`convex/profile.ts`, used by the
-roster, the character pages, guild crafting, item panels and the addon's
-guild data). Blizzard's profile describes the character as of their last
-session, so its time is `lastLoginAt`:
+Per character and per part, one rule (`decide` in `convex/profile.ts`, used
+by the roster, the character pages, guild crafting, item panels and the
+addon's guild data). Blizzard's profile describes the character as of their
+last session, so its time is `lastLoginAt`:
 
-- Level: the higher of the two (levels never drop; `lastLoginAt` is the start
-  of the session, so a level gained later in it can be Blizzard's).
-- Gear and item level, the profession list with skill: the addon's while its
-  read is newer than `lastLoginAt`.
-- Known recipes, per profession: the addon's read while newer, added to
-  Blizzard's list (recipes are only lost with the profession). A profession
-  no longer known shows none.
-- Quests in progress: the addon's quest log while newer than `lastLoginAt`,
-  else Blizzard's list (ids only).
-- Talents: the addon's while newer than the last time Blizzard's talents
-  changed (`talentsChangedAt`, set by the hourly sync); an empty list from the
-  addon doesn't replace Blizzard's points.
-- Anything the addon never read stays Blizzard's.
+- Gear (and item level), talents, the profession list with skill, the quest
+  log: if only one source has the part, that one. If both do, the newer: the
+  addon's read time for that part (talents: `talentsAt`, which a failed read
+  doesn't move) against the `lastLoginAt` of the sync that last fetched that
+  part from Blizzard (`characters.blizzardAt`; a part whose fetch failed
+  keeps its older time).
+- Empty (no gear, no talent points, no professions, an empty quest log) shows
+  only when both sources say empty. Either can come back empty by mistake:
+  Forever's `GetProfessions` returns nothing right after login and at logout,
+  and Blizzard has empty responses. So one empty source never hides the
+  other's data, and a real removal (unlearning, a respec, abandoning quests)
+  shows once Blizzard agrees, after the player logs out and the next sync.
+- Under level 10 Blizzard has no profile, so everything is the addon's (the
+  character page says so).
+- Known recipes: Blizzard's and the addon's together, per profession in the
+  list shown (recipes are only lost with the profession). Both writers only
+  add: an upload adds a read's recipes to the stored ones, and a Blizzard
+  sync adds to the recipes earlier syncs listed. The profile drops them only
+  with their profession.
+- Turned-in quests: everything either source has seen (both lists only grow).
+- Level: the higher of the two (levels never drop).
 
-So: no addon, Blizzard's data as before. `/reload` after a level, a gear
-swap or opening a profession: the game's (the pages say "From the game, 5
-minutes ago"; the roster's Last synced shows the controller icon and the
-newest in-game time). Play elsewhere without the app and log out: Blizzard's
-is newer and takes over.
+Both sides also protect against failed reads before they reach the rule: the
+addon never replaces a non-empty profession list with an empty one (and reads
+again 5 seconds after login), and the upload keeps the stored list when an
+older addon sends an empty one. The in-game status window compares with the
+quest log Guildie shows (`questsFrom`: Blizzard's has ids only, so only ids
+are compared).
+
+Checking it: `profile.test.ts` runs every part through every case (missing,
+empty, older, newer, from either source). Maintainers see a "Data sources"
+panel at the bottom of each character page (Battle.net account ids in the
+`MAINTAINER_BATTLENET_IDS` Convex env var, comma-separated; everyone on a
+local backend), and after a deploy:
+
+```sh
+npx convex run sources:audit --deployment <name>   # pass continueCursor back to page
+```
+
+lists characters that show empty while a source has data (should never
+happen) and parts where one source is empty and the other isn't.
 
 Addon data is player-provided; Blizzard's can't be edited by the player.
 

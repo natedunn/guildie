@@ -109,6 +109,7 @@ test("server comparison includes actual inventory, quest and accepted delivery d
 		bags: [{ id: 4306, count: 7 }],
 		bank: [],
 		quests: [{ id: 1, complete: true }],
+		questsFrom: "game",
 		completedQuestIds: [2],
 		deliveryIds: ["event1"],
 	});

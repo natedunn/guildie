@@ -6,7 +6,7 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
-import { mergeProfile, type Profession } from "./profile";
+import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -202,6 +202,7 @@ export const ingest = mutation({
 							raceToken: c.raceToken,
 							guild: c.guild,
 							talentTrees: await treesFromRanks(ctx, c.talents),
+							talentsCapturedAt: c.talentsAt,
 						}
 					: {
 							capturedAt: existing.capturedAt,
@@ -213,6 +214,7 @@ export const ingest = mutation({
 							raceToken: existing.raceToken,
 							guild: existing.guild,
 							talentTrees: existing.talentTrees,
+							talentsCapturedAt: existing.talentsCapturedAt,
 						};
 
 			const incomingGear: SnapshotFields["equipment"] = c.equipment && {
@@ -225,12 +227,20 @@ export const ingest = mutation({
 				capturedAt: c.professions.capturedAt,
 				list: c.professions.list,
 			};
-			const professions = newer(incomingProfessions, existing?.professions);
+			// An empty list never replaces a non-empty one: in game it's more
+			// likely a read before the data loaded (Forever's GetProfessions
+			// returns nothing right after login, and older addons sent that).
+			// The site shows Blizzard's when only one source is empty (profile.ts).
+			const professions =
+				incomingProfessions && incomingProfessions.list.length === 0 && existing?.professions?.list.length
+					? existing.professions
+					: newer(incomingProfessions, existing?.professions);
 			const proficiencies = newer(c.proficiencies, existing?.proficiencies);
 			const quests = newer(c.quests, existing?.quests);
 
-			// Known recipes, per profession: the newer read, matched to the catalog
-			// (an unchanged read keeps its earlier match).
+			// Known recipes, per profession: the newer read matched to the catalog
+			// (an unchanged read keeps its earlier match), added to what we had:
+			// recipes only grow, so a partial or empty read can't take any away.
 			const recipes = new Map((existing?.recipes ?? []).map((r) => [r.professionId, r]));
 			for (const r of c.recipes) {
 				const before = recipes.get(r.professionId);
@@ -242,14 +252,18 @@ export const ingest = mutation({
 					professionId: r.professionId,
 					profession: r.profession,
 					capturedAt: r.capturedAt,
-					recipeIds,
+					recipeIds: addRecipes(before?.recipeIds, recipeIds),
 					count: r.known.length,
 					unmatched: missing,
 				});
 			}
-			// Professions the character no longer has take their recipes with them.
-			const keptRecipes = [...recipes.values()].filter(
-				(r) => !professions || professions.list.some((p) => p.id === r.professionId),
+			// Recipes stay until both sources say their profession is gone (an
+			// empty or failed profession read deletes nothing); the profile shows
+			// them only for professions in the list it shows (profile.ts).
+			const keptRecipes = dropGoneRecipes(
+				[...recipes.values()],
+				professions?.list.map((p) => p.id),
+				character?.professions?.map((p) => p.id),
 			);
 
 			const snapshot: SnapshotFields = {

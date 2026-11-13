@@ -53,11 +53,16 @@ local function inventoryKey(items)
     table.sort(parts)
     return table.concat(parts, ",")
 end
-local function questKey(quests)
+--- `idsOnly`: Guildie shows Blizzard's quest list (ids, no progress), so
+--- only which quests are in the log can be compared.
+local function questKey(quests, idsOnly)
     local parts = {}
     for _, q in ipairs(quests or {}) do
-        local value = q.id .. ":" .. tostring(q.complete == true) .. ":" .. tostring(q.failed == true)
-        for _, o in ipairs(q.objectives or {}) do value = value .. ":" .. tostring(o.done == true) .. ":" .. (o.text or "") end
+        local value = tostring(q.id)
+        if not idsOnly then
+            value = value .. ":" .. tostring(q.complete == true) .. ":" .. tostring(q.failed == true)
+            for _, o in ipairs(q.objectives or {}) do value = value .. ":" .. tostring(o.done == true) .. ":" .. (o.text or "") end
+        end
         parts[#parts + 1] = value
     end
     table.sort(parts)
@@ -157,7 +162,10 @@ function S.compare(me, entry)
             add(part == "bags" and "Bag contents changed" or "Bank contents changed")
         end
     end
-    if me.quests and details.quests and questKey(me.quests.list) ~= questKey(details.quests) then add("Quest log changed") end
+    local idsOnly = details.questsFrom == "blizzard"
+    if me.quests and details.quests and questKey(me.quests.list, idsOnly) ~= questKey(details.quests, idsOnly) then
+        add("Quest log changed")
+    end
     local completions = details.completedQuestIds and missing(me.completedQuestIds, details.completedQuestIds) or 0
     if completions > 0 then add(plural(completions, "quest completion") .. " awaiting confirmation") end
     local deliveries = details.deliveryIds and missing(me.deliveries, details.deliveryIds, function(e) return e.id end) or 0
@@ -199,30 +207,62 @@ function S.syncedText(entry, now)
         synced.from == "game" and "the game" or "Blizzard")
 end
 
---- One line for the minimap button's tooltip.
-function S.headline(result)
-    if result.state == "behind" then
-        return plural(#result.changes, "change") .. " since the last Guildie update"
-    elseif result.state == "current" then
-        return "Matches the last Guildie update"
-    elseif result.state == "unverified" then
-        return "Sync status needs verification"
-    elseif result.state == "unknown" then
-        return "Guildie doesn't know this character yet"
+--- Live sync's own problem, if any (from LivePixels health): what's wrong
+--- and the one thing to do about it. nil when it's running fine or off.
+function S.liveProblem(health)
+    if not health or not health.enabled then return nil end
+    if health.error then return { title = "Live sync stopped", body = health.error } end
+    if health.editing then
+        return { title = "Live sync paused", body = "Close Edit Mode to resume. The square doesn't send while you move it." }
     end
-    return "No data from the Guildie app yet"
+    if not health.hasData then
+        return { title = "Live sync waiting", body = "Nothing to send until your character has loaded. Reload if this doesn't clear." }
+    end
+    if health.stalled then
+        return { title = "Live sync stopped", body = "The square stopped updating. Make sure it's on screen and uncovered, or reload to sync instead." }
+    end
 end
 
-
-function S.warning(result, health)
-    if not health.enabled then return nil end
-    if health.error then return health.error end
-    if health.editing then return "Pixel export is paused in Edit Mode. Close Edit Mode to resume." end
-    if not health.hasData then return "No character data is available to export yet. Reload after the character has loaded." end
-    if health.stalled then return "Pixel output has stopped updating. Check the square and use reload/logout sync if needed." end
-    if health.cycleSeconds and health.cycleSeconds > 30 then
-        return string.format("A full data cycle takes about %d seconds. Keep the entire square uncovered; check the app for incomplete captures.", health.cycleSeconds)
+--- The answer the Status page and the minimap tooltip give: one tone
+--- ("ok", "info", "wait", "problem"), a title, one sentence, and whether
+--- Save & reload is the thing to do. Worded around what the addon can know:
+--- Guildie's side (GuildieData.lua) only refreshes at login or reload, so with
+--- live sync on, changes since then are sent, not missing.
+---   result: S.check(...); health: ns.livePixels.health(); dirty: anything
+---   changed since this UI loaded.
+function S.summary(result, health, dirty)
+    local live = health and health.enabled
+    local problem = S.liveProblem(health)
+    if result.state == "nodata" then
+        return { tone = "wait", title = "Waiting for the Guildie app",
+            body = "Open the Guildie app and sign in, then reload to load your guild's data." }
+    elseif result.state == "unknown" then
+        return { tone = "info", title = "Not on Guildie yet",
+            body = "Claim this character on guildie.club with the Guildie app running. It shows here after your next reload." }
     end
-    if result.state == "behind" then return "Local data differs from the last server update. Live receipt cannot be verified here; check the app." end
-    if result.state ~= "current" then return "No recent matching server data is available. Check the app, then reload to refresh this comparison." end
+    if problem then return { tone = "problem", title = problem.title, body = problem.body, reload = true } end
+    if result.state == "current" then
+        return { tone = "ok", title = "Up to date",
+            body = live and "Guildie matches your character. Live sync sends new changes as you play."
+                or "Guildie matches your character. New changes upload when you reload or log out." }
+    elseif result.state == "unverified" then
+        return { tone = "info", title = "Check not loaded",
+            body = "This window's copy of Guildie's data is old or incomplete. Reload to refresh it.", reload = true }
+    end
+    -- Behind: changes since Guildie's copy was loaded.
+    local n = #result.changes
+    if live then
+        return { tone = "ok", title = "Live sync on",
+            body = "The Guildie app picks up your changes as you play. This window confirms them at your next reload." }
+    elseif dirty then
+        return { tone = "wait", title = S.plural(n, "change") .. " to upload",
+            body = "They upload when you reload or log out, with the Guildie app running.", reload = true }
+    end
+    return { tone = "info", title = "Saved for upload",
+        body = "Your last reload saved these for the Guildie app. This window confirms them at your next reload.", reload = true }
+end
+
+--- One line for the minimap button's tooltip.
+function S.headline(result, health, dirty)
+    return S.summary(result, health, dirty).title
 end

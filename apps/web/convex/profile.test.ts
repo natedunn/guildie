@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { averageItemLevel, mergeProfile } from "./profile.ts";
+import {
+	addBlizzardRecipes,
+	addRecipes,
+	auditCharacter,
+	averageItemLevel,
+	blizzardPartTimes,
+	decide,
+	dropGoneRecipes,
+	mergeProfile,
+} from "./profile.ts";
 
 const HOUR = 3600_000;
 const LOGIN = 1_794_261_703_000;
@@ -79,14 +88,35 @@ test("a newer in-game read wins per field", () => {
 	assert.deepEqual(p.synced, { kind: "app", at });
 });
 
-test("later Blizzard timestamps cannot replace successful addon sections", () => {
-	const s = snapshot(LOGIN - HOUR);
-	const p = mergeProfile({ ...blizzard, lastLoginAt: LOGIN + 10 * HOUR, profileSyncedAt: LOGIN + 20 * HOUR }, s);
-	assert.equal(p.equipment?.[0].name, "New Hat");
-	assert.equal(p.talentTrees?.[0].points, 14);
-	assert.equal(p.professions[0].skill, 120);
-	assert.equal(p.sources.gear.at, LOGIN - HOUR, "preserve actual capture age");
+test("Blizzard comes back when it's newer (played without the app since)", () => {
+	const p = mergeProfile(blizzard, { ...snapshot(LOGIN - HOUR), level: 21 });
+	assert.equal(p.level, 22);
+	assert.equal(p.equipment?.[0].name, "Old Hat");
+	assert.equal(p.averageItemLevel, 20);
+	assert.equal(p.talentTrees?.[0].points, 13);
+	// Blizzard's professions, with the game's recipes added (recipes only grow).
+	assert.deepEqual(
+		p.professions.map((x) => [x.name, x.knownRecipes]),
+		[
+			["Tailoring", [10, 11, 12]],
+			["Enchanting", [20, 21]],
+		],
+	);
+	assert.equal(p.sources.professions.kind, "blizzard");
+	assert.equal(p.sources.gear.kind, "blizzard");
+});
+
+test("no professions from the game while Blizzard has some: Blizzard's", () => {
+	const s = { ...snapshot(LOGIN + 3 * HOUR), professions: { capturedAt: LOGIN + 3 * HOUR, list: [] } };
+	const p = mergeProfile(blizzard, s);
+	assert.deepEqual(
+		p.professions.map((x) => x.name),
+		["Tailoring", "Enchanting"],
+	);
+	assert.equal(p.sources.professions.kind, "blizzard");
+	// The game's recipes still add to Blizzard's.
 	assert.deepEqual(p.professions[0].knownRecipes, [10, 11, 12]);
+	assert.deepEqual(p.professions[1].knownRecipes, [20, 21]);
 });
 
 test("no talents from the game while Blizzard has some: Blizzard's", () => {
@@ -155,13 +185,271 @@ test("quests: Blizzard's ids until the game's quest log is newer", () => {
 	assert.deepEqual(newer.quests, log.list);
 	assert.deepEqual(newer.sources.quests, { kind: "addon", at: LOGIN + 3 * HOUR });
 
-	// A later session timestamp cannot undo an observed quest log.
+	// Played without the app and logged out since: Blizzard's again.
 	const older = mergeProfile(withQuests, {
 		...snapshot(LOGIN + 3 * HOUR),
 		quests: { ...log, capturedAt: LOGIN - HOUR },
 	});
-	assert.deepEqual(older.quests, log.list);
+	assert.deepEqual(older.quests, [{ id: 166 }, { id: 214 }]);
+
+	// An empty quest log from the game doesn't hide Blizzard's.
+	const empty = mergeProfile(withQuests, { ...snapshot(LOGIN + 3 * HOUR), quests: { ...log, list: [] } });
+	assert.deepEqual(empty.quests, [{ id: 166 }, { id: 214 }]);
 
 	// Not synced since quests were added: nothing to show yet.
 	assert.equal(mergeProfile(blizzard, null).quests, undefined);
+});
+
+// ---- The rule matrix -------------------------------------------------------
+// Every section goes through `decide`; this covers each case of it, then runs
+// each section through mergeProfile with each case, so no section can drift.
+
+const T = 1_000;
+const cases: {
+	name: string;
+	addon?: { at: number; count: number };
+	blizzard?: { count: number };
+	shown: "addon" | "blizzard" | "none";
+	reason: string;
+}[] = [
+	{ name: "neither", shown: "none", reason: "none" },
+	{ name: "addon only", addon: { at: T, count: 2 }, shown: "addon", reason: "only" },
+	{ name: "addon only, empty (under 10)", addon: { at: T, count: 0 }, shown: "addon", reason: "only" },
+	{ name: "blizzard only", blizzard: { count: 2 }, shown: "blizzard", reason: "only" },
+	{ name: "blizzard only, empty", blizzard: { count: 0 }, shown: "blizzard", reason: "only" },
+	{ name: "addon newer", addon: { at: T + 1, count: 2 }, blizzard: { count: 3 }, shown: "addon", reason: "newer" },
+	{
+		name: "blizzard newer",
+		addon: { at: T - 1, count: 2 },
+		blizzard: { count: 3 },
+		shown: "blizzard",
+		reason: "newer",
+	},
+	{
+		name: "same time: blizzard",
+		addon: { at: T, count: 2 },
+		blizzard: { count: 3 },
+		shown: "blizzard",
+		reason: "newer",
+	},
+	{
+		name: "addon newer but empty",
+		addon: { at: T + 1, count: 0 },
+		blizzard: { count: 3 },
+		shown: "blizzard",
+		reason: "other-empty",
+	},
+	{
+		name: "blizzard newer but empty",
+		addon: { at: T - 1, count: 2 },
+		blizzard: { count: 0 },
+		shown: "addon",
+		reason: "other-empty",
+	},
+	{
+		name: "both empty, addon newer",
+		addon: { at: T + 1, count: 0 },
+		blizzard: { count: 0 },
+		shown: "addon",
+		reason: "both-empty",
+	},
+	{
+		name: "both empty, blizzard newer",
+		addon: { at: T - 1, count: 0 },
+		blizzard: { count: 0 },
+		shown: "blizzard",
+		reason: "both-empty",
+	},
+];
+
+for (const c of cases) {
+	test(`decide: ${c.name}`, () => {
+		const d = decide(c.addon, c.blizzard && { at: T, count: c.blizzard.count }, T);
+		assert.equal(d.shown, c.shown);
+		assert.equal(d.reason, c.reason);
+	});
+}
+
+// Each section built from a case: the addon's and Blizzard's versions with
+// `count` entries, recognisable by their source ("addon"/"blizzard").
+const gearItem = (src: string) => ({
+	slot: "HEAD",
+	itemId: 1,
+	name: src,
+	quality: "COMMON",
+	itemLevel: 10,
+	tooltip: [],
+});
+const profession = (src: string, i: number) => ({
+	id: 100 + i,
+	name: `${src}${i}`,
+	skill: 1,
+	maxSkill: 75,
+	secondary: false,
+});
+const tree = (points: number) => ({ id: 1, name: "Tree", points, talents: [] });
+const sections = {
+	gear: {
+		addon: (n: number, at: number) => ({
+			equipment: { capturedAt: at, items: Array.from({ length: n }, () => gearItem("addon")) },
+		}),
+		blizzard: (n: number) => ({ equipment: Array.from({ length: n }, () => gearItem("blizzard")) }),
+		shown: (p: ReturnType<typeof mergeProfile>) => p.equipment,
+		empty: (v: unknown) => Array.isArray(v) && v.length === 0,
+	},
+	professions: {
+		addon: (n: number, at: number) => ({
+			professions: { capturedAt: at, list: Array.from({ length: n }, (_, i) => profession("addon", i)) },
+		}),
+		blizzard: (n: number) => ({ professions: Array.from({ length: n }, (_, i) => profession("blizzard", i)) }),
+		shown: (p: ReturnType<typeof mergeProfile>) => p.professions,
+		empty: (v: unknown) => Array.isArray(v) && v.length === 0,
+	},
+	talents: {
+		addon: (n: number, at: number) => ({ capturedAt: at, talentTrees: n ? [tree(n)] : [] }),
+		blizzard: (n: number) => ({ talentTrees: n ? [tree(n)] : [] }),
+		shown: (p: ReturnType<typeof mergeProfile>) => p.talentTrees,
+		empty: (v: unknown) => Array.isArray(v) && v.length === 0,
+	},
+	quests: {
+		addon: (n: number, at: number) => ({
+			quests: { capturedAt: at, list: Array.from({ length: n }, (_, i) => ({ id: i + 1, title: "addon" })) },
+		}),
+		blizzard: (n: number) => ({ quests: { syncedAt: T, ids: Array.from({ length: n }, (_, i) => i + 1) } }),
+		shown: (p: ReturnType<typeof mergeProfile>) => p.quests,
+		empty: (v: unknown) => Array.isArray(v) && v.length === 0,
+	},
+} as const;
+
+for (const [section, build] of Object.entries(sections)) {
+	for (const c of cases) {
+		// Talents always come with a snapshot; "no addon" means no snapshot at all.
+		test(`${section}: ${c.name}`, () => {
+			const character = { level: 20, lastLoginAt: T, ...(c.blizzard ? build.blizzard(c.blizzard.count) : {}) };
+			const snap = c.addon
+				? {
+						capturedAt: section === "talents" ? c.addon.at : 0,
+						level: 20,
+						talentTrees: [],
+						...build.addon(c.addon.count, c.addon.at),
+					}
+				: null;
+			const p = mergeProfile(character, snap);
+			const d = p.decisions[section as keyof typeof p.decisions];
+			if (section === "talents" && c.addon === undefined && c.blizzard === undefined) {
+				assert.equal(d.shown, "none");
+				return;
+			}
+			assert.equal(d.shown, c.shown, "decision");
+			const shown = build.shown(p);
+			if (c.shown === "none") return assert.ok(shown === undefined || build.empty(shown));
+			// The shown value is the chosen source's.
+			const expected = c.shown === "addon" ? c.addon!.count : c.blizzard!.count;
+			if (expected === 0) return assert.ok(build.empty(shown) || shown === undefined);
+			const text = JSON.stringify(shown);
+			if (section === "quests" && c.shown === "blizzard") assert.ok(!text.includes("addon"));
+			else if (section === "talents") assert.equal((shown as { points: number }[])[0].points, expected);
+			else assert.ok(text.includes(c.shown) && !text.includes(c.shown === "addon" ? "blizzard" : "addon"));
+			// Never empty while a source has data.
+			const anyData = (c.addon?.count ?? 0) > 0 || (c.blizzard?.count ?? 0) > 0;
+			if (anyData) assert.ok(!build.empty(shown), "an empty source never hides the other's data");
+		});
+	}
+}
+
+test("recipes: union of both sources, kept only for professions shown", () => {
+	const p = mergeProfile(
+		{ ...blizzard, lastLoginAt: LOGIN + 10 * HOUR },
+		{
+			...snapshot(LOGIN),
+			recipes: [
+				{
+					professionId: 197,
+					profession: "Tailoring",
+					capturedAt: LOGIN,
+					recipeIds: [11, 12, 13],
+					count: 3,
+					unmatched: 0,
+				},
+				{ professionId: 999, profession: "Gone", capturedAt: LOGIN, recipeIds: [1], count: 1, unmatched: 0 },
+			],
+		},
+	);
+	// Blizzard newer: Blizzard's list, with the game's recipes added.
+	assert.deepEqual(p.professions.find((x) => x.id === 197)?.knownRecipes, [10, 11, 12, 13]);
+	assert.equal(
+		p.professions.some((x) => x.id === 999),
+		false,
+	);
+});
+
+test("audit: flags one source empty, and is quiet when the sources agree", () => {
+	const clean = auditCharacter({ ...blizzard, slug: "a" }, snapshot(LOGIN + HOUR));
+	assert.deepEqual(clean, []);
+	const s = { ...snapshot(LOGIN + HOUR), professions: { capturedAt: LOGIN + HOUR, list: [] } };
+	const findings = auditCharacter({ ...blizzard, slug: "b" }, s);
+	assert.deepEqual(
+		findings.map((f) => [f.section, f.problem]),
+		[["professions", "addon empty, the other has 2"]],
+	);
+});
+
+// ---- Review fixes: reads in sequence ---------------------------------------
+
+test("recipes in sequence: a partial or empty read never takes recipes away", () => {
+	let stored = addRecipes(undefined, [1, 2, 3]);
+	stored = addRecipes(stored, [2]); // a filtered window
+	stored = addRecipes(stored, []); // an older addon's empty read
+	stored = addRecipes(stored, [4]);
+	assert.deepEqual(stored, [1, 2, 3, 4]);
+
+	// Blizzard: a partial response keeps what earlier syncs listed.
+	const first = addBlizzardRecipes(undefined, [{ id: 171, knownRecipes: [10, 11] }]);
+	const second = addBlizzardRecipes(first, [{ id: 171, knownRecipes: [11, 12] }, { id: 182 }]);
+	assert.deepEqual(second, [
+		{ id: 171, knownRecipes: [10, 11, 12] },
+		{ id: 182, knownRecipes: [] },
+	]);
+});
+
+test("a failed talent read keeps its old time and loses to Blizzard's newer respec", () => {
+	// Talents read at LOGIN - HOUR; later reads failed, so the snapshot is newer
+	// but its talents aren't. Blizzard has the respec from the session after.
+	const s = { ...snapshot(LOGIN + 3 * HOUR), talentsCapturedAt: LOGIN - HOUR };
+	const p = mergeProfile({ ...blizzard, blizzardAt: { talentTrees: LOGIN } }, s);
+	assert.equal(p.talentTrees?.[0].points, 13, "Blizzard's");
+	assert.equal(p.sources.talents.kind, "blizzard");
+	// The same talents read after Blizzard's session: the game's.
+	const fresh = mergeProfile(blizzard, { ...s, talentsCapturedAt: LOGIN + 3 * HOUR });
+	assert.equal(fresh.talentTrees?.[0].points, 14);
+});
+
+test("a Blizzard part whose fetch failed keeps its older time", () => {
+	// Gear fetched at an old login; the latest sync's gear fetch failed.
+	const times = blizzardPartTimes({ equipment: LOGIN - 5 * HOUR }, LOGIN + 5 * HOUR, {
+		equipment: false,
+		professions: true,
+		talentTrees: true,
+		quests: true,
+	});
+	assert.deepEqual(times, {
+		equipment: LOGIN - 5 * HOUR,
+		professions: LOGIN + 5 * HOUR,
+		talentTrees: LOGIN + 5 * HOUR,
+		quests: LOGIN + 5 * HOUR,
+	});
+	// The game's gear, read after that old fetch, wins although lastLoginAt is newer.
+	const p = mergeProfile({ ...blizzard, lastLoginAt: LOGIN + 5 * HOUR, blizzardAt: times }, snapshot(LOGIN));
+	assert.equal(p.equipment?.[0].name, "New Hat");
+	assert.equal(p.sources.gear.kind, "addon");
+	assert.equal(p.sources.professions.kind, "blizzard", "professions were fetched after the read");
+});
+
+test("recipes of a profession both sources say is gone are dropped", () => {
+	const r = [{ professionId: 197 }, { professionId: 333 }];
+	assert.deepEqual(dropGoneRecipes(r, [197], [197]), [{ professionId: 197 }], "unlearned Enchanting");
+	assert.deepEqual(dropGoneRecipes(r, [197], [197, 333]), r, "Blizzard still lists it");
+	assert.deepEqual(dropGoneRecipes(r, [], [197]), r, "an empty read in game decides nothing");
+	assert.deepEqual(dropGoneRecipes(r, undefined, undefined), r);
+	assert.deepEqual(dropGoneRecipes(r, [197], undefined), [{ professionId: 197 }], "under 10: the game decides");
 });

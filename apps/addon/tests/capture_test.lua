@@ -311,6 +311,7 @@ test("a version 1 saved character upgrades and keeps its talents", function()
     local c = payload(state.db).characters[1]
     eq(c.level, 23)
     eq(c.talents[1].id, 134214, "talents kept when they can't be read")
+    eq(c.talentsAt, nil, "and not given a new read time")
     eq(#c.equipment.items, 2)
 end)
 
@@ -367,6 +368,50 @@ test("modern clients: C_TooltipInfo and GetProfessions", function()
     eq(c.professions.skills[1].id, 197, "skill line id")
     eq(c.professions.skills[3].name, "Cooking")
     assert(ns.current())
+end)
+
+test("an empty professions read keeps the last non-empty one", function()
+    local state = lich()
+    wow.load(state)
+    local slots = { 3, nil, nil, nil, 5, nil, 7 }
+    _G.GetProfessions = function() return slots[1], slots[2], slots[3], slots[4], slots[5], slots[6], slots[7] end
+    _G.GetProfessionInfo = function(i)
+        local p = ({ [3] = { "Herbalism", 17, 75, 182 }, [5] = { "Cooking", 1, 75, 185 }, [7] = { "First Aid", 50, 75, 129 } })[i]
+        return p[1], "icon", p[2], p[3], 0, 0, p[4]
+    end
+    wow.fire("PLAYER_ENTERING_WORLD")
+    local c = payload(state.db).characters[1]
+    eq(#c.professions.skills, 3, "all 7 slots read")
+    eq(c.professions.skills[3].name, "First Aid")
+    local at = c.professions.capturedAt
+    -- Not loaded (login or logout): all nil.
+    slots = {}
+    wow.fire("PLAYER_LOGOUT")
+    c = payload(state.db).characters[1]
+    eq(#c.professions.skills, 3)
+    eq(c.professions.capturedAt, at, "the last read keeps its own time")
+end)
+
+test("a character with no professions sends an empty list", function()
+    local state = lich()
+    wow.load(state)
+    _G.GetProfessions = function() return nil, nil, nil, nil, nil, nil, nil end
+    _G.GetProfessionInfo = function() return nil end
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(#payload(state.db).characters[1].professions.skills, 0)
+end)
+
+test("recipes survive an empty profession list", function()
+    local state = lich({ db = { version = 4, characters = { ["Player-4904-004E2B22"] = {
+        guid = "Player-4904-004E2B22", name = "Lich", level = 23, capturedAt = 1,
+        professions = { capturedAt = 1, skills = {} },
+        recipes = { { profession = "Tailoring", capturedAt = 1, known = { { name = "Bolt of Linen Cloth" } } } },
+    } } } })
+    wow.load(state)
+    _G.GetProfessions = function() return nil, nil, nil, nil, nil, nil, nil end
+    _G.GetProfessionInfo = function() return nil end
+    wow.fire("PLAYER_LOGOUT")
+    eq(#payload(state.db).characters[1].recipes, 1)
 end)
 
 test("encoder: escapes, NaN, empty lists", function()

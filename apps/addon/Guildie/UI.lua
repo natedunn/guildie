@@ -9,6 +9,17 @@ local ADDON, ns = ...
 local GOLD = "|cffd9b45a"
 local GREEN = "|cff40e040"
 local GREY = "|cff9d9d9d"
+local RED = "|cffff5a4a"
+local WHITE = "|cffffffff"
+
+-- Each status tone: its title color and the ready-check icon beside it.
+local TONES = {
+    ok = { color = GREEN, icon = "Interface\\RaidFrame\\ReadyCheck-Ready", rgb = { 0.25, 0.88, 0.25 } },
+    info = { color = WHITE, icon = "Interface\\RaidFrame\\ReadyCheck-Waiting", rgb = { 1, 1, 1 } },
+    wait = { color = GOLD, icon = "Interface\\RaidFrame\\ReadyCheck-Waiting", rgb = { 0.85, 0.71, 0.35 } },
+    problem = { color = RED, icon = "Interface\\RaidFrame\\ReadyCheck-NotReady", rgb = { 1, 0.35, 0.29 } },
+}
+ns.TONES = TONES
 local AFK_INTERVAL = 20 * 60 -- seconds between automatic reloads, at most
 
 local function settings() return ns.settings() end
@@ -21,11 +32,11 @@ local function settings() return ns.settings() end
 -- to fit them until it reaches the screen height, keeping the footer visible.
 
 local ICON = "Interface\\AddOns\\Guildie\\icon"
-local WIDTH = 620
+local WIDTH = 540
 local MARGIN = 20
 local TEXT_WIDTH = WIDTH - 2 * MARGIN - 20 -- room for the scrollbar
-local BODY_TOP = 140 -- below the character header
-local FOOTER_HEIGHT = 36
+local BODY_TOP = 96 -- below the character header
+local FOOTER_HEIGHT = 34
 
 local window
 
@@ -123,7 +134,7 @@ local function layout()
     local prev, prevDx = nil, 0
     local height = 0
     for _, row in ipairs(window.rows) do
-        local shown = row.shown ~= false
+        local shown = row.shown ~= false and (not row.visible or row.visible())
         if row.el.SetShown then row.el:SetShown(shown) elseif shown then row.el:Show() else row.el:Hide() end
         if shown then
             local dx = row.dx or 0
@@ -174,56 +185,39 @@ function ns.windowState()
     local me = ns.current()
     local result = ns.status.check(me, GuildieData, UnitGUID("player"), UnitName("player"))
     local now = GetServerTime()
-    local s = { result = result }
+    local health = ns.livePixels.health()
+    local summary = ns.status.summary(result, health, ns.dirty)
+    local tone = TONES[summary.tone] or TONES.info
+    local s = { result = result, summary = summary }
 
     local className = UnitClass("player")
     s.name = classColor(me and me.classToken or select(2, UnitClass("player"))) .. ((me and me.name) or UnitName("player") or "") .. "|r"
     local guild = me and me.guild and me.guild.name
     s.info = string.format("Level %d %s", (me and me.level) or UnitLevel("player") or 0, className or "")
-    s.guild = guild and (GREY .. "<" .. guild .. ">|r") or ""
+        .. (guild and (GREY .. "  \194\183  <" .. guild .. ">|r") or "")
+    s.tone = summary.tone
+    s.icon = tone.icon
+    s.status = tone.color .. summary.title .. "|r"
+    s.body = summary.body
 
+    -- Details: what changed since Guildie's copy loaded, and the times.
     if result.state == "behind" then
-        local n = #result.changes
-        s.status = GOLD .. ns.status.plural(n, "change") .. " since the last Guildie update|r"
         local lines = {}
-        for _, change in ipairs(result.changes) do
-            table.insert(lines, GREY .. "-|r " .. change)
-        end
+        for _, change in ipairs(result.changes) do table.insert(lines, GREY .. "\194\183|r " .. change) end
+        s.changesTitle = health.enabled and "Sent since your last reload" or "Changed since your last reload"
         s.changes = table.concat(lines, "\n")
-    elseif result.state == "current" then
-        s.status = GREEN .. "Matches the last Guildie update|r"
-    elseif result.state == "unverified" then
-        s.status = GOLD .. "Sync status needs verification|r"
-        s.changes = "The loaded server data is old or incomplete. Reload to load the latest comparison, or check the Guildie app."
-    elseif result.state == "unknown" then
-        s.status = GOLD .. "Connect this character|r"
-        s.changes = GREY .. "Claim it on guildie.club (level 10 or higher) with the Guildie app running; it shows here after your next /reload.|r"
-    else
-        s.status = GOLD .. "Waiting for the Guildie app|r"
-        s.changes = GREY .. "Open the Guildie app and sign in, then reload WoW to load your guild's data.|r"
     end
     s.synced = ns.status.syncedText(result.entry, now)
-    if s.synced then s.synced = GREY .. s.synced .. "|r" end
-
-    if result.state == "behind" and not ns.dirty then
-        -- Nothing new since this UI loaded: the game wrote it to disk then and
-        -- the app uploads it, but GuildieData.lua was read before that, so
-        -- this view only catches up at the next /reload.
-        s.next = "Saved at your last /reload for the app to upload. Reload again to refresh this status."
-    elseif result.state == "behind" then
-        s.next = "Reload to save these changes for the Guildie app to upload. Logging out saves them too."
-    else
-        s.next = "Changes save for the app to upload when you log out or reload."
-    end
-
-    s.method = ns.livePixels.get().enabled and "Method: experimental pixel sync" or "Method: reload / logout sync"
-    if ns.livePixels.get().enabled then
-        s.next = "The app can read the square without reloading. This window cannot verify live receipt; its server comparison refreshes at login or reload."
-    end
     s.verified = type(GuildieData) == "table" and GuildieData.generatedAt
-        and ("Server comparison updated " .. ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now))
-        or "No server comparison loaded."
-    s.warning = ns.status.warning(result, ns.livePixels.health())
+        and ("Guildie's copy loaded " .. ns.status.ago(math.floor(GuildieData.generatedAt / 1000), now) .. " (refreshes at reload)")
+        or nil
+    s.method = health.enabled and "Sync method: live (the Guildie app reads the square)" or "Sync method: when you reload or log out"
+    if health.enabled and health.cycleSeconds and health.cycleSeconds > 30 then
+        s.method = s.method .. string.format("\nA full update takes about %d seconds; keep the square uncovered.", health.cycleSeconds)
+    end
+    -- Problems always show their details.
+    s.detailsOpen = summary.tone == "problem" or (window and window.detailsOpen) or false
+    s.reload = summary.reload == true
     return s
 end
 
@@ -232,26 +226,38 @@ local function refresh()
     local s = ns.windowState()
     window.name:SetText(s.name)
     window.info:SetText(s.info)
-    window.guild:SetText(s.guild)
-    setRow(window.status, s.status)
+    window.stateIcon:SetTexture(s.icon)
+    window.status:SetText(s.status)
+    setRow(window.summary, s.body)
+    setRow(window.changesTitle, s.changesTitle and (GOLD .. s.changesTitle .. "|r") or nil)
     setRow(window.changes, s.changes)
-    setRow(window.synced, s.synced)
-    setRow(window.next, s.next)
-    setRow(window.method, s.method)
-    setRow(window.verified, s.verified)
-    setRow(window.warning, s.warning)
+    setRow(window.synced, s.synced and (GREY .. s.synced .. "|r") or nil)
+    setRow(window.verified, s.verified and (GREY .. s.verified .. "|r") or nil)
+    setRow(window.method, s.method and (GREY .. s.method .. "|r") or nil)
+    window.showDetails = s.detailsOpen
+    window.detailsToggle:SetText(s.detailsOpen and "Hide details" or "Show details")
     if window.refreshSettings then window.refreshSettings() end
     local inCombat = InCombatLockdown and InCombatLockdown()
     window.upload:SetEnabled(not inCombat)
-    window.uploadHint:SetText(inCombat and "Available after combat." or "Saves data and refreshes this comparison. Keep the Guildie app running.")
+    window.showUpload = s.reload
+    window.uploadHint:SetText(inCombat and "Available after combat." or "Saves now for the Guildie app; keep it running.")
     layout()
 end
 ns.onCapture = refresh
 
-local function heading(label)
-    local fs = text("GameFontHighlight")
+--- A gold section title with a hairline under it (Settings).
+function ns.sectionTitle(parent, label, width)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetSize(width, 22)
+    local fs = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
     fs:SetText(label)
-    return fs
+    f.text = fs
+    local line = f:CreateTexture(nil, "ARTWORK")
+    line:SetSize(width, 1)
+    line:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+    if line.SetColorTexture then line:SetColorTexture(1, 0.82, 0, 0.18) else line:SetTexture(1, 0.82, 0, 0.18) end
+    return f
 end
 
 local function rule(parent, width)
@@ -259,6 +265,59 @@ local function rule(parent, width)
     line:SetSize(width, 1)
     if line.SetColorTexture then line:SetColorTexture(1, 1, 1, 0.10) else line:SetTexture(1, 1, 1, 0.10) end
     return line
+end
+
+--- Status and Settings tabs: the game's own tabs under the window where the
+--- client has them (the selected one drawn raised), else plain buttons with
+--- the selected one highlighted (never disabled: a disabled button reads as
+--- the unselected one).
+local function buildTabs()
+    window.tabs = {}
+    local keys = { "status", "settings" }
+    local native = type(PanelTemplates_SetTab) == "function" and type(PanelTemplates_SetNumTabs) == "function"
+    local list = {}
+    for i, key in ipairs(keys) do
+        local tab
+        if native then
+            local ok, made = pcall(CreateFrame, "Button", "GuildieWindowTab" .. i, window, "PanelTabButtonTemplate")
+            tab = ok and made or nil
+        end
+        if not tab then
+            native = false
+            tab = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
+            tab:SetSize(110, 24)
+        end
+        if tab.SetID then tab:SetID(i) end
+        tab:SetText(key == "status" and "Status" or "Settings")
+        tab:SetScript("OnClick", function() window:selectPage(key) end)
+        window.tabs[key] = tab
+        list[i] = tab
+    end
+    if native then
+        window.Tabs = list
+        list[1]:SetPoint("TOPLEFT", window, "BOTTOMLEFT", 12, 2)
+        list[2]:SetPoint("TOPLEFT", list[1], "TOPRIGHT", 3, 0)
+        for _, tab in ipairs(list) do
+            if type(PanelTemplates_TabResize) == "function" then pcall(PanelTemplates_TabResize, tab, 0) end
+        end
+        PanelTemplates_SetNumTabs(window, #list)
+    else
+        list[1]:SetPoint("TOPLEFT", window, "BOTTOMLEFT", 12, 0)
+        list[2]:SetPoint("TOPLEFT", list[1], "TOPRIGHT", 6, 0)
+    end
+    window.nativeTabs = native
+    function window:markTab(page)
+        for i, key in ipairs(keys) do
+            local tab = self.tabs[key]
+            if self.nativeTabs then
+                if key == page then PanelTemplates_SetTab(self, i) end
+            else
+                tab:SetEnabled(true)
+                if key == page then tab:LockHighlight() else tab:UnlockHighlight() end
+            end
+            tab.selected = key == page
+        end
+    end
 end
 
 local function buildWindow()
@@ -276,24 +335,20 @@ local function buildWindow()
     window:Hide()
     tinsert(UISpecialFrames, "GuildieWindow") -- Escape closes it
 
-    -- Header: the character, beside the logo.
+    -- Header: the character beside the logo, guild on the same line.
     window.name = window:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    window.name:SetPoint("TOPLEFT", window, "TOPLEFT", headerX, -32)
+    window.name:SetPoint("TOPLEFT", window, "TOPLEFT", headerX, -34)
     window.name:SetJustifyH("LEFT")
-    window.info = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    window.info:SetPoint("TOPLEFT", window.name, "BOTTOMLEFT", 0, -3)
-    window.info:SetJustifyH("LEFT")
     window.name:SetWidth(WIDTH - headerX - MARGIN)
     window.name:SetWordWrap(false)
+    window.info = window:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    window.info:SetPoint("TOPLEFT", window.name, "BOTTOMLEFT", 0, -4)
+    window.info:SetJustifyH("LEFT")
     window.info:SetWidth(WIDTH - headerX - MARGIN)
-    window.guild = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    window.guild:SetPoint("TOPLEFT", window.info, "BOTTOMLEFT", 0, -5)
-    window.guild:SetWidth(WIDTH - headerX - MARGIN)
-    window.guild:SetWordWrap(false)
-    window.guild:SetJustifyH("LEFT")
+    window.info:SetWordWrap(false)
 
     local headerRule = rule(window, WIDTH - 2 * MARGIN)
-    headerRule:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP + 12)
+    headerRule:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN, -BODY_TOP + 10)
     local ok, scroll = pcall(CreateFrame, "ScrollFrame", nil, window, "UIPanelScrollFrameTemplate")
     window.scroll = ok and scroll or CreateFrame("ScrollFrame", nil, window)
     -- Lets the template hide its bar too when the scroll range is 0.
@@ -308,17 +363,24 @@ local function buildWindow()
         local limit = math.max(0, window.body:GetHeight() - self:GetHeight())
         self:SetVerticalScroll(math.max(0, math.min(limit, self:GetVerticalScroll() - delta * 32)))
     end)
+    local page = window.body -- the scroll child the rows live in
+    window.page = "status"
+    window.detailsOpen, window.showDetails, window.showUpload = false, false, false
 
-    window.status = text("GameFontHighlight")
-    window.changes = text("GameFontHighlightSmall")
-    window.synced = text("GameFontHighlightSmall")
-    window.next = text("GameFontHighlightSmall")
-    window.method = text("GameFontHighlight")
-    window.verified = text("GameFontDisableSmall")
-    window.warning = text("GameFontNormal")
+    -- The answer: an icon and a title, then one sentence.
+    local state = CreateFrame("Frame", nil, page)
+    state:SetSize(TEXT_WIDTH, 26)
+    window.stateIcon = state:CreateTexture(nil, "ARTWORK")
+    window.stateIcon:SetSize(22, 22)
+    window.stateIcon:SetPoint("LEFT", state, "LEFT", 0, 0)
+    window.status = state:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    window.status:SetPoint("LEFT", window.stateIcon, "RIGHT", 8, 0)
+    window.status:SetJustifyH("LEFT")
+    window.status:SetWidth(TEXT_WIDTH - 32)
+    window.summary = text("GameFontHighlight")
 
-    local upload = CreateFrame("Button", nil, window.body, "UIPanelButtonTemplate")
-    upload:SetSize(144, 26)
+    local upload = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
+    upload:SetSize(150, 26)
     upload:SetText("Save & reload")
     upload:SetScript("OnClick", function()
         if InCombatLockdown and InCombatLockdown() then return end
@@ -328,47 +390,57 @@ local function buildWindow()
     window.upload = upload
     window.uploadHint = text("GameFontDisableSmall")
 
+    -- Details, collapsed unless something's wrong.
+    local toggle = CreateFrame("Button", nil, page)
+    toggle:SetSize(140, 18)
+    local toggleText = toggle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    toggleText:SetPoint("LEFT", toggle, "LEFT", 0, 0)
+    toggle:SetFontString(toggleText)
+    toggle:SetScript("OnClick", function()
+        window.detailsOpen = not window.showDetails
+        refresh()
+    end)
+    window.detailsToggle = toggle
+    window.changesTitle = text("GameFontNormalSmall")
+    window.changes = text("GameFontHighlightSmall")
+    window.synced = text("GameFontHighlightSmall")
+    window.verified = text("GameFontHighlightSmall")
+    window.method = text("GameFontHighlightSmall")
+
     local footerRule = rule(window, WIDTH - 2 * MARGIN)
     footerRule:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, FOOTER_HEIGHT - 4)
     local foot = window:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     foot:SetPoint("BOTTOMLEFT", window, "BOTTOMLEFT", MARGIN, 12)
-    foot:SetText("Guildie app required \194\183 guildie.club")
+    foot:SetText("Needs the Guildie app \194\183 guildie.club")
 
+    local function details() return window.showDetails end
     window.statusRows = {
-        { el = heading("Character sync"), gap = 0 },
-        { el = window.status, gap = 10 },
-        { el = window.changes, gap = 8 },
-        { el = window.synced, gap = 6 },
-        { el = window.verified, gap = 6 },
-        { el = window.method, gap = 18 },
-        { el = window.next, gap = 8 },
-        { el = window.warning, gap = 12 },
-        { el = upload, gap = 16, height = 26 },
-        { el = window.uploadHint, gap = 6 },
+        { el = state, gap = 0, height = 26 },
+        { el = window.summary, gap = 6 },
+        { el = upload, gap = 14, height = 26, visible = function() return window.showUpload end },
+        { el = window.uploadHint, gap = 4, visible = function() return window.showUpload end },
+        { el = toggle, gap = 16, height = 18 },
+        { el = window.changesTitle, gap = 8, visible = details },
+        { el = window.changes, gap = 4, visible = details },
+        { el = window.synced, gap = 10, visible = details },
+        { el = window.verified, gap = 4, visible = details },
+        { el = window.method, gap = 4, visible = details },
     }
-    window.settingsRows, window.refreshSettings, window.preferences = ns.buildSettingsRows(window.body, TEXT_WIDTH, refresh)
-    window.tabs = {}
-    function window:selectPage(page)
-        self.page = page == "settings" and "settings" or "status"
+    window.settingsRows, window.refreshSettings, window.preferences = ns.buildSettingsRows(page, TEXT_WIDTH, refresh)
+    buildTabs()
+    function window:selectPage(name)
+        self.page = name == "settings" and "settings" or "status"
         for _, list in ipairs({self.statusRows, self.settingsRows}) do
             for _, row in ipairs(list) do row.el:Hide() end
         end
         self.rows = self.page == "status" and self.statusRows or self.settingsRows
         self.scroll:SetVerticalScroll(0)
-        for key, tab in pairs(self.tabs) do tab:SetEnabled(key ~= self.page) end
+        self:markTab(self.page)
         refresh()
     end
-    for i, key in ipairs({"status", "settings"}) do
-        local tab = CreateFrame("Button", nil, window, "UIPanelButtonTemplate")
-        tab:SetPoint("TOPLEFT", window, "TOPLEFT", MARGIN + (i - 1) * 132, -100)
-        tab:SetSize(124, 26)
-        tab:SetText(key == "status" and "Status" or "Settings")
-        tab:SetScript("OnClick", function() window:selectPage(key) end)
-        window.tabs[key] = tab
-    end
-    window.page, window.rows = "status", window.statusRows
+    window.rows = window.statusRows
     for _, row in ipairs(window.settingsRows) do row.el:Hide() end
-    window.tabs.status:SetEnabled(false)
+    window:markTab("status")
     window:SetScript("OnShow", refresh)
 end
 ns.buildWindow = function()
@@ -434,13 +506,11 @@ local function buildButton()
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:AddLine("Guildie")
-        -- The window's headline, and the first few changes.
+        -- The window's answer, and the first few changes.
         local result = ns.status.check(ns.current(), GuildieData, UnitGUID("player"), UnitName("player"))
-        if result.state == "current" then
-            GameTooltip:AddLine(ns.status.headline(result), 0.25, 0.88, 0.25)
-        else
-            GameTooltip:AddLine(ns.status.headline(result), 0.85, 0.71, 0.35)
-        end
+        local summary = ns.status.summary(result, ns.livePixels.health(), ns.dirty)
+        local rgb = (TONES[summary.tone] or TONES.info).rgb
+        GameTooltip:AddLine(summary.title, rgb[1], rgb[2], rgb[3])
         for i, change in ipairs(result.changes) do
             if i > 3 then break end
             GameTooltip:AddLine(change, 1, 1, 1)

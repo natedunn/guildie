@@ -1,9 +1,10 @@
 # Guildie addon
 
-Experimental sync without reloading is configured under **Options → AddOns →
-Guildie**. Export starts off; enabling it is remembered across logins. Choose amber
-(default) or grayscale troubleshooting mode, small or large squares, and move it
-through Edit Mode. After enabling or disabling export, `/reload` saves your choice for the app. The signed-in Windows app captures only while that saved choice is enabled, unless capture was also disabled in its Settings → Addon. See
+Experimental sync without reloading is configured in the Guildie window →
+**Settings** → Sync (Live, as you play). Export starts off; enabling it is
+remembered across logins. Choose amber (default) or grayscale troubleshooting
+mode, small or large squares, and move it to a corner or anywhere in the
+game's own Edit Mode (Escape → Edit Mode; Guildie never opens it itself). After enabling or disabling export, `/reload` saves your choice for the app. The signed-in Windows app captures only while that saved choice is enabled, unless capture was also disabled in its Settings → Addon. See
 [live sync](../../docs/live-sync.md) for setup and current limitations. New files
 in this update require a full game restart.
 
@@ -24,20 +25,23 @@ reload the UI, and the Guildie app, running on the same computer, uploads it the
 - **Minimap button**, addon compartment and `/guildie` open one Guildie window.
   Options → AddOns → Guildie is a logo/name launcher with an **Open Guildie** button.
   Drag the minimap button to reposition it.
-- **Status tab:** only character sync status, actual differences from the loaded
-  server comparison, sync method, warnings, and **Save & reload**. The wider
-  window lists all changes and scrolls only when content exceeds the screen.
-- **Settings tab:** general preferences, then experimental pixel sync, color/size
-  controls, safe corner placement and Edit Mode.
+- **Status tab:** one answer with an icon (`Status.lua` `S.summary`): Up to
+  date, Live sync on, N changes to upload, Saved for upload, a live sync
+  problem with its fix, Check not loaded, Not on Guildie yet, Waiting for the
+  Guildie app. **Save & reload** shows when reloading is the thing to do.
+  Details (what changed since the last reload, times, sync method) are
+  collapsed unless there's a problem.
+- **Settings tab:** sections. Sync: the method (live, or when you reload or
+  log out; reload while AFK only with the latter). Live square (only with
+  live sync): position, size, on-screen warning, grayscale. Display: minimap
+  button, empty tooltip notes. The tabs are the game's own along the bottom
+  edge where the client has them.
 - **Server comparison:** `Status.lua` compares the local character with
-  `GuildieData.characters`, loaded at login/reload. Actual differences take
-  priority regardless of transport. Recent matching data says **Matches the last
-  Guildie update**; old or incomplete comparison data is explicitly unverified.
-  Bags, bank, quests and delivery uploads are included alongside gear,
-  professions and talents. The addon cannot confirm live receipt or detect
-  screen obstruction; the app provides live capture/upload health. Pixel sync
-  shows a dismissible banner only for local export failures or stalled output.
-  Visibility instructions remain in Settings; cached comparisons stay on Status.
+  `GuildieData.characters`, loaded at login/reload. With live sync on, the
+  app uploads changes as you play, but this copy only refreshes at reload, so
+  changes since then read as sent, not missing. The addon can't confirm live
+  receipt itself; the app shows capture and upload health. Pixel sync shows a
+  dismissible banner only for local export failures or stalled output.
 - **Sync while I'm AFK** (off by default, experimental): reloads the UI for
   you while you're flagged AFK and out of combat, if something changed, at most
   every 20 minutes. If the game doesn't allow addons to reload on their own, it

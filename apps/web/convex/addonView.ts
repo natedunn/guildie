@@ -1,6 +1,6 @@
 import type { Doc } from "./_generated/dataModel";
 import { SLOTS } from "./addonPayload.ts";
-import { mergeProfile } from "./profile.ts";
+import { mergeProfile, type Profile } from "./profile.ts";
 
 // What Guildie shows for one of the player's own characters, cut down to what
 // the addon compares with the live game ("3 changes not on Guildie yet").
@@ -27,7 +27,10 @@ export type AddonView = {
 	details?: {
 		bags?: { id: number; count: number }[];
 		bank?: { id: number; count: number }[];
-		quests?: NonNullable<NonNullable<Snapshot>["quests"]>["list"];
+		/** The quest log Guildie shows (profile.ts): the game's, or Blizzard's ids only. */
+		quests?: Profile["quests"];
+		/** Where `quests` came from: Blizzard's has ids only, so the addon compares ids. */
+		questsFrom?: "game" | "blizzard";
 		completedQuestIds?: number[];
 		deliveryIds?: string[];
 	};
@@ -83,7 +86,8 @@ export function addonView(
 		details: {
 			bags: inventory?.bags?.items.map(({ id, count }) => ({ id, count })),
 			bank: inventory?.bank?.items.map(({ id, count }) => ({ id, count })),
-			quests: snapshot?.quests?.list,
+			quests: profile.quests,
+			questsFrom: profile.sources.quests && (profile.sources.quests.kind === "addon" ? "game" : "blizzard"),
 			completedQuestIds: snapshot?.completedQuestIds,
 			deliveryIds: snapshot?.deliveryIds,
 		},
