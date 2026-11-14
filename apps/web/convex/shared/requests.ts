@@ -1,6 +1,8 @@
 // Guild requests: a member asks for an item (reagents and the like) or for a
-// craft; a guildmate claims it, makes the trade or mail happen, and the
-// requester marks it done. An item can instead be asked for as ongoing ("send
+// craft. Item requests aren't claimed: anyone sends some, and the requester's
+// addon counts what arrives and closes it (or the requester marks it done).
+// A craft is claimed by someone who knows the recipe, who makes and sends it,
+// and the requester marks it done. An item can instead be asked for as ongoing ("send
 // me any Silk Cloth you have"): no quantity and no claims, up for 2 weeks to
 // 3 months, then it ends by itself. One active item request per item, of
 // either kind. These are the rules, kept free of Convex imports
@@ -88,6 +90,9 @@ export function check(action: Action, req: RequestLike, actor: Actor): Verdict {
 	if (req.ongoing && action !== "cancel") return no("Ongoing requests aren't claimed. Send any you have.");
 	switch (action) {
 		case "claim":
+			// Old claims on item requests can still be released or marked sent.
+			if (req.kind === "item")
+				return no("Item requests aren't claimed. Send what you have; it counts when it arrives.");
 			if (mine) return no("That's your own request.");
 			if (req.status !== "open") return no("Someone already claimed this.");
 			if (req.kind === "craft" && !actor.knowsRecipe) return no("None of your characters knows this recipe.");

@@ -54,17 +54,24 @@ test("membership: only characters in this guild's roster now count", () => {
 	assert.deepEqual(rosterCharacters([], "g1"), [], "no claimed characters: not a member");
 });
 
-test("claiming: anyone else for items; only knowers for crafts; never your own", () => {
-	assert.ok(ok("claim", req(), MILLER));
-	assert.equal(check("claim", req(), { userId: TODD }).ok, false);
-	assert.deepEqual(check("claim", req(), { userId: TODD }), { ok: false, error: "That's your own request." });
+test("claiming: crafts only, by someone who knows the recipe, never your own", () => {
+	assert.equal(ok("claim", req(), MILLER), false, "item requests aren't claimed");
+	assert.match((check("claim", req(), { userId: MILLER }) as { error: string }).error, /aren't claimed/);
 	const craft = req({ kind: "craft" });
+	assert.deepEqual(check("claim", craft, { userId: TODD, knowsRecipe: true }), {
+		ok: false,
+		error: "That's your own request.",
+	});
 	assert.equal(ok("claim", craft, MILLER, false), false, "doesn't know the recipe");
 	assert.ok(ok("claim", craft, MILLER, true));
-	assert.equal(ok("claim", req({ status: "claimed", claim: { userId: BRENNA } }), MILLER), false, "already claimed");
+	assert.equal(
+		ok("claim", req({ kind: "craft", status: "claimed", claim: { userId: BRENNA } }), MILLER, true),
+		false,
+		"already claimed",
+	);
 });
 
-test("claimed: the claimant marks it sent or releases it; the requester can take it back", () => {
+test("claimed (crafts, and item claims from before): the claimant marks it sent or releases it; the requester can take it back", () => {
 	const claimed = req({ status: "claimed", claim: { userId: MILLER } });
 	assert.ok(ok("markSent", claimed, MILLER));
 	assert.equal(ok("markSent", claimed, TODD), false);

@@ -5,8 +5,8 @@ who's in the guild, their level, class, race, rank, gear, talents,
 professions and recipes, and in game, which guildmates an item would help.
 
 - **The site**, [guildie.club](https://guildie.club): rosters, characters,
-  what the guild can craft, guild requests (ask for reagents or a craft,
-  a guildmate claims it), and who's on which dungeon quest. Your own bags,
+  what the guild can craft, guild requests (ask for reagents, which count
+  as they arrive, or for a craft), and who's on which dungeon quest. Your own bags,
   banks and quest logs in one place. Sign in with Battle.net and claim your
   characters.
 - **The Windows app** ([download](https://github.com/natedunn/guildie/releases/latest)):

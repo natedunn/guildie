@@ -460,17 +460,22 @@ Addon data is player-provided; Blizzard's can't be edited by the player.
 
 ## Guild requests
 
-Members ask the guild for an item or a craft; a guildmate claims it and
-trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
+Members ask the guild for an item or a craft. Items aren't claimed:
+guildmates trade or mail what they have, and the requester's addon counts
+what arrives and closes the request (or the requester marks it done). A craft
+is claimed by someone who knows the recipe, who makes and sends it; the
+requester marks it done (`/g/<region>/<guild>/requests`,
 "Request this" in the item panel, "Request" on Crafting rows). Rules in
 `apps/web/convex/shared/requests.ts` (tested), handlers in
 `apps/web/convex/requests.ts`.
 
 - **Who:** only signed-in members (a claimed character in the guild's roster
   now) see, post, claim or close requests, even in a public guild. Items:
-  any other member can claim. Crafts: only a member with a character that
-  knows the recipe (merged professions, so the addon's recipe reads count).
-- **Lifecycle:** open → claimed → done (the requester; the claimant can mark
+  nobody claims them (claims made before this stay until released or
+  closed). Crafts: only a member with a character that knows the recipe
+  (merged professions, so the addon's recipe reads count).
+- **Lifecycle:** items: open → done (when received reaches the amount, or
+  the requester) or cancelled. Crafts: open → claimed → done (the requester; the claimant can mark
   it sent first) or cancelled (the requester). The claimant, or the
   requester, can release a claim (back to open). 15 open per player per
   guild, quantity 1-1000, note up to 140 characters.
