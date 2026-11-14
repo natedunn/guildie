@@ -32,6 +32,15 @@ export const QUALITY_COLORS: Record<string, string> = {
 export const wowheadItemUrl = (itemId: number) => `https://www.wowhead.com/forever/item=${itemId}`;
 
 /** A square item icon. Common and poor items get a neutral edge, like the game. */
+/**
+ * Enchants make no item, so they have no icon of their own here: they get
+ * the Enchanting profession's (trade_engraving), a Blizzard render.
+ */
+export const ENCHANT_ICON = "https://render.worldofwarcraft.com/forever-us/icons/56/136244.jpg";
+/** A craft with no item: an enchant, by profession or name. */
+export const isEnchant = (craft: { profession?: string; name?: string }) =>
+	craft.profession === "Enchanting" || !!craft.name?.startsWith("Enchant ");
+
 export function ItemIcon({
 	icon,
 	quality,

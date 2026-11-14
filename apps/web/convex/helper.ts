@@ -11,7 +11,7 @@ import { forGame, takeToasts as takeToastsFor } from "./notifications";
 import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
-import { type AddonRequest, addonRequests, refreshMats } from "./requests";
+import { type AddonCraft, type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
@@ -620,6 +620,7 @@ type GuildDataBase = {
 	characters: GuildData["characters"];
 	requests: GuildData["requests"];
 	myRequests: GuildData["myRequests"];
+	crafts: GuildData["crafts"];
 	recipes: GuildData["recipes"];
 	notifications: GuildData["notifications"];
 };
@@ -660,6 +661,12 @@ export type GuildData = {
 	 */
 	requests: Record<string, AddonRequest[]>;
 	myRequests: { open: number; stale: number };
+	/**
+	 * Accepted crafts the player asked for or is making (addon 0.20.0+;
+	 * older addons ignore it): which mail and trades are mats, the crafted
+	 * item or an enchant for them (Deliveries.lua).
+	 */
+	crafts: AddonCraft[];
 	/**
 	 * Recipe items and guild crafters (addon 0.14.0+; older addons ignore
 	 * it): whether a pattern is worth sending someone, judged in game
@@ -783,6 +790,7 @@ export const guildDataBase = internalQuery({
 			characters,
 			requests: requests.byItem,
 			myRequests: requests.mine,
+			crafts: requests.crafts,
 			recipes: packAddonRecipes(addonRecipes(taught, recipeCharacters)),
 			notifications: await forGame(ctx, row.userId),
 		};
@@ -834,6 +842,7 @@ export const guildData = action({
 			characters: base.characters,
 			requests: base.requests,
 			myRequests: base.myRequests,
+			crafts: base.crafts,
 			recipes: base.recipes,
 			notifications: base.notifications,
 		};

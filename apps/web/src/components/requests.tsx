@@ -18,7 +18,7 @@ import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { type ReactNode, useEffect, useState } from "react";
 import { ClassText } from "@/components/class-name";
-import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
+import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/components/item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -452,6 +452,15 @@ function CraftRequestForm({
 	const [note, setNote] = useState("");
 	const [character, setCharacter] = useState(characters[0]?.slug);
 	const [declared, setDeclared] = useState(false);
+	// Who to ask: guildmates who know it, not your own characters; only those on Guildie can answer.
+	const { data: known } = useQuery(
+		convexQuery(api.requests.crafters, { region: guild.region, slug: guild.slug, recipeId: target.recipeId }),
+	);
+	const crafters = known ?? [];
+	const askable = crafters.filter((c) => c.onGuildie);
+	const [picked, setCrafter] = useState<string>();
+	const crafter = picked ?? (askable.length === 1 ? askable[0].slug : undefined);
+	const asked = askable.find((c) => c.slug === crafter);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const q = Math.max(1, Math.min(REQUEST_LIMITS.quantity, Math.floor(Number(quantity)) || 1));
@@ -470,6 +479,7 @@ function CraftRequestForm({
 				note: note.trim() || undefined,
 				character,
 				declared,
+				crafter,
 			});
 			onDone();
 		} catch (err) {
@@ -488,7 +498,12 @@ function CraftRequestForm({
 			}}
 		>
 			<div className="flex items-start gap-3">
-				<ItemIcon icon={target.icon} quality={target.quality} size={36} empty={!target.icon} />
+				<ItemIcon
+					icon={target.icon ?? (isEnchant(target) ? ENCHANT_ICON : undefined)}
+					quality={target.quality}
+					size={36}
+					empty={!target.icon && !isEnchant(target)}
+				/>
 				<div className="min-w-0 flex-1">
 					<Dialog.Title className="text-sm font-semibold">Request a craft</Dialog.Title>
 					<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[target.quality ?? "COMMON"] }}>
@@ -498,17 +513,10 @@ function CraftRequestForm({
 				<CloseButton />
 			</div>
 
-			{target.crafters && target.crafters.length > 0 && (
-				<p className="text-[13px] text-muted-foreground">
-					Can make it:{" "}
-					{target.crafters.slice(0, 5).map((c, i) => (
-						<span key={c.slug}>
-							{i > 0 && ", "}
-							<ClassText classId={c.classId}>{c.name}</ClassText>
-						</span>
-					))}
-					{target.crafters.length > 5 && ` +${target.crafters.length - 5}`}
-				</p>
+			{known === undefined ? (
+				<p className="text-[13px] text-muted-foreground">Finding who can make it…</p>
+			) : (
+				<CrafterPicker crafters={crafters} value={crafter} onChange={setCrafter} />
 			)}
 
 			<AskingAs characters={characters} value={character} onChange={setCharacter} />
@@ -550,7 +558,8 @@ function CraftRequestForm({
 					</label>
 				)}
 				<p className="text-xs text-muted-foreground">
-					Sending the mats to whoever claims it is on you. Guildmates see "
+					Sending the mats is on you, once {asked ? `${asked.name} accepts` : "they accept"}. With the Guildie app, what
+					arrives shows on the request. {asked ? `${asked.name} sees` : "They see"} "
 					{matsLabel(mats?.covered ? "inventory" : declared ? "declared" : "missing")}", never what's in your bags.
 				</p>
 			</div>
@@ -558,11 +567,52 @@ function CraftRequestForm({
 			{error && <p className="text-[13px] text-destructive">{error}</p>}
 			<div className="flex justify-end gap-2">
 				<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Cancel</Dialog.Close>
-				<Button type="submit" size="sm" disabled={busy}>
-					{busy ? "Posting…" : "Post request"}
+				<Button type="submit" size="sm" disabled={busy || !crafter}>
+					{busy ? "Asking…" : asked ? `Ask ${asked.name}` : "Pick a crafter"}
 				</Button>
 			</div>
 		</form>
+	);
+}
+
+/** Who to ask to craft it: one guildmate who knows the recipe. They accept or decline. */
+export function CrafterPicker({
+	crafters,
+	value,
+	onChange,
+	label = "Ask",
+}: {
+	crafters: (Character & { onGuildie: boolean })[];
+	value: string | undefined;
+	onChange: (slug: string) => void;
+	label?: string;
+}) {
+	if (crafters.length === 0)
+		return <p className="text-[13px] text-muted-foreground">Nobody else in the guild knows this recipe yet.</p>;
+	const askable = crafters.some((c) => c.onGuildie);
+	return (
+		<Field label={label}>
+			<select
+				value={value ?? ""}
+				onChange={(e) => e.target.value && onChange(e.target.value)}
+				className="h-9 w-full rounded-md border bg-well px-2 text-[0.8125rem] pointer-coarse:h-10 pointer-coarse:text-base"
+			>
+				<option value="" disabled>
+					{askable ? "Pick a crafter…" : "Nobody on Guildie knows it"}
+				</option>
+				{crafters.map((c) => (
+					<option key={c.slug} value={c.slug} disabled={!c.onGuildie}>
+						{c.name}
+						{c.onGuildie ? "" : " (not on Guildie yet)"}
+					</option>
+				))}
+			</select>
+			<span className="block text-xs text-muted-foreground">
+				{askable
+					? "They accept or decline; you're told either way. Only guildmates on Guildie can answer."
+					: "Nobody who knows it is on Guildie yet, so nobody could answer. Invite them to Guildie."}
+			</span>
+		</Field>
 	);
 }
 
@@ -596,7 +646,110 @@ const STATUS_LABEL: Record<RequestView["status"], string> = {
 	expired: "Expired",
 };
 
-/** One request with what the viewer can do: claim a craft, release, mark sent; the requester's done, cancel, keep. */
+/** A request's icon: the item's, the Enchanting icon for an enchant, else an empty slot. */
+function RequestIcon({ request: r, size }: { request: RequestView; size: number }) {
+	if (r.item) return <ItemIcon icon={r.item.icon} quality={r.item.quality} size={size} className="block" />;
+	const enchant = !!r.recipe && isEnchant(r.recipe);
+	return <ItemIcon icon={enchant ? ENCHANT_ICON : undefined} size={size} empty={!enchant} className="block" />;
+}
+
+/** After a decline (or no answer, or the crafter backing out): pick someone else in a dialog, like the request form. */
+function AskSomeoneElse({
+	request: r,
+	crafters,
+}: {
+	request: RequestView;
+	crafters: (Character & { onGuildie: boolean })[];
+}) {
+	const act = useMutation(api.requests.act);
+	const [open, setOpen] = useState(false);
+	const [picked, setPicked] = useState<string>();
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const askable = crafters.filter((c) => c.onGuildie);
+	// Never pre-pick whoever just said no; they can still be picked again.
+	const fresh = askable.filter((c) => c.slug !== r.lastAsk?.character.slug);
+	const crafter = picked ?? (fresh.length === 1 ? fresh[0].slug : undefined);
+	const asked = askable.find((c) => c.slug === crafter);
+	const title = r.item?.name ?? r.recipe?.name ?? "this";
+	const ask = async () => {
+		if (!crafter) return;
+		setBusy(true);
+		setError(null);
+		try {
+			await act({ requestId: r._id as Id<"requests">, action: "ask", character: crafter });
+			setOpen(false);
+		} catch (err) {
+			setError(errorText(err, "Couldn't ask them."));
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<Dialog.Root open={open} onOpenChange={setOpen}>
+			<Dialog.Trigger render={<Button size="xs" variant="outline" />}>Ask someone else</Dialog.Trigger>
+			<Dialog.Portal>
+				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) p-4 shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+					<div className="flex items-start gap-3">
+						<RequestIcon request={r} size={36} />
+						<div className="min-w-0 flex-1">
+							<Dialog.Title className="text-sm font-semibold">Ask someone else</Dialog.Title>
+							<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[r.item?.quality ?? "COMMON"] }}>
+								{title}
+							</p>
+						</div>
+						<CloseButton />
+					</div>
+					<CrafterPicker crafters={crafters} value={crafter} onChange={setPicked} />
+					{error && <p className="text-[13px] text-destructive">{error}</p>}
+					<div className="flex justify-end gap-2">
+						<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Cancel</Dialog.Close>
+						<Button size="sm" disabled={busy || !crafter} onClick={() => void ask()}>
+							{busy ? "Asking…" : asked ? `Ask ${asked.name}` : "Pick a crafter"}
+						</Button>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	);
+}
+
+/** A craft's state in a sentence: asked, accepted, or how the last ask ended. */
+function CraftState({ request: r }: { request: RequestView }) {
+	const who = (c: Character, mine: boolean) => (mine ? "you" : <ClassText classId={c.classId}>{c.name}</ClassText>);
+	const verb = !r.item && r.recipe && isEnchant(r.recipe) ? "enchanting" : "crafting";
+	if (r.claim)
+		return (
+			<span className="text-muted-foreground">
+				{r.claim.mine ? "You're" : <ClassText classId={r.claim.character.classId}>{r.claim.character.name}</ClassText>}
+				{r.claim.mine ? ` ${verb} it` : ` is ${verb} it`} · accepted {ago(r.claim.claimedAt)}
+			</span>
+		);
+	if (r.ask)
+		return (
+			<span className="text-muted-foreground">
+				Asked {who(r.ask.character, r.ask.mine)} {ago(r.ask.askedAt)}
+				{r.ask.mine ? " · will you craft it?" : " · waiting for an answer"}
+			</span>
+		);
+	if (r.lastAsk) {
+		const outcome =
+			r.lastAsk.outcome === "declined"
+				? "declined"
+				: r.lastAsk.outcome === "lapsed"
+					? "didn't answer in 7 days"
+					: "backed out";
+		return (
+			<span className="text-muted-foreground">
+				<ClassText classId={r.lastAsk.character.classId}>{r.lastAsk.character.name}</ClassText> {outcome}
+			</span>
+		);
+	}
+	return null;
+}
+
+/** One request with what the viewer can do: accept or decline an ask, ask a crafter, back out; the requester's done, cancel, keep. */
 export function RequestRow({ request: r, compact }: { request: RequestView; compact?: boolean }) {
 	const act = useMutation(api.requests.act);
 	const setDeclared = useMutation(api.requests.setDeclared);
@@ -616,8 +769,10 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 			setBusy(false);
 		}
 	};
-	const doAct = (action: "claim" | "unclaim" | "markSent" | "complete" | "cancel" | "keep") =>
-		run(() => act({ requestId: r._id as Id<"requests">, action }));
+	const doAct = (
+		action: "ask" | "accept" | "decline" | "unclaim" | "markSent" | "complete" | "cancel" | "keep",
+		character?: string,
+	) => run(() => act({ requestId: r._id as Id<"requests">, action, character }));
 
 	const title = r.item?.name ?? r.recipe?.name ?? "Request";
 	return (
@@ -628,7 +783,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						<ItemIcon icon={r.item.icon} quality={r.item.quality} size={32} className="block" />
 					</ItemHover>
 				) : (
-					<ItemIcon size={32} empty className="block" />
+					<RequestIcon request={r} size={32} />
 				)}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex flex-wrap items-baseline gap-x-2">
@@ -643,8 +798,9 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							<span className="text-xs text-muted-foreground">Ongoing · {timeLeft(r.until)}</span>
 						) : (
 							<span className="num text-[13px] text-muted-foreground">
-								×{remainingQuantity(r)}
-								{r.kind === "item" ? " remaining" : ""}
+								{/* Open: what's still to come; closed: what was asked for. */}×
+								{active ? remainingQuantity(r) : r.quantity}
+								{r.kind === "item" && active ? " remaining" : ""}
 							</span>
 						)}
 						{r.kind === "craft" && (
@@ -663,7 +819,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						{" · "}
 						{ago(r.createdAt)}
 						{r.stale && <span className="text-foreground"> · no activity for over a week</span>}
-						{r.kind === "craft" && active && (
+						{r.kind === "craft" && r.status === "open" && (
 							<>
 								{" · "}
 								<span className={r.mats?.state === "missing" ? undefined : "text-foreground"}>
@@ -691,10 +847,18 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								{r.mine ? "Guildmates send any they have" : "Send any you have"}
 								{r.have ? <span className="text-foreground"> · you have {r.have}</span> : null}
 							</span>
+						) : r.kind === "craft" && active && (r.ask || r.claim || r.lastAsk) ? (
+							<CraftState request={r} />
 						) : r.claim ? (
 							<>
 								<span className="text-muted-foreground">
-									{r.status === "claimed" ? "Claimed by " : "Was claimed by "}
+									{r.kind === "craft"
+										? r.status === "done"
+											? "Made by "
+											: "Was taken on by "
+										: r.status === "claimed"
+											? "Claimed by "
+											: "Was claimed by "}
 								</span>
 								{r.claim.mine ? (
 									"you"
@@ -710,7 +874,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							</>
 						) : (
 							<span className="text-muted-foreground">
-								{r.kind === "craft" && r.status === "open" ? "Not claimed yet" : STATUS_LABEL[r.status]}
+								{r.kind === "craft" && r.status === "open" ? "Waiting for a crafter" : STATUS_LABEL[r.status]}
 							</span>
 						)}
 						{!active && r.closedAt && <span className="text-muted-foreground"> · {ago(r.closedAt)}</span>}
@@ -753,21 +917,68 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 				</div>
 			)}
 
+			{r.matsProgress && r.matsProgress.length > 0 && active && (
+				<div className={cn(!compact && "pl-[42px]")}>
+					<ul className="max-w-sm space-y-0.5 text-[13px]">
+						{r.matsProgress.map((m) => (
+							<li key={m.itemId} className="flex items-baseline gap-2">
+								<span className="min-w-0 flex-1 truncate text-muted-foreground">{m.name}</span>
+								<span className={cn("num text-xs", m.got >= m.need ? "text-foreground" : "text-muted-foreground")}>
+									{Math.min(m.got, 9999)}/{m.need}
+								</span>
+							</li>
+						))}
+					</ul>
+					<p className="text-xs text-muted-foreground">
+						Mats {r.mine ? "you've sent" : "sent to you"}, as the Guildie app saw them. They don't have to be complete.
+					</p>
+				</div>
+			)}
+
+			{active && r.claim && !r.item && r.recipe && isEnchant(r.recipe) && (r.mine || r.claim.mine) && (
+				<p className={cn("text-xs text-muted-foreground", !compact && "pl-[42px]")}>
+					{r.mine ? (
+						<>
+							Trade <ClassText classId={r.claim.character.classId}>{r.claim.character.name}</ClassText>: put the item to
+							enchant in the trade window's "Will not be traded" slot, and they enchant it there. With the Guildie app,
+							this closes when the trade completes.
+						</>
+					) : (
+						<>
+							Trade <ClassText classId={r.requester.classId}>{r.requester.name}</ClassText>: they put the item in the
+							"Will not be traded" slot, and you cast the enchant on it there.
+						</>
+					)}
+				</p>
+			)}
+
 			{active && (
 				<div className={cn("flex flex-wrap items-center gap-1.5", !compact && "pl-[42px]")}>
-					{r.canClaim && (
-						<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("claim")}>
-							Claim
-						</Button>
+					{r.crafters && <AskSomeoneElse request={r} crafters={r.crafters} />}
+					{r.ask?.mine && (
+						<>
+							<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("accept")}>
+								Accept
+							</Button>
+							<Button size="xs" variant="ghost" disabled={busy} onClick={() => doAct("decline")}>
+								Decline
+							</Button>
+						</>
 					)}
-					{r.claim?.mine && !r.claim.sentAt && (
+					{r.kind === "item" && r.claim?.mine && !r.claim.sentAt && (
 						<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("markSent")}>
 							Mark sent
 						</Button>
 					)}
 					{r.claim && (r.claim.mine || r.mine) && (
 						<Button size="xs" variant="ghost" disabled={busy} onClick={() => doAct("unclaim")}>
-							{r.claim.mine ? "Unclaim" : "Release claim"}
+							{r.kind === "craft"
+								? r.claim.mine
+									? "Back out"
+									: "Take it back"
+								: r.claim.mine
+									? "Unclaim"
+									: "Release claim"}
 						</Button>
 					)}
 					{r.mine && r.ongoing && (
@@ -789,9 +1000,6 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								Cancel request
 							</Button>
 						</>
-					)}
-					{!r.canClaim && !r.mine && !r.claim?.mine && r.status === "open" && r.kind === "craft" && (
-						<span className="text-xs text-muted-foreground">None of your characters knows this recipe.</span>
 					)}
 				</div>
 			)}

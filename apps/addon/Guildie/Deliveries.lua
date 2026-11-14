@@ -91,6 +91,24 @@ local function requestsFor(id, recipient, sender)
     -- Ambiguity or stale/missing guild data: use manual completion instead.
     return #matches == 1 and matches[1] or nil, #rows, #matches
 end
+local function contains(list, id)
+    for _, x in ipairs(type(list) == "table" and list or {}) do if x == id then return true end end
+    return false
+end
+-- Accepted crafts (GuildieData.crafts, oldest first): the crafted item from
+-- the crafter to the requester, or mats from the requester to the crafter.
+-- Mats go to the oldest craft that uses them; the server moves them on to
+-- the next once that one has all it needs.
+local function craftFor(id, recipient, sender)
+    for _, c in ipairs(GuildieData and type(GuildieData.crafts) == "table" and GuildieData.crafts or {}) do
+        local r, x = c.requester or {}, c.crafter or {}
+        local toRequester = sameCharacter(recipient, r.name, r.slug) and sameCharacter(sender, x.name, x.slug)
+        local toCrafter = sameCharacter(recipient, x.name, x.slug) and sameCharacter(sender, r.name, r.slug)
+        if c.requestId and ((c.itemId == id and toRequester) or (contains(c.reagents, id) and toCrafter)) then
+            return c.requestId, c.itemId == id and "crafted item" or "mats"
+        end
+    end
+end
 -- Forever: UnitName gives the first name, GetUnitName(unit, true) the full
 -- "Name Surname" (both match; the full one is exact and reads better in the feed).
 local function fullName(unit)
@@ -98,20 +116,16 @@ local function fullName(unit)
     if type(name) ~= "string" or name == "" then name = UnitName(unit) end
     return name
 end
-local function record(kind, other, items)
+-- Report one matched event: `items` by item id, each to the request `match` names.
+local function report(kind, other, items, match)
     local guid, me = UnitGUID("player"), fullName("player")
     if not guid or not nameKey(other) or other == "" then return end
     local c = GuildieDB.characters and GuildieDB.characters[guid]
     if not c then ns.capture("delivery"); c = GuildieDB.characters and GuildieDB.characters[guid] end
     if not c then return end
-    local received = kind == "mailReceived" or kind == "tradeReceived"
     local now, records = GetServerTime(), ns.reconcileDeliveries(c)
     for id, quantity in pairs(items) do
-        local recipient, sender = received and me or other, received and other or me
-        local requestId, requests, matches = requestsFor(id, recipient, sender)
-        trace(true, kind, "item", id, "x" .. quantity, "from", sender, "to", recipient,
-            requestId and ("-> request " .. requestId)
-                or ("-> no match (" .. requests .. " requests for this item, " .. matches .. " matched)"))
+        local requestId = match(id, quantity, me)
         if requestId and quantity > 0 then
             c.deliverySequence = (c.deliverySequence or 0) + 1
             records[#records + 1] = {id = guid .. ":" .. now .. ":" .. c.deliverySequence,
@@ -120,6 +134,42 @@ local function record(kind, other, items)
     end
     GuildieDB.deliveryOutbox[c.guid] = records
     ns.reconcileDeliveries(c)
+end
+local function record(kind, other, items)
+    local received = kind == "mailReceived" or kind == "tradeReceived"
+    report(kind, other, items, function(id, quantity, me)
+        local recipient, sender = received and me or other, received and other or me
+        local requestId, requests, matches = requestsFor(id, recipient, sender)
+        local craftId, what
+        if not requestId then craftId, what = craftFor(id, recipient, sender) end
+        trace(true, kind, "item", id, "x" .. quantity, "from", sender, "to", recipient,
+            requestId and ("-> request " .. requestId)
+                or craftId and ("-> craft " .. craftId .. " (" .. what .. ")")
+                or ("-> no match (" .. requests .. " requests for this item, " .. matches .. " matched; no craft)"))
+        return requestId or craftId
+    end)
+end
+-- An enchant done over trade: the requester's item in the "Will not be
+-- traded" slot carried an enchant named like the one they asked for, from
+-- the crafter who accepted. Names compare loosely ("Minor Stamina" in
+-- "Enchant Bracer - Minor Stamina"); /guildie trace shows what the game said.
+local function sameEnchant(shown, asked)
+    if type(shown) ~= "string" or type(asked) ~= "string" or shown == "" then return false end
+    shown, asked = shown:lower(), asked:lower()
+    return shown == asked or asked:find(shown, 1, true) ~= nil or shown:find(asked, 1, true) ~= nil
+end
+local function recordEnchant(other, enchant, itemId)
+    report("enchantReceived", other, {[itemId or 1] = 1}, function(_, _, me)
+        for _, c in ipairs(GuildieData and type(GuildieData.crafts) == "table" and GuildieData.crafts or {}) do
+            local r, x = c.requester or {}, c.crafter or {}
+            if c.requestId and c.enchant and sameEnchant(enchant, c.enchant)
+                and sameCharacter(me, r.name, r.slug) and sameCharacter(other, x.name, x.slug) then
+                trace(true, "enchantReceived", enchant, "from", other, "-> craft " .. c.requestId)
+                return c.requestId
+            end
+        end
+        trace(true, "enchantReceived", enchant, "from", other, "-> no accepted enchant craft matches")
+    end)
 end
 local function add(items, id, count)
     if type(id) == "number" and id > 0 and type(count) == "number" and count > 0 then
@@ -224,7 +274,19 @@ local function readTrade()
         local _, _, given = GetTradePlayerItemInfo(slot)
         add(sent, itemID(GetTradePlayerItemLink(slot)), given)
     end
-    return {other = fullName("NPC"), incoming = incoming, sent = sent, started = GetTime()}
+    -- Slot 7 ("Will not be traded"): the enchant pending on the player's own item.
+    -- (name, texture, count, quality, enchantment, ...): any later text that
+    -- isn't a texture path; which position varies by client.
+    local enchant, enchantItem
+    local function pending(_, _, ...)
+        for i = 1, select("#", ...) do
+            local v = select(i, ...)
+            if type(v) == "string" and v ~= "" and not v:find("[\\/]") then return v end
+        end
+    end
+    enchant = pending(GetTradePlayerItemInfo(7))
+    if enchant then enchantItem = itemID(GetTradePlayerItemLink(7)) end
+    return {other = fullName("NPC"), incoming = incoming, sent = sent, enchant = enchant, enchantItem = enchantItem, started = GetTime()}
 end
 local function describe(items)
     local parts = {}
@@ -288,9 +350,12 @@ local function onEvent(event, a, b)
         if trade then
             local offer = next(trade.incoming) or next(trade.sent)
             if a ~= 1 and b ~= 1 then trade.locked = nil
-            elseif offer then trade.locked = {incoming = trade.incoming, sent = trade.sent} end
+            elseif offer or trade.enchant then
+                trade.locked = {incoming = trade.incoming, sent = trade.sent, enchant = trade.enchant, enchantItem = trade.enchantItem}
+            end
         end
-        trace(false, event, a, b, "in", trade and describe(trade.incoming), "out", trade and describe(trade.sent))
+        trace(false, event, a, b, "in", trade and describe(trade.incoming), "out", trade and describe(trade.sent),
+            "enchant", trade and trade.enchant)
     elseif event == "TRADE_CLOSED" then
         if trade then trade.closedAt = trade.closedAt or GetTime() end
         trace(false, event)
@@ -309,6 +374,8 @@ local function onEvent(event, a, b)
             local offer = t.locked or t
             record("tradeReceived", t.other, offer.incoming)
             record("tradeSent", t.other, offer.sent)
+            local enchant = offer.enchant or t.enchant
+            if enchant then recordEnchant(t.other, enchant, offer.enchantItem or t.enchantItem) end
         end
     end
 end

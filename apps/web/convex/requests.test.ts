@@ -54,26 +54,39 @@ test("membership: only characters in this guild's roster now count", () => {
 	assert.deepEqual(rosterCharacters([], "g1"), [], "no claimed characters: not a member");
 });
 
-test("claiming: crafts only, by someone who knows the recipe, never your own", () => {
-	assert.equal(ok("claim", req(), MILLER), false, "item requests aren't claimed");
+test("nothing is claimed anymore: items count what arrives, crafts are asked", () => {
+	assert.equal(ok("claim", req(), MILLER), false);
 	assert.match((check("claim", req(), { userId: MILLER }) as { error: string }).error, /aren't claimed/);
+	assert.equal(ok("claim", req({ kind: "craft" }), MILLER, true), false);
+});
+
+test("asks: the requester asks one crafter, who accepts or declines; nobody else answers", () => {
 	const craft = req({ kind: "craft" });
-	assert.deepEqual(check("claim", craft, { userId: TODD, knowsRecipe: true }), {
-		ok: false,
-		error: "That's your own request.",
-	});
-	assert.equal(ok("claim", craft, MILLER, false), false, "doesn't know the recipe");
-	assert.ok(ok("claim", craft, MILLER, true));
-	assert.equal(
-		ok("claim", req({ kind: "craft", status: "claimed", claim: { userId: BRENNA } }), MILLER, true),
-		false,
-		"already claimed",
-	);
+	assert.ok(ok("ask", craft, TODD), "the requester asks");
+	assert.equal(ok("ask", craft, MILLER), false, "someone else can't");
+	assert.equal(ok("ask", req(), TODD), false, "items aren't asked of anyone");
+	const asked = req({ kind: "craft", ask: { userId: MILLER } });
+	assert.equal(ok("ask", asked, TODD), false, "one ask at a time");
+	for (const action of ["accept", "decline"] as const) {
+		assert.ok(ok(action, asked, MILLER), action);
+		assert.equal(ok(action, asked, BRENNA), false, `${action} by someone not asked`);
+		assert.equal(ok(action, asked, TODD), false, `${action} by the requester`);
+		assert.equal(ok(action, craft, MILLER), false, `${action} with no ask`);
+	}
+	assert.equal(nextStatus("accept", "open"), "claimed");
+	assert.equal(nextStatus("decline", "open"), "open");
+	const accepted = req({ kind: "craft", status: "claimed", claim: { userId: MILLER } });
+	assert.equal(ok("accept", accepted, MILLER), false, "already accepted");
+	assert.equal(ok("ask", accepted, TODD), false, "accepted: no new ask");
+	assert.ok(ok("unclaim", accepted, MILLER), "the crafter backs out");
+	assert.ok(ok("unclaim", accepted, TODD), "the requester takes it back");
+	assert.equal(ok("markSent", accepted, MILLER), false, "crafts count when they arrive");
+	assert.equal(ok("setMats", accepted, TODD), false, "mats are settled once accepted");
 });
 
 test("claimed (crafts, and item claims from before): the claimant marks it sent or releases it; the requester can take it back", () => {
 	const claimed = req({ status: "claimed", claim: { userId: MILLER } });
-	assert.ok(ok("markSent", claimed, MILLER));
+	assert.ok(ok("markSent", claimed, MILLER), "an item claim from before");
 	assert.equal(ok("markSent", claimed, TODD), false);
 	assert.equal(ok("markSent", claimed, BRENNA), false);
 	assert.ok(ok("unclaim", claimed, MILLER));
@@ -194,13 +207,10 @@ test("help requires full inventory coverage and a known craft, never just eligib
 	assert.equal(canHelpFromInventory(item, false, known, []), false);
 	assert.equal(canHelpFromInventory(item, true, known, scans), false);
 	assert.equal(canHelpFromInventory({ ...item, status: "claimed" }, false, known, scans), false);
+	// Crafts are asked of one crafter: never "I can help" from bags.
 	const craft = { kind: "craft" as const, status: "open", quantity: 2, recipeId: 10 };
 	const reagents = [{ itemId: 1, name: "Cloth", quantity: 2 }];
-	assert.equal(canHelpFromInventory(craft, false, known, scans, reagents), true);
-	assert.equal(canHelpFromInventory({ ...craft, quantity: 3 }, false, known, scans, reagents), false);
-	assert.equal(canHelpFromInventory(craft, false, new Set(), scans, reagents), false);
-	assert.equal(canHelpFromInventory(craft, false, known, scans, []), false);
-	assert.equal(canHelpFromInventory(craft, false, known, scans), false);
+	assert.equal(canHelpFromInventory(craft, false, known, scans, reagents), false);
 });
 
 // ---- Ongoing requests ------------------------------------------------------------
@@ -262,7 +272,7 @@ test("fixed item requests count down and help uses only the remainder", () => {
 	assert.equal(remainingQuantity(request), 13);
 	assert.equal(remainingQuantity({ ...request, receivedQuantity: 25 }), 0);
 	assert.equal(remainingQuantity({ ...request, receivedQuantity: undefined }), 20);
-	assert.equal(remainingQuantity({ ...request, kind: "craft" }), 20);
+	assert.equal(remainingQuantity({ ...request, kind: "craft" }), 13, "crafted items count down too");
 	assert.equal(remainingQuantity({ ...request, ongoing: true, quantity: 0 }), 0);
 	const scans = [{ bags: { capturedAt: NOW, items: [{ id: 4306, count: 13 }] } }];
 	assert(canHelpFromInventory(request, false, new Set(), scans));

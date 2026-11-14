@@ -1,8 +1,10 @@
 // Guild requests: a member asks for an item (reagents and the like) or for a
 // craft. Item requests aren't claimed: anyone sends some, and the requester's
 // addon counts what arrives and closes it (or the requester marks it done).
-// A craft is claimed by someone who knows the recipe, who makes and sends it,
-// and the requester marks it done. An item can instead be asked for as ongoing ("send
+// A craft is asked of one guildmate who knows the recipe; they accept or
+// decline (an ask lapses after 7 days). Once accepted, the mats the requester
+// sends them show as progress, and the crafted item (or the enchant, over
+// trade) arriving closes it. The requester can always mark it done. An item can instead be asked for as ongoing ("send
 // me any Silk Cloth you have"): no quantity and no claims, up for 2 weeks to
 // 3 months, then it ends by itself. One active item request per item, of
 // either kind. These are the rules, kept free of Convex imports
@@ -55,11 +57,24 @@ export type RequestLike = {
 	ongoing?: boolean;
 	until?: number;
 	requester: string;
+	/** Crafts: the guildmate asked, until they answer. */
+	ask?: { userId: string };
+	/** Accepted crafts (the crafter), and item claims from before claims ended. */
 	claim?: { userId: string; sentAt?: number };
 	lastActivityAt: number;
 };
 
-export type Action = "claim" | "unclaim" | "markSent" | "complete" | "cancel" | "keep" | "setMats";
+export type Action =
+	| "claim"
+	| "ask"
+	| "accept"
+	| "decline"
+	| "unclaim"
+	| "markSent"
+	| "complete"
+	| "cancel"
+	| "keep"
+	| "setMats";
 
 /**
  * Membership: of the roster rows for a player's claimed characters, those in
@@ -90,20 +105,29 @@ export function check(action: Action, req: RequestLike, actor: Actor): Verdict {
 	if (req.ongoing && action !== "cancel") return no("Ongoing requests aren't claimed. Send any you have.");
 	switch (action) {
 		case "claim":
-			// Old claims on item requests can still be released or marked sent.
-			if (req.kind === "item")
-				return no("Item requests aren't claimed. Send what you have; it counts when it arrives.");
-			if (mine) return no("That's your own request.");
-			if (req.status !== "open") return no("Someone already claimed this.");
-			if (req.kind === "craft" && !actor.knowsRecipe) return no("None of your characters knows this recipe.");
+			// Nothing is claimed anymore. Old claims can still be released, and old item claims marked sent.
+			return req.kind === "item"
+				? no("Item requests aren't claimed. Send what you have; it counts when it arrives.")
+				: no("Crafts are asked of one crafter, who accepts.");
+		case "ask":
+			if (!mine) return no("Only the requester can do that.");
+			if (req.kind !== "craft") return no("Only crafts are asked of someone.");
+			if (req.status !== "open") return no("A crafter already accepted this.");
+			if (req.ask) return no("Wait for their answer, or cancel and ask again.");
+			return yes;
+		case "accept":
+		case "decline":
+			if (req.status !== "open" || req.ask?.userId !== actor.userId) return no("This wasn't asked of you.");
 			return yes;
 		case "unclaim":
-			if (req.status !== "claimed") return no("Nobody has claimed this.");
-			// The claimant lets it go, or the requester takes it back from someone who went quiet.
-			if (!claimant && !mine) return no("Only whoever claimed it, or the requester, can release it.");
+			if (req.status !== "claimed") return no("Nobody has taken this on.");
+			// The crafter backs out, or the requester takes it back from someone who went quiet.
+			if (!claimant && !mine) return no("Only the crafter, or the requester, can do that.");
 			return yes;
 		case "markSent":
-			if (req.status !== "claimed" || !claimant) return no("Only whoever claimed it can mark it sent.");
+			// Crafts count when they arrive; only item claims from before can be marked sent.
+			if (req.kind !== "item" || req.status !== "claimed" || !claimant)
+				return no("Only whoever claimed it can mark it sent.");
 			return yes;
 		case "complete":
 		case "cancel":
@@ -113,7 +137,7 @@ export function check(action: Action, req: RequestLike, actor: Actor): Verdict {
 		case "setMats":
 			if (!mine) return no("Only the requester can do that.");
 			if (req.kind !== "craft") return no("Only craft requests have mats.");
-			if (req.status !== "open") return no("The mats can only change before someone claims it.");
+			if (req.status !== "open") return no("The mats can only change before the crafter accepts.");
 			return yes;
 	}
 }
@@ -122,8 +146,10 @@ export function check(action: Action, req: RequestLike, actor: Actor): Verdict {
 export function nextStatus(action: Action, status: RequestStatus): RequestStatus {
 	switch (action) {
 		case "claim":
+		case "accept":
 			return "claimed";
 		case "unclaim":
+		case "decline":
 			return "open";
 		case "complete":
 			return "done";
@@ -135,6 +161,9 @@ export function nextStatus(action: Action, status: RequestStatus): RequestStatus
 }
 
 type Timed = Pick<RequestLike, "status" | "lastActivityAt" | "ongoing" | "until">;
+
+/** An unanswered ask to a crafter lapses after this (the requester can ask someone else). */
+export const ASK_MS = 7 * DAY_MS;
 
 /** Fixed-amount requests go quiet; ongoing ones have an end date instead. */
 export const isStale = (req: Timed, now: number) =>
@@ -255,16 +284,14 @@ export function matsLabel(state: MatsState | undefined) {
 	return "Mats not confirmed";
 }
 
-/** Fixed item requests count down as receipts arrive; the stored quantity stays the target. */
+/** Fixed requests (items, and crafted items) count down as receipts arrive; the stored quantity stays the target. */
 export function remainingQuantity(request: {
 	kind: string;
 	quantity: number;
 	receivedQuantity?: number;
 	ongoing?: boolean;
 }) {
-	return request.kind === "item" && !request.ongoing
-		? Math.max(0, request.quantity - (request.receivedQuantity ?? 0))
-		: request.quantity;
+	return request.ongoing ? request.quantity : Math.max(0, request.quantity - (request.receivedQuantity ?? 0));
 }
 
 /**
@@ -294,12 +321,8 @@ export function canHelpFromInventory(
 			(sumInventory(scans).counts.get(request.itemId) ?? 0) >= remainingQuantity(request)
 		);
 	}
-	return (
-		request.recipeId !== undefined &&
-		known.has(request.recipeId) &&
-		!!reagents &&
-		matsCheck(reagents, request.quantity, scans).covered
-	);
+	// Crafts are asked of one crafter: "I can help" is an ask to you (the caller knows).
+	return false;
 }
 
 export const deliveryName = (name: string) => name.trim().toLowerCase().replace(/ /g, "-");
@@ -345,33 +368,126 @@ export type DeliveryRejection =
 	| "not from the claimant"
 	| "request not claimed"
 	| "not the claimant"
-	| "not to the requester";
+	| "not to the requester"
+	| "craft not accepted"
+	| "not an enchant"
+	| "not between requester and crafter";
+
+/**
+ * What a report counts toward: the requester receiving what they asked for
+ * (`receipt`), the claimant's own report of sending it (`sent`, never
+ * progress), or a craft's mats going from the requester to the crafter, as
+ * either of them saw it (`matsSent`, `matsReceived`; progress is the larger).
+ */
+export type DeliveryUse = "receipt" | "sent" | "matsSent" | "matsReceived";
+
+type Reporter = { userId: string; slug: string; name: string; guildId: string };
+
+export function deliveryOutcome(
+	r: DeliveryRequest,
+	e: DeliveryReport,
+	reporter: Reporter,
+	now: number,
+	/** Crafts: the recipe's reagent item ids. */
+	reagents: number[] = [],
+): { use: DeliveryUse } | { rejected: DeliveryRejection } {
+	const no = (rejected: DeliveryRejection) => ({ rejected });
+	if (!["open", "claimed"].includes(r.status)) return no("request closed");
+	if (r.guildId !== reporter.guildId) return no("other guild");
+	if (e.at < r.createdAt) return no("before the request");
+	if (e.at > now + 600000) return no("in the future");
+	if (now - e.at > 30 * DAY_MS) return no("older than 30 days");
+	if (r.ongoing && r.until !== undefined && (r.until <= now || e.at >= r.until)) return no("ongoing request ended");
+	const received = e.kind.endsWith("Received");
+	const isRequester = r.userId === reporter.userId && r.character.slug === reporter.slug;
+	const isClaimant = !!r.claim && r.claim.userId === reporter.userId && r.claim.character.slug === reporter.slug;
+
+	if (r.kind === "item") {
+		if (e.kind === "enchantReceived") return no("not an enchant");
+		if (r.itemId !== e.itemId) return no("different item");
+		if (received) {
+			if (!isRequester) return no("not the requester");
+			if (r.claim && e.at < r.claim.claimedAt) return no("before the claim");
+			if (r.claim && !sameCharacter(e.other, r.claim.character)) return no("not from the claimant");
+			return { use: "receipt" };
+		}
+		if (!r.claim) return no("request not claimed");
+		if (!isClaimant) return no("not the claimant");
+		if (e.at < r.claim.claimedAt) return no("before the claim");
+		if (!sameCharacter(e.other, r.character)) return no("not to the requester");
+		return { use: "sent" };
+	}
+
+	// Crafts: only between the requester and the crafter who accepted.
+	const claim = r.claim;
+	if (r.status !== "claimed" || !claim) return no("craft not accepted");
+	const fromCrafter = sameCharacter(e.other, claim.character);
+	const toRequester = sameCharacter(e.other, r.character);
+	if (e.kind === "enchantReceived") {
+		if (r.itemId !== undefined) return no("not an enchant");
+		if (!isRequester) return no("not the requester");
+		if (e.at < claim.claimedAt) return no("before the claim");
+		if (!fromCrafter) return no("not from the claimant");
+		return { use: "receipt" };
+	}
+	if (r.itemId !== undefined && e.itemId === r.itemId) {
+		if (e.at < claim.claimedAt) return no("before the claim");
+		if (received) {
+			if (!isRequester) return no("not the requester");
+			if (!fromCrafter) return no("not from the claimant");
+			return { use: "receipt" };
+		}
+		if (!isClaimant) return no("not the claimant");
+		if (!toRequester) return no("not to the requester");
+		return { use: "sent" };
+	}
+	// Mats may go over before the crafter answers; any time since the request counts.
+	if (reagents.includes(e.itemId)) {
+		if (received && isClaimant && toRequester) return { use: "matsReceived" };
+		if (!received && isRequester && fromCrafter) return { use: "matsSent" };
+		return no("not between requester and crafter");
+	}
+	return no("different item");
+}
 
 export function deliveryRejection(
 	r: DeliveryRequest,
 	e: DeliveryReport,
-	reporter: { userId: string; slug: string; name: string; guildId: string },
+	reporter: Reporter,
 	now: number,
+	reagents: number[] = [],
 ): DeliveryRejection | undefined {
-	if (r.kind !== "item") return "not an item request";
-	if (r.itemId !== e.itemId) return "different item";
-	if (!["open", "claimed"].includes(r.status)) return "request closed";
-	if (r.guildId !== reporter.guildId) return "other guild";
-	if (e.at < r.createdAt) return "before the request";
-	if (e.at > now + 600000) return "in the future";
-	if (now - e.at > 30 * DAY_MS) return "older than 30 days";
-	if (r.ongoing && r.until !== undefined && (r.until <= now || e.at >= r.until)) return "ongoing request ended";
-	if (e.kind.endsWith("Received")) {
-		if (r.userId !== reporter.userId || r.character.slug !== reporter.slug) return "not the requester";
-		if (r.claim && e.at < r.claim.claimedAt) return "before the claim";
-		if (r.claim && !sameCharacter(e.other, r.claim.character)) return "not from the claimant";
-		return undefined;
-	}
-	if (!r.claim) return "request not claimed";
-	if (r.claim.userId !== reporter.userId || r.claim.character.slug !== reporter.slug) return "not the claimant";
-	if (e.at < r.claim.claimedAt) return "before the claim";
-	if (!sameCharacter(e.other, r.character)) return "not to the requester";
-	return undefined;
+	const outcome = deliveryOutcome(r, e, reporter, now, reagents);
+	return "rejected" in outcome ? outcome.rejected : undefined;
+}
+
+/** Mats delivered so far per reagent, from one side's reports. */
+export type MatsCount = { itemId: number; quantity: number }[];
+export const matsAdd = (list: MatsCount | undefined, itemId: number, quantity: number): MatsCount => {
+	const out = (list ?? []).map((m) => ({ ...m }));
+	const row = out.find((m) => m.itemId === itemId);
+	if (row) row.quantity += quantity;
+	else out.push({ itemId, quantity });
+	return out;
+};
+/**
+ * Mats progress per reagent: the larger of what the requester's addon saw
+ * sent and what the crafter's saw arrive, so one mail seen from both sides
+ * counts once, whichever of them runs the app.
+ */
+export function matsProgress(
+	reagents: { itemId: number; name: string; quantity: number }[],
+	quantity: number,
+	sent: MatsCount | undefined,
+	received: MatsCount | undefined,
+) {
+	const count = (list: MatsCount | undefined, id: number) => list?.find((m) => m.itemId === id)?.quantity ?? 0;
+	return reagents.map((x) => ({
+		itemId: x.itemId,
+		name: x.name,
+		need: x.quantity * quantity,
+		got: Math.max(count(sent, x.itemId), count(received, x.itemId)),
+	}));
 }
 
 export const deliveryMatches = (...args: Parameters<typeof deliveryRejection>) => !deliveryRejection(...args);

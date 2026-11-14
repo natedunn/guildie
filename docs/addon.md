@@ -493,22 +493,42 @@ Addon data is player-provided; Blizzard's can't be edited by the player.
 Members ask the guild for an item or a craft. Items aren't claimed:
 guildmates trade or mail what they have, and the requester's addon counts
 what arrives and closes the request (or the requester marks it done). A craft
-is claimed by someone who knows the recipe, who makes and sends it; the
-requester marks it done (`/g/<region>/<guild>/requests`,
+is asked of one guildmate who knows the recipe, who accepts or declines; the
+mats the requester sends them show as progress, and the crafted item (or the
+enchant, over trade) arriving closes it (`/g/<region>/<guild>/requests`,
 "Request this" in the item panel, "Request" on Crafting rows). Rules in
 `apps/web/convex/shared/requests.ts` (tested), handlers in
 `apps/web/convex/requests.ts`.
 
 - **Who:** only signed-in members (a claimed character in the guild's roster
-  now) see, post, claim or close requests, even in a public guild. Items:
-  nobody claims them (claims made before this stay until released or
-  closed). Crafts: only a member with a character that knows the recipe
-  (merged professions, so the addon's recipe reads count).
+  now) see, post or close requests, even in a public guild. Items: nobody
+  claims them (claims made before this stay until released or closed).
+  Crafts: asked of a guildmate on Guildie whose character knows the recipe
+  (merged professions, so the addon's recipe reads count), never your own
+  characters; only crafts whose item can be traded (not "Binds when picked
+  up").
 - **Lifecycle:** items: open → done (when received reaches the amount, or
-  the requester) or cancelled. Crafts: open → claimed → done (the requester; the claimant can mark
-  it sent first) or cancelled (the requester). The claimant, or the
-  requester, can release a claim (back to open). 15 open per player per
+  the requester) or cancelled. Crafts: open with an `ask` → claimed when the
+  crafter accepts (`claim` is the crafter) → done (received reaches the
+  amount, or the requester) or cancelled. A decline, an ask unanswered for 7
+  days (the daily cron) or the crafter backing out leaves it open with
+  `lastAsk` saying how, and the requester asks someone else. Each step
+  notifies the other side (see "Notifications"). 15 open per player per
   guild, quantity 1-1000, note up to 140 characters.
+- **Craft deliveries** (`shared/requests.ts` `deliveryOutcome`, tested): the
+  addon gets the player's accepted crafts in `GuildieData.crafts` (`{
+  requestId, itemId | enchant, reagents, requester, crafter }`, oldest
+  first). Mats (the recipe's reagents) from the requester to the crafter
+  count as the requester's addon saw them sent (`matsSent`) and as the
+  crafter's saw them arrive (`matsReceived`); progress per reagent is the
+  larger, so one mail counts once whichever of them runs the app. Mats go to
+  the oldest accepted craft between those two that still needs them, and
+  never gate completion. The crafted item from the crafter to the requester
+  counts like an item receipt. An enchant (no crafted item) counts when a
+  completed trade with the crafter had an enchant named like the recipe
+  pending on the requester's item in the "Will not be traded" slot
+  (`enchantReceived`; names compare loosely, unverified in Forever, `/guildie
+  trace` shows what the client returns).
 - **Fixed amount or ongoing:** an item can instead be asked for as ongoing
   ("send me any you have"): no quantity (stored as 0), nobody claims it,
   guildmates just send it. It's up for 2 weeks, 1 month or 3 months (no

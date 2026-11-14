@@ -1,6 +1,6 @@
 import type { api } from "@convex/_generated/api";
 import type { FunctionReturnType } from "convex/server";
-import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
+import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/components/item";
 import { cn } from "@/lib/utils";
 
 // Pieces shared by a character's Professions tab and the guild's "who can
@@ -44,6 +44,8 @@ export function RecipeItem({
 				<ItemHover item={item} className="shrink-0">
 					<ItemIcon icon={item.icon} quality={item.quality} size={size} className="block" />
 				</ItemHover>
+			) : isEnchant(recipe) ? (
+				<ItemIcon icon={ENCHANT_ICON} size={size} className="block" />
 			) : (
 				<ItemIcon size={size} empty className="block" />
 			)}

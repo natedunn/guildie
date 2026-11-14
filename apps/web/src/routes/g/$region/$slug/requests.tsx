@@ -14,8 +14,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { shortDate, timeLeft } from "@/lib/format";
 
 // Guild requests: members ask for items and crafts. Items: guildmates send
-// some, and the requester's addon counts what arrives. Crafts: a crafter
-// claims it; the requester marks them done (rules: convex/shared/requests.ts). Items can
+// some, and the requester's addon counts what arrives. Crafts: asked of one
+// crafter, who accepts or declines; the crafted item arriving closes it (rules: convex/shared/requests.ts). Items can
 // also be asked for as ongoing ("send me any you have"): their own tab, never
 // claimed. Members only, even in a public guild. The tab and the filter live
 // in the URL (?type=ongoing&view=mine), independent of each other.
@@ -109,9 +109,10 @@ function RequestsPage() {
 		<div className="max-w-3xl space-y-4 pb-12">
 			<p className="text-[13px] text-muted-foreground">
 				Ask the guild for a fixed amount of something: guildmates trade or mail what they have, and with the Guildie app
-				it closes by itself once it all arrives. Ask for a craft, and whoever claims it makes it and sends it. Or ask
-				for an item as ongoing, and guildmates send any they have. Requests also show on item tooltips in game (with the
-				Guildie app).
+				it closes by itself once it all arrives. Ask a guildmate who knows the recipe to craft something: they accept or
+				decline, the mats you send them show as they arrive, and it closes when the crafted item (or the enchant)
+				reaches you. Or ask for an item as ongoing, and guildmates send any they have. Requests also show on item
+				tooltips in game (with the Guildie app).
 			</p>
 
 			<NewRequest guild={guild} characters={data.characters} ongoing={type === "ongoing"} />
@@ -162,7 +163,7 @@ function RequestsPage() {
 				<p className="text-xs text-muted-foreground">
 					{type === "ongoing"
 						? "Things guildmates want that your characters’ last synced bags and banks have some of."
-						: "Requests covered by your characters’ last synced bags and banks. Crafts also require a known recipe and all materials."}
+						: "Crafts guildmates asked you to make, and requests your characters’ last synced bags and banks cover."}
 				</p>
 			)}
 
