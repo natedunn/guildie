@@ -161,16 +161,37 @@ function U.scoreItem(item, w, level, cls, rules, offHand, prefs)
     return score, stat, total, off
 end
 
-function U.suits(score, stat, total, rules)
-    if total > 0 then return stat >= rules.minFit * total end
-    return score > 0
-end
-
 local function contains(list, value)
     for _, v in ipairs(list or {}) do
         if v == value then return true end
     end
     return false
+end
+
+--- The stats' part (stat from scoreItem) as minFit sees it: a stat the spec
+--- names (spec.fit, else spec.stats; spell power when spell damage or
+--- healing is named) counts as a full stat point however low its weight
+--- (fitOf in upgrades.ts).
+function U.fitOf(item, spec, rules, stat)
+    local named = spec.fit or spec.stats or {}
+    local fit = stat
+    for _, key in ipairs(sortedKeys(item.stats or {})) do
+        local value = item.stats[key]
+        local listed = contains(named, key)
+            or (key == "SPELL_POWER" and (contains(named, "SPELL_DAMAGE_DONE") or contains(named, "SPELL_HEALING_DONE")))
+        if listed and value > 0 then
+            local full = value * ((rules.points and rules.points[key]) or 1)
+            local counted = (spec.w[key] or 0) * value
+            if full > counted then fit = fit + (full - counted) end
+        end
+    end
+    return fit
+end
+
+--- Whether a spec has a use for the item at all (stat: U.fitOf's).
+function U.suits(score, stat, total, rules)
+    if total > 0 then return stat >= rules.minFit * total end
+    return score > 0
 end
 
 --- The level from which the member can use the item, or nil.
@@ -231,7 +252,7 @@ local function gainFor(item, m, specKey, slots, rules)
     local best
     for _, offHand in ipairs(options) do
         local score, stat, total, off = U.scoreItem(item, spec.w, m.level, cls, rules, offHand, m)
-        if U.suits(score, stat, total, rules) then
+        if U.suits(score, U.fitOf(item, spec, rules, stat), total, rules) then
             local base, against = U.baseline(item, slots, m.th, offHand)
             local gain = (score - base) / math.max(base, rules.minBase)
             local empty = true

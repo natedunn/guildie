@@ -70,8 +70,10 @@ export type Rules = {
 	/**
 	 * "DRUID:1" (class token, tree index) -> name, weights and its priority
 	 * stats, first to last (the first five of a player's own: losing any of them keeps it from being an upgrade).
+	 * `fit`: every stat a player's own list names (missing: `stats`); those
+	 * always count as suiting the spec (fitOf).
 	 */
-	specs: Record<string, { name: string; w: Weights; stats?: string[] }>;
+	specs: Record<string, { name: string; w: Weights; stats?: string[]; fit?: string[] }>;
 	classes: Record<number, ClassRules>;
 };
 
@@ -416,6 +418,7 @@ export function specsFor(classId: number, trees: Tree[] | undefined, choice: Sta
 				.join("/"),
 			w: customWeights(base.w, own, rules.points, tiers),
 			stats: own.slice(0, KEPT_STATS),
+			fit: own,
 		};
 		return { spec, spec2: talents.spec2 };
 	}
@@ -602,7 +605,35 @@ export function scoreItem(
 	return off !== undefined ? { score, stat, total, off } : { score, stat, total };
 }
 
-/** Whether a spec has a use for the item at all. */
+/**
+ * The stats' part (`stat` from scoreItem) as `minFit` sees it: a stat the
+ * spec names (`fit`, else `stats`; spell power when spell damage or healing
+ * is named) counts as a full stat point however low its weight, so a stat on
+ * a player's list never makes an item look unsuited (Spirit last on an
+ * Enhancement shaman's list).
+ */
+export function fitOf(
+	item: ItemInfo,
+	spec: { w: Weights; stats?: string[]; fit?: string[] },
+	rules: Pick<Rules, "points">,
+	stat: number,
+) {
+	const named = spec.fit ?? spec.stats ?? [];
+	let fit = stat;
+	for (const key of Object.keys(item.stats).sort()) {
+		const value = item.stats[key];
+		const listed =
+			named.includes(key) ||
+			(key === "SPELL_POWER" && (named.includes("SPELL_DAMAGE_DONE") || named.includes("SPELL_HEALING_DONE")));
+		if (!listed || value <= 0) continue;
+		const full = value * (rules.points?.[key] ?? 1);
+		const counted = (spec.w[key] ?? 0) * value;
+		if (full > counted) fit += full - counted;
+	}
+	return fit;
+}
+
+/** Whether a spec has a use for the item at all (`stat`: fitOf's). */
 export function suits(s: { score: number; stat: number; total: number }, rules: Pick<Rules, "minFit">) {
 	return s.total > 0 ? s.stat >= rules.minFit * s.total : s.score > 0;
 }
@@ -673,7 +704,7 @@ function gainFor(item: ItemInfo, m: UpgradeMember, specKey: string, slots: Recor
 	let best: { gain: number; net: number; against: number[]; off?: number; empty: boolean } | undefined;
 	for (const offHand of options) {
 		const s = scoreItem(item, spec.w, m.level, cls, rules, offHand, m);
-		if (!suits(s, rules)) continue;
+		if (!suits({ ...s, stat: fitOf(item, spec, rules, s.stat) }, rules)) continue;
 		const { base, against } = baseline(item, slots, m.th, offHand);
 		const gain = (s.score - base) / Math.max(base, rules.minBase);
 		const empty = against.every((slot) => slots[slot] === undefined);
