@@ -642,6 +642,68 @@ const STATUS_LABEL: Record<RequestView["status"], string> = {
 	expired: "Expired",
 };
 
+/** After a decline (or no answer, or the crafter backing out): pick someone else in a dialog, like the request form. */
+function AskSomeoneElse({
+	request: r,
+	crafters,
+}: {
+	request: RequestView;
+	crafters: (Character & { onGuildie: boolean })[];
+}) {
+	const act = useMutation(api.requests.act);
+	const [open, setOpen] = useState(false);
+	const [picked, setPicked] = useState<string>();
+	const [error, setError] = useState<string | null>(null);
+	const [busy, setBusy] = useState(false);
+	const askable = crafters.filter((c) => c.onGuildie);
+	// Never pre-pick whoever just said no; they can still be picked again.
+	const fresh = askable.filter((c) => c.slug !== r.lastAsk?.character.slug);
+	const crafter = picked ?? (fresh.length === 1 ? fresh[0].slug : undefined);
+	const asked = askable.find((c) => c.slug === crafter);
+	const title = r.item?.name ?? r.recipe?.name ?? "this";
+	const ask = async () => {
+		if (!crafter) return;
+		setBusy(true);
+		setError(null);
+		try {
+			await act({ requestId: r._id as Id<"requests">, action: "ask", character: crafter });
+			setOpen(false);
+		} catch (err) {
+			setError(errorText(err, "Couldn't ask them."));
+		} finally {
+			setBusy(false);
+		}
+	};
+	return (
+		<Dialog.Root open={open} onOpenChange={setOpen}>
+			<Dialog.Trigger render={<Button size="xs" variant="outline" />}>Ask someone else</Dialog.Trigger>
+			<Dialog.Portal>
+				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) p-4 shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+					<div className="flex items-start gap-3">
+						<ItemIcon icon={r.item?.icon} quality={r.item?.quality} size={36} empty={!r.item?.icon} />
+						<div className="min-w-0 flex-1">
+							<Dialog.Title className="text-sm font-semibold">Ask someone else</Dialog.Title>
+							<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[r.item?.quality ?? "COMMON"] }}>
+								{title}
+							</p>
+						</div>
+						<CloseButton />
+					</div>
+					<CrafterPicker crafters={crafters} value={crafter} onChange={setPicked} />
+					{error && <p className="text-[13px] text-destructive">{error}</p>}
+					<div className="flex justify-end gap-2">
+						<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Cancel</Dialog.Close>
+						<Button size="sm" disabled={busy || !crafter} onClick={() => void ask()}>
+							{busy ? "Asking…" : asked ? `Ask ${asked.name}` : "Pick a crafter"}
+						</Button>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
+	);
+}
+
 /** A craft's state in a sentence: asked, accepted, or how the last ask ended. */
 function CraftState({ request: r }: { request: RequestView }) {
 	const who = (c: Character, mine: boolean) => (mine ? "you" : <ClassText classId={c.classId}>{c.name}</ClassText>);
@@ -669,7 +731,6 @@ function CraftState({ request: r }: { request: RequestView }) {
 		return (
 			<span className="text-muted-foreground">
 				<ClassText classId={r.lastAsk.character.classId}>{r.lastAsk.character.name}</ClassText> {outcome}
-				{r.mine ? " · ask someone else" : ""}
 			</span>
 		);
 	}
@@ -700,7 +761,6 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 		action: "ask" | "accept" | "decline" | "unclaim" | "markSent" | "complete" | "cancel" | "keep",
 		character?: string,
 	) => run(() => act({ requestId: r._id as Id<"requests">, action, character }));
-	const [askNext, setAskNext] = useState<string>();
 
 	const title = r.item?.name ?? r.recipe?.name ?? "Request";
 	return (
@@ -863,42 +923,9 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 				</div>
 			)}
 
-			{active && r.crafters && (
-				<div className={cn("space-y-1.5", !compact && "pl-[42px]")}>
-					{r.crafters.length === 0 ? (
-						<p className="text-xs text-muted-foreground">Nobody else in the guild knows this recipe now.</p>
-					) : (
-						<div className="flex flex-wrap items-center gap-1">
-							<span className="mr-1 text-xs text-muted-foreground">Ask</span>
-							{r.crafters.map((c) => (
-								<button
-									key={c.slug}
-									type="button"
-									className="chip disabled:opacity-50"
-									data-active={askNext === c.slug}
-									aria-pressed={askNext === c.slug}
-									disabled={!c.onGuildie}
-									title={c.onGuildie ? undefined : `${c.name} isn't on Guildie yet`}
-									onClick={() => setAskNext(c.slug)}
-								>
-									<ClassText classId={c.classId}>{c.name}</ClassText>
-								</button>
-							))}
-							<Button
-								size="xs"
-								variant="outline"
-								disabled={busy || !askNext}
-								onClick={() => askNext && doAct("ask", askNext)}
-							>
-								Ask
-							</Button>
-						</div>
-					)}
-				</div>
-			)}
-
 			{active && (
 				<div className={cn("flex flex-wrap items-center gap-1.5", !compact && "pl-[42px]")}>
+					{r.crafters && <AskSomeoneElse request={r} crafters={r.crafters} />}
 					{r.ask?.mine && (
 						<>
 							<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("accept")}>
