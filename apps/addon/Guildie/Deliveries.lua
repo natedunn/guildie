@@ -1,6 +1,48 @@
 -- Observe completed mail/trades; never send mail, collect items, or accept trades.
 local _, ns = ...
 local MAX_RECORDS = 200
+-- The server ignores events older than 30 days, so older unacknowledged ones
+-- (a character that never synced again) can go.
+local MAX_AGE = 31 * 86400
+local TRACE_LINES = 400
+
+-- `/guildie trace`: a local log of every mail and trade step and each match
+-- decision, kept in SavedVariables (GuildieDB.deliveryTrace, written at
+-- /reload or logout) and never uploaded. For checking what Forever's client
+-- actually does; decisions are also printed to chat.
+local function traceOn()
+    return GuildieDB and GuildieDB.deliveryTrace and GuildieDB.deliveryTrace.enabled
+end
+local function trace(loud, ...)
+    if not traceOn() then return end
+    local parts = {}
+    for i = 1, select("#", ...) do
+        local v = select(i, ...)
+        parts[#parts + 1] = type(v) == "string" and string.format("%q", v) or tostring(v)
+    end
+    local line = table.concat(parts, " ")
+    local lines = GuildieDB.deliveryTrace.lines
+    lines[#lines + 1] = (date and date("%H:%M:%S") or "") .. " " .. line
+    while #lines > TRACE_LINES do table.remove(lines, 1) end
+    if loud and print then print("Guildie trace: " .. line) end
+end
+ns.deliveryTrace = trace
+function ns.toggleDeliveryTrace()
+    GuildieDB.deliveryTrace = GuildieDB.deliveryTrace or {lines = {}}
+    local t = GuildieDB.deliveryTrace
+    t.lines = t.lines or {}
+    t.enabled = not t.enabled
+    if t.enabled then
+        print("Guildie: delivery trace on. Mail and trades are logged to SavedVariables at /reload; /guildie trace again turns it off.")
+        -- How this client names characters (does UnitName include the surname?).
+        trace(true, "identity", "UnitName", UnitName("player"),
+            "GetUnitName", GetUnitName and GetUnitName("player", true) or nil,
+            "UnitFullName", UnitFullName and UnitFullName("player") or nil,
+            "guid", UnitGUID("player"))
+    else
+        print("Guildie: delivery trace off.")
+    end
+end
 -- Saved independently of the transmitted window: unacknowledged events do not
 -- expire or get pushed out by newer mail. Acknowledgements load on login/reload.
 function ns.reconcileDeliveries(c)
@@ -10,8 +52,9 @@ function ns.reconcileDeliveries(c)
     local acknowledged = {}
     for _, id in ipairs(entry and entry.details and entry.details.deliveryIds or {}) do acknowledged[id] = true end
     local kept, window = {}, {}
+    local oldest = GetServerTime and GetServerTime() - MAX_AGE or 0
     for _, event in ipairs(records) do
-        if not acknowledged[event.id] then
+        if not acknowledged[event.id] and (event.at or oldest) >= oldest then
             kept[#kept + 1] = event
             if #window < MAX_RECORDS then window[#window + 1] = event end
         end
@@ -22,7 +65,15 @@ function ns.reconcileDeliveries(c)
 end
 local function nameKey(name)
     if type(name) ~= "string" then return nil end
-    return name:match("^%s*(.-)%s*$"):lower():gsub(" ", "-")
+    local key = name:match("^%s*(.-)%s*$"):lower():gsub(" ", "-")
+    return key ~= "" and key or nil
+end
+-- Blizzard's name for a Forever character is the first name only and its
+-- slug is `{name}-{surname}`; the game may show either. Same rule as the
+-- server's `sameCharacter` (shared/requests.ts).
+local function sameCharacter(observed, name, slug)
+    local key = nameKey(observed)
+    return key ~= nil and (key == nameKey(name) or (type(slug) == "string" and key == slug:lower()))
 end
 local function itemID(link)
     return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
@@ -31,13 +82,14 @@ local function requestsFor(id, recipient, sender)
     local matches = {}
     local rows = GuildieData and GuildieData.requests and GuildieData.requests[id] or {}
     for _, r in ipairs(rows) do
-        if r.kind == "item" and r.requestId and nameKey(r.name) == nameKey(recipient)
-            and (not r.claimedBy or nameKey(r.claimedBy.name) == nameKey(sender)) then
+        local claim = r.claimedBy
+        if r.kind == "item" and r.requestId and sameCharacter(recipient, r.name, r.slug)
+            and (not claim or sameCharacter(sender, claim.name, claim.slug)) then
             matches[#matches + 1] = r.requestId
         end
     end
     -- Ambiguity or stale/missing guild data: use manual completion instead.
-    return #matches == 1 and matches[1] or nil
+    return #matches == 1 and matches[1] or nil, #rows, #matches
 end
 local function record(kind, other, items)
     local guid, me = UnitGUID("player"), UnitName("player")
@@ -48,7 +100,11 @@ local function record(kind, other, items)
     local received = kind == "mailReceived" or kind == "tradeReceived"
     local now, records = GetServerTime(), ns.reconcileDeliveries(c)
     for id, quantity in pairs(items) do
-        local requestId = requestsFor(id, received and me or other, received and other or me)
+        local recipient, sender = received and me or other, received and other or me
+        local requestId, requests, matches = requestsFor(id, recipient, sender)
+        trace(true, kind, "item", id, "x" .. quantity, "from", sender, "to", recipient,
+            requestId and ("-> request " .. requestId)
+                or ("-> no match (" .. requests .. " requests for this item, " .. matches .. " matched)"))
         if requestId and quantity > 0 then
             c.deliverySequence = (c.deliverySequence or 0) + 1
             records[#records + 1] = {id = guid .. ":" .. now .. ":" .. c.deliverySequence,
@@ -89,11 +145,13 @@ end
 local function prepareTake(index, slot)
     if pendingTake and GetTime() - pendingTake.started < 30 then
         -- Concurrent operations cannot be attributed safely. Fail closed.
+        trace(true, "take", index, slot, "-> ignored: another collection is still pending")
         pendingTake = {started = GetTime(), ambiguous = true}
         return
     end
     pendingTake = nil
     local mail = inbox[index]
+    trace(false, "take", index, slot, "sender", mail and mail.sender or "(not player mail, COD or returned)")
     if not mail then return end
     local items, before = {}, {}
     for n, entry in pairs(mail.slots) do
@@ -101,7 +159,8 @@ local function prepareTake(index, slot)
     end
     for id in pairs(items) do
         before[id] = bagCount(id)
-        if before[id] == nil then return end
+        if before[id] == nil then trace(true, "take", "-> no bag count API"); return end
+        trace(false, "take", "item", id, "x" .. items[id], "bags before", before[id])
     end
     pendingTake = {sender = mail.sender, items = items, before = before, success = {}, started = GetTime()}
 end
@@ -111,6 +170,7 @@ local function finishTake()
     if GetTime() - p.started > 30 then pendingTake = nil; return end
     for id, quantity in pairs(p.items) do
         local count = bagCount(id)
+        trace(false, "collect", "item", id, "success event", p.success[id] and "yes" or "no", "bags now", count)
         if p.success[id] and count and count - p.before[id] >= quantity then
             record("mailReceived", p.sender, {[id] = quantity})
             p.items[id] = nil
@@ -137,6 +197,21 @@ local function readTrade()
     end
     return {other = UnitName("NPC"), incoming = incoming, sent = sent, started = GetTime()}
 end
+local function describe(items)
+    local parts = {}
+    for id, n in pairs(items) do parts[#parts + 1] = id .. "x" .. n end
+    return #parts > 0 and table.concat(parts, ",") or "-"
+end
+-- Re-read the window, keeping who it's with and what was on offer when
+-- someone last accepted: an accept is undone by any change to the items, so
+-- that offer is the one that completes, even if the window empties first.
+local function rereadTrade(previous)
+    local t = readTrade()
+    if not t then return previous end
+    t.other = t.other or (previous and previous.other)
+    t.locked = previous and previous.locked
+    return t
+end
 local function hook(name, fn)
     if not hooks[name] and type(_G[name]) == "function" and hooksecurefunc then
         local ok = pcall(hooksecurefunc, name, function(...) pcall(fn, ...) end)
@@ -146,7 +221,9 @@ end
 local function installHooks()
     hook("SendMail", function(recipient)
         pendingSend = nil
-        if type(GetSendMailCOD) ~= "function" or GetSendMailCOD() > 0 then return end
+        local cod = type(GetSendMailCOD) == "function" and GetSendMailCOD() or nil
+        trace(false, "send", "to", recipient, "items", describe(outgoing), "cod", cod)
+        if not cod or cod > 0 then return end
         pendingSend = {other = recipient, items = outgoing, started = GetTime()}
     end)
     hook("TakeInboxItem", prepareTake)
@@ -159,26 +236,49 @@ local function onEvent(event, a, b)
     elseif event == "MAIL_SEND_INFO_UPDATE" then refreshSend()
     elseif event == "MAIL_SEND_SUCCESS" then
         local p = pendingSend; pendingSend = nil
+        trace(false, event, p and "pending send" or "no pending send")
         if p and GetTime() - p.started <= 30 then record("mailSent", p.other, p.items) end
     elseif event == "MAIL_SUCCESS" then
+        trace(false, event, a)
         if pendingTake and not pendingTake.ambiguous and a then pendingTake.success[a] = true end
         finishTake()
-    elseif event == "BAG_UPDATE_DELAYED" then finishTake()
+    elseif event == "BAG_UPDATE_DELAYED" then
+        if pendingTake then finishTake() end
     elseif event == "MAIL_FAILED" or event == "MAIL_CLOSED" then
+        if pendingSend or pendingTake then trace(false, event, a) end
         pendingSend, pendingTake = nil, nil
-    elseif event == "TRADE_SHOW" or event == "TRADE_PLAYER_ITEM_CHANGED" or event == "TRADE_TARGET_ITEM_CHANGED" then
+    elseif event == "TRADE_SHOW" then
         trade = readTrade()
+        trace(false, event, "with", trade and trade.other)
+    elseif event == "TRADE_PLAYER_ITEM_CHANGED" or event == "TRADE_TARGET_ITEM_CHANGED" then
+        trade = rereadTrade(trade)
+        trace(false, event, trade and describe(trade.incoming), trade and describe(trade.sent))
     elseif event == "TRADE_ACCEPT_UPDATE" then
-        trade = readTrade()
-        if trade then trade.accepted = a == 1 and b == 1 end
+        trade = rereadTrade(trade)
+        if trade then
+            local offer = next(trade.incoming) or next(trade.sent)
+            if a ~= 1 and b ~= 1 then trade.locked = nil
+            elseif offer then trade.locked = {incoming = trade.incoming, sent = trade.sent} end
+        end
+        trace(false, event, a, b, "in", trade and describe(trade.incoming), "out", trade and describe(trade.sent))
     elseif event == "TRADE_CLOSED" then
-        if trade and trade.accepted then trade.closedAt = GetTime() else trade = nil end
-    elseif event == "TRADE_REQUEST_CANCEL" or event == "UI_ERROR_MESSAGE" then trade = nil
+        if trade then trade.closedAt = trade.closedAt or GetTime() end
+        trace(false, event)
+    elseif event == "TRADE_REQUEST_CANCEL" then
+        trace(false, event); trade = nil
+    elseif event == "UI_ERROR_MESSAGE" then
+        -- A failed trade (bags full, too far) never says "Trade complete", so
+        -- an error is only noted; a new trade starts a fresh read.
+        if trade then trace(false, event, b) end
     elseif event == "UI_INFO_MESSAGE" and ERR_TRADE_COMPLETE and b == ERR_TRADE_COMPLETE then
+        -- "Trade complete" is the proof; both accepting isn't always reported.
         local t = trade; trade = nil
-        if t and t.accepted and (not t.closedAt or GetTime() - t.closedAt <= 5) then
-            record("tradeReceived", t.other, t.incoming)
-            record("tradeSent", t.other, t.sent)
+        local fresh = t and (not t.closedAt or GetTime() - t.closedAt <= 5)
+        trace(false, "trade complete", fresh and "with " .. tostring(t.other) or "-> no recent trade window")
+        if fresh then
+            local offer = t.locked or t
+            record("tradeReceived", t.other, offer.incoming)
+            record("tradeSent", t.other, offer.sent)
         end
     end
 end

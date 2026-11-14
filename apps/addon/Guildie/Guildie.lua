@@ -487,7 +487,11 @@ frame:SetScript("OnEvent", function(_, event, questID)
 end)
 
 SLASH_GUILDIE1 = "/guildie"
-SlashCmdList.GUILDIE = function()
+SlashCmdList.GUILDIE = function(command)
+    if type(command) == "string" and command:lower():match("^%s*trace%s*$") and ns.toggleDeliveryTrace then
+        ns.toggleDeliveryTrace()
+        return
+    end
     capture("slash")
     if ns.toggleWindow then ns.toggleWindow() end
 end

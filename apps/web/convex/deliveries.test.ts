@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseCharacter } from "./addonPayload.ts";
-import { deliveryMatches, deliveryParticipants, deliveryProgress, remainingQuantity } from "./shared/requests.ts";
+import {
+	deliveryMatches,
+	deliveryParticipants,
+	deliveryProgress,
+	deliveryRejection,
+	remainingQuantity,
+	sameCharacter,
+} from "./shared/requests.ts";
 
 const now = 1794300000000;
 const request = {
@@ -132,4 +139,47 @@ test("only receipt quantities reduce the remainder, preserving the target and cl
 		assert.equal(state.receivedQuantity, 22);
 		assert.equal(state.status, "done");
 	}
+});
+
+test("Forever names: first name or full name match, nothing else does", () => {
+	const bung = { name: "Bung", slug: "bung-dingus" };
+	for (const shown of ["Bung", "bung", " Bung ", "Bung Dingus", "Bung-Dingus"])
+		assert(sameCharacter(shown, bung), shown);
+	for (const shown of ["", "Bungo", "Bung Other", "Dingus", "bung-dingus-x"])
+		assert(!sameCharacter(shown, bung), shown);
+	assert(!sameCharacter("Bung", { name: "Bung Other" }), "no slug: the name alone");
+
+	// As stored in production: first names, with the surname only in the slug.
+	const forever = {
+		...request,
+		character: { slug: "bung-dingus", name: "Bung" },
+		claim: { ...request.claim, character: { slug: "todd-bonzalezz", name: "Todd" } },
+	};
+	const bungReporter = { ...receiver, slug: "bung-dingus", name: "Bung" };
+	const toddReporter = { ...sender, slug: "todd-bonzalezz", name: "Todd" };
+	for (const other of ["Todd", "Todd Bonzalezz"])
+		assert(deliveryMatches(forever, { ...event, other }, bungReporter, now));
+	for (const other of ["Bung", "Bung Dingus"])
+		assert(deliveryMatches(forever, { ...event, kind: "tradeSent", other }, toddReporter, now));
+	const known = { name: "Todd", slug: "todd-bonzalezz" };
+	assert.deepEqual(deliveryParticipants({ kind: "mailReceived", other: "Todd" }, bungReporter, known).sender, known);
+});
+
+test("rejected reports say why", () => {
+	const cases: [Parameters<typeof deliveryRejection>, string | undefined][] = [
+		[[request, event, receiver, now], undefined],
+		[[{ ...request, kind: "craft" }, event, receiver, now], "not an item request"],
+		[[request, { ...event, itemId: 1 }, receiver, now], "different item"],
+		[[{ ...request, status: "done" }, event, receiver, now], "request closed"],
+		[[request, event, { ...receiver, guildId: "x" }, now], "other guild"],
+		[[request, { ...event, at: now - 20000 }, receiver, now], "before the request"],
+		[[request, { ...event, at: now - 6000 }, receiver, now], "before the claim"],
+		[[request, event, receiver, now + 31 * 86400000], "older than 30 days"],
+		[[request, event, { ...receiver, slug: "alt" }, now], "not the requester"],
+		[[request, { ...event, other: "Someone" }, receiver, now], "not from the claimant"],
+		[[{ ...request, claim: undefined }, { ...event, kind: "mailSent" }, sender, now], "request not claimed"],
+		[[request, { ...event, kind: "mailSent", other: "Receiver-Last" }, receiver, now], "not the claimant"],
+		[[request, { ...event, kind: "mailSent", other: "Someone" }, sender, now], "not to the requester"],
+	];
+	for (const [args, why] of cases) assert.equal(deliveryRejection(...args), why);
 });

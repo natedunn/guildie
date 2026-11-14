@@ -119,7 +119,7 @@ print("Delivery capture passed")
 local c = ns.current()
 GuildieDB.deliveryOutbox = {}
 c.deliveries = {}
-for i = 1, 205 do c.deliveries[i] = {id = "event-" .. i, at = 1} end
+for i = 1, 205 do c.deliveries[i] = {id = "event-" .. i, at = GetServerTime()} end
 ns.reconcileDeliveries(c)
 assert(#c.deliveries == 200)
 assert(#GuildieDB.deliveryOutbox[c.guid] == 205, "no eviction by age or window size")
@@ -128,3 +128,82 @@ ns.reconcileDeliveries(c)
 assert(#GuildieDB.deliveryOutbox[c.guid] == 203)
 assert(c.deliveries[1].id == "event-3")
 assert(c.deliveries[200].id == "event-202", "acknowledgements advance wire window")
+
+-- Unacknowledged events past the server's 30 days go; recent ones stay.
+GuildieDB.deliveryOutbox[c.guid][1].at = GetServerTime() - 32 * 86400
+ns.reconcileDeliveries(c)
+assert(#GuildieDB.deliveryOutbox[c.guid] == 202, "events the server would ignore are pruned")
+print("Delivery outbox passed")
+
+-- Forever names: Blizzard's name is the first name, the slug has the surname,
+-- and the game may show either. Both match the request; another name doesn't.
+local function fresh(name)
+    ns = wow.load({guid = "Player-names", name = name, level = 20})
+    callbacks = {}
+    hooksecurefunc = function(n, fn) callbacks[n] = fn end
+    wow.fire("PLAYER_ENTERING_WORLD")
+end
+local function receiveTrade(from)
+    UnitName = function(unit) return unit == "NPC" and from or ns.current() and ns.current().name end
+    GetTradeTargetItemInfo = function(slot) if slot == 1 then return "Cloth", nil, 3 end end
+    GetTradeTargetItemLink = function(slot) if slot == 1 then return "item:4306" end end
+    wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 1, 0)
+    wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
+    return #(ns.current().deliveries or {})
+end
+for _, case in ipairs({
+    {me = "Bung", from = "Todd", n = 1},
+    {me = "Bung Dingus", from = "Todd Bonzalezz", n = 1},
+    {me = "Bung", from = "Todd-Bonzalezz", n = 1},
+    {me = "Bung", from = "Toddy", n = 0},
+    {me = "Bungo", from = "Todd", n = 0},
+    {me = "Bung Other", from = "Todd", n = 0},
+}) do
+    fresh(case.me)
+    GuildieData = {requests = {[4306] = {{requestId = "req2", kind = "item", name = "Bung", slug = "bung-dingus",
+        claimedBy = {name = "Todd", slug = "todd-bonzalezz"}}}}}
+    assert(receiveTrade(case.from) == case.n, case.me .. " from " .. case.from)
+end
+print("Delivery names passed")
+
+-- Trades: "Trade complete" is the proof, even when both accepting is never
+-- reported, and the accepted offer counts even if the window empties first.
+-- Unrelated UI errors don't drop the trade; cancelled ones still don't count.
+fresh("Bung")
+GuildieData = {requests = {[4306] = {{requestId = "req2", kind = "item", name = "Bung", slug = "bung-dingus"}}}}
+UnitName = function(unit) return unit == "NPC" and "Todd" or "Bung" end
+local offer = 5
+GetTradeTargetItemInfo = function(slot) if slot == 1 and offer > 0 then return "Cloth", nil, offer end end
+GetTradeTargetItemLink = function(slot) if slot == 1 and offer > 0 then return "item:4306" end end
+wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 0, 1)
+wow.fire("UI_ERROR_MESSAGE", 50, "Out of range.")
+offer = 0; wow.fire("TRADE_TARGET_ITEM_CHANGED"); wow.fire("TRADE_CLOSED")
+wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
+assert(#ns.current().deliveries == 1 and ns.current().deliveries[1].quantity == 5, "accepted offer counts")
+offer = 5
+wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 1, 0); wow.fire("TRADE_ACCEPT_UPDATE", 0, 0)
+offer = 2; wow.fire("TRADE_TARGET_ITEM_CHANGED")
+wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
+assert(#ns.current().deliveries == 2 and ns.current().deliveries[2].quantity == 2, "a changed offer counts as changed")
+wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 1, 0); wow.fire("TRADE_REQUEST_CANCEL")
+wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
+assert(#ns.current().deliveries == 2, "cancelled trade")
+print("Delivery trades passed")
+
+-- The trace: off by default, logs steps and decisions when on, never uploaded.
+assert(not (GuildieDB.deliveryTrace and GuildieDB.deliveryTrace.enabled))
+local printed = {}
+print = function(line) printed[#printed + 1] = line end
+SlashCmdList.GUILDIE("trace")
+wow.fire("TRADE_SHOW"); wow.fire("TRADE_ACCEPT_UPDATE", 1, 0)
+wow.fire("UI_INFO_MESSAGE", 1, ERR_TRADE_COMPLETE)
+SlashCmdList.GUILDIE("trace")
+print = _G.realPrint or io.write
+local lines = table.concat(GuildieDB.deliveryTrace.lines, "\n")
+assert(lines:find("identity") and lines:find("\"Bung\""), "identity logged")
+assert(lines:find('"TRADE_ACCEPT_UPDATE" 1 0', 1, true) and lines:find("tradeReceived") and lines:find("request req2"), "steps and decision logged")
+assert(table.concat(printed, "\n"):find("request req2"), "decisions printed")
+assert(not GuildieDB.deliveryTrace.enabled)
+wow.fire("PLAYER_LOGOUT")
+assert(not GuildieDB.payload:find("identity"), "trace is not part of the upload")
+io.write("Delivery trace passed\n")

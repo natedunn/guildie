@@ -297,8 +297,18 @@ export function canHelpFromInventory(
 	);
 }
 
-/** Exact names only: never guess a Forever surname from a first name. */
 export const deliveryName = (name: string) => name.trim().toLowerCase().replace(/ /g, "-");
+/**
+ * Whether a name the game showed is this character. Blizzard's `name` for a
+ * Forever character is the first name only and its slug is
+ * `{name}-{surname}`; the game may show either ("Bung", "Bung Dingus"). The
+ * reporter is pinned by its GUID, so this only checks the other side. The
+ * addon has the same rule (Deliveries.lua, `sameCharacter`).
+ */
+export function sameCharacter(observed: string, c: { name: string; slug?: string }) {
+	const key = deliveryName(observed);
+	return key !== "" && (key === deliveryName(c.name) || key === c.slug);
+}
 type DeliveryReport = { kind: string; other: string; itemId: number; quantity: number; at: number };
 type DeliveryRequest = {
 	kind: string;
@@ -315,38 +325,51 @@ type DeliveryRequest = {
 	receivedQuantity?: number;
 	sentQuantity?: number;
 };
-export function deliveryMatches(
+/** Why a delivery report didn't count, kept on its ledger row for debugging. */
+export type DeliveryRejection =
+	| "not an item request"
+	| "different item"
+	| "request closed"
+	| "other guild"
+	| "before the request"
+	| "in the future"
+	| "older than 30 days"
+	| "ongoing request ended"
+	| "not the requester"
+	| "before the claim"
+	| "not from the claimant"
+	| "request not claimed"
+	| "not the claimant"
+	| "not to the requester";
+
+export function deliveryRejection(
 	r: DeliveryRequest,
 	e: DeliveryReport,
 	reporter: { userId: string; slug: string; name: string; guildId: string },
 	now: number,
-) {
-	if (
-		r.kind !== "item" ||
-		r.itemId !== e.itemId ||
-		!["open", "claimed"].includes(r.status) ||
-		r.guildId !== reporter.guildId ||
-		e.at < r.createdAt ||
-		e.at > now + 600000 ||
-		now - e.at > 30 * DAY_MS ||
-		(r.ongoing && r.until !== undefined && (r.until <= now || e.at >= r.until))
-	)
-		return false;
+): DeliveryRejection | undefined {
+	if (r.kind !== "item") return "not an item request";
+	if (r.itemId !== e.itemId) return "different item";
+	if (!["open", "claimed"].includes(r.status)) return "request closed";
+	if (r.guildId !== reporter.guildId) return "other guild";
+	if (e.at < r.createdAt) return "before the request";
+	if (e.at > now + 600000) return "in the future";
+	if (now - e.at > 30 * DAY_MS) return "older than 30 days";
+	if (r.ongoing && r.until !== undefined && (r.until <= now || e.at >= r.until)) return "ongoing request ended";
 	if (e.kind.endsWith("Received")) {
-		return (
-			r.userId === reporter.userId &&
-			r.character.slug === reporter.slug &&
-			(!r.claim || (e.at >= r.claim.claimedAt && deliveryName(e.other) === deliveryName(r.claim.character.name)))
-		);
+		if (r.userId !== reporter.userId || r.character.slug !== reporter.slug) return "not the requester";
+		if (r.claim && e.at < r.claim.claimedAt) return "before the claim";
+		if (r.claim && !sameCharacter(e.other, r.claim.character)) return "not from the claimant";
+		return undefined;
 	}
-	return (
-		!!r.claim &&
-		r.claim.userId === reporter.userId &&
-		r.claim.character.slug === reporter.slug &&
-		e.at >= r.claim.claimedAt &&
-		deliveryName(e.other) === deliveryName(r.character.name)
-	);
+	if (!r.claim) return "request not claimed";
+	if (r.claim.userId !== reporter.userId || r.claim.character.slug !== reporter.slug) return "not the claimant";
+	if (e.at < r.claim.claimedAt) return "before the claim";
+	if (!sameCharacter(e.other, r.character)) return "not to the requester";
+	return undefined;
 }
+
+export const deliveryMatches = (...args: Parameters<typeof deliveryRejection>) => !deliveryRejection(...args);
 export function deliveryProgress(
 	r: Pick<DeliveryRequest, "status" | "quantity" | "ongoing" | "receivedQuantity" | "sentQuantity">,
 	e: Pick<DeliveryReport, "kind" | "quantity">,
@@ -361,15 +384,13 @@ export function deliveryProgress(
 }
 
 /** Keep the observed names even when there is no exact known character match. */
-export function deliveryParticipants<T extends { name: string }>(
+export function deliveryParticipants<T extends { name: string; slug?: string }>(
 	event: Pick<DeliveryReport, "kind" | "other">,
 	reporter: T,
 	knownOther?: T,
 ) {
 	const other =
-		knownOther && deliveryName(knownOther.name) === deliveryName(event.other)
-			? { ...knownOther, name: event.other }
-			: { name: event.other };
+		knownOther && sameCharacter(event.other, knownOther) ? { ...knownOther, name: event.other } : { name: event.other };
 	const received = event.kind.endsWith("Received");
 	return {
 		sender: received ? other : reporter,

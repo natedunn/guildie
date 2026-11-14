@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Addon:** Items you send or receive for a guild request through mail or trade are more reliably counted toward it: names now match with or without the surname, trades count even when the game doesn't report both sides accepting, and a report is only cleared from the addon once Guildie has processed it. `/guildie trace` logs each mail and trade step for troubleshooting.
+
 ## 0.3.35
 
 ### Improvements

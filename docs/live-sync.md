@@ -142,8 +142,12 @@ completion. A sender report only marks a claimed request sent and records a
 separate sent total. Ongoing requests record receipts without closing.
 
 The addon must have the request in its downloaded GuildieData before the action.
-It binds the event to that request ID and uses exact character names (including
-Forever surnames), never a first-name guess. Its existing limited tooltip request
+It binds the event to that request ID. Names: Blizzard's `name` for a Forever
+character is the first name only (`Bung`), with the surname only in the slug
+(`bung-dingus`), and the game may show either. A name counts when it equals
+the first name or the full `{name}-{surname}` (`sameCharacter`, the same rule in
+`Deliveries.lua` and `shared/requests.ts`). The reporter itself is pinned by its
+GUID, so names only check the other side. Its existing limited tooltip request
 cache may omit a request; stale or missing data requires manual completion.
 The currently loaded cache only updates at reload/login. No mail text, subject,
 coins, or unrelated transactions are uploaded.
@@ -163,6 +167,14 @@ completion. Reload/logout writes them to SavedVariables; live pixels carry the
 same records sooner. A crash before saving can lose unsynced records. Ingestion
 schedules bounded batches of 50, so completion may appear shortly after upload.
 The existing payload/live snapshot size limits still apply.
+
+**Trace.** `/guildie trace` (again to stop) logs each mail and trade step, the
+names the client shows (`UnitName`, `GetUnitName`, `UnitFullName`) and every match
+decision to `GuildieDB.deliveryTrace` (the last 400 lines, written at `/reload` or
+logout, never uploaded); decisions also print to chat. Run it for every PC test
+and keep the trace with the result. On the server, every report that reaches a
+request leaves a `requestDeliveryEvents` row; one that didn't count has
+`rejected` saying why (`shared/requests.ts`, `DeliveryRejection`).
 
 PC test, using a matching backend/app and both players' updated addons:
 
@@ -187,7 +199,12 @@ PC test, using a matching backend/app and both players' updated addons:
    never fulfill the new request. Craft/enchant requests retain manual controls.
 
 Capture requires `MAIL_SUCCESS` with an item ID plus the expected bag-count
-increase, or `UI_INFO_MESSAGE` matching `ERR_TRADE_COMPLETE` after both accepts.
+increase, or `UI_INFO_MESSAGE` matching `ERR_TRADE_COMPLETE` within 5 seconds of
+the trade window. "Both accepted" isn't required (clients don't always report
+it before the trade closes). The items counted are the offer as of the last
+accept (any change to the items undoes an accept), so a window that empties
+while completing still counts what was traded. UI errors during a trade are
+only noted: a failed trade never says "Trade complete".
 Confirm these actual event sequences on Forever before approving release; tests
 use API stubs and do not establish client support. Unknown/restricted APIs are
 caught and leave the manual controls available. Nothing clicks or accepts for
@@ -284,8 +301,12 @@ missing bank access and unopened recipe windows retain existing reads.
 Delivery reports have stable IDs and are deduplicated server-side. Pending reports
 live in SavedVariables separately from the 200-event transmission window. They
 are removed only when the downloaded per-character delivery IDs acknowledge
-server ingestion, loaded on login/reload. This acknowledges durable ingestion
-and scheduled processing, not request fulfillment. More than 200 pending events
+them, loaded on login/reload. A report is acknowledged once the server has
+processed it (counted, or recorded as rejected), not on upload, so a failed
+processing run leaves it pending and it is sent again. Reports from a character
+not yet in a guild's roster stay pending. Unacknowledged reports older than 31
+days are dropped (the server ignores them after 30). Acknowledgement is not
+request fulfillment. More than 200 pending events
 advance in batches across reloads. Server matching still refuses ambiguous,
 expired (over 30 days), or no-longer-active requests; manual completion remains
 available. No claim of guaranteed automatic matching is made.

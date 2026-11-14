@@ -158,7 +158,9 @@ preserved, and the remaining amount is derived from recipient receipts, floored
 at zero. Tooltips show this server remainder after refreshed GuildieData loads
 at login or `/reload`; the addon does not subtract local receipts a second time.
 Crafts, enchants, COD, returns and uncertain matches keep manual completion.
-A request must be in the loaded GuildieData, including its request ID. Tracking
+A request must be in the loaded GuildieData, including its request ID.
+`/guildie trace` logs every mail and trade step and match decision to
+SavedVariables (never uploaded) for checking the client's behavior. Tracking
 retains at most 200 matching events per character for 30 days; it cannot recover
 transactions missed while the addon was disabled. Installing `Deliveries.lua`
 requires a full game restart. Forever event behavior remains pending the
