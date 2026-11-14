@@ -586,26 +586,25 @@ export function CrafterPicker({
 		return <p className="text-[13px] text-muted-foreground">Nobody else in the guild knows this recipe yet.</p>;
 	const askable = crafters.some((c) => c.onGuildie);
 	return (
-		<Field label={label} as="div">
-			<div className="flex flex-wrap gap-1">
+		<Field label={label}>
+			<select
+				value={value ?? ""}
+				onChange={(e) => e.target.value && onChange(e.target.value)}
+				className="h-9 w-full rounded-md border bg-well px-2 text-[0.8125rem] pointer-coarse:h-10 pointer-coarse:text-base"
+			>
+				<option value="" disabled>
+					{askable ? "Pick a crafter…" : "Nobody on Guildie knows it"}
+				</option>
 				{crafters.map((c) => (
-					<button
-						key={c.slug}
-						type="button"
-						className="chip disabled:opacity-50"
-						data-active={value === c.slug}
-						aria-pressed={value === c.slug}
-						disabled={!c.onGuildie}
-						title={c.onGuildie ? undefined : `${c.name} isn't on Guildie yet, so they couldn't answer`}
-						onClick={() => onChange(c.slug)}
-					>
-						<ClassText classId={c.classId}>{c.name}</ClassText>
-					</button>
+					<option key={c.slug} value={c.slug} disabled={!c.onGuildie}>
+						{c.name}
+						{c.onGuildie ? "" : " (not on Guildie yet)"}
+					</option>
 				))}
-			</div>
+			</select>
 			<span className="block text-xs text-muted-foreground">
 				{askable
-					? "They accept or decline; you're told either way. Greyed out: not on Guildie yet."
+					? "They accept or decline; you're told either way. Only guildmates on Guildie can answer."
 					: "Nobody who knows it is on Guildie yet, so nobody could answer. Invite them to Guildie."}
 			</span>
 		</Field>
