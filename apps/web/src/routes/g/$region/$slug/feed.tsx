@@ -435,8 +435,13 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 			<div className="min-w-0 flex-1 text-base leading-snug">
 				<div>{text}</div>
 				{/* The kind's icon leads the grey line (on the portraits it would cover a group). */}
-				<div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-					<HugeiconsIcon icon={KIND_ICON[e.kind]} size={14} strokeWidth={2} className="flex-none" />
+				<div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+					<HugeiconsIcon
+						icon={KIND_ICON[e.kind]}
+						size={14}
+						strokeWidth={2}
+						className="flex-none translate-y-px opacity-70"
+					/>
 					<span className="truncate">{detail || KIND_LABEL[e.kind]}</span>
 				</div>
 			</div>
