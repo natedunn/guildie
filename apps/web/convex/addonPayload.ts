@@ -164,7 +164,8 @@ export type Delivery = {
 	id: string;
 	reporterName?: string;
 	requestId: string;
-	kind: "mailSent" | "mailReceived" | "tradeSent" | "tradeReceived";
+	/** enchantReceived: a trade that put the requested enchant on the requester's item (addon 0.20.0). */
+	kind: "mailSent" | "mailReceived" | "tradeSent" | "tradeReceived" | "enchantReceived";
 	other: string;
 	itemId: number;
 	quantity: number;
@@ -540,7 +541,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 				arr(events, "deliveries", 200).map((raw) => {
 					const e = obj(raw, "delivery");
 					const kind = str(e.kind, "delivery.kind", 20);
-					if (!["mailSent", "mailReceived", "tradeSent", "tradeReceived"].includes(kind))
+					if (!["mailSent", "mailReceived", "tradeSent", "tradeReceived", "enchantReceived"].includes(kind))
 						fail("delivery.kind", "unknown kind");
 					return {
 						id: plain(e.id, "delivery.id", 160),

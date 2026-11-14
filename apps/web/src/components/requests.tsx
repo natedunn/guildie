@@ -452,6 +452,10 @@ function CraftRequestForm({
 	const [note, setNote] = useState("");
 	const [character, setCharacter] = useState(characters[0]?.slug);
 	const [declared, setDeclared] = useState(false);
+	// Who to ask: guildmates who know it, not your own characters.
+	const crafters = (target.crafters ?? []).filter((c) => !characters.some((m) => m.slug === c.slug));
+	const [crafter, setCrafter] = useState(crafters.length === 1 ? crafters[0].slug : undefined);
+	const asked = crafters.find((c) => c.slug === crafter);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const q = Math.max(1, Math.min(REQUEST_LIMITS.quantity, Math.floor(Number(quantity)) || 1));
@@ -470,6 +474,7 @@ function CraftRequestForm({
 				note: note.trim() || undefined,
 				character,
 				declared,
+				crafter,
 			});
 			onDone();
 		} catch (err) {
@@ -498,18 +503,7 @@ function CraftRequestForm({
 				<CloseButton />
 			</div>
 
-			{target.crafters && target.crafters.length > 0 && (
-				<p className="text-[13px] text-muted-foreground">
-					Can make it:{" "}
-					{target.crafters.slice(0, 5).map((c, i) => (
-						<span key={c.slug}>
-							{i > 0 && ", "}
-							<ClassText classId={c.classId}>{c.name}</ClassText>
-						</span>
-					))}
-					{target.crafters.length > 5 && ` +${target.crafters.length - 5}`}
-				</p>
-			)}
+			<CrafterPicker crafters={crafters} value={crafter} onChange={setCrafter} />
 
 			<AskingAs characters={characters} value={character} onChange={setCharacter} />
 
@@ -550,7 +544,8 @@ function CraftRequestForm({
 					</label>
 				)}
 				<p className="text-xs text-muted-foreground">
-					Sending the mats to whoever claims it is on you. Guildmates see "
+					Sending the mats is on you, once {asked ? asked.name : "they"} accept. With the Guildie app, what arrives
+					shows on the request. {asked ? asked.name : "They"} see "
 					{matsLabel(mats?.covered ? "inventory" : declared ? "declared" : "missing")}", never what's in your bags.
 				</p>
 			</div>
@@ -558,11 +553,44 @@ function CraftRequestForm({
 			{error && <p className="text-[13px] text-destructive">{error}</p>}
 			<div className="flex justify-end gap-2">
 				<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Cancel</Dialog.Close>
-				<Button type="submit" size="sm" disabled={busy}>
-					{busy ? "Posting…" : "Post request"}
+				<Button type="submit" size="sm" disabled={busy || !crafter}>
+					{busy ? "Asking…" : asked ? `Ask ${asked.name}` : "Pick a crafter"}
 				</Button>
 			</div>
 		</form>
+	);
+}
+
+/** Who to ask to craft it: one guildmate who knows the recipe. They accept or decline. */
+function CrafterPicker({
+	crafters,
+	value,
+	onChange,
+}: {
+	crafters: Character[];
+	value: string | undefined;
+	onChange: (slug: string) => void;
+}) {
+	if (crafters.length === 0)
+		return <p className="text-[13px] text-muted-foreground">Nobody else in the guild knows this recipe yet.</p>;
+	return (
+		<Field label="Ask" as="div">
+			<div className="flex flex-wrap gap-1">
+				{crafters.map((c) => (
+					<button
+						key={c.slug}
+						type="button"
+						className="chip"
+						data-active={value === c.slug}
+						aria-pressed={value === c.slug}
+						onClick={() => onChange(c.slug)}
+					>
+						<ClassText classId={c.classId}>{c.name}</ClassText>
+					</button>
+				))}
+			</div>
+			<span className="block text-xs text-muted-foreground">They accept or decline; you're told either way.</span>
+		</Field>
 	);
 }
 
@@ -596,7 +624,41 @@ const STATUS_LABEL: Record<RequestView["status"], string> = {
 	expired: "Expired",
 };
 
-/** One request with what the viewer can do: claim a craft, release, mark sent; the requester's done, cancel, keep. */
+/** A craft's state in a sentence: asked, accepted, or how the last ask ended. */
+function CraftState({ request: r }: { request: RequestView }) {
+	const who = (c: Character, mine: boolean) => (mine ? "you" : <ClassText classId={c.classId}>{c.name}</ClassText>);
+	if (r.claim)
+		return (
+			<span className="text-muted-foreground">
+				{r.claim.mine ? "You're" : <ClassText classId={r.claim.character.classId}>{r.claim.character.name}</ClassText>}
+				{r.claim.mine ? " crafting it" : " is crafting it"} · accepted {ago(r.claim.claimedAt)}
+			</span>
+		);
+	if (r.ask)
+		return (
+			<span className="text-muted-foreground">
+				Asked {who(r.ask.character, r.ask.mine)} {ago(r.ask.askedAt)}
+				{r.ask.mine ? " · will you craft it?" : " · waiting for an answer"}
+			</span>
+		);
+	if (r.lastAsk) {
+		const outcome =
+			r.lastAsk.outcome === "declined"
+				? "declined"
+				: r.lastAsk.outcome === "lapsed"
+					? "didn't answer in 7 days"
+					: "backed out";
+		return (
+			<span className="text-muted-foreground">
+				<ClassText classId={r.lastAsk.character.classId}>{r.lastAsk.character.name}</ClassText> {outcome}
+				{r.mine ? " · ask someone else" : ""}
+			</span>
+		);
+	}
+	return null;
+}
+
+/** One request with what the viewer can do: accept or decline an ask, ask a crafter, back out; the requester's done, cancel, keep. */
 export function RequestRow({ request: r, compact }: { request: RequestView; compact?: boolean }) {
 	const act = useMutation(api.requests.act);
 	const setDeclared = useMutation(api.requests.setDeclared);
@@ -616,8 +678,11 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 			setBusy(false);
 		}
 	};
-	const doAct = (action: "claim" | "unclaim" | "markSent" | "complete" | "cancel" | "keep") =>
-		run(() => act({ requestId: r._id as Id<"requests">, action }));
+	const doAct = (
+		action: "ask" | "accept" | "decline" | "unclaim" | "markSent" | "complete" | "cancel" | "keep",
+		character?: string,
+	) => run(() => act({ requestId: r._id as Id<"requests">, action, character }));
+	const [askNext, setAskNext] = useState<string>();
 
 	const title = r.item?.name ?? r.recipe?.name ?? "Request";
 	return (
@@ -691,6 +756,8 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								{r.mine ? "Guildmates send any they have" : "Send any you have"}
 								{r.have ? <span className="text-foreground"> · you have {r.have}</span> : null}
 							</span>
+						) : r.kind === "craft" && active && (r.ask || r.claim || r.lastAsk) ? (
+							<CraftState request={r} />
 						) : r.claim ? (
 							<>
 								<span className="text-muted-foreground">
@@ -710,7 +777,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							</>
 						) : (
 							<span className="text-muted-foreground">
-								{r.kind === "craft" && r.status === "open" ? "Not claimed yet" : STATUS_LABEL[r.status]}
+								{r.kind === "craft" && r.status === "open" ? "Waiting for a crafter" : STATUS_LABEL[r.status]}
 							</span>
 						)}
 						{!active && r.closedAt && <span className="text-muted-foreground"> · {ago(r.closedAt)}</span>}
@@ -753,21 +820,82 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 				</div>
 			)}
 
+			{r.matsProgress && r.matsProgress.length > 0 && active && (
+				<div className={cn(!compact && "pl-[42px]")}>
+					<ul className="max-w-sm space-y-0.5 text-[13px]">
+						{r.matsProgress.map((m) => (
+							<li key={m.itemId} className="flex items-baseline gap-2">
+								<span className="min-w-0 flex-1 truncate text-muted-foreground">{m.name}</span>
+								<span className={cn("num text-xs", m.got >= m.need ? "text-foreground" : "text-muted-foreground")}>
+									{Math.min(m.got, 9999)}/{m.need}
+								</span>
+							</li>
+						))}
+					</ul>
+					<p className="text-xs text-muted-foreground">
+						Mats {r.mine ? "you've sent" : "sent to you"}, as the Guildie app saw them. They don't have to be complete.
+					</p>
+				</div>
+			)}
+
+			{active && r.crafters && (
+				<div className={cn("space-y-1.5", !compact && "pl-[42px]")}>
+					{r.crafters.length === 0 ? (
+						<p className="text-xs text-muted-foreground">Nobody else in the guild knows this recipe now.</p>
+					) : (
+						<div className="flex flex-wrap items-center gap-1">
+							<span className="mr-1 text-xs text-muted-foreground">Ask</span>
+							{r.crafters.map((c) => (
+								<button
+									key={c.slug}
+									type="button"
+									className="chip"
+									data-active={askNext === c.slug}
+									aria-pressed={askNext === c.slug}
+									onClick={() => setAskNext(c.slug)}
+								>
+									<ClassText classId={c.classId}>{c.name}</ClassText>
+								</button>
+							))}
+							<Button
+								size="xs"
+								variant="outline"
+								disabled={busy || !askNext}
+								onClick={() => askNext && doAct("ask", askNext)}
+							>
+								Ask
+							</Button>
+						</div>
+					)}
+				</div>
+			)}
+
 			{active && (
 				<div className={cn("flex flex-wrap items-center gap-1.5", !compact && "pl-[42px]")}>
-					{r.canClaim && (
-						<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("claim")}>
-							Claim
-						</Button>
+					{r.ask?.mine && (
+						<>
+							<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("accept")}>
+								Accept
+							</Button>
+							<Button size="xs" variant="ghost" disabled={busy} onClick={() => doAct("decline")}>
+								Decline
+							</Button>
+						</>
 					)}
-					{r.claim?.mine && !r.claim.sentAt && (
+					{r.kind === "item" && r.claim?.mine && !r.claim.sentAt && (
 						<Button size="xs" variant="outline" disabled={busy} onClick={() => doAct("markSent")}>
 							Mark sent
 						</Button>
 					)}
 					{r.claim && (r.claim.mine || r.mine) && (
 						<Button size="xs" variant="ghost" disabled={busy} onClick={() => doAct("unclaim")}>
-							{r.claim.mine ? "Unclaim" : "Release claim"}
+							{r.kind === "craft"
+								? r.claim.mine
+									? "Back out"
+									: "Take it back"
+								: r.claim.mine
+									? "Unclaim"
+									: "Release claim"}
 						</Button>
 					)}
 					{r.mine && r.ongoing && (
@@ -789,9 +917,6 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								Cancel request
 							</Button>
 						</>
-					)}
-					{!r.canClaim && !r.mine && !r.claim?.mine && r.status === "open" && r.kind === "craft" && (
-						<span className="text-xs text-muted-foreground">None of your characters knows this recipe.</span>
 					)}
 				</div>
 			)}

@@ -7,22 +7,25 @@ import type { Delivery } from "./addonPayload";
 import { noteDelivery, noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
-import { notifyRequester } from "./notifications";
+import { notify, notifyRequester } from "./notifications";
 import { vRegion } from "./schema";
 import { untradeable } from "./shared/itemInfo";
 import {
 	ACTIVE,
 	type Action,
+	ASK_MS,
 	canChange,
 	canHelpFromInventory,
 	check,
 	deliveryName,
+	deliveryOutcome,
 	deliveryParticipants,
 	deliveryProgress,
-	deliveryRejection,
 	EXPIRE_MS,
 	isStale,
+	matsAdd,
 	matsCheck,
+	matsProgress,
 	matsState,
 	nextStatus,
 	ongoingUntil,
@@ -111,6 +114,54 @@ async function professionIds(ctx: Ctx, characters: Doc<"characters">[]) {
 	const out = new Set<number>();
 	for (const c of characters) for (const p of (await pickProfile(ctx, c)).professions) out.add(p.id);
 	return out;
+}
+
+/**
+ * The guildmate asked to craft: a character in this guild's roster (not one
+ * of the requester's) who knows the recipe, and the user who claimed it.
+ * Throws the player-facing reason.
+ */
+async function crafterFor(ctx: Ctx, guildId: Id<"guilds">, slug: string, recipeId: number, requester: Id<"users">) {
+	const row = (
+		await ctx.db
+			.query("characters")
+			.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
+			.collect()
+	).find((m) => m.slug === slug);
+	if (!row) throw new ConvexError("That crafter isn't in the guild.");
+	const owner = await ctx.db
+		.query("ownedCharacters")
+		.withIndex("by_slug", (q) => q.eq("flavor", row.flavor).eq("region", row.region).eq("slug", row.slug))
+		.first();
+	if (!owner) throw new ConvexError(`${row.name} isn't on Guildie yet, so they couldn't answer. Ask someone else.`);
+	if (owner.userId === requester) throw new ConvexError("That's one of your own characters.");
+	const profile = await pickProfile(ctx, row);
+	if (!profile.professions.some((p) => p.knownRecipes?.includes(recipeId)))
+		throw new ConvexError(`${row.name} doesn't know this recipe (as far as Guildie knows).`);
+	return { userId: owner.userId, character: brief(row) };
+}
+
+/** Guildmates (not `except`'s characters) who know a recipe, highest level first. */
+async function craftersOf(ctx: Ctx, guildId: Id<"guilds">, recipeId: number, except: Id<"users">) {
+	const roster = await ctx.db
+		.query("characters")
+		.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
+		.collect();
+	const own = new Set(
+		(
+			await ctx.db
+				.query("ownedCharacters")
+				.withIndex("by_user", (q) => q.eq("userId", except))
+				.collect()
+		).map((c) => c.slug),
+	);
+	const out = [];
+	for (const m of roster) {
+		if (own.has(m.slug)) continue;
+		const profile = await pickProfile(ctx, m);
+		if (profile.professions.some((p) => p.knownRecipes?.includes(recipeId))) out.push(m);
+	}
+	return out.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name)).map(brief);
 }
 
 const brief = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
@@ -230,6 +281,19 @@ async function view(
 					mine: r.claim.userId === viewer.userId,
 				}
 			: null,
+		/** Crafts: who was asked, until they answer; `mine`: the viewer was. */
+		ask: r.ask ? { character: r.ask.character, askedAt: r.ask.askedAt, mine: r.ask.userId === viewer.userId } : null,
+		lastAsk: r.lastAsk ?? null,
+		/** The requester's own craft with nobody asked (declined, lapsed): who else could make it. */
+		crafters:
+			mine && r.kind === "craft" && r.status === "open" && !r.ask && recipe
+				? await craftersOf(ctx, r.guildId, recipe.recipeId, viewer.userId)
+				: null,
+		/** Accepted crafts: mats delivered per reagent (the requester and the crafter see it). */
+		matsProgress:
+			r.kind === "craft" && recipe && r.claim && (mine || r.claim.userId === viewer.userId)
+				? matsProgress(recipe.reagents, r.quantity, r.matsSent, r.matsReceived)
+				: null,
 		mats: r.mats ? { state: r.mats.state, declared: r.mats.declared } : null,
 		matsCheck: check && {
 			reagents: check.reagents,
@@ -243,15 +307,11 @@ async function view(
 		closedAt: r.closedAt,
 		stale: isStale(r, now),
 		fit,
-		canHelp: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
-		// Crafts only: item requests count what arrives, from anyone.
-		canClaim:
-			active &&
-			r.status === "open" &&
-			r.kind === "craft" &&
-			!mine &&
-			r.recipeId !== undefined &&
-			viewer.known.has(r.recipeId),
+		// Crafts: an ask to the viewer, and crafts they're making. Items: what their bags cover.
+		canHelp:
+			r.kind === "craft"
+				? active && (r.ask?.userId === viewer.userId || r.claim?.userId === viewer.userId)
+				: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
 	};
 }
 
@@ -355,6 +415,11 @@ export const sidebar = query({
 			const known = new Set([...(await knownRecipes(ctx, characters)).values()].flatMap((s) => [...s]));
 			let canHelp = 0;
 			for (const r of await activeIn(ctx, guildId)) {
+				// Crafts asked of you, waiting for an answer.
+				if (r.kind === "craft") {
+					if (r.ask?.userId === userId) canHelp++;
+					continue;
+				}
 				// Fixed amounts only: any Silk in your bags would light this up for weeks.
 				if (r.status !== "open" || r.userId === userId || r.ongoing) continue;
 				const recipe = r.recipeId !== undefined ? await recipeRow(ctx, r.recipeId) : null;
@@ -423,6 +488,8 @@ export const create = mutation({
 		character: v.optional(v.string()),
 		/** Crafts: "I have the mats". */
 		declared: v.optional(v.boolean()),
+		/** Crafts: the guildmate asked to craft it (a character slug in the guild who knows the recipe). */
+		crafter: v.optional(v.string()),
 		/** Items: "send me any you have", for `days` (14, 30 or 90). `quantity` is ignored. */
 		ongoing: v.optional(v.boolean()),
 		days: v.optional(v.number()),
@@ -452,6 +519,7 @@ export const create = mutation({
 		let itemId = args.itemId;
 		let recipeId: number | undefined;
 		let mats: Doc<"requests">["mats"];
+		let ask: Doc<"requests">["ask"];
 		if (args.kind === "item") {
 			if (itemId === undefined || !Number.isInteger(itemId) || itemId < 1) throw new ConvexError("Which item?");
 			await requireTradeable(ctx, itemId, "nobody can send it to you");
@@ -462,22 +530,8 @@ export const create = mutation({
 			recipeId = recipe.recipeId;
 			itemId = recipe.craftedItemId;
 			if (itemId !== undefined) await requireTradeable(ctx, itemId, "only whoever crafts it can have it");
-			// Someone else in the guild has to know it, or nobody could claim it.
-			const members = await ctx.db
-				.query("characters")
-				.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
-				.collect();
-			const mineIds = new Set(member.characters.map((c) => c._id));
-			let knower = false;
-			for (const m of members) {
-				if (mineIds.has(m._id)) continue;
-				const profile = await pickProfile(ctx, m);
-				if (profile.professions.some((p) => p.knownRecipes?.includes(recipe.recipeId))) {
-					knower = true;
-					break;
-				}
-			}
-			if (!knower) throw new ConvexError("Nobody else in the guild knows this recipe yet.");
+			if (!args.crafter) throw new ConvexError("Who should craft it?");
+			ask = { ...(await crafterFor(ctx, guild._id, args.crafter, recipe.recipeId, member.userId)), askedAt: now };
 			const checked = matsCheck(recipe.reagents, fields.quantity, await scansOf(ctx, member.userId));
 			const declared = !!args.declared;
 			mats = { state: matsState(checked.covered, declared), declared, checkedAt: checked.checkedAt };
@@ -499,31 +553,42 @@ export const create = mutation({
 			...(ongoing ? { ongoing: true } : {}),
 			status: "open" as const,
 			mats,
+			...(ask ? { ask } : {}),
 			createdAt: now,
 			lastActivityAt: now,
 		};
 		const id = await ctx.db.insert("requests", request);
 		await noteRequest(ctx, "request", { ...request, _id: id });
+		if (ask) {
+			const created = await ctx.db.get(id);
+			if (created) await notify(ctx, ask.userId, created, "craftAsked", request.character);
+		}
 		return id;
 	},
 });
 
 /**
- * Everything else that happens to a request: claim, unclaim (release), mark
- * sent, mark done, cancel, keep ("still need this"). Each counts as activity.
+ * Everything else that happens to a request. Crafts: ask a crafter (again,
+ * after a decline), accept or decline (the crafter), back out (the crafter)
+ * or take it back (the requester). Any request: mark done, cancel, keep
+ * ("still need this"). Old claims can still be released, and old item claims
+ * marked sent. Each counts as activity, and the other side hears about it.
  */
 export const act = mutation({
 	args: {
 		requestId: v.id("requests"),
 		action: v.union(
 			v.literal("claim"),
+			v.literal("ask"),
+			v.literal("accept"),
+			v.literal("decline"),
 			v.literal("unclaim"),
 			v.literal("markSent"),
 			v.literal("complete"),
 			v.literal("cancel"),
 			v.literal("keep"),
 		),
-		/** Claims: the character to claim as. */
+		/** Asks: the crafter's character slug. */
 		character: v.optional(v.string()),
 	},
 	handler: async (ctx, { requestId, action, character: characterSlug }) => {
@@ -536,33 +601,55 @@ export const act = mutation({
 		// The requester can always close their own; everyone else must be in the guild now.
 		const characters = await charactersIn(ctx, userId, guild._id);
 		if (r.userId !== userId && characters.length === 0) throw new ConvexError("Only this guild's members can do that.");
-
-		let claimer: Doc<"characters"> | undefined;
-		if (action === "claim") {
-			const known = await knownRecipes(ctx, characters);
-			const knows = (c: Doc<"characters">) =>
-				r.kind === "item" || (r.recipeId !== undefined && !!known.get(c._id)?.has(r.recipeId));
-			claimer = pickCharacter(characters, characterSlug, knows);
-		}
-		const verdict = check(action as Action, ruleView(r), { userId, knowsRecipe: !!claimer });
+		const verdict = check(action as Action, ruleView(r), { userId });
 		if (!verdict.ok) throw new ConvexError(verdict.error);
 
 		const now = Date.now();
 		const status = nextStatus(action as Action, r.status);
 		const patch: Partial<Doc<"requests">> = { status, lastActivityAt: now };
-		if (action === "claim" && claimer) patch.claim = { userId, character: brief(claimer), claimedAt: now };
-		if (action === "unclaim") patch.claim = undefined;
+		let asked: Doc<"requests">["ask"];
+		if (action === "ask") {
+			if (!characterSlug || r.recipeId === undefined) throw new ConvexError("Who should craft it?");
+			asked = { ...(await crafterFor(ctx, guild._id, characterSlug, r.recipeId, userId)), askedAt: now };
+			patch.ask = asked;
+		}
+		if (action === "accept" && r.ask) {
+			patch.claim = { userId, character: r.ask.character, claimedAt: now };
+			patch.ask = undefined;
+		}
+		if (action === "decline" && r.ask) {
+			patch.ask = undefined;
+			patch.lastAsk = { character: r.ask.character, outcome: "declined", at: now };
+		}
+		if (action === "unclaim") {
+			patch.claim = undefined;
+			if (r.kind === "craft" && r.claim)
+				patch.lastAsk = { character: r.claim.character, outcome: "backedOut", at: now };
+		}
 		if (action === "markSent" && r.claim) patch.claim = { ...r.claim, sentAt: now };
-		if (status === "done" || status === "cancelled") patch.closedAt = now;
+		if (status === "done" || status === "cancelled") {
+			patch.closedAt = now;
+			patch.ask = undefined;
+		}
 		await ctx.db.patch(requestId, patch);
-		// The guild's feed: claimed, and fulfilled (done, by whoever claimed it).
-		if (action === "claim" && claimer) await noteRequest(ctx, "claim", r, brief(claimer));
-		// The requester hears about their craft being taken on and sent.
-		if (action === "claim" && claimer && r.kind === "craft")
-			await notifyRequester(ctx, r, "craftClaimed", brief(claimer));
-		if (action === "markSent" && r.claim) await notifyRequester(ctx, r, "craftSent", r.claim.character);
+
+		// The guild's feed: a crafter taking it on, and fulfilled (done).
+		if (action === "accept" && r.ask) await noteRequest(ctx, "claim", r, r.ask.character);
 		if (status === "done" && r.status !== "done")
 			await noteRequest(ctx, "fulfilled", r, patch.claim?.character ?? r.claim?.character);
+		// The other side hears about it.
+		if (asked) await notify(ctx, asked.userId, r, "craftAsked", r.character);
+		if (action === "accept" && r.ask) await notifyRequester(ctx, r, "craftAccepted", r.ask.character);
+		if (action === "decline" && r.ask) await notifyRequester(ctx, r, "craftDeclined", r.ask.character);
+		if (action === "markSent" && r.claim) await notifyRequester(ctx, r, "craftSent", r.claim.character);
+		if (action === "unclaim" && r.kind === "craft" && r.claim) {
+			if (r.claim.userId === userId) await notifyRequester(ctx, r, "craftBackedOut", r.claim.character);
+			else await notify(ctx, r.claim.userId, r, "craftWithdrawn", r.character);
+		}
+		if (action === "cancel" && r.kind === "craft") {
+			const crafter = r.claim?.userId ?? r.ask?.userId;
+			if (crafter) await notify(ctx, crafter, r, "craftWithdrawn", r.character);
+		}
 	},
 });
 
@@ -639,6 +726,7 @@ const ruleView = (r: Doc<"requests">) => ({
 	ongoing: r.ongoing,
 	until: r.until,
 	requester: r.userId as string,
+	ask: r.ask && { userId: r.ask.userId as string },
 	claim: r.claim && { userId: r.claim.userId as string, sentAt: r.claim.sentAt },
 	lastActivityAt: r.lastActivityAt,
 });
@@ -702,9 +790,47 @@ export const expireStale = internalMutation({
 			await notifyRequester(ctx, r, "requestExpired");
 			closed++;
 		}
+		// Asks to a crafter with no answer in 7 days lapse; the request stays open to ask someone else.
+		const asks = await ctx.db
+			.query("requests")
+			.withIndex("by_status_activity", (q) => q.eq("status", "open").lt("lastActivityAt", now - ASK_MS))
+			.filter((q) => q.eq(q.field("kind"), "craft"))
+			.take(BATCH);
+		for (const r of asks) {
+			if (!r.ask || now - r.ask.askedAt < ASK_MS) continue;
+			await ctx.db.patch(r._id, {
+				ask: undefined,
+				lastAsk: { character: r.ask.character, outcome: "lapsed", at: now },
+			});
+			await notifyRequester(ctx, r, "askLapsed", r.ask.character);
+		}
 		if (closed >= BATCH) await ctx.scheduler.runAfter(1000, internal.requests.expireStale, {});
 		else await ctx.scheduler.runAfter(0, internal.requests.closeOngoingOfLeavers, {});
 		return { closed };
+	},
+});
+
+/**
+ * One-off, after craft asks shipped: deletes craft requests still open or
+ * claimed from before (no ask, the old claim flow), with the guild's OK.
+ * `npx convex run requests:dropLegacyCrafts '{"before": <deploy time ms>}'`.
+ */
+export const dropLegacyCrafts = internalMutation({
+	args: { before: v.number(), dryRun: v.optional(v.boolean()) },
+	handler: async (ctx, { before, dryRun }) => {
+		const dropped: string[] = [];
+		for (const status of ACTIVE) {
+			const rows = await ctx.db
+				.query("requests")
+				.withIndex("by_status_activity", (q) => q.eq("status", status))
+				.collect();
+			for (const r of rows) {
+				if (r.kind !== "craft" || r.createdAt >= before || r.ask) continue;
+				dropped.push(`${r._id} (${r.status}, ${r.character.name})`);
+				if (!dryRun) await ctx.db.delete(r._id);
+			}
+		}
+		return { dropped };
 	},
 });
 
@@ -753,6 +879,48 @@ const ADDON_PER_ITEM = 5;
 /** Items with requests in the file, at most (newest activity first). */
 const ADDON_ITEMS = 300;
 
+/** An accepted craft the player is part of, as the addon matches mail and trades to it (Deliveries.lua). */
+export type AddonCraft = {
+	requestId: string;
+	/** The crafted item; none for an enchant (`enchant` is its name, matched on the trade window). */
+	itemId?: number;
+	enchant?: string;
+	reagents: number[];
+	requester: { name: string; slug: string };
+	crafter: { name: string; slug: string };
+};
+
+/** Accepted crafts the player asked for or is making, oldest first (mats go to the oldest that needs them). */
+async function addonCrafts(ctx: QueryCtx, userId: Id<"users">): Promise<AddonCraft[]> {
+	const rows = [
+		...(await ctx.db
+			.query("requests")
+			.withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "claimed"))
+			.collect()),
+		...(await ctx.db
+			.query("requests")
+			.withIndex("by_claimant", (q) => q.eq("claim.userId", userId).eq("status", "claimed"))
+			.collect()),
+	].filter((r) => r.kind === "craft" && r.claim && r.recipeId !== undefined);
+	rows.sort((a, b) => (a.claim?.claimedAt ?? 0) - (b.claim?.claimedAt ?? 0));
+	const out: AddonCraft[] = [];
+	const seen = new Set<string>();
+	for (const r of rows.slice(0, 100)) {
+		if (seen.has(r._id) || !r.claim) continue;
+		seen.add(r._id);
+		const recipe = await recipeRow(ctx, r.recipeId as number);
+		if (!recipe) continue;
+		out.push({
+			requestId: r._id,
+			...(r.itemId !== undefined ? { itemId: r.itemId } : { enchant: recipe.name }),
+			reagents: recipe.reagents.map((x) => x.itemId),
+			requester: { name: r.character.name, slug: r.character.slug },
+			crafter: { name: r.claim.character.name, slug: r.claim.character.slug },
+		});
+	}
+	return out;
+}
+
 /**
  * Compact requests for the addon's tooltips: by item id, each guild's active
  * requests (enchants, with no item, are left out), and the player's own
@@ -796,6 +964,7 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 	return {
 		byItem,
 		mine: { open: mine.length, stale: mine.filter((r) => isStale(r, now)).length },
+		crafts: await addonCrafts(ctx, userId),
 	};
 }
 
@@ -866,6 +1035,31 @@ export const search = query({
 });
 
 /**
+ * Which craft a reagent counts toward: of the crafts this crafter accepted
+ * from this requester, the oldest that still needs it (as this side counts),
+ * else the one the addon named.
+ */
+async function matsTarget(ctx: MutationCtx, r: Doc<"requests">, itemId: number, side: "matsSent" | "matsReceived") {
+	const claim = r.claim;
+	if (!claim) return r;
+	const crafts = (
+		await ctx.db
+			.query("requests")
+			.withIndex("by_claimant", (q) => q.eq("claim.userId", claim.userId).eq("status", "claimed"))
+			.collect()
+	)
+		.filter((x) => x.userId === r.userId && x.kind === "craft" && x.recipeId !== undefined)
+		.sort((a, b) => (a.claim?.claimedAt ?? 0) - (b.claim?.claimedAt ?? 0));
+	for (const x of crafts) {
+		const recipe = await recipeRow(ctx, x.recipeId as number);
+		const need = (recipe?.reagents.find((g) => g.itemId === itemId)?.quantity ?? 0) * x.quantity;
+		const got = x[side]?.find((m) => m.itemId === itemId)?.quantity ?? 0;
+		if (need > 0 && got < need) return x;
+	}
+	return r;
+}
+
+/**
  * Called only after helper ingestion verifies ownership of the reporting
  * character. Each report is settled once (counted, or kept with why it
  * didn't count) and only then acknowledged to the addon through the
@@ -910,23 +1104,26 @@ export async function recordDeliveries(
 			quantity: event.quantity,
 			at: event.at,
 		};
-		const rejected = r
-			? deliveryRejection(
+		const recipe = r?.kind === "craft" && r.recipeId !== undefined ? await recipeRow(ctx, r.recipeId) : null;
+		const outcome = r
+			? deliveryOutcome(
 					r,
 					event,
 					{ userId, slug: character.slug, name: character.name, guildId: character.guildId },
 					Date.now(),
+					recipe?.reagents.map((x) => x.itemId),
 				)
-			: "request gone";
-		if (!r || rejected) {
+			: { rejected: "request gone" as const };
+		if (!r || "rejected" in outcome) {
+			const rejected = "rejected" in outcome ? outcome.rejected : undefined;
 			const { sender, recipient, method } = deliveryParticipants(event, reporter);
 			await ctx.db.insert("requestDeliveryEvents", { ...row, method, sender, recipient, rejected });
 			continue;
 		}
 		// The other side is whoever the request says it should be, when the
 		// observed name fits them (a first name alone has no slug to look up).
-		const expected = event.kind.endsWith("Received") ? r.claim?.character : r.character;
-		const otherSlug = expected && sameCharacter(event.other, expected) ? expected.slug : deliveryName(event.other);
+		const expected = [r.claim?.character, r.character].find((c) => c && sameCharacter(event.other, c));
+		const otherSlug = expected ? expected.slug : deliveryName(event.other);
 		const knownOther = await ctx.db
 			.query("characters")
 			.withIndex("by_slug", (q) =>
@@ -946,6 +1143,16 @@ export async function recordDeliveries(
 			sender: participants.sender,
 			recipient: participants.recipient,
 		});
+		// Mats: progress on the oldest craft between these two that still needs them.
+		if (outcome.use === "matsSent" || outcome.use === "matsReceived") {
+			const side = outcome.use;
+			const target = await matsTarget(ctx, r, event.itemId, side);
+			await ctx.db.patch(target._id, {
+				[side]: matsAdd(target[side], event.itemId, event.quantity),
+				lastActivityAt: Math.max(target.lastActivityAt, event.at),
+			});
+			continue;
+		}
 		const progress = deliveryProgress(r, event);
 		const patch: Partial<Doc<"requests">> = { ...progress, lastActivityAt: Math.max(r.lastActivityAt, event.at) };
 		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };

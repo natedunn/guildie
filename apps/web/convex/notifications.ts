@@ -40,16 +40,29 @@ async function requestName(ctx: QueryCtx, r: Doc<"requests">) {
 
 /** Tell a request's requester something happened to it. */
 export async function notifyRequester(ctx: MutationCtx, r: Doc<"requests">, kind: NotificationKind, actor?: Actor) {
+	await notify(ctx, r.userId, r, kind, actor);
+}
+
+/** Tell someone (the requester, or the crafter asked) something happened to a request. */
+export async function notify(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	r: Doc<"requests">,
+	kind: NotificationKind,
+	actor?: Actor,
+) {
 	const guild = await ctx.db.get(r.guildId);
 	if (!guild) return;
+	// The crafter's link opens their "I can help" view; the requester's their own.
+	const view = userId === r.userId ? "mine" : "help";
 	await ctx.db.insert("notifications", {
-		userId: r.userId,
+		userId,
 		guildId: r.guildId,
 		kind,
 		requestId: r._id,
 		...(actor ? { actor: { name: actor.name, slug: actor.slug, classId: actor.classId } } : {}),
 		text: notificationText(kind, await requestName(ctx, r), actor),
-		link: `/g/${guild.region}/${guild.slug}/requests?view=mine`,
+		link: `/g/${guild.region}/${guild.slug}/requests?view=${view}`,
 		at: Date.now(),
 	});
 }
@@ -79,6 +92,7 @@ export const list = query({
 					text: n.text,
 					actor: n.actor,
 					guild: { name: guild.name, region: guild.region, slug: guild.slug },
+					view: n.link.includes("view=help") ? ("help" as const) : ("mine" as const),
 					at: n.at,
 					read: n.readAt !== undefined,
 				},

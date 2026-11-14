@@ -17,6 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
+- **Guildie, App, Addon:** Craft requests are now asked of one guildmate who knows the recipe. They accept or decline (an ask with no answer lapses after a week), and you're notified either way. Once they accept, the mats you send them show as they arrive, and the request closes by itself when the crafted item reaches you, or, for an enchant, when they enchant your item over trade. You can still mark it done yourself.
 - **Guildie, App, Addon:** Notifications. When someone takes on or sends one of your crafts, or a request of yours completes or expires, it shows under Personal → Notifications, with a count in the sidebar. The Windows app shows craft updates and completed requests as Windows notifications (click one to open the request), and the addon prints craft updates in chat when you log in or /reload.
 - **Guildie:** React to what your guildmates do on the Feed: a heart, a thumbs up, or one of a few game icons. Reacting to a group ("14 members cleared Wailing Caverns") counts for the whole group.
 

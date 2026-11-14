@@ -667,6 +667,12 @@ export default defineSchema({
 			v.literal("craftSent"),
 			v.literal("requestDone"),
 			v.literal("requestExpired"),
+			v.literal("craftAsked"),
+			v.literal("craftAccepted"),
+			v.literal("craftDeclined"),
+			v.literal("askLapsed"),
+			v.literal("craftWithdrawn"),
+			v.literal("craftBackedOut"),
 		),
 		requestId: v.optional(v.id("requests")),
 		/** Who did it, when someone did. */
@@ -730,6 +736,23 @@ export default defineSchema({
 			v.literal("cancelled"),
 			v.literal("expired"),
 		),
+		/** Crafts: the guildmate asked to craft it, until they accept or decline (or it lapses after 7 days). */
+		ask: v.optional(
+			v.object({
+				userId: v.id("users"),
+				character: vRequestCharacter,
+				askedAt: v.number(),
+			}),
+		),
+		/** Crafts: how the last ask ended when it didn't end in a craft ("Miller declined"). */
+		lastAsk: v.optional(
+			v.object({
+				character: vRequestCharacter,
+				outcome: v.union(v.literal("declined"), v.literal("lapsed"), v.literal("backedOut")),
+				at: v.number(),
+			}),
+		),
+		/** The crafter who accepted (crafts), or an item claim from before claims ended. */
 		claim: v.optional(
 			v.object({
 				userId: v.id("users"),
@@ -739,6 +762,13 @@ export default defineSchema({
 				sentAt: v.optional(v.number()),
 			}),
 		),
+		/**
+		 * Crafts: mats delivered to the crafter per reagent, as the requester's
+		 * addon saw them sent and as the crafter's saw them arrive. Progress is
+		 * the larger (shared/requests.ts matsProgress).
+		 */
+		matsSent: v.optional(v.array(v.object({ itemId: v.number(), quantity: v.number() }))),
+		matsReceived: v.optional(v.array(v.object({ itemId: v.number(), quantity: v.number() }))),
 		/** Crafts: how we know the requester has the reagents (shared/requests.ts, MatsState). */
 		mats: v.optional(
 			v.object({
@@ -756,7 +786,10 @@ export default defineSchema({
 		.index("by_guild_status", ["guildId", "status"])
 		.index("by_user_status", ["userId", "status"])
 		.index("by_status_activity", ["status", "lastActivityAt"])
-		.index("by_status_until", ["status", "until"]),
+		.index("by_status_until", ["status", "until"])
+		// Crafts asked of a player, and crafts they accepted.
+		.index("by_asked", ["ask.userId", "status"])
+		.index("by_claimant", ["claim.userId", "status"]),
 
 	/** Cached client-credentials tokens for the Blizzard API. */
 	apiTokens: defineTable({

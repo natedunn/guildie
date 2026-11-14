@@ -2,7 +2,17 @@
 // so tests can run it (notifications.test.ts). The handlers are in
 // convex/notifications.ts.
 
-export type NotificationKind = "craftClaimed" | "craftSent" | "requestDone" | "requestExpired";
+export type NotificationKind =
+	| "craftClaimed"
+	| "craftSent"
+	| "requestDone"
+	| "requestExpired"
+	| "craftAsked"
+	| "craftAccepted"
+	| "craftDeclined"
+	| "askLapsed"
+	| "craftWithdrawn"
+	| "craftBackedOut";
 
 /** Where each kind is shown besides the site's inbox. */
 export const CHANNELS: Record<NotificationKind, { desktop: boolean; game: boolean }> = {
@@ -10,6 +20,14 @@ export const CHANNELS: Record<NotificationKind, { desktop: boolean; game: boolea
 	craftSent: { desktop: true, game: true },
 	requestDone: { desktop: true, game: false },
 	requestExpired: { desktop: false, game: false },
+	// To the crafter:
+	craftAsked: { desktop: true, game: true },
+	craftWithdrawn: { desktop: false, game: false },
+	// To the requester:
+	craftAccepted: { desktop: true, game: true },
+	craftDeclined: { desktop: true, game: true },
+	askLapsed: { desktop: false, game: false },
+	craftBackedOut: { desktop: true, game: false },
 };
 
 /** Only recent ones become a system notification or a chat line (the app or game may have been off for days). */
@@ -33,5 +51,17 @@ export function notificationText(kind: NotificationKind, what: { name: string; q
 			return `Your request for ${count}${what.name} is complete`;
 		case "requestExpired":
 			return `Your request for ${count}${what.name} expired`;
+		case "craftAsked":
+			return `${who} asks you to craft ${what.name}${times}`;
+		case "craftAccepted":
+			return `${who} accepted your craft: ${what.name}${times}`;
+		case "craftDeclined":
+			return `${who} declined your craft: ${what.name}${times}. Ask someone else?`;
+		case "askLapsed":
+			return `${who} didn't answer your craft request for ${what.name} in 7 days. Ask someone else?`;
+		case "craftWithdrawn":
+			return `${who} cancelled their craft request for ${what.name}${times}`;
+		case "craftBackedOut":
+			return `${who} can't craft your ${what.name} after all. Ask someone else?`;
 	}
 }

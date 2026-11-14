@@ -42,8 +42,8 @@ function NotificationsPage() {
 			<Page width="medium">
 				{rows.length === 0 ? (
 					<p className="text-[0.8125rem] text-muted-foreground">
-						Nothing yet. When someone takes on or sends one of your crafts, or a request completes or expires, it shows
-						here.
+						Nothing yet. When someone asks you to craft something, answers your ask, or one of your requests completes
+						or expires, it shows here.
 					</p>
 				) : (
 					<ul className="divide-y divide-border">
@@ -54,7 +54,7 @@ function NotificationsPage() {
 									<Link
 										to="/g/$region/$slug/requests"
 										params={{ region: n.guild.region, slug: n.guild.slug }}
-										search={{ view: "mine" }}
+										search={{ view: n.view }}
 										className="group flex items-baseline gap-3 py-2.5"
 									>
 										<span

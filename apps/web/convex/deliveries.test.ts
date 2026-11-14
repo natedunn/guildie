@@ -3,9 +3,12 @@ import { test } from "node:test";
 import { parseCharacter } from "./addonPayload.ts";
 import {
 	deliveryMatches,
+	deliveryOutcome,
 	deliveryParticipants,
 	deliveryProgress,
 	deliveryRejection,
+	matsAdd,
+	matsProgress,
 	remainingQuantity,
 	sameCharacter,
 } from "./shared/requests.ts";
@@ -45,7 +48,6 @@ test("only exact, authorized, contemporaneous item deliveries match", () => {
 	])
 		assert(!deliveryMatches(request, { ...event, ...patch }, receiver, now));
 	for (const patch of [
-		{ kind: "craft" },
 		{ status: "done" },
 		{ status: "cancelled" },
 		{ guildId: "elsewhere" },
@@ -168,7 +170,7 @@ test("Forever names: first name or full name match, nothing else does", () => {
 test("rejected reports say why", () => {
 	const cases: [Parameters<typeof deliveryRejection>, string | undefined][] = [
 		[[request, event, receiver, now], undefined],
-		[[{ ...request, kind: "craft" }, event, receiver, now], "not an item request"],
+		[[{ ...request, kind: "craft", status: "open" }, event, receiver, now], "craft not accepted"],
 		[[request, { ...event, itemId: 1 }, receiver, now], "different item"],
 		[[{ ...request, status: "done" }, event, receiver, now], "request closed"],
 		[[request, event, { ...receiver, guildId: "x" }, now], "other guild"],
@@ -182,4 +184,95 @@ test("rejected reports say why", () => {
 		[[request, { ...event, kind: "mailSent", other: "Someone" }, sender, now], "not to the requester"],
 	];
 	for (const [args, why] of cases) assert.equal(deliveryRejection(...args), why);
+});
+
+test("crafts: mats from the requester to the crafter, the crafted item back, an enchant over trade", () => {
+	// Todd asked Miller for 2 Silk Bandages (2 Silk Cloth each); Miller accepted.
+	const craft = {
+		...request,
+		kind: "craft",
+		itemId: 6450,
+		quantity: 2,
+		status: "claimed",
+		character: { slug: "todd-bonzalezz", name: "Todd" },
+		userId: "todd",
+		claim: { userId: "miller", character: { slug: "miller-litesworth", name: "Miller" }, claimedAt: now - 5000 },
+	};
+	const todd = { userId: "todd", slug: "todd-bonzalezz", name: "Todd", guildId: "guild" };
+	const miller = { userId: "miller", slug: "miller-litesworth", name: "Miller", guildId: "guild" };
+	const silk = 4306;
+	const use = (
+		e: Partial<typeof event>,
+		who: typeof todd,
+		reagents = [silk],
+		r: Parameters<typeof deliveryOutcome>[0] = craft,
+	) => deliveryOutcome(r, { ...event, ...e }, who, now, reagents);
+	// Mats, seen from both sides; before the accept too.
+	assert.deepEqual(use({ kind: "mailSent", itemId: silk, other: "Miller Litesworth" }, todd), { use: "matsSent" });
+	assert.deepEqual(use({ kind: "mailReceived", itemId: silk, other: "Todd" }, miller), { use: "matsReceived" });
+	assert.deepEqual(use({ kind: "tradeSent", itemId: silk, other: "Miller", at: now - 8000 }, todd), {
+		use: "matsSent",
+	});
+	assert.deepEqual(use({ kind: "mailSent", itemId: silk, other: "Brenna" }, todd), {
+		rejected: "not between requester and crafter",
+	});
+	assert.deepEqual(use({ kind: "mailReceived", itemId: silk, other: "Miller" }, todd), {
+		rejected: "not between requester and crafter",
+	});
+	// The crafted item back: the requester's receipt counts; the crafter's send is only "sent".
+	assert.deepEqual(use({ kind: "tradeReceived", itemId: 6450, other: "Miller" }, todd), { use: "receipt" });
+	assert.deepEqual(use({ kind: "mailSent", itemId: 6450, other: "Todd Bonzalezz" }, miller), { use: "sent" });
+	assert.deepEqual(use({ kind: "mailReceived", itemId: 6450, other: "Brenna" }, todd), {
+		rejected: "not from the claimant",
+	});
+	assert.deepEqual(use({ kind: "mailReceived", itemId: 9999, other: "Miller" }, todd), { rejected: "different item" });
+	// Not accepted yet: nothing counts.
+	assert.deepEqual(
+		use({ kind: "mailSent", itemId: silk, other: "Miller" }, todd, [silk], { ...craft, status: "open" }),
+		{
+			rejected: "craft not accepted",
+		},
+	);
+	// An enchant (no crafted item): the trade that put it on the requester's item.
+	const enchant = { ...craft, itemId: undefined, quantity: 1 };
+	assert.deepEqual(use({ kind: "enchantReceived", itemId: 2453, other: "Miller" }, todd, [], enchant), {
+		use: "receipt",
+	});
+	assert.deepEqual(use({ kind: "enchantReceived", itemId: 2453, other: "Miller" }, miller, [], enchant), {
+		rejected: "not the requester",
+	});
+	assert.deepEqual(use({ kind: "enchantReceived", itemId: 2453, other: "Miller" }, todd), {
+		rejected: "not an enchant",
+	});
+	assert.deepEqual(use({ kind: "enchantReceived", itemId: 4306, other: "Miller" }, receiver, [], request), {
+		rejected: "not an enchant",
+	});
+	// Receipts close it at the quantity, crafted or enchanted.
+	let state = { ...craft, ...deliveryProgress(craft, { kind: "tradeReceived", quantity: 1 }) };
+	assert.equal(state.status, "claimed");
+	state = { ...state, ...deliveryProgress(state, { kind: "mailReceived", quantity: 1 }) };
+	assert.equal(state.status, "done");
+	assert.equal(deliveryProgress(enchant, { kind: "enchantReceived", quantity: 1 }).status, "done");
+	// Participants: an enchant is a received trade.
+	assert.equal(deliveryParticipants({ kind: "enchantReceived", other: "Miller" }, { name: "Todd" }).method, "trade");
+});
+
+test("mats progress: one transfer seen from both sides counts once", () => {
+	const reagents = [
+		{ itemId: 4306, name: "Silk Cloth", quantity: 2 },
+		{ itemId: 2321, name: "Fine Thread", quantity: 1 },
+	];
+	let sent = matsAdd(undefined, 4306, 3);
+	sent = matsAdd(sent, 4306, 1);
+	const received = matsAdd(undefined, 4306, 3);
+	assert.deepEqual(matsProgress(reagents, 2, sent, received), [
+		{ itemId: 4306, name: "Silk Cloth", need: 4, got: 4 },
+		{ itemId: 2321, name: "Fine Thread", need: 2, got: 0 },
+	]);
+	assert.deepEqual(
+		matsProgress(reagents, 1, undefined, matsAdd(undefined, 2321, 1))[1].got,
+		1,
+		"the crafter's side alone",
+	);
+	assert.deepEqual(sent, [{ itemId: 4306, quantity: 4 }], "adds per reagent");
 });
