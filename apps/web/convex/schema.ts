@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { REACTIONS } from "./shared/reactions";
 
 /**
  * Which game a guild plays. Forever is the only one implemented; the field
@@ -557,6 +558,27 @@ export default defineSchema({
 		deliveryMethod: v.optional(v.union(v.literal("mail"), v.literal("trade"))),
 		requestCompleted: v.optional(v.boolean()),
 	}).index("by_guild", ["guildId", "at"]),
+
+	/**
+	 * Reactions to feed events (feedReactions.ts), by a guild member: one row
+	 * per player, event and reaction. A grouped row on the page ("14 members
+	 * cleared Wailing Caverns") is many events; reacting to it adds a row on
+	 * one of them, and the page counts each player once per reaction across
+	 * the group. `eventAt` copies the event's time so the feed reads a page's
+	 * reactions with one range.
+	 */
+	feedReactions: defineTable({
+		guildId: v.id("guilds"),
+		eventId: v.id("feedEvents"),
+		eventAt: v.number(),
+		userId: v.id("users"),
+		/** Who they reacted as: their highest-level character in the guild then. */
+		character: vRequestCharacter,
+		reaction: v.union(...REACTIONS.map((r) => v.literal(r))),
+		at: v.number(),
+	})
+		.index("by_guild", ["guildId", "eventAt"])
+		.index("by_user_event", ["userId", "eventId"]),
 
 	/**
 	 * Each dungeon's quests (shared/dungeons.ts), from Blizzard's quest areas:
