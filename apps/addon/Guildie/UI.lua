@@ -609,3 +609,27 @@ function ns.refreshSyncWarning()
     warning:SetHeight(math.max(54, warning.text:GetStringHeight() + 8))
     warning:Show()
 end
+
+-- Notifications from Guildie (GuildieData.notifications: "Miller will craft
+-- your Silk Bandage ×2"), loaded at login and /reload: each printed once in
+-- chat. The site only offers recent unread ones, so remembering the ids it
+-- still offers is enough.
+function ns.announceNotifications()
+    local list = GuildieData and GuildieData.notifications
+    if type(list) ~= "table" or type(GuildieDB) ~= "table" then return end
+    local seen, offered = GuildieDB.notified or {}, {}
+    for _, n in ipairs(list) do
+        if type(n) == "table" and type(n.id) == "string" and type(n.text) == "string" then
+            offered[n.id] = true
+            -- Shown as written: no color or texture codes from data.
+            if not seen[n.id] then print(GOLD .. "Guildie|r: " .. n.text:gsub("|", "||")) end
+        end
+    end
+    GuildieDB.notified = offered
+end
+local announcer = CreateFrame("Frame")
+announcer:RegisterEvent("PLAYER_ENTERING_WORLD")
+announcer:SetScript("OnEvent", function()
+    -- After the login chat spam settles.
+    if C_Timer then C_Timer.After(3, ns.announceNotifications) else ns.announceNotifications() end
+end)

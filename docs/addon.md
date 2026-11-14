@@ -90,6 +90,10 @@ used); the account page lists them with Disconnect.
 - A 401 from `snapshot` or `guild-data` means the token was revoked (say from
   the account page): the helper and the app forget it and show "not connected".
 - `GET /api/helper/me` → `{ battletag, characters }` or 401.
+- `POST /api/helper/notifications` (the Windows app, every minute while
+  connected) → `{ notifications: [{ id, text, link }] }` or 401: recent
+  notifications for the app to show, each handed out once (`link` is a path
+  on the site; the app opens nothing else). See "Notifications".
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
   `{ "version": 7, "characters": [ ... ] }` (versions 1, talents and level
   only, 2, without `inventory`, 3, without `quests`, 4, without `completedQuestIds`, 5, without `deliveries`, and 6, without `addons`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
@@ -300,8 +304,34 @@ your last login or reload.
 - Guild requests (addon 0.8.0): `requests` and `myRequests`; see "Guild
   requests".
 - Recipe items (addon 0.14.0): `recipes`; see "Recipe items".
+- Notifications (addon 0.20.0): `notifications`, `[{ id, text }]`, recent
+  unread ones meant for the game; see "Notifications".
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.
+
+## Notifications
+
+What happened to a player's requests, written once with its text when it
+happens (`convex/notifications.ts`, text and channels in
+`shared/notifications.ts`), kept 60 days:
+
+| Kind             | When                             | Site inbox | Windows app | In game |
+| ---------------- | -------------------------------- | ---------- | ----------- | ------- |
+| `craftClaimed`   | someone claims your craft        | yes        | yes         | yes     |
+| `craftSent`      | the claimant marks it sent       | yes        | yes         | yes     |
+| `requestDone`    | deliveries complete your request | yes        | yes         | no      |
+| `requestExpired` | the daily cron expires it        | yes        | no          | no      |
+
+- **Site:** Personal → Notifications (`/notifications`), unread count in the
+  sidebar. Opening it marks everything read.
+- **Windows app:** asks `POST /api/helper/notifications` every minute while
+  connected and shows each as a system notification; clicking opens the
+  request. Only ones from the last 24 hours, unread, each once (with the app
+  on two computers, the first to ask shows it).
+- **In game:** `GuildieData.notifications`, unread ones from the last 7 days;
+  the addon prints each once in chat at login or `/reload`
+  (`ns.announceNotifications`, UI.lua), remembering the ids in
+  `GuildieDB.notified`.
 
 ## Recipe items
 

@@ -7,6 +7,7 @@ import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./add
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
+import { forGame, takeToasts as takeToastsFor } from "./notifications";
 import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
@@ -69,6 +70,18 @@ async function tokenOwner(ctx: QueryCtx, token: string) {
 		.withIndex("by_tokenHash", (q) => q.eq("tokenHash", tokenHash))
 		.unique();
 }
+
+/**
+ * For the Windows app, every minute: notifications to show as system
+ * notifications, each once (notifications.ts takeToasts). null: unknown token.
+ */
+export const takeToasts = mutation({
+	args: { token: v.string() },
+	handler: async (ctx, { token }) => {
+		const row = await tokenOwner(ctx, token);
+		return row ? await takeToastsFor(ctx, row.userId) : null;
+	},
+});
 
 /** For the helper to check its token: who it belongs to and which characters it can upload. */
 export const whoami = query({
@@ -608,6 +621,7 @@ type GuildDataBase = {
 	requests: GuildData["requests"];
 	myRequests: GuildData["myRequests"];
 	recipes: GuildData["recipes"];
+	notifications: GuildData["notifications"];
 };
 
 export type GuildData = {
@@ -653,6 +667,12 @@ export type GuildData = {
 	 * (items as pairs) inside Convex; the HTTP route unpacks it.
 	 */
 	recipes: PackedAddonRecipes;
+	/**
+	 * Recent unread notifications meant for the game (addon 0.20.0+; older
+	 * addons ignore it): the addon prints each once at login or /reload
+	 * ("Miller will craft your Silk Bandage ×2"). notifications.ts.
+	 */
+	notifications: { id: string; text: string }[];
 };
 
 /** The token's guilds (those its claimed characters are in) and their members. */
@@ -764,6 +784,7 @@ export const guildDataBase = internalQuery({
 			requests: requests.byItem,
 			myRequests: requests.mine,
 			recipes: packAddonRecipes(addonRecipes(taught, recipeCharacters)),
+			notifications: await forGame(ctx, row.userId),
 		};
 	},
 });
@@ -814,6 +835,7 @@ export const guildData = action({
 			requests: base.requests,
 			myRequests: base.myRequests,
 			recipes: base.recipes,
+			notifications: base.notifications,
 		};
 	},
 });

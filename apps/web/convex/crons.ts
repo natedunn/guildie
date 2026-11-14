@@ -14,6 +14,9 @@ crons.weekly(
 // Guild requests with no activity for 30 days close as expired (requests.ts).
 crons.daily("expire stale requests", { hourUTC: 8, minuteUTC: 30 }, internal.requests.expireStale, {});
 
+// Notifications older than 60 days go (notifications.ts).
+crons.daily("prune notifications", { hourUTC: 8, minuteUTC: 45 }, internal.notifications.prune, {});
+
 crons.daily("backfill item names and icons", { hourUTC: 10, minuteUTC: 30 }, internal.items.backfill, {});
 
 crons.daily("backfill quest titles", { hourUTC: 11, minuteUTC: 0 }, internal.quests.backfill, {});

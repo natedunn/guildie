@@ -96,10 +96,20 @@ function showWindow(url?: string) {
 	win.focus();
 }
 
-function notify(title: string, body: string) {
+/** Shown notifications, held until clicked or closed: one that's garbage-collected loses its click. */
+const shown = new Set<Notification>();
+
+function notify(title: string, body: string, onClick?: () => void) {
 	log(`${title}: ${body}`);
 	if (smokeTest || !Notification.isSupported()) return;
-	new Notification({ title, body, icon: join(__dirname, "assets", "guildie-256.png") }).show();
+	const n = new Notification({ title, body, icon: join(__dirname, "assets", "guildie-256.png") });
+	shown.add(n);
+	n.on("close", () => shown.delete(n));
+	n.on("click", () => {
+		shown.delete(n);
+		onClick?.();
+	});
+	n.show();
 }
 
 /**
@@ -191,6 +201,8 @@ app.whenReady().then(async () => {
 	const connection = new Connection(origin, log, pixelConfig);
 	app.on("before-quit", () => connection.stop());
 	connection.onNotice = notify;
+	// The site's notifications ("Miller will craft your Silk Bandage"): clicking opens the request.
+	connection.onSiteNotification = (text, url) => notify("Guildie", text, () => showWindow(url));
 	log(`Guildie ${__VERSION__} for ${origin}`);
 
 	// ---- The addon: installed and kept up to date in WoW: Forever ----
