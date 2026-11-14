@@ -2,7 +2,7 @@
 ## Title: Guildie
 ## Notes: Shares your character with your guild on guildie.club and adds guild suggestions to item tooltips.
 ## Author: Guildie
-## Version: 0.20.0
+## Version: 0.20.1
 ## SavedVariables: GuildieDB
 ## OptionalDeps: DialogueUI
 ## IconTexture: Interface\AddOns\Guildie\icon
