@@ -140,7 +140,7 @@ function FeedPage() {
 					<section key={day}>
 						{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
 						<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">{day}</h2>
-						<ul className="surface-card divide-y divide-border">
+						<ul className="surface-card divide-y divide-border overflow-hidden">
 							{groupDay(list).map((row) => (
 								<EventRow
 									key={row.id}
@@ -338,7 +338,8 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 
 	let text: ReactNode;
 	let detail: ReactNode = null;
-	let aside: ReactNode = null;
+	/** A dungeon's art, along the row's right edge. */
+	let art: string | undefined;
 	switch (e.kind) {
 		case "level":
 			text = (
@@ -355,15 +356,7 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 					{everyone} cleared {dungeonLink ?? "a dungeon"} for the first time
 				</>
 			);
-			if (dungeon)
-				aside = (
-					<img
-						src={dungeonArtUrl(dungeon.key)}
-						alt=""
-						loading="lazy"
-						className="hidden h-10 w-24 flex-none rounded-[4px] border border-border object-cover sm:block"
-					/>
-				);
+			if (dungeon) art = dungeonArtUrl(dungeon.key);
 			break;
 		case "quests": {
 			const n = e.quests?.length ?? 0;
@@ -426,7 +419,18 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 	const avatars = (e.kind === "claim" || e.kind === "fulfilled") && e.other ? [e.other] : people;
 
 	return (
-		<li className="group/row relative flex items-center gap-3.5 px-4 py-3.5">
+		<li className="group/row relative isolate flex items-start gap-3.5 px-4 py-3.5">
+			{/* Top to bottom along the right edge, fading in from the text's side and out
+			    to the edge; under the reactions. The text stops before it (the spacer). */}
+			{art && (
+				<img
+					src={art}
+					alt=""
+					loading="lazy"
+					draggable={false}
+					className="pointer-events-none absolute inset-y-0 right-0 -z-10 h-full w-40 object-cover [mask-image:linear-gradient(90deg,transparent,#000_22%,#000_45%,transparent)] sm:w-60"
+				/>
+			)}
 			<Portraits people={avatars} />
 			<div className="min-w-0 flex-1 text-base leading-snug">
 				<div>{text}</div>
@@ -436,8 +440,8 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 					<span className="truncate">{detail || KIND_LABEL[e.kind]}</span>
 				</div>
 			</div>
-			<Reactions reactions={row.reactions} onReact={onReact} />
-			{aside}
+			{art && <span className="w-10 flex-none sm:w-24" />}
+			<Reactions reactions={row.reactions} onReact={onReact} onArt={!!art} />
 		</li>
 	);
 }
@@ -509,9 +513,19 @@ function reactors(list: Event["reactions"]) {
  * A row's reactions, in their own column at the right: one summary (the
  * three most used as tiles, then the total; outlined in the accent when
  * one is yours) that opens a panel to react and see who did. Rows without
- * reactions show an add tile there on hover (always on touch).
+ * reactions show an add tile there on hover (always on touch). Top-aligned
+ * with the row's first line, over the dungeon art where there is some.
  */
-function Reactions({ reactions, onReact }: { reactions: Event["reactions"]; onReact: (reaction: Reaction) => void }) {
+function Reactions({
+	reactions,
+	onReact,
+	onArt,
+}: {
+	reactions: Event["reactions"];
+	onReact: (reaction: Reaction) => void;
+	/** Over the row's art: a frosted backing so it reads. */
+	onArt?: boolean;
+}) {
 	// Each player once per reaction (a group's events can each carry theirs).
 	const by = new Map<Reaction, Event["reactions"]>();
 	for (const r of reactions) {
@@ -531,6 +545,7 @@ function Reactions({ reactions, onReact }: { reactions: Event["reactions"]; onRe
 				aria-label={total ? `${total} reactions` : "React"}
 				className={cn(
 					"num flex h-7 flex-none items-center gap-[7px] rounded-md border text-xs transition-[color,background-color,border-color,opacity]",
+					onArt && "bg-surface/75! backdrop-blur-sm",
 					!total
 						? "w-7 justify-center border-dashed border-(--border-strong) text-muted-foreground hover:text-foreground focus-visible:opacity-100 data-popup-open:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
 						: mine
