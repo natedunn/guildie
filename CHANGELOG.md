@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie, App:** Items you mail or trade for a guildmate's request now count as soon as your Guildie app syncs, without waiting for them to collect it. When they do collect it, it isn't counted twice. The request shows what's been delivered and what's sent but not collected yet.
+
 ## 0.3.36
 
 ### New

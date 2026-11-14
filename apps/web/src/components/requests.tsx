@@ -828,16 +828,16 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							</>
 						)}
 					</p>
-					{r.kind === "item" && (r.receivedQuantity > 0 || r.sentQuantity > 0) && (
-						<p className="text-[13px] text-muted-foreground">
-							{r.ongoing ? `${r.receivedQuantity} received` : `${r.receivedQuantity}/${r.quantity} received`}
-							{r.sentQuantity > 0 && ` · ${r.sentQuantity} sent (may already be received)`}
+					{r.kind === "item" && r.deliveredQuantity > 0 && (
+						<p className="num text-[13px] text-muted-foreground">
+							{r.ongoing ? `${r.deliveredQuantity} delivered` : `${r.deliveredQuantity}/${r.quantity} delivered`}
+							{r.uncollectedQuantity > 0 && ` · ${r.uncollectedQuantity} sent, not collected yet`}
 						</p>
 					)}
 					{r.kind === "item" && active && r.mine && (
 						<p className="text-xs text-muted-foreground">
-							With the updated Guildie addon, confirmed collections and trades update this request after sync. Mark done
-							if a delivery was not tracked.
+							Mail and trades count once the sender's or your Guildie app syncs. Mark done if a delivery was not
+							tracked.
 						</p>
 					)}
 					{r.note && <p className="text-[13px]">“{r.note}”</p>}

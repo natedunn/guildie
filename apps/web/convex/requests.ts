@@ -17,6 +17,7 @@ import {
 	canChange,
 	canHelpFromInventory,
 	check,
+	deliveredQuantity,
 	deliveryName,
 	deliveryOutcome,
 	deliveryParticipants,
@@ -269,6 +270,9 @@ async function view(
 		quantity: r.quantity,
 		receivedQuantity: r.receivedQuantity ?? 0,
 		sentQuantity: r.sentQuantity ?? 0,
+		deliveredQuantity: deliveredQuantity(r),
+		/** Reported sent but not yet reported collected by the requester. */
+		uncollectedQuantity: (r.senders ?? []).reduce((n, x) => n + Math.max(0, x.sent - x.received), 0),
 		ongoing,
 		until: r.until,
 		have,
@@ -853,6 +857,36 @@ export const dropLegacyCrafts = internalMutation({
 	},
 });
 
+/**
+ * One-off, after sends started counting: sends turned away only because the
+ * item request wasn't claimed are counted now, on requests still open. Run
+ * once per deployment: `npx convex run requests:countEarlierSends '{"dryRun":true}'`.
+ */
+export const countEarlierSends = internalMutation({
+	args: { dryRun: v.optional(v.boolean()) },
+	handler: async (ctx, { dryRun }) => {
+		const counted: string[] = [];
+		for (const row of await ctx.db.query("requestDeliveryEvents").collect()) {
+			if (row.rejected !== "request not claimed" || !row.sender || !row.recipient) continue;
+			const r = await ctx.db.get(row.requestId);
+			if (!r || r.kind !== "item" || r.claim || !ACTIVE.includes(r.status) || r.itemId !== row.itemId) continue;
+			if (row.at < r.createdAt || row.sender.slug === r.character.slug) continue;
+			if (!sameCharacter(row.recipient.name, r.character)) continue;
+			counted.push(`${row.sender.name} sent ${row.quantity}× ${row.itemId} to ${r.character.name}`);
+			if (dryRun) continue;
+			const progress = deliveryProgress(r, { kind: row.kind, quantity: row.quantity }, row.sender);
+			await ctx.db.patch(r._id, {
+				...progress,
+				lastActivityAt: Math.max(r.lastActivityAt, row.at),
+				...(progress.status === "done" ? { closedAt: Date.now() } : {}),
+			});
+			if (progress.status === "done") await notifyRequester(ctx, r, "requestDone");
+			await ctx.db.patch(row._id, { rejected: undefined });
+		}
+		return { counted };
+	},
+});
+
 /** Ongoing requests whose requester has no character left in that guild close as expired. */
 export const closeOngoingOfLeavers = internalMutation({
 	args: { cursor: v.optional(v.union(v.string(), v.null())) },
@@ -1172,7 +1206,7 @@ export async function recordDeliveries(
 			});
 			continue;
 		}
-		const progress = deliveryProgress(r, event);
+		const progress = deliveryProgress(r, event, participants.sender);
 		const patch: Partial<Doc<"requests">> = { ...progress, lastActivityAt: Math.max(r.lastActivityAt, event.at) };
 		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };
 		if (progress.status === "done") patch.closedAt = Date.now();
