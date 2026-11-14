@@ -173,7 +173,11 @@ The existing payload/live snapshot size limits still apply.
 the full one. The mail sender and a typed recipient show full names.
 `MAIL_SUCCESS` fires with no argument. Sending matched a request, uploaded, and
 was settled on the server (rejected "request not claimed", correct for one's own
-alts) and acknowledged. Trades, returned mail and COD weren't tried yet.
+alts) and acknowledged. Retest after the collection fix (`a4059c6`): a direct
+attachment click (×1) and Open All on one mail (×2) each recorded one receipt,
+the request reached 3/3 and closed, the feed credited the real sender with full
+names, and both reports were acknowledged. Still untried in Forever: trades,
+Open All across several mails, full-bag failure, COD and returned mail.
 
 **Trace.** `/guildie trace` (again to stop) logs each mail and trade step, the
 names the client shows (`UnitName`, `GetUnitName`, `UnitFullName`) and every match
