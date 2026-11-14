@@ -159,9 +159,17 @@ async function craftersOf(ctx: Ctx, guildId: Id<"guilds">, recipeId: number, exc
 	for (const m of roster) {
 		if (own.has(m.slug)) continue;
 		const profile = await pickProfile(ctx, m);
-		if (profile.professions.some((p) => p.knownRecipes?.includes(recipeId))) out.push(m);
+		if (!profile.professions.some((p) => p.knownRecipes?.includes(recipeId))) continue;
+		// Only players on Guildie can answer an ask.
+		const owner = await ctx.db
+			.query("ownedCharacters")
+			.withIndex("by_slug", (q) => q.eq("flavor", m.flavor).eq("region", m.region).eq("slug", m.slug))
+			.first();
+		out.push({ ...brief(m), onGuildie: !!owner, level: m.level });
 	}
-	return out.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name)).map(brief);
+	return out
+		.sort((a, b) => Number(b.onGuildie) - Number(a.onGuildie) || b.level - a.level || a.name.localeCompare(b.name))
+		.map(({ level: _, ...c }) => c);
 }
 
 const brief = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
@@ -350,6 +358,17 @@ export const list = query({
 			characters: member.characters.map(brief),
 			requests: out,
 		};
+	},
+});
+
+/** The craft form: guildmates who know a recipe, and which of them are on Guildie (only they can be asked). */
+export const crafters = query({
+	args: { region: vRegion, slug: v.string(), recipeId: v.number() },
+	handler: async (ctx, { region, slug, recipeId }) => {
+		const guild = await guildByKey(ctx, region, slug);
+		const member = guild && (await membership(ctx, guild));
+		if (!guild || !member) return null;
+		return await craftersOf(ctx, guild._id, recipeId, member.userId);
 	},
 });
 

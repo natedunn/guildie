@@ -452,10 +452,15 @@ function CraftRequestForm({
 	const [note, setNote] = useState("");
 	const [character, setCharacter] = useState(characters[0]?.slug);
 	const [declared, setDeclared] = useState(false);
-	// Who to ask: guildmates who know it, not your own characters.
-	const crafters = (target.crafters ?? []).filter((c) => !characters.some((m) => m.slug === c.slug));
-	const [crafter, setCrafter] = useState(crafters.length === 1 ? crafters[0].slug : undefined);
-	const asked = crafters.find((c) => c.slug === crafter);
+	// Who to ask: guildmates who know it, not your own characters; only those on Guildie can answer.
+	const { data: known } = useQuery(
+		convexQuery(api.requests.crafters, { region: guild.region, slug: guild.slug, recipeId: target.recipeId }),
+	);
+	const crafters = known ?? [];
+	const askable = crafters.filter((c) => c.onGuildie);
+	const [picked, setCrafter] = useState<string>();
+	const crafter = picked ?? (askable.length === 1 ? askable[0].slug : undefined);
+	const asked = askable.find((c) => c.slug === crafter);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const q = Math.max(1, Math.min(REQUEST_LIMITS.quantity, Math.floor(Number(quantity)) || 1));
@@ -503,7 +508,11 @@ function CraftRequestForm({
 				<CloseButton />
 			</div>
 
-			<CrafterPicker crafters={crafters} value={crafter} onChange={setCrafter} />
+			{known === undefined ? (
+				<p className="text-[13px] text-muted-foreground">Finding who can make it…</p>
+			) : (
+				<CrafterPicker crafters={crafters} value={crafter} onChange={setCrafter} />
+			)}
 
 			<AskingAs characters={characters} value={character} onChange={setCharacter} />
 
@@ -544,8 +553,8 @@ function CraftRequestForm({
 					</label>
 				)}
 				<p className="text-xs text-muted-foreground">
-					Sending the mats is on you, once {asked ? asked.name : "they"} accept. With the Guildie app, what arrives
-					shows on the request. {asked ? asked.name : "They"} see "
+					Sending the mats is on you, once {asked ? `${asked.name} accepts` : "they accept"}. With the Guildie app, what
+					arrives shows on the request. {asked ? `${asked.name} sees` : "They see"} "
 					{matsLabel(mats?.covered ? "inventory" : declared ? "declared" : "missing")}", never what's in your bags.
 				</p>
 			</div>
@@ -562,34 +571,43 @@ function CraftRequestForm({
 }
 
 /** Who to ask to craft it: one guildmate who knows the recipe. They accept or decline. */
-function CrafterPicker({
+export function CrafterPicker({
 	crafters,
 	value,
 	onChange,
+	label = "Ask",
 }: {
-	crafters: Character[];
+	crafters: (Character & { onGuildie: boolean })[];
 	value: string | undefined;
 	onChange: (slug: string) => void;
+	label?: string;
 }) {
 	if (crafters.length === 0)
 		return <p className="text-[13px] text-muted-foreground">Nobody else in the guild knows this recipe yet.</p>;
+	const askable = crafters.some((c) => c.onGuildie);
 	return (
-		<Field label="Ask" as="div">
+		<Field label={label} as="div">
 			<div className="flex flex-wrap gap-1">
 				{crafters.map((c) => (
 					<button
 						key={c.slug}
 						type="button"
-						className="chip"
+						className="chip disabled:opacity-50"
 						data-active={value === c.slug}
 						aria-pressed={value === c.slug}
+						disabled={!c.onGuildie}
+						title={c.onGuildie ? undefined : `${c.name} isn't on Guildie yet, so they couldn't answer`}
 						onClick={() => onChange(c.slug)}
 					>
 						<ClassText classId={c.classId}>{c.name}</ClassText>
 					</button>
 				))}
 			</div>
-			<span className="block text-xs text-muted-foreground">They accept or decline; you're told either way.</span>
+			<span className="block text-xs text-muted-foreground">
+				{askable
+					? "They accept or decline; you're told either way. Greyed out: not on Guildie yet."
+					: "Nobody who knows it is on Guildie yet, so nobody could answer. Invite them to Guildie."}
+			</span>
 		</Field>
 	);
 }
@@ -708,8 +726,9 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 							<span className="text-xs text-muted-foreground">Ongoing · {timeLeft(r.until)}</span>
 						) : (
 							<span className="num text-[13px] text-muted-foreground">
-								×{remainingQuantity(r)}
-								{r.kind === "item" ? " remaining" : ""}
+								{/* Open: what's still to come; closed: what was asked for. */}×
+								{active ? remainingQuantity(r) : r.quantity}
+								{r.kind === "item" && active ? " remaining" : ""}
 							</span>
 						)}
 						{r.kind === "craft" && (
@@ -728,7 +747,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						{" · "}
 						{ago(r.createdAt)}
 						{r.stale && <span className="text-foreground"> · no activity for over a week</span>}
-						{r.kind === "craft" && active && (
+						{r.kind === "craft" && r.status === "open" && (
 							<>
 								{" · "}
 								<span className={r.mats?.state === "missing" ? undefined : "text-foreground"}>
@@ -761,7 +780,13 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						) : r.claim ? (
 							<>
 								<span className="text-muted-foreground">
-									{r.status === "claimed" ? "Claimed by " : "Was claimed by "}
+									{r.kind === "craft"
+										? r.status === "done"
+											? "Made by "
+											: "Was taken on by "
+										: r.status === "claimed"
+											? "Claimed by "
+											: "Was claimed by "}
 								</span>
 								{r.claim.mine ? (
 									"you"
@@ -849,9 +874,11 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								<button
 									key={c.slug}
 									type="button"
-									className="chip"
+									className="chip disabled:opacity-50"
 									data-active={askNext === c.slug}
 									aria-pressed={askNext === c.slug}
+									disabled={!c.onGuildie}
+									title={c.onGuildie ? undefined : `${c.name} isn't on Guildie yet`}
 									onClick={() => setAskNext(c.slug)}
 								>
 									<ClassText classId={c.classId}>{c.name}</ClassText>
