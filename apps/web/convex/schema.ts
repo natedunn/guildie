@@ -669,6 +669,8 @@ export default defineSchema({
 		kind: v.string(),
 		quantity: v.number(),
 		at: v.number(),
+		/** Why the report didn't count (shared/requests.ts, DeliveryRejection); none when it did. */
+		rejected: v.optional(v.string()),
 	}).index("by_character_event", ["characterId", "eventId"]),
 
 	requests: defineTable({

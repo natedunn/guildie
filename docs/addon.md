@@ -497,8 +497,8 @@ trades or mails it; the requester marks it done (`/g/<region>/<guild>/requests`,
   leave it "Mats not confirmed". The requester sees have/need per reagent
   and when bags and bank were last read; nobody else ever sees the counts.
   Claimed requests keep their mats state (the mats may be in the mail).
-- **In game:** `requests` in the guild data, by item id: `{ kind, quantity,
-  name, classId, claimedBy? }`, or `{ kind, ongoing = true, name, classId }`
+- **In game:** `requests` in the guild data, by item id: `{ requestId, kind, quantity,
+  name, slug, classId, claimedBy? = { name, slug, classId } }`, or `{ requestId, kind, ongoing = true, name, slug, classId }`
   (no quantity), ongoing first, at most 5 per item and 300 items. The
   tooltip has a row per request: "Todd | wants all you have" (ongoing, and
   then no "might want" row for Todd), "Miller | requesting 20, claimed by
@@ -632,7 +632,7 @@ Google/Apple" can't run in an embedded browser. Instead:
 
 Optional character `deliveries` is an array of at most 200 records: `id`,
 `requestId`, `kind` (`mailSent`, `mailReceived`, `tradeSent`, `tradeReceived`),
-`other` (exact character name), `itemId`, `quantity`, and `at` (game time seconds).
+`other` (the other character's name as the game showed it), `itemId`, `quantity`, and `at` (game time seconds).
 The app accepts v6 and earlier formats. Upload ownership checks precede bounded
 internal processing; optional request progress fields and the new
 `requestDeliveryEvents` table are additive, with no migration needed. Existing

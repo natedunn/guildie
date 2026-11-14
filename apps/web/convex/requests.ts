@@ -15,10 +15,10 @@ import {
 	canChange,
 	canHelpFromInventory,
 	check,
-	deliveryMatches,
 	deliveryName,
 	deliveryParticipants,
 	deliveryProgress,
+	deliveryRejection,
 	EXPIRE_MS,
 	isStale,
 	matsCheck,
@@ -27,6 +27,7 @@ import {
 	ongoingUntil,
 	remainingQuantity,
 	rosterCharacters,
+	sameCharacter,
 	shouldExpire,
 	sumInventory,
 	validateNew,
@@ -732,8 +733,10 @@ export type AddonRequest = {
 	/** Ongoing (addons since ongoing requests; older ones ignore it): "wants all you have", and no "might want" row for them. */
 	ongoing?: true;
 	name: string;
+	/** `{name}-{surname}`: Blizzard's `name` is the first name only (delivery matching). */
+	slug: string;
 	classId: number;
-	claimedBy?: { name: string; classId: number };
+	claimedBy?: { name: string; slug: string; classId: number };
 };
 
 /** Requests per item shown on a tooltip, at most. */
@@ -767,8 +770,17 @@ export async function addonRequests(ctx: QueryCtx, guildIds: Id<"guilds">[], use
 			kind: r.kind,
 			...(r.ongoing ? { ongoing: true as const } : { quantity: remainingQuantity(r) }),
 			name: r.character.name,
+			slug: r.character.slug,
 			classId: r.character.classId,
-			...(r.claim ? { claimedBy: { name: r.claim.character.name, classId: r.claim.character.classId } } : {}),
+			...(r.claim
+				? {
+						claimedBy: {
+							name: r.claim.character.name,
+							slug: r.claim.character.slug,
+							classId: r.claim.character.classId,
+						},
+					}
+				: {}),
 		});
 	}
 	const mine = await activeOf(ctx, userId);
@@ -844,7 +856,12 @@ export const search = query({
 	},
 });
 
-/** Called only after helper ingestion verifies ownership of the reporting character. */
+/**
+ * Called only after helper ingestion verifies ownership of the reporting
+ * character. Each report is settled once (counted, or kept with why it
+ * didn't count) and only then acknowledged to the addon through the
+ * snapshot's `deliveryIds`, so a report that fails here is sent again.
+ */
 export async function recordDeliveries(
 	ctx: MutationCtx,
 	userId: Id<"users">,
@@ -853,8 +870,11 @@ export async function recordDeliveries(
 	reporterName = character.name,
 	reporterGuid?: string,
 ) {
+	// Not in a guild's roster yet (it can lag): leave the reports unacknowledged for later.
 	if (!character.inRoster || !character.guildId) return;
+	const settled: string[] = [];
 	for (const event of events) {
+		settled.push(event.id);
 		const requestId = ctx.db.normalizeId("requests", event.requestId);
 		if (!requestId) continue;
 		const seen = await ctx.db
@@ -863,43 +883,59 @@ export async function recordDeliveries(
 			.unique();
 		if (seen) continue;
 		const r = await ctx.db.get(requestId);
-		if (
-			!r ||
-			!deliveryMatches(
-				r,
-				event,
-				{ userId, slug: character.slug, name: character.name, guildId: character.guildId },
-				Date.now(),
-			)
-		)
-			continue;
-		const knownOther = await ctx.db
-			.query("characters")
-			.withIndex("by_slug", (q) =>
-				q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", deliveryName(event.other)),
-			)
-			.first();
 		const observedReporterName = event.reporterName ?? reporterName;
-		const participants = deliveryParticipants(
-			event,
-			{ name: observedReporterName, characterId: character._id, slug: character.slug, classId: character.classId },
-			knownOther
-				? { name: knownOther.name, characterId: knownOther._id, slug: knownOther.slug, classId: knownOther.classId }
-				: undefined,
-		);
-		await ctx.db.insert("requestDeliveryEvents", {
-			guildId: r.guildId,
+		const reporter = {
+			name: observedReporterName,
+			characterId: character._id,
+			slug: character.slug,
+			classId: character.classId,
+		};
+		const row = {
+			guildId: r?.guildId ?? character.guildId,
 			reporterGuid,
 			itemId: event.itemId,
-			method: participants.method,
-			sender: participants.sender,
-			recipient: participants.recipient,
 			characterId: character._id,
 			eventId: event.id,
 			requestId,
 			kind: event.kind,
 			quantity: event.quantity,
 			at: event.at,
+		};
+		const rejected = r
+			? deliveryRejection(
+					r,
+					event,
+					{ userId, slug: character.slug, name: character.name, guildId: character.guildId },
+					Date.now(),
+				)
+			: "request gone";
+		if (!r || rejected) {
+			const { sender, recipient, method } = deliveryParticipants(event, reporter);
+			await ctx.db.insert("requestDeliveryEvents", { ...row, method, sender, recipient, rejected });
+			continue;
+		}
+		// The other side is whoever the request says it should be, when the
+		// observed name fits them (a first name alone has no slug to look up).
+		const expected = event.kind.endsWith("Received") ? r.claim?.character : r.character;
+		const otherSlug = expected && sameCharacter(event.other, expected) ? expected.slug : deliveryName(event.other);
+		const knownOther = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) =>
+				q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", otherSlug),
+			)
+			.first();
+		const participants = deliveryParticipants(
+			event,
+			reporter,
+			knownOther
+				? { name: knownOther.name, characterId: knownOther._id, slug: knownOther.slug, classId: knownOther.classId }
+				: undefined,
+		);
+		await ctx.db.insert("requestDeliveryEvents", {
+			...row,
+			method: participants.method,
+			sender: participants.sender,
+			recipient: participants.recipient,
 		});
 		const progress = deliveryProgress(r, event);
 		const patch: Partial<Doc<"requests">> = { ...progress, lastActivityAt: Math.max(r.lastActivityAt, event.at) };
@@ -916,6 +952,16 @@ export async function recordDeliveries(
 				progress.status === "done",
 			);
 		}
+	}
+	const snapshot = await ctx.db
+		.query("addonSnapshots")
+		.withIndex("by_slug", (q) =>
+			q.eq("flavor", character.flavor).eq("region", character.region).eq("slug", character.slug),
+		)
+		.unique();
+	if (snapshot && settled.length) {
+		const deliveryIds = [...new Set([...(snapshot.deliveryIds ?? []), ...settled])].slice(-200);
+		await ctx.db.patch(snapshot._id, { deliveryIds });
 	}
 }
 

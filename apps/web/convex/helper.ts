@@ -280,9 +280,9 @@ export const ingest = mutation({
 				proficiencies,
 				quests,
 				completedQuestIds: mergeCompletedQuestIds(existing?.completedQuestIds, c.completedQuestIds),
-				deliveryIds: c.deliveries
-					? [...new Set([...(existing?.deliveryIds ?? []), ...c.deliveries.map((e) => e.id)])].slice(-200)
-					: existing?.deliveryIds,
+				// Acknowledged once processed (requests.recordDeliveries); an empty
+				// list tells the addon this server acknowledges at all.
+				deliveryIds: existing?.deliveryIds ?? (c.deliveries ? [] : undefined),
 			};
 			if (!existing) await ctx.db.insert("addonSnapshots", snapshot);
 			else await ctx.db.replace(existing._id, snapshot);
