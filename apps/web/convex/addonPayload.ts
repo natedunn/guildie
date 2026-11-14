@@ -164,7 +164,7 @@ export type Delivery = {
 	id: string;
 	reporterName?: string;
 	requestId: string;
-	/** enchantReceived: a trade that put the requested enchant on the requester's item (addon 0.20.0). */
+	/** enchantReceived: a trade that put the requested enchant on the requester's item (addon 0.21.0). */
 	kind: "mailSent" | "mailReceived" | "tradeSent" | "tradeReceived" | "enchantReceived";
 	other: string;
 	itemId: number;

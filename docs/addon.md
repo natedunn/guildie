@@ -304,7 +304,7 @@ your last login or reload.
 - Guild requests (addon 0.8.0): `requests` and `myRequests`; see "Guild
   requests".
 - Recipe items (addon 0.14.0): `recipes`; see "Recipe items".
-- Notifications (addon 0.20.0): `notifications`, `[{ id, text }]`, recent
+- Notifications (addon 0.21.0): `notifications`, `[{ id, text }]`, recent
   unread ones meant for the game; see "Notifications".
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.

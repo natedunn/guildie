@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.36
+
 ### New
 
 - **Guildie, App, Addon:** Craft requests are now asked of one guildmate who knows the recipe. They accept or decline (an ask with no answer lapses after a week), and you're notified either way. Once they accept, the mats you send them show as they arrive, and the request closes by itself when the crafted item reaches you, or, for an enchant, when they enchant your item over trade. You can still mark it done yourself.

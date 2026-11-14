@@ -662,7 +662,7 @@ export type GuildData = {
 	requests: Record<string, AddonRequest[]>;
 	myRequests: { open: number; stale: number };
 	/**
-	 * Accepted crafts the player asked for or is making (addon 0.20.0+;
+	 * Accepted crafts the player asked for or is making (addon 0.21.0+;
 	 * older addons ignore it): which mail and trades are mats, the crafted
 	 * item or an enchant for them (Deliveries.lua).
 	 */
@@ -675,7 +675,7 @@ export type GuildData = {
 	 */
 	recipes: PackedAddonRecipes;
 	/**
-	 * Recent unread notifications meant for the game (addon 0.20.0+; older
+	 * Recent unread notifications meant for the game (addon 0.21.0+; older
 	 * addons ignore it): the addon prints each once at login or /reload
 	 * ("Miller will craft your Silk Bandage ×2"). notifications.ts.
 	 */
