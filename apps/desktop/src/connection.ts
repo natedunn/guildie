@@ -53,6 +53,8 @@ export type Status = {
 
 const TICK_MS = 2_000;
 const RETRY_MS = 60_000;
+/** How often to ask for notifications while connected. */
+const NOTIFY_MS = 60_000;
 
 export class Connection {
 	/** The site's origin, which the token is kept under. */
@@ -70,6 +72,7 @@ export class Connection {
 	private update: UpdateState | undefined;
 	private timer: NodeJS.Timeout | undefined;
 	private lastRetry = 0;
+	private lastNotifications = 0;
 	private readonly pixels: LivePixels | undefined;
 	private pixelStatus: PixelStatus | undefined;
 	private pixelsEnabled = false;
@@ -77,6 +80,8 @@ export class Connection {
 	private readonly listeners = new Set<(status: Status) => void>();
 	/** Notices for the user (shown as notifications by main). */
 	onNotice: (title: string, body: string) => void = () => {};
+	/** A notification from the site to show (main shows it; clicking opens `url`). */
+	onSiteNotification: (text: string, url: string) => void = () => {};
 	/** The WoW folder was chosen (main installs or updates the addon there). */
 	onWowFolder: (folder: string) => void = () => {};
 
@@ -209,11 +214,26 @@ export class Connection {
 			this.addonLoaded = loaded;
 			this.emit();
 		}
-		if (this.account) return this.sync.tick();
+		if (this.account) {
+			if (Date.now() - this.lastNotifications > NOTIFY_MS) {
+				this.lastNotifications = Date.now();
+				void this.checkNotifications();
+			}
+			return this.sync.tick();
+		}
 		// Offline at start (or since): try the saved token again every minute.
 		if (this.api.token && Date.now() - this.lastRetry > RETRY_MS) {
 			this.lastRetry = Date.now();
 			await this.verify().catch(() => undefined);
+		}
+	}
+
+	/** The site's notifications for this account, shown once each (notifications.ts on the site). */
+	private async checkNotifications() {
+		try {
+			for (const n of (await this.api.notifications()) ?? []) this.onSiteNotification(n.text, this.origin + n.link);
+		} catch (e) {
+			this.log(`Couldn't check notifications: ${(e as Error).message}`);
 		}
 	}
 

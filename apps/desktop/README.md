@@ -144,6 +144,11 @@ waits for someone to approve the code it logs.
 | `src/updater.ts`    | App updates from GitHub Releases (electron-updater)                                           |
 | `src/smoke.ts`      | `--smoke-test`                                                                                |
 
+Notifications: while connected, `connection.ts` asks the site for new ones
+every minute (`Api.notifications`, `POST /api/helper/notifications`) and
+main shows each as a system notification; clicking it opens the window at
+that page. Only plain paths on the connected site are accepted.
+
 The upload and download logic is `packages/sync` (`@guildie/sync`), which
 the retired helper used too. `scripts/build.mjs` bundles main and preload
 with esbuild, so the packaged app carries no `node_modules`, and copies the

@@ -88,6 +88,27 @@ export class Api {
 		return (await res.json()) as GuildData;
 	}
 
+	/**
+	 * Notifications to show as system notifications, each handed out once
+	 * (`link`: a path on the site). null when the token is unknown or revoked;
+	 * an empty list from a site without notifications.
+	 */
+	async notifications(): Promise<{ id: string; text: string; link: string }[] | null> {
+		const res = await this.fetch("/api/helper/notifications", { method: "POST" });
+		if (res.status === 401) return null;
+		if (res.status === 404) return [];
+		if (!res.ok) throw new Error(`Guildie answered ${res.status}`);
+		const body = (await res.json()) as { notifications?: unknown };
+		if (!Array.isArray(body.notifications)) return [];
+		return body.notifications.flatMap((n) => {
+			const { id, text, link } = (n ?? {}) as Record<string, unknown>;
+			// Only plain site paths: a notification never opens anywhere else.
+			return typeof id === "string" && typeof text === "string" && typeof link === "string" && /^\/[^/\\]/.test(link)
+				? [{ id, text: text.slice(0, 200), link }]
+				: [];
+		});
+	}
+
 	async signOut() {
 		await this.fetch("/api/helper/signout", { method: "POST" }).catch(() => undefined);
 	}

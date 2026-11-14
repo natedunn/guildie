@@ -7,6 +7,7 @@ import type { Delivery } from "./addonPayload";
 import { noteDelivery, noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
+import { notifyRequester } from "./notifications";
 import { vRegion } from "./schema";
 import { untradeable } from "./shared/itemInfo";
 import {
@@ -556,6 +557,10 @@ export const act = mutation({
 		await ctx.db.patch(requestId, patch);
 		// The guild's feed: claimed, and fulfilled (done, by whoever claimed it).
 		if (action === "claim" && claimer) await noteRequest(ctx, "claim", r, brief(claimer));
+		// The requester hears about their craft being taken on and sent.
+		if (action === "claim" && claimer && r.kind === "craft")
+			await notifyRequester(ctx, r, "craftClaimed", brief(claimer));
+		if (action === "markSent" && r.claim) await notifyRequester(ctx, r, "craftSent", r.claim.character);
 		if (status === "done" && r.status !== "done")
 			await noteRequest(ctx, "fulfilled", r, patch.claim?.character ?? r.claim?.character);
 	},
@@ -683,6 +688,7 @@ export const expireStale = internalMutation({
 			for (const r of rows) {
 				if (!shouldExpire(r, now)) continue;
 				await ctx.db.patch(r._id, { status: "expired", closedAt: now });
+				await notifyRequester(ctx, r, "requestExpired");
 				closed++;
 			}
 		}
@@ -693,6 +699,7 @@ export const expireStale = internalMutation({
 			.take(BATCH);
 		for (const r of ended) {
 			await ctx.db.patch(r._id, { status: "expired", closedAt: now });
+			await notifyRequester(ctx, r, "requestExpired");
 			closed++;
 		}
 		if (closed >= BATCH) await ctx.scheduler.runAfter(1000, internal.requests.expireStale, {});
@@ -944,6 +951,7 @@ export async function recordDeliveries(
 		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };
 		if (progress.status === "done") patch.closedAt = Date.now();
 		await ctx.db.patch(r._id, patch);
+		if (progress.status === "done" && r.status !== "done") await notifyRequester(ctx, r, "requestDone");
 		if (participants.received) {
 			await noteDelivery(
 				ctx,

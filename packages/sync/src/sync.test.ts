@@ -297,3 +297,22 @@ test("durable captures survive restart, partial acceptance and disabled capture"
 	await new SyncEngine(api, "/missing", events, root).tick();
 	assert.equal(calls.length, 2);
 });
+
+test("notifications: plain site paths only, revoked tokens and older sites", async () => {
+	const answer = {
+		notifications: [
+			{ id: "n1", text: "Miller will craft your Silk Bandage ×2", link: "/g/us/unbound/requests?view=mine" },
+			{ id: "n2", text: "elsewhere", link: "https://evil.example/x" },
+			{ id: "n3", text: "protocol-relative", link: "//evil.example/x" },
+			{ id: "n4", text: "backslash", link: "/\\evil.example" },
+			{ id: 5, text: "bad id", link: "/x" },
+		],
+	};
+	const { api, calls } = fakeApi(() => ({ status: 200, body: answer }));
+	assert.deepEqual(await api.notifications(), [answer.notifications[0]]);
+	assert.equal(calls[0].method, "POST");
+	assert.equal(calls[0].path, "/api/helper/notifications");
+	assert.equal(await fakeApi(() => ({ status: 401, body: {} })).api.notifications(), null);
+	assert.deepEqual(await fakeApi(() => ({ status: 404, body: {} })).api.notifications(), [], "a site from before");
+	await assert.rejects(fakeApi(() => ({ status: 500, body: {} })).api.notifications());
+});

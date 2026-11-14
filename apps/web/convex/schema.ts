@@ -655,6 +655,36 @@ export default defineSchema({
 	 * it, the requester marks it done. Only the guild's signed-in members see
 	 * them. Rules: convex/shared/requests.ts.
 	 */
+	/**
+	 * What happened to a player's requests, for the site's inbox, the Windows
+	 * app and the addon (convex/notifications.ts). Pruned after 60 days.
+	 */
+	notifications: defineTable({
+		userId: v.id("users"),
+		guildId: v.id("guilds"),
+		kind: v.union(
+			v.literal("craftClaimed"),
+			v.literal("craftSent"),
+			v.literal("requestDone"),
+			v.literal("requestExpired"),
+		),
+		requestId: v.optional(v.id("requests")),
+		/** Who did it, when someone did. */
+		actor: v.optional(vRequestCharacter),
+		/** Written once, when it happened: "Miller will craft your Silk Bandage ×2". */
+		text: v.string(),
+		/** Where it leads on the site: a path. */
+		link: v.string(),
+		at: v.number(),
+		readAt: v.optional(v.number()),
+		/** A Windows app showed it (or skipped it: not a desktop kind). */
+		toastedAt: v.optional(v.number()),
+	})
+		.index("by_user", ["userId", "at"])
+		.index("by_user_read", ["userId", "readAt", "at"])
+		.index("by_user_toast", ["userId", "toastedAt", "at"])
+		.index("by_at", ["at"]),
+
 	requestDeliveryEvents: defineTable({
 		// Optional for compatibility with receipts stored before participant snapshots.
 		guildId: v.optional(v.id("guilds")),

@@ -11,6 +11,7 @@ import {
 	Login03Icon,
 	Menu01Icon,
 	MoneyBag01Icon,
+	Notification01Icon,
 	PuzzleIcon,
 	ScrollTextIcon,
 	Settings02Icon,
@@ -68,6 +69,7 @@ function SidebarNav() {
 	const { data: viewer } = useQuery(convexQuery(api.users.viewer, {}));
 	// Requests you could fill, per guild, and yours that went quiet (members only).
 	const { data: requests } = useQuery({ ...convexQuery(api.requests.sidebar, {}), enabled: !!viewer });
+	const { data: unread } = useQuery({ ...convexQuery(api.notifications.unread, {}), enabled: !!viewer });
 	const requestsIn = (g: { region: string; slug: string }) =>
 		requests?.guilds.find((r) => r.region === g.region && r.slug === g.slug);
 	const stale = (requests?.guilds ?? []).filter((g) => g.stale > 0);
@@ -166,6 +168,15 @@ function SidebarNav() {
 
 				{viewer && (
 					<NavSection title="Personal">
+						<NavLink to="/notifications">
+							<HugeiconsIcon icon={Notification01Icon} size={15} strokeWidth={1.75} />
+							<span className="flex-1">Notifications</span>
+							{!!unread && (
+								<span className="num text-xs text-highlight" title="Unread notifications">
+									{unread >= 100 ? "99+" : unread}
+								</span>
+							)}
+						</NavLink>
 						<NavLink to="/inventory">
 							<HugeiconsIcon icon={MoneyBag01Icon} size={15} strokeWidth={1.75} />
 							Inventory

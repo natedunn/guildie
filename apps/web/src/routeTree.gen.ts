@@ -14,6 +14,7 @@ import { Route as AddonRouteImport } from './routes/addon'
 import { Route as DataRouteImport } from './routes/data'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MeRouteImport } from './routes/me'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignInRouteImport } from './routes/sign-in'
@@ -30,6 +31,7 @@ import { Route as SettingsAppRouteImport } from './routes/settings/app'
 import { Route as SettingsGuildsRouteImport } from './routes/settings/guilds'
 import { Route as ApiHelperGuildDataRouteImport } from './routes/api/helper/guild-data'
 import { Route as ApiHelperMeRouteImport } from './routes/api/helper/me'
+import { Route as ApiHelperNotificationsRouteImport } from './routes/api/helper/notifications'
 import { Route as ApiHelperPairRouteImport } from './routes/api/helper/pair'
 import { Route as ApiHelperSignoutRouteImport } from './routes/api/helper/signout'
 import { Route as ApiHelperSnapshotRouteImport } from './routes/api/helper/snapshot'
@@ -75,6 +77,11 @@ const InventoryRoute = InventoryRouteImport.update({
 const MeRoute = MeRouteImport.update({
   id: '/me',
   path: '/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const QuestsRoute = QuestsRouteImport.update({
@@ -155,6 +162,11 @@ const ApiHelperGuildDataRoute = ApiHelperGuildDataRouteImport.update({
 const ApiHelperMeRoute = ApiHelperMeRouteImport.update({
   id: '/api/helper/me',
   path: '/api/helper/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHelperNotificationsRoute = ApiHelperNotificationsRouteImport.update({
+  id: '/api/helper/notifications',
+  path: '/api/helper/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHelperPairRoute = ApiHelperPairRouteImport.update({
@@ -271,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/data': typeof DataRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/sign-in': typeof SignInRoute
@@ -287,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
+  '/api/helper/notifications': typeof ApiHelperNotificationsRoute
   '/api/helper/pair': typeof ApiHelperPairRouteWithChildren
   '/api/helper/signout': typeof ApiHelperSignoutRoute
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
@@ -315,6 +329,7 @@ export interface FileRoutesByTo {
   '/data': typeof DataRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/quests': typeof QuestsRoute
   '/sign-in': typeof SignInRoute
   '/auth/refresh': typeof AuthRefreshRoute
@@ -330,6 +345,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
+  '/api/helper/notifications': typeof ApiHelperNotificationsRoute
   '/api/helper/pair': typeof ApiHelperPairRouteWithChildren
   '/api/helper/signout': typeof ApiHelperSignoutRoute
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
@@ -357,6 +373,7 @@ export interface FileRoutesById {
   '/data': typeof DataRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
+  '/notifications': typeof NotificationsRoute
   '/quests': typeof QuestsRoute
   '/settings': typeof SettingsRouteWithChildren
   '/sign-in': typeof SignInRoute
@@ -373,6 +390,7 @@ export interface FileRoutesById {
   '/settings/': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
+  '/api/helper/notifications': typeof ApiHelperNotificationsRoute
   '/api/helper/pair': typeof ApiHelperPairRouteWithChildren
   '/api/helper/signout': typeof ApiHelperSignoutRoute
   '/api/helper/snapshot': typeof ApiHelperSnapshotRoute
@@ -403,6 +421,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/inventory'
     | '/me'
+    | '/notifications'
     | '/quests'
     | '/settings'
     | '/sign-in'
@@ -419,6 +438,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/helper/guild-data'
     | '/api/helper/me'
+    | '/api/helper/notifications'
     | '/api/helper/pair'
     | '/api/helper/signout'
     | '/api/helper/snapshot'
@@ -447,6 +467,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/inventory'
     | '/me'
+    | '/notifications'
     | '/quests'
     | '/sign-in'
     | '/auth/refresh'
@@ -462,6 +483,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/api/helper/guild-data'
     | '/api/helper/me'
+    | '/api/helper/notifications'
     | '/api/helper/pair'
     | '/api/helper/signout'
     | '/api/helper/snapshot'
@@ -488,6 +510,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/inventory'
     | '/me'
+    | '/notifications'
     | '/quests'
     | '/settings'
     | '/sign-in'
@@ -504,6 +527,7 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/api/helper/guild-data'
     | '/api/helper/me'
+    | '/api/helper/notifications'
     | '/api/helper/pair'
     | '/api/helper/signout'
     | '/api/helper/snapshot'
@@ -533,6 +557,7 @@ export interface RootRouteChildren {
   DataRoute: typeof DataRoute
   InventoryRoute: typeof InventoryRoute
   MeRoute: typeof MeRoute
+  NotificationsRoute: typeof NotificationsRoute
   QuestsRoute: typeof QuestsRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   SignInRoute: typeof SignInRoute
@@ -545,6 +570,7 @@ export interface RootRouteChildren {
   HelperConnectRoute: typeof HelperConnectRoute
   ApiHelperGuildDataRoute: typeof ApiHelperGuildDataRoute
   ApiHelperMeRoute: typeof ApiHelperMeRoute
+  ApiHelperNotificationsRoute: typeof ApiHelperNotificationsRoute
   ApiHelperPairRoute: typeof ApiHelperPairRouteWithChildren
   ApiHelperSignoutRoute: typeof ApiHelperSignoutRoute
   ApiHelperSnapshotRoute: typeof ApiHelperSnapshotRoute
@@ -587,6 +613,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me'
       preLoaderRoute: typeof MeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/quests': {
@@ -699,6 +732,13 @@ declare module '@tanstack/react-router' {
       path: '/api/helper/me'
       fullPath: '/api/helper/me'
       preLoaderRoute: typeof ApiHelperMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/helper/notifications': {
+      id: '/api/helper/notifications'
+      path: '/api/helper/notifications'
+      fullPath: '/api/helper/notifications'
+      preLoaderRoute: typeof ApiHelperNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/helper/pair': {
@@ -937,6 +977,7 @@ const rootRouteChildren: RootRouteChildren = {
   DataRoute: DataRoute,
   InventoryRoute: InventoryRoute,
   MeRoute: MeRoute,
+  NotificationsRoute: NotificationsRoute,
   QuestsRoute: QuestsRoute,
   SettingsRoute: SettingsRouteWithChildren,
   SignInRoute: SignInRoute,
@@ -949,6 +990,7 @@ const rootRouteChildren: RootRouteChildren = {
   HelperConnectRoute: HelperConnectRoute,
   ApiHelperGuildDataRoute: ApiHelperGuildDataRoute,
   ApiHelperMeRoute: ApiHelperMeRoute,
+  ApiHelperNotificationsRoute: ApiHelperNotificationsRoute,
   ApiHelperPairRoute: ApiHelperPairRouteWithChildren,
   ApiHelperSignoutRoute: ApiHelperSignoutRoute,
   ApiHelperSnapshotRoute: ApiHelperSnapshotRoute,
