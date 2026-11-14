@@ -168,6 +168,13 @@ same records sooner. A crash before saving can lose unsynced records. Ingestion
 schedules bounded batches of 50, so completion may appear shortly after upload.
 The existing payload/live snapshot size limits still apply.
 
+**Seen in Forever (PR #76 pass, 2026-11-13).** `UnitName` gives the first name
+("Todd"), `GetUnitName(unit, true)` the full "Todd Bonzalezz"; the addon records
+the full one. The mail sender and a typed recipient show full names.
+`MAIL_SUCCESS` fires with no argument. Sending matched a request, uploaded, and
+was settled on the server (rejected "request not claimed", correct for one's own
+alts) and acknowledged. Trades, returned mail and COD weren't tried yet.
+
 **Trace.** `/guildie trace` (again to stop) logs each mail and trade step, the
 names the client shows (`UnitName`, `GetUnitName`, `UnitFullName`) and every match
 decision to `GuildieDB.deliveryTrace` (the last 400 lines, written at `/reload` or
@@ -198,8 +205,12 @@ PC test, using a matching backend/app and both players' updated addons:
    cancelled request followed by a new one for the same item. Old receipts must
    never fulfill the new request. Craft/enchant requests retain manual controls.
 
-Capture requires `MAIL_SUCCESS` with an item ID plus the expected bag-count
-increase, or `UI_INFO_MESSAGE` matching `ERR_TRADE_COMPLETE` within 5 seconds of
+Mail collection counts when the taken items left that sender's mail in the
+inbox (a live count, so shifting indexes don't matter) and the bag count rose,
+each by the full amount, within 30 seconds of the take. Forever's `MAIL_SUCCESS`
+carries no item ID (seen in game, PR #76), so it is only a cue to check. A
+failed take moves neither; a bag increase from elsewhere doesn't empty the mail.
+Trades count on `UI_INFO_MESSAGE` matching `ERR_TRADE_COMPLETE` within 5 seconds of
 the trade window. "Both accepted" isn't required (clients don't always report
 it before the trade closes). The items counted are the offer as of the last
 accept (any change to the items undoes an accept), so a window that empties
