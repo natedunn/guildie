@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** React to what your guildmates do on the Feed: a heart, a thumbs up, or one of a few game icons. Reacting to a group ("14 members cleared Wailing Caverns") counts for the whole group.
+
+### Improvements
+
+- **Guildie:** Feed rows no longer leave a wide gap on the left for big groups: a group's portraits share one small spot, with a count when there are more than three.
+
 ## 0.3.35
 
 ### Improvements
