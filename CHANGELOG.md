@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** React to what your guildmates do on the Feed: a heart, a thumbs up, or one of a few game icons. Reacting to a group ("14 members cleared Wailing Caverns") counts for the whole group.
+
+### Improvements
+
+- **Guildie:** Feed rows no longer leave a wide gap on the left for big groups: a group's portraits share one small spot, with a count when there are more than three.
+
 ### Fixes
 
 - **Addon:** Items you send or receive for a guild request through mail or trade are more reliably counted toward it: items you collect from the mailbox now count (they never did in Forever), names match with or without the surname, trades count even when the game doesn't report both sides accepting, and a report is only cleared from the addon once Guildie has processed it. `/guildie trace` logs each mail and trade step for troubleshooting.

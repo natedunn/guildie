@@ -1,18 +1,24 @@
+import { Popover } from "@base-ui/react/popover";
 import { api } from "@convex/_generated/api";
 import { DUNGEON_BY_KEY, dungeonArtUrl } from "@convex/shared/dungeons";
+import { gameIconUrl, REACTION_GAME_ICON, REACTION_LABEL, REACTIONS, type Reaction } from "@convex/shared/reactions";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
 	ArrowUpDoubleIcon,
 	Castle01Icon,
 	DeliveryBox01Icon,
+	FavouriteIcon,
 	HandHelpingIcon,
 	InboxIcon,
 	ScrollTextIcon,
+	SmilePlusIcon,
+	ThumbsUpIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { Fragment, type ReactNode, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
@@ -31,6 +37,8 @@ import { cn } from "@/lib/utils";
 // events share a row: everyone who cleared a dungeon, everyone who turned in
 // its quests, everyone who reached the same level (a character's level-ups
 // first merge into one).
+// Members react to rows (convex/feedReactions.ts); a grouped row's reactions
+// are its events' together, each player counted once per reaction.
 
 type Show = "all" | "levels" | "dungeons" | "quests" | "requests";
 type Search = { show?: Show };
@@ -65,6 +73,29 @@ function FeedPage() {
 	const { data } = useQuery({
 		...convexQuery(api.feed.list, { region: params.region as Region, slug: params.slug, limit }),
 		placeholderData: keepPreviousData,
+	});
+	// Reacting shows at once; the server's answer replaces it.
+	const toggle = useMutation(api.feedReactions.toggle).withOptimisticUpdate((store, { eventIds, reaction }) => {
+		const key = { region: params.region as Region, slug: params.slug, limit };
+		const current = store.getQuery(api.feed.list, key);
+		if (!current || current.hidden) return;
+		const ids = new Set<string>(eventIds);
+		const had = current.events.some((e) => ids.has(e.id) && e.reactions.some((r) => r.mine && r.reaction === reaction));
+		const me = current.events.flatMap((e) => e.reactions).find((r) => r.mine)?.character ?? {
+			slug: "",
+			name: "You",
+			classId: 0,
+		};
+		store.setQuery(api.feed.list, key, {
+			...current,
+			events: current.events.map((e) => {
+				if (had && ids.has(e.id))
+					return { ...e, reactions: e.reactions.filter((r) => !(r.mine && r.reaction === reaction)) };
+				if (!had && e.id === eventIds[0])
+					return { ...e, reactions: [...e.reactions, { reaction, character: me, mine: true }] };
+				return e;
+			}),
+		});
 	});
 	if (!data) return null;
 	if (data.hidden) return <MembersOnly />;
@@ -109,9 +140,13 @@ function FeedPage() {
 					<section key={day}>
 						{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
 						<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">{day}</h2>
-						<ul className="surface-card divide-y divide-border">
+						<ul className="surface-card divide-y divide-border overflow-hidden">
 							{groupDay(list).map((row) => (
-								<EventRow key={row.id} row={row} />
+								<EventRow
+									key={row.id}
+									row={row}
+									onReact={(reaction) => void toggle({ eventIds: row.ids, reaction }).catch(() => {})}
+								/>
 							))}
 						</ul>
 					</section>
@@ -155,8 +190,11 @@ function byDay(events: Event[]): [string, Event[]][] {
 }
 
 type Person = Event["character"];
-/** One row: an event, and everyone it's about when alike events were grouped (`people`, first is the event's own). */
-type Row = { id: string; event: Event; people: Person[] };
+/**
+ * One row: an event, and everyone it's about when alike events were grouped
+ * (`people`, first is the event's own); `ids`: all its events, first the row's own.
+ */
+type Row = { id: string; ids: Event["id"][]; event: Event; people: Person[]; reactions: Event["reactions"] };
 
 /**
  * A day's events as rows: a character's level-ups merge into one ("from"
@@ -167,6 +205,8 @@ function groupDay(events: Event[]): Row[] {
 	// A character's level-ups that day: the newest (highest), from the lowest.
 	const levels = new Map<string, Event>();
 	const merged: Event[] = [];
+	/** A merged level-up's events (the newest first). */
+	const mergedIds = new Map<Event, Event["id"][]>();
 	for (const e of events) {
 		if (e.kind !== "level") {
 			merged.push(e);
@@ -174,10 +214,15 @@ function groupDay(events: Event[]): Row[] {
 		}
 		const seen = levels.get(e.character.slug);
 		if (!seen) {
-			const copy = { ...e };
+			const copy = { ...e, reactions: [...e.reactions] };
 			levels.set(e.character.slug, copy);
 			merged.push(copy);
-		} else if (e.fromLevel !== undefined && (seen.fromLevel === undefined || e.fromLevel < seen.fromLevel)) {
+			mergedIds.set(copy, [e.id]);
+			continue;
+		}
+		mergedIds.get(seen)?.push(e.id);
+		seen.reactions.push(...e.reactions);
+		if (e.fromLevel !== undefined && (seen.fromLevel === undefined || e.fromLevel < seen.fromLevel)) {
 			seen.fromLevel = e.fromLevel;
 		}
 	}
@@ -192,12 +237,20 @@ function groupDay(events: Event[]): Row[] {
 					: undefined;
 		const row = key ? byKey.get(key) : undefined;
 		if (row) {
+			row.ids.push(...(mergedIds.get(e) ?? [e.id]));
+			row.reactions.push(...e.reactions);
 			if (!row.people.some((p) => p.slug === e.character.slug)) row.people.push(e.character);
 			if (e.kind === "quests")
 				row.event = { ...row.event, quests: [...new Set([...(row.event.quests ?? []), ...(e.quests ?? [])])] };
 			continue;
 		}
-		const fresh = { id: e.id, event: e, people: [e.character] };
+		const fresh = {
+			id: e.id,
+			ids: mergedIds.get(e) ?? [e.id],
+			event: e,
+			people: [e.character],
+			reactions: [...e.reactions],
+		};
 		rows.push(fresh);
 		if (key) byKey.set(key, fresh);
 	}
@@ -214,10 +267,21 @@ const KIND_ICON = {
 	delivery: DeliveryBox01Icon,
 } as const;
 
+/** The grey line's words when a row has nothing else to say there. */
+const KIND_LABEL = {
+	level: "Level-up",
+	dungeon: "First clear",
+	quests: "Dungeon quests",
+	request: "Request",
+	claim: "Request claimed",
+	fulfilled: "Request fulfilled",
+	delivery: "Delivery",
+} as const;
+
 /** Names shown in a grouped row before "and N others". */
 const NAMES = 4;
 
-function EventRow({ row }: { row: Row }) {
+function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) => void }) {
 	const { event: e, people } = row;
 	const params = Route.useParams();
 	const person = (c: NonNullable<Event["other"]>) => (
@@ -262,7 +326,7 @@ function EventRow({ row }: { row: Row }) {
 	const item = e.item && (
 		<ItemHover item={e.item} className="inline align-baseline">
 			<span className="mr-1.5 inline-block align-middle">
-				<ItemIcon icon={e.item.icon} quality={e.item.quality} size={18} />
+				<ItemIcon icon={e.item.icon} quality={e.item.quality} size={22} />
 			</span>
 			<span className="font-medium" style={{ color: QUALITY_COLORS[e.item.quality ?? "COMMON"] }}>
 				{(e.quantity ?? 1) > 1 && <span className="num">{e.quantity}× </span>}
@@ -274,7 +338,8 @@ function EventRow({ row }: { row: Row }) {
 
 	let text: ReactNode;
 	let detail: ReactNode = null;
-	let aside: ReactNode = null;
+	/** A dungeon's art, along the row's right edge. */
+	let art: string | undefined;
 	switch (e.kind) {
 		case "level":
 			text = (
@@ -291,15 +356,7 @@ function EventRow({ row }: { row: Row }) {
 					{everyone} cleared {dungeonLink ?? "a dungeon"} for the first time
 				</>
 			);
-			if (dungeon)
-				aside = (
-					<img
-						src={dungeonArtUrl(dungeon.key)}
-						alt=""
-						loading="lazy"
-						className="hidden h-10 w-24 flex-none rounded-[4px] border border-border object-cover sm:block"
-					/>
-				);
+			if (dungeon) art = dungeonArtUrl(dungeon.key);
 			break;
 		case "quests": {
 			const n = e.quests?.length ?? 0;
@@ -359,30 +416,208 @@ function EventRow({ row }: { row: Row }) {
 			);
 			break;
 	}
-	const avatars = (e.kind === "claim" || e.kind === "fulfilled") && e.other ? [e.other] : people.slice(0, 3);
+	const avatars = (e.kind === "claim" || e.kind === "fulfilled") && e.other ? [e.other] : people;
 
 	return (
-		<li className="flex items-center gap-3 px-3 py-2.5">
-			{/* One avatar, or up to three overlapping for a group; the kind's icon in the corner. */}
-			{/* As wide as three overlapping, right-aligned, so every row's text starts in the same place. */}
-			<div className="relative flex w-[68px] flex-none justify-end">
-				{avatars.map((a, i) => (
-					<CharacterAvatar
-						key={a.slug}
-						url={a.avatarUrl}
-						size={32}
-						className={cn("rounded-full", i > 0 && "-ml-3.5 ring-2 ring-surface")}
-					/>
-				))}
-				<span className="absolute -right-1 -bottom-1 grid size-[18px] place-items-center rounded-full border border-border bg-background text-muted-foreground">
-					<HugeiconsIcon icon={KIND_ICON[e.kind]} size={11} strokeWidth={2} />
-				</span>
-			</div>
-			<div className="min-w-0 flex-1 text-[0.8125rem] leading-snug">
+		<li className="group/row relative isolate flex items-start gap-3.5 px-4 py-3.5">
+			{/* Top to bottom along the right edge, fading in from the text's side and out
+			    to the edge; under the reactions. The text stops before it (the spacer). */}
+			{art && (
+				<img
+					src={art}
+					alt=""
+					loading="lazy"
+					draggable={false}
+					className="pointer-events-none absolute inset-y-0 right-0 -z-10 h-full w-40 object-cover [mask-image:linear-gradient(90deg,transparent,#000_22%,#000_45%,transparent)] sm:w-60"
+				/>
+			)}
+			<Portraits people={avatars} />
+			<div className="min-w-0 flex-1 text-base leading-snug">
 				<div>{text}</div>
-				{detail && <div className="mt-0.5 truncate text-xs text-muted-foreground">{detail}</div>}
+				{/* The kind's icon leads the grey line (on the portraits it would cover a group). */}
+				<div className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+					<HugeiconsIcon icon={KIND_ICON[e.kind]} size={14} strokeWidth={2} className="flex-none" />
+					<span className="truncate">{detail || KIND_LABEL[e.kind]}</span>
+				</div>
 			</div>
-			{aside}
+			{art && <span className="w-10 flex-none sm:w-24" />}
+			<Reactions reactions={row.reactions} onReact={onReact} onArt={!!art} />
 		</li>
+	);
+}
+
+/**
+ * Who a row is about, in one 36px spot so every row's text starts in the
+ * same place: one portrait, two on a diagonal, three in a triangle, or two
+ * and a count ("+12") for more.
+ */
+function Portraits({ people }: { people: Person[] }) {
+	if (people.length <= 1) return <CharacterAvatar url={people[0]?.avatarUrl} size={36} className="rounded-full" />;
+	const ring = "absolute rounded-full ring-2 ring-surface";
+	if (people.length === 2)
+		return (
+			<div className="relative size-9 flex-none">
+				<CharacterAvatar url={people[0].avatarUrl} size={25} className={cn(ring, "top-0 left-0")} />
+				<CharacterAvatar url={people[1].avatarUrl} size={25} className={cn(ring, "right-0 bottom-0")} />
+			</div>
+		);
+	const rest = people.length - 2;
+	return (
+		<div className="relative size-9 flex-none">
+			<CharacterAvatar url={people[0].avatarUrl} size={21} className={cn(ring, "top-0 left-[7.5px]")} />
+			<CharacterAvatar url={people[1].avatarUrl} size={21} className={cn(ring, "bottom-0 left-0")} />
+			{rest === 1 ? (
+				<CharacterAvatar url={people[2].avatarUrl} size={21} className={cn(ring, "right-0 bottom-0")} />
+			) : (
+				<span
+					className={cn(
+						ring,
+						"num right-0 bottom-0 grid size-[21px] place-items-center border border-border bg-secondary text-[9px] font-semibold tracking-tight text-foreground",
+					)}
+				>
+					+{Math.min(rest, 99)}
+				</span>
+			)}
+		</div>
+	);
+}
+
+/** A reaction's mark: line icons for the basics, the game's icons for the rest. */
+function ReactionMark({ reaction, size }: { reaction: Reaction; size: number }) {
+	const game = REACTION_GAME_ICON[reaction];
+	if (game)
+		return (
+			<img
+				src={gameIconUrl(game)}
+				alt=""
+				loading="lazy"
+				draggable={false}
+				className="flex-none rounded-[3px] border border-white/10"
+				style={{ width: size, height: size }}
+			/>
+		);
+	return <HugeiconsIcon icon={reaction === "like" ? ThumbsUpIcon : FavouriteIcon} size={size - 2} strokeWidth={2} />;
+}
+
+/** "You, Sela and 3 others". */
+function reactors(list: Event["reactions"]) {
+	const names = [
+		...(list.some((r) => r.mine) ? ["You"] : []),
+		...list.filter((r) => !r.mine).map((r) => r.character.name),
+	];
+	if (names.length <= 4) return names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+	return `${names.slice(0, 3).join(", ")} and ${names.length - 3} others`;
+}
+
+/**
+ * A row's reactions, in their own column at the right: one summary (the
+ * three most used as tiles, then the total; outlined in the accent when
+ * one is yours) that opens a panel to react and see who did. Rows without
+ * reactions show an add tile there on hover (always on touch). Top-aligned
+ * with the row's first line, over the dungeon art where there is some.
+ */
+function Reactions({
+	reactions,
+	onReact,
+	onArt,
+}: {
+	reactions: Event["reactions"];
+	onReact: (reaction: Reaction) => void;
+	/** Over the row's art: a frosted backing so it reads. */
+	onArt?: boolean;
+}) {
+	// Each player once per reaction (a group's events can each carry theirs).
+	const by = new Map<Reaction, Event["reactions"]>();
+	for (const r of reactions) {
+		const list = by.get(r.reaction) ?? [];
+		if (!list.some((x) => (r.mine ? x.mine : !x.mine && x.character.slug === r.character.slug))) list.push(r);
+		by.set(r.reaction, list);
+	}
+	// Most used first; ties in the picker's order.
+	const shown = REACTIONS.filter((r) => by.get(r)?.length).sort(
+		(a, b) => (by.get(b)?.length ?? 0) - (by.get(a)?.length ?? 0),
+	);
+	const total = shown.reduce((n, r) => n + (by.get(r)?.length ?? 0), 0);
+	const mine = reactions.some((r) => r.mine);
+	return (
+		<Popover.Root>
+			<Popover.Trigger
+				aria-label={total ? `${total} reactions` : "React"}
+				className={cn(
+					"num flex h-7 flex-none items-center gap-[7px] rounded-md border text-xs transition-[color,background-color,border-color,opacity]",
+					onArt && "bg-surface/75! backdrop-blur-sm",
+					!total
+						? "w-7 justify-center border-dashed border-(--border-strong) text-muted-foreground hover:text-foreground focus-visible:opacity-100 data-popup-open:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
+						: mine
+							? "border-highlight/45 bg-highlight/8 pr-2.5 pl-1 text-foreground"
+							: "border-border bg-muted pr-2.5 pl-1 text-muted-foreground hover:border-(--border-strong) hover:text-foreground",
+				)}
+			>
+				{total ? (
+					<>
+						<span className="flex gap-[3px]">
+							{shown.slice(0, 3).map((r) => (
+								<ReactionTile key={r} reaction={r} size={20} />
+							))}
+						</span>
+						{total}
+					</>
+				) : (
+					<HugeiconsIcon icon={SmilePlusIcon} size={15} strokeWidth={2} />
+				)}
+			</Popover.Trigger>
+			<Popover.Portal>
+				<Popover.Positioner side="bottom" align="end" sideOffset={6} className="isolate z-50">
+					<Popover.Popup className="w-64 origin-(--transform-origin) rounded-lg border border-(--border-strong) bg-popover bg-(image:--card-sheen) p-1.5 text-[0.8125rem] text-popover-foreground shadow-(--popover-shadow) outline-none duration-100 data-closed:animate-out data-closed:fade-out-0 data-open:animate-in data-open:fade-in-0">
+						<div className={cn("flex gap-0.5", total > 0 && "mb-1 border-b border-border pb-1.5")}>
+							{REACTIONS.map((r) => {
+								const on = !!by.get(r)?.some((x) => x.mine);
+								return (
+									<button
+										key={r}
+										type="button"
+										aria-label={REACTION_LABEL[r]}
+										aria-pressed={on}
+										title={REACTION_LABEL[r]}
+										onClick={() => onReact(r)}
+										className={cn(
+											"grid h-8 w-[34px] place-items-center rounded-md text-foreground transition-colors",
+											on ? "bg-highlight/10 ring-1 ring-highlight/45 ring-inset" : "hover:bg-selected",
+										)}
+									>
+										<ReactionMark reaction={r} size={22} />
+									</button>
+								);
+							})}
+						</div>
+						{shown.map((r) => {
+							const list = by.get(r) ?? [];
+							return (
+								<div key={r} className="flex items-center gap-2 px-1.5 py-1 text-muted-foreground">
+									<span className="grid size-[18px] flex-none place-items-center text-foreground">
+										<ReactionMark reaction={r} size={18} />
+									</span>
+									<span className="min-w-0 flex-1 truncate">{reactors(list)}</span>
+									<span className="num">{list.length}</span>
+								</div>
+							);
+						})}
+					</Popover.Popup>
+				</Popover.Positioner>
+			</Popover.Portal>
+		</Popover.Root>
+	);
+}
+
+/** A reaction as a small square tile (the summary): the game's icon, or the line icon on a faint fill. */
+function ReactionTile({ reaction, size }: { reaction: Reaction; size: number }) {
+	if (REACTION_GAME_ICON[reaction]) return <ReactionMark reaction={reaction} size={size} />;
+	return (
+		<span
+			className="grid flex-none place-items-center rounded-[4px] bg-secondary text-foreground"
+			style={{ width: size, height: size }}
+		>
+			<ReactionMark reaction={reaction} size={14} />
+		</span>
 	);
 }

@@ -1,9 +1,11 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { type MutationCtx, query } from "./_generated/server";
 import type { Delivery } from "./addonPayload";
 import { access } from "./guilds";
 import { vRegion } from "./schema";
+import { REACTIONS, type Reaction } from "./shared/reactions";
 
 // A guild's feed: what its members did, written as it's noticed.
 // - level: the roster sync or an addon upload shows a higher level than the
@@ -70,7 +72,14 @@ async function fixLevelTime(ctx: MutationCtx, c: Character, level: number, at: n
 		.order("desc")
 		.take(200);
 	const event = recent.find((e) => e.kind === "level" && e.level === level && e.character.slug === c.slug);
-	if (event && event.at !== at) await ctx.db.patch(event._id, { at });
+	if (!event || event.at === at) return;
+	await ctx.db.patch(event._id, { at });
+	// Reactions copy the event's time (feed.list reads them by it).
+	const reactions = await ctx.db
+		.query("feedReactions")
+		.withIndex("by_guild", (q) => q.eq("guildId", c.guildId).eq("eventAt", event.at))
+		.collect();
+	for (const r of reactions) if (r.eventId === event._id) await ctx.db.patch(r._id, { eventAt: at });
 }
 
 /** Dungeons cleared for the first time (after the baseline read). */
@@ -198,6 +207,24 @@ export const list = query({
 		const more = events.length > take;
 		const shown = events.slice(0, take);
 
+		// Reactions to what's shown, by event; the viewer's own marked.
+		const viewer = await getAuthUserId(ctx);
+		const oldest = shown.at(-1)?.at ?? 0;
+		const reactionRows = await ctx.db
+			.query("feedReactions")
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("eventAt", oldest))
+			.take(5000);
+		const reactions = new Map<
+			Id<"feedEvents">,
+			{ reaction: Reaction; character: Doc<"feedReactions">["character"]; mine: boolean }[]
+		>();
+		for (const r of reactionRows) {
+			if (!REACTIONS.includes(r.reaction)) continue;
+			const list = reactions.get(r.eventId) ?? [];
+			list.push({ reaction: r.reaction, character: r.character, mine: r.userId === viewer });
+			reactions.set(r.eventId, list);
+		}
+
 		const avatars = new Map<string, string | undefined>();
 		const items = new Map<number, Doc<"items"> | null>();
 		const quests = new Map<number, string | undefined>();
@@ -237,6 +264,7 @@ export const list = query({
 				return {
 					id: e._id,
 					at: e.at,
+					reactions: reactions.get(e._id) ?? [],
 					kind: e.kind,
 					character: { ...e.character, avatarUrl: avatars.get(e.character.slug) },
 					other: e.other && { ...e.other, avatarUrl: avatars.get(e.other.slug) },
