@@ -243,12 +243,14 @@ async function view(
 		stale: isStale(r, now),
 		fit,
 		canHelp: canHelpFromInventory(r, mine, viewer.known, active && !mine ? await scans() : [], recipe?.reagents),
+		// Crafts only: item requests count what arrives, from anyone.
 		canClaim:
 			active &&
 			r.status === "open" &&
-			!ongoing &&
+			r.kind === "craft" &&
 			!mine &&
-			(r.kind === "item" || (r.recipeId !== undefined && viewer.known.has(r.recipeId))),
+			r.recipeId !== undefined &&
+			viewer.known.has(r.recipeId),
 	};
 }
 

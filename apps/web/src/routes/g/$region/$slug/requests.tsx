@@ -13,8 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { shortDate, timeLeft } from "@/lib/format";
 
-// Guild requests: members ask for items and crafts, guildmates claim them,
-// the requester marks them done (rules: convex/shared/requests.ts). Items can
+// Guild requests: members ask for items and crafts. Items: guildmates send
+// some, and the requester's addon counts what arrives. Crafts: a crafter
+// claims it; the requester marks them done (rules: convex/shared/requests.ts). Items can
 // also be asked for as ongoing ("send me any you have"): their own tab, never
 // claimed. Members only, even in a public guild. The tab and the filter live
 // in the URL (?type=ongoing&view=mine), independent of each other.
@@ -107,9 +108,10 @@ function RequestsPage() {
 	return (
 		<div className="max-w-3xl space-y-4 pb-12">
 			<p className="text-[13px] text-muted-foreground">
-				Ask the guild for a fixed amount of something, or a craft: whoever claims it trades or mails it, and you mark it
-				done. Or ask for an item as ongoing, and guildmates send any they have. Requests also show on item tooltips in
-				game (with the Guildie app).
+				Ask the guild for a fixed amount of something: guildmates trade or mail what they have, and with the Guildie app
+				it closes by itself once it all arrives. Ask for a craft, and whoever claims it makes it and sends it. Or ask
+				for an item as ongoing, and guildmates send any they have. Requests also show on item tooltips in game (with the
+				Guildie app).
 			</p>
 
 			<NewRequest guild={guild} characters={data.characters} ongoing={type === "ongoing"} />

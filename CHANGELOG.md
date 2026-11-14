@@ -21,6 +21,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Guildie:** Item requests are no longer claimed: anyone can send what they have, and with the Guildie app the request counts what arrives and closes once it's all there. You can still mark it done yourself. Craft requests work as before.
 - **Guildie:** Feed rows no longer leave a wide gap on the left for big groups: a group's portraits share one small spot, with a count when there are more than three.
 
 ### Fixes

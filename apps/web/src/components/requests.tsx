@@ -217,7 +217,7 @@ const DURATIONS: { days: OngoingDays; label: string }[] = [
 ];
 
 /**
- * Items: a fixed amount (someone claims it, sends it, you mark it done) or
+ * Items: a fixed amount (guildmates send some; it closes when it all arrives) or
  * ongoing (send me any you have, for 2 weeks to 3 months). One request per
  * item: with `existing`, this changes that one, switching kinds included.
  */
@@ -395,7 +395,7 @@ function ItemRequestForm({
 						<p className="text-xs text-muted-foreground">
 							{ongoing
 								? "Guildmates send any they have, whenever. Their tooltips in game show you want it."
-								: "Someone claims it, sends it, and you mark it done."}
+								: "Guildmates send what they have. With the Guildie app it closes by itself once it all arrives; or mark it done."}
 						</p>
 					)}
 				</>
@@ -589,14 +589,14 @@ export function useNow() {
 }
 
 const STATUS_LABEL: Record<RequestView["status"], string> = {
-	open: "Not claimed yet",
+	open: "Open",
 	claimed: "Claimed",
 	done: "Done",
 	cancelled: "Cancelled",
 	expired: "Expired",
 };
 
-/** One request with what the viewer can do: claim, release, mark sent; the requester's done, cancel, keep. */
+/** One request with what the viewer can do: claim a craft, release, mark sent; the requester's done, cancel, keep. */
 export function RequestRow({ request: r, compact }: { request: RequestView; compact?: boolean }) {
 	const act = useMutation(api.requests.act);
 	const setDeclared = useMutation(api.requests.setDeclared);
@@ -709,7 +709,9 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 								</span>
 							</>
 						) : (
-							<span className="text-muted-foreground">{STATUS_LABEL[r.status]}</span>
+							<span className="text-muted-foreground">
+								{r.kind === "craft" && r.status === "open" ? "Not claimed yet" : STATUS_LABEL[r.status]}
+							</span>
 						)}
 						{!active && r.closedAt && <span className="text-muted-foreground"> · {ago(r.closedAt)}</span>}
 					</p>
