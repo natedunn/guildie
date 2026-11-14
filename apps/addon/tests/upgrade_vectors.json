@@ -69,6 +69,18 @@
 				},
 				"stats": ["INTELLECT", "SPELL_DAMAGE_DONE", "STAMINA"]
 			},
+			"DRUID:1:AGILITY,INTELLECT,SPIRIT": {
+				"name": "Agi/Int/Spi",
+				"w": {
+					"AGILITY": 1,
+					"INTELLECT": 0.5,
+					"SPIRIT": 0.1,
+					"STAMINA": 0.6,
+					"ARMOR": 0.02
+				},
+				"stats": ["AGILITY", "INTELLECT", "SPIRIT"],
+				"fit": ["AGILITY", "INTELLECT", "SPIRIT"]
+			},
 			"WARRIOR:1": {
 				"name": "Fury",
 				"w": {
@@ -365,6 +377,25 @@
 			"stats": {},
 			"armor": 60
 		},
+		"clothIntBracers": {
+			"invType": "WRIST",
+			"cls": 4,
+			"subclass": 1,
+			"stats": {
+				"INTELLECT": 3
+			},
+			"armor": 14
+		},
+		"leatherIntSpiBracers": {
+			"invType": "WRIST",
+			"cls": 4,
+			"subclass": 2,
+			"stats": {
+				"INTELLECT": 3,
+				"SPIRIT": 4
+			},
+			"armor": 39
+		},
 		"tinyIntGloves": {
 			"invType": "HAND",
 			"cls": 4,
@@ -598,6 +629,31 @@
 			},
 			"weaponPref": 2,
 			"weaponPrefs": [2, 16]
+		},
+		"Spirited": {
+			"name": "Spirited",
+			"classId": 11,
+			"level": 27,
+			"spec": "DRUID:1:AGILITY,INTELLECT,SPIRIT",
+			"seen": 2000000,
+			"slots": {
+				"9": 1.5
+			},
+			"keys": {
+				"9": {
+					"INTELLECT": 3
+				}
+			}
+		},
+		"Spiritless": {
+			"name": "Spiritless",
+			"classId": 11,
+			"level": 27,
+			"spec": "DRUID:1",
+			"seen": 2000000,
+			"slots": {
+				"9": 1.5
+			}
 		},
 		"Cub": {
 			"name": "Cub",
@@ -1236,6 +1292,26 @@
 				"against": [18],
 				"off": null
 			}
+		},
+		{
+			"name": "low-weight Spirit on their list doesn't count against the item: an upgrade",
+			"item": "leatherIntSpiBracers",
+			"member": "Spirited",
+			"expect": {
+				"kind": "upgrade",
+				"gain": 0.7866666666666665,
+				"spec": "DRUID:1:AGILITY,INTELLECT,SPIRIT",
+				"at": null,
+				"second": false,
+				"against": [9],
+				"off": null
+			}
+		},
+		{
+			"name": "Spirit and Intellect off the list: doesn't suit",
+			"item": "leatherIntSpiBracers",
+			"member": "Spiritless",
+			"expect": null
 		}
 	],
 	"scores": [

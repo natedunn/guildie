@@ -33,7 +33,9 @@ away, already worn or Unique already worn, an `unlessChosen` weapon type they
 didn't list). Spec = tree with most points (under
 `minSpecPoints`: `DEFAULT_TREE`); a second tree with 10+ is the second spec.
 Score = Σ weight × stat + armor and DPS terms; items whose stats are mostly
-useless to the spec (`minFit`) don't suit it. Compare with what they wear in
+useless to the spec (`minFit`) don't suit it; a stat the spec names
+(a player's whole own list, `fit`; else `stats`) always counts as useful
+(`fitOf`). Compare with what they wear in
 that slot (weaker ring/trinket, main+off hand for a two-hander). **Upgrade:**
 gain ≥ `upgrade` (15%), usable now, main spec, a wanted armor type, none of
 the spec's priority stats (`stats`) lower than worn (member `keys`).

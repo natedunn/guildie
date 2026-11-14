@@ -41,6 +41,13 @@ const rules = {
 			w: { INTELLECT: 1, SPIRIT: 0.5, STAMINA: 0.6, SPELL_POWER: 1.3, SPELL_DAMAGE_DONE: 1.3, ARMOR: 0.02 },
 			stats: ["INTELLECT", "SPELL_DAMAGE_DONE", "STAMINA"],
 		},
+		// A player's own list: Spirit last, worth little, but named (fit), so it never counts against an item.
+		"DRUID:1:AGILITY,INTELLECT,SPIRIT": {
+			name: "Agi/Int/Spi",
+			w: { AGILITY: 1, INTELLECT: 0.5, SPIRIT: 0.1, STAMINA: 0.6, ARMOR: 0.02 },
+			stats: ["AGILITY", "INTELLECT", "SPIRIT"],
+			fit: ["AGILITY", "INTELLECT", "SPIRIT"],
+		},
 		"WARRIOR:1": {
 			name: "Fury",
 			w: { STRENGTH: 1, AGILITY: 0.8, STAMINA: 0.6, ARMOR: 0.02, ATTACK_POWER: 0.45, DPS: 4.5, OFFHAND_DPS: 1.4 },
@@ -110,6 +117,8 @@ const items: Record<string, any> = {
 	clothAgiShoulders: { invType: "SHOULDER", cls: 4, subclass: 1, stats: { AGILITY: 6, STAMINA: 4 }, armor: 25 },
 	plainClothHelm: { invType: "HEAD", cls: 4, subclass: 1, stats: {}, armor: 30 },
 	plainLeatherHelm: { invType: "HEAD", cls: 4, subclass: 2, stats: {}, armor: 60 },
+	clothIntBracers: { invType: "WRIST", cls: 4, subclass: 1, stats: { INTELLECT: 3 }, armor: 14 },
+	leatherIntSpiBracers: { invType: "WRIST", cls: 4, subclass: 2, stats: { INTELLECT: 3, SPIRIT: 4 }, armor: 39 },
 	tinyIntGloves: { invType: "HAND", cls: 4, subclass: 1, stats: { INTELLECT: 4 }, armor: 10 },
 	throwingKnife: { invType: "THROWN", cls: 2, subclass: 16, stats: {}, dps: 20 },
 };
@@ -233,6 +242,18 @@ const members: Record<string, any> = {
 		weaponPref: 2,
 		weaponPrefs: [2, 16],
 	},
+	// Their own list ends in Spirit; cloth bracers worn (Int 3, armor 14, cloth counting less: 1.5).
+	Spirited: {
+		name: "Spirited",
+		classId: 11,
+		level: 27,
+		spec: "DRUID:1:AGILITY,INTELLECT,SPIRIT",
+		seen: SEEN,
+		slots: { 9: 1.5 },
+		keys: { 9: { INTELLECT: 3 } },
+	},
+	// The same without Spirit on the list (Feral's built-in weights: no Spirit, no Intellect).
+	Spiritless: { name: "Spiritless", classId: 11, level: 27, spec: "DRUID:1", seen: SEEN, slots: { 9: 1.5 } },
 	// A low-level hunter with no head or shoulders.
 	Cub: { name: "Cub", classId: 3, level: 12, spec: "HUNTER:0", seen: SEEN, slots: { 5: 2 } },
 	Bowman: {
@@ -312,6 +333,8 @@ const judgeCases: [string, string, string, number?][] = [
 	["plain armor of a type they don't want, empty slot", "plainClothHelm", "Miller"],
 	["thrown weapon for a hunter: left out", "throwingKnife", "Arrow"],
 	["thrown weapon for a hunter who lists it", "throwingKnife", "Thrower"],
+	["low-weight Spirit on their list doesn't count against the item: an upgrade", "leatherIntSpiBracers", "Spirited"],
+	["Spirit and Intellect off the list: doesn't suit", "leatherIntSpiBracers", "Spiritless"],
 ];
 const cases = judgeCases.map(([name, item, member, itemId]) => ({
 	name,

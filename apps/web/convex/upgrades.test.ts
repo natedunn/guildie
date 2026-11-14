@@ -256,6 +256,50 @@ test("real weights: plausible picks", () => {
 	assert.equal(why, "+100 Armor over Embossed Leather Gloves");
 });
 
+test("real weights: a stat on the player's own list never counts against an item", () => {
+	const r = upgradeRules();
+	// An Enhancement shaman's own list, Spirit last at a tenth; leather then mail.
+	const shaman = upgradeMember(
+		{
+			name: "Todd",
+			classId: 7,
+			level: 27,
+			seenMs: 0,
+			talentTrees: [{ name: "Enhancement", points: 18, talents: [] }],
+			statPriority: {
+				stats: ["STRENGTH", "ATTACK_POWER", "INTELLECT", "AGILITY", "CRIT_RATING", "STAMINA", "SPIRIT"],
+				tiers: [1, 1, 0.5, 0.25, 0.25, 0.1, 0.1],
+			},
+			gearPreference: { armor: { types: [2, 3], strict: false } },
+			equipment: [
+				{
+					slot: "WRIST",
+					itemId: 1,
+					name: "Featherbead Bracers",
+					quality: "UNCOMMON",
+					itemLevel: 18,
+					info: itemInfoFromTooltip([
+						{ left: "Wrist", right: "Cloth" },
+						{ left: "14 Armor" },
+						{ left: "+3 Intellect" },
+					]),
+				},
+			],
+		},
+		r,
+	)!;
+	const dokebi = itemInfoFromTooltip([
+		{ left: "Wrist", right: "Leather" },
+		{ left: "39 Armor" },
+		{ left: "+3 Intellect" },
+		{ left: "+4 Spirit" },
+	])!;
+	assert.equal(judge(dokebi, shaman, r)?.kind, "upgrade", "more of everything, in their first armor type");
+	// The same shaman without a list: Spirit isn't Enhancement's, the bracers don't suit.
+	const plain = { ...shaman, spec: "SHAMAN:1" };
+	assert.equal(judge(dokebi, plain, r), undefined);
+});
+
 test("real weights: white and grey armor, armor types, a hunter's thrown weapons", () => {
 	const r = upgradeRules();
 	const item = (lines: { left: string; right?: string }[]) => itemInfoFromTooltip(lines)!;
