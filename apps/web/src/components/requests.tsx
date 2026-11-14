@@ -18,7 +18,7 @@ import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
 import { type ReactNode, useEffect, useState } from "react";
 import { ClassText } from "@/components/class-name";
-import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
+import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/components/item";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -498,7 +498,12 @@ function CraftRequestForm({
 			}}
 		>
 			<div className="flex items-start gap-3">
-				<ItemIcon icon={target.icon} quality={target.quality} size={36} empty={!target.icon} />
+				<ItemIcon
+					icon={target.icon ?? (isEnchant(target) ? ENCHANT_ICON : undefined)}
+					quality={target.quality}
+					size={36}
+					empty={!target.icon && !isEnchant(target)}
+				/>
 				<div className="min-w-0 flex-1">
 					<Dialog.Title className="text-sm font-semibold">Request a craft</Dialog.Title>
 					<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[target.quality ?? "COMMON"] }}>
@@ -641,6 +646,13 @@ const STATUS_LABEL: Record<RequestView["status"], string> = {
 	expired: "Expired",
 };
 
+/** A request's icon: the item's, the Enchanting icon for an enchant, else an empty slot. */
+function RequestIcon({ request: r, size }: { request: RequestView; size: number }) {
+	if (r.item) return <ItemIcon icon={r.item.icon} quality={r.item.quality} size={size} className="block" />;
+	const enchant = !!r.recipe && isEnchant(r.recipe);
+	return <ItemIcon icon={enchant ? ENCHANT_ICON : undefined} size={size} empty={!enchant} className="block" />;
+}
+
 /** After a decline (or no answer, or the crafter backing out): pick someone else in a dialog, like the request form. */
 function AskSomeoneElse({
 	request: r,
@@ -680,7 +692,7 @@ function AskSomeoneElse({
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 space-y-4 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) p-4 shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					<div className="flex items-start gap-3">
-						<ItemIcon icon={r.item?.icon} quality={r.item?.quality} size={36} empty={!r.item?.icon} />
+						<RequestIcon request={r} size={36} />
 						<div className="min-w-0 flex-1">
 							<Dialog.Title className="text-sm font-semibold">Ask someone else</Dialog.Title>
 							<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[r.item?.quality ?? "COMMON"] }}>
@@ -706,11 +718,12 @@ function AskSomeoneElse({
 /** A craft's state in a sentence: asked, accepted, or how the last ask ended. */
 function CraftState({ request: r }: { request: RequestView }) {
 	const who = (c: Character, mine: boolean) => (mine ? "you" : <ClassText classId={c.classId}>{c.name}</ClassText>);
+	const verb = !r.item && r.recipe && isEnchant(r.recipe) ? "enchanting" : "crafting";
 	if (r.claim)
 		return (
 			<span className="text-muted-foreground">
 				{r.claim.mine ? "You're" : <ClassText classId={r.claim.character.classId}>{r.claim.character.name}</ClassText>}
-				{r.claim.mine ? " crafting it" : " is crafting it"} · accepted {ago(r.claim.claimedAt)}
+				{r.claim.mine ? ` ${verb} it` : ` is ${verb} it`} · accepted {ago(r.claim.claimedAt)}
 			</span>
 		);
 	if (r.ask)
@@ -770,7 +783,7 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						<ItemIcon icon={r.item.icon} quality={r.item.quality} size={32} className="block" />
 					</ItemHover>
 				) : (
-					<ItemIcon size={32} empty className="block" />
+					<RequestIcon request={r} size={32} />
 				)}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<div className="flex flex-wrap items-baseline gap-x-2">
@@ -920,6 +933,23 @@ export function RequestRow({ request: r, compact }: { request: RequestView; comp
 						Mats {r.mine ? "you've sent" : "sent to you"}, as the Guildie app saw them. They don't have to be complete.
 					</p>
 				</div>
+			)}
+
+			{active && r.claim && !r.item && r.recipe && isEnchant(r.recipe) && (r.mine || r.claim.mine) && (
+				<p className={cn("text-xs text-muted-foreground", !compact && "pl-[42px]")}>
+					{r.mine ? (
+						<>
+							Trade <ClassText classId={r.claim.character.classId}>{r.claim.character.name}</ClassText>: put the item to
+							enchant in the trade window's "Will not be traded" slot, and they enchant it there. With the Guildie app,
+							this closes when the trade completes.
+						</>
+					) : (
+						<>
+							Trade <ClassText classId={r.requester.classId}>{r.requester.name}</ClassText>: they put the item in the
+							"Will not be traded" slot, and you cast the enchant on it there.
+						</>
+					)}
+				</p>
 			)}
 
 			{active && (
