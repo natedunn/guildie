@@ -176,8 +176,16 @@ was settled on the server (rejected "request not claimed", correct for one's own
 alts) and acknowledged. Retest after the collection fix (`a4059c6`): a direct
 attachment click (×1) and Open All on one mail (×2) each recorded one receipt,
 the request reached 3/3 and closed, the feed credited the real sender with full
-names, and both reports were acknowledged. Still untried in Forever: trades,
-Open All across several mails, full-bag failure, COD and returned mail.
+names, and both reports were acknowledged.
+
+Trades (`22c9ee5`, partner with nothing installed, unclaimed request for 5):
+2 + 1 + 2 counted and closed the request; a cancelled trade and a changed offer
+(3 accepted, changed to 1) counted nothing and 1. `TRADE_ACCEPT_UPDATE` showed
+`1 1` before completion in only one of three completed trades, so requiring it
+(the earlier code) would have missed most. Every completed trade fired
+`TRADE_CLOSED` twice before "Trade complete". `GetUnitName("NPC", true)` gives
+the partner's full name. Still untried in Forever: the sender side of a claimed
+request, Open All across several mails, full-bag failure, COD and returned mail.
 
 **Trace.** `/guildie trace` (again to stop) logs each mail and trade step, the
 names the client shows (`UnitName`, `GetUnitName`, `UnitFullName`) and every match
