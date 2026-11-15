@@ -1,6 +1,7 @@
+import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
 import { recipeCandidates } from "@convex/shared/recipeStatus";
-import type { VerdictKind } from "@convex/shared/upgrades";
+import { kindRank, type VerdictKind } from "@convex/shared/upgrades";
 import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQueries, useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { UpgradeWhy } from "@/components/upgrade-why";
+import { MARKER_LABELS, type MarkerKind, VerdictGlyph, VerdictMarker } from "@/components/verdict-marker";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
@@ -44,18 +46,20 @@ import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 // "Who can make...": every recipe someone in the guild knows, searched on the
 // client (recipe, item, item kind, tooltip text, reagents). The search and the
 // profession filter live in the URL so a result can be shared in chat.
-// Members also get two upgrade views, both by the gear-upgrade rules
-// (shared/upgrades.ts) with each character's stat priority:
-// - "Upgrades for me" (?view=upgrades): what the guild can craft (their own
-//   recipes included) that would be an upgrade for the viewer's characters;
-// - "Upgrades I can craft" (?view=craft): the viewer's recipes that would be
+// Members also get Upgrades, two views by the gear-upgrade rules
+// (shared/upgrades.ts) with each character's stat priority, for all of the
+// viewer's characters or one (?char=):
+// - "Crafts for me" (?view=upgrades): what the guild can craft (their own
+//   recipes included) that would be an upgrade for the viewer's characters,
+//   a card per character, each row marked upgrade / possible / empty slot;
+// - "Crafts for others" (?view=craft): the viewer's recipes that would be
 //   an upgrade for someone in the guild (their own other characters included).
 // And "Who can learn" (?view=learn): every recipe item (pattern, plans,
 // formula...) for the guild's professions, with who could learn it now or
 // later, who already has one and who knows it: is it worth sending someone?
 
 type View = "upgrades" | "craft" | "learn";
-/** `char`: which of the viewer's characters the upgrade views are about (slug; default their first). */
+/** `char`: which of the viewer's characters the upgrade views are about (slug; default all of them). */
 type Search = { q?: string; profession?: string; view?: View; char?: string };
 
 export const Route = createFileRoute("/g/$region/$slug/crafting")({
@@ -168,27 +172,26 @@ function CraftingPage() {
 	const learnIndex = useLearnIndex(learnRows, query.trim() !== "" && (showLearn || !view));
 	const neededCount = useMemo(() => learnRows.filter((r) => r.needed).length, [learnRows]);
 	const [showRemoved, setShowRemoved] = useState(false);
-	// The upgrade views are about one of the viewer's characters at a time.
+	// The upgrade views cover all of the viewer's characters, or one (?char=).
 	const characters = upgrades?.characters ?? [];
-	const char = characters.find((c) => c.slug === search.char) ?? characters[0];
-	const forChar = useMemo(
+	const char = characters.find((c) => c.slug === search.char);
+	// Crafts for me: a row per item and character it helps.
+	const forMe = useMemo(
 		() =>
-			(upgrades?.hits ?? [])
-				.flatMap((h) => {
-					const mine = h.for.filter((x) => x.slug === char?.slug);
-					return mine.length ? [{ ...h, for: mine }] : [];
-				})
-				.sort((a, b) => b.for[0].gain - a.for[0].gain || a.name.localeCompare(b.name)),
+			(upgrades?.hits ?? []).flatMap((h) =>
+				h.for.filter((x) => !char || x.slug === char.slug).map((f) => ({ ...h, for: [f] })),
+			),
 		[upgrades, char],
 	);
-	// Items the player removed from this character's suggestions: hidden unless "Show removed".
-	const kept = useMemo(() => forChar.filter((h) => !h.for[0].removed), [forChar]);
-	const removedCount = forChar.length - kept.length;
+	// Items the player removed from a character's suggestions: hidden unless "Show removed".
+	const kept = useMemo(() => forMe.filter((h) => !h.for[0].removed), [forMe]);
+	const removedCount = forMe.length - kept.length;
+	// Crafts for others: what any of the viewer's characters can make, or one crafter's.
 	const asChar = useMemo(
-		() => (canCraft?.hits ?? []).filter((h) => h.crafters.some((c) => c.slug === char?.slug)),
+		() => (canCraft?.hits ?? []).filter((h) => !char || h.crafters.some((c) => c.slug === char.slug)),
 		[canCraft, char],
 	);
-	const source: Row[] = showUpgrades ? (showRemoved ? forChar : kept) : showCraft ? asChar : (data ?? []);
+	const source: Row[] = showUpgrades ? (showRemoved ? forMe : kept) : showCraft ? asChar : (data ?? []);
 
 	const index = useMemo(() => buildIndex(source), [source]);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
@@ -232,8 +235,20 @@ function CraftingPage() {
 			),
 		});
 	});
-	const onDismiss = (itemId: number, removed: boolean) =>
-		char && void dismiss({ region: params.region as Region, slug: char.slug, itemId, removed });
+	const setRemoved = (row: Row, removed: boolean) => {
+		const h = row.for?.[0];
+		const itemId = row.item?.itemId;
+		if (h && itemId !== undefined) void dismiss({ region: params.region as Region, slug: h.slug, itemId, removed });
+	};
+	// Remove asks first (unless the player said not to); Restore doesn't.
+	const [confirming, setConfirming] = useState<Row | null>(null);
+	const onRemove = (row: Row) => {
+		const h = row.for?.[0];
+		if (!h) return;
+		if (h.removed) setRemoved(row, false);
+		else if (skipRemoveConfirm()) setRemoved(row, true);
+		else setConfirming(row);
+	};
 
 	if (!data) {
 		return <p className={EMPTY}>This guild's crafting is for members only.</p>;
@@ -247,7 +262,7 @@ function CraftingPage() {
 	const setProfession = (p?: string) =>
 		navigate({ search: (prev) => ({ ...prev, profession: p }), replace: true, resetScroll: false });
 	const setChar = (slug: string) =>
-		navigate({ search: (prev) => ({ ...prev, char: slug }), replace: true, resetScroll: false });
+		navigate({ search: (prev) => ({ ...prev, char: slug || undefined }), replace: true, resetScroll: false });
 	const setView = (v?: View) =>
 		navigate({ search: (prev) => ({ ...prev, view: v, profession: undefined }), replace: true, resetScroll: false });
 	const loading = (showUpgrades && !upgrades) || (showCraft && !canCraft);
@@ -296,34 +311,50 @@ function CraftingPage() {
 				    (Upgrades for me) Show removed on the right. Wraps on phones. Who can
 				    learn has its own. */}
 				<div className={cn("flex flex-wrap items-center gap-2", showLearn && "hidden")}>
-					{(showUpgrades || showCraft) && char ? (
-						<CharacterPicker label="Character" hideLabel characters={characters} value={char.slug} onChange={setChar} />
-					) : null}
 					{showUpgrades || showCraft ? (
-						// Which way: upgrades the guild can make for this character, or ones they can make for the guild.
-						<div className="flex gap-1 @max-md:order-first @max-md:basis-full" role="group" aria-label="Which upgrades">
-							<button
-								type="button"
-								className="chip h-10 @max-md:flex-1 @max-md:justify-center"
-								data-active={showUpgrades}
-								aria-pressed={showUpgrades}
-								title="What the guild can craft that's an upgrade for this character"
-								onClick={() => setView("upgrades")}
+						<>
+							{/* Which way: what guildmates can craft for your characters, or what yours can craft for them. */}
+							<div
+								role="group"
+								aria-label="Which upgrades"
+								className="flex h-10 gap-0.5 rounded-[7px] border border-input bg-well p-[3px] @max-md:order-first @max-md:basis-full"
 							>
-								Get crafted {upgrades ? <span className="num text-xs text-muted-foreground">{kept.length}</span> : null}
-							</button>
-							<button
-								type="button"
-								className="chip h-10 @max-md:flex-1 @max-md:justify-center"
-								data-active={showCraft}
-								aria-pressed={showCraft}
-								title="What this character can craft that's an upgrade for someone in the guild"
-								onClick={() => setView("craft")}
-							>
-								Craft for others{" "}
-								{canCraft ? <span className="num text-xs text-muted-foreground">{asChar.length}</span> : null}
-							</button>
-						</div>
+								<button
+									type="button"
+									className={SEGMENT}
+									data-active={showUpgrades}
+									aria-pressed={showUpgrades}
+									title="What guildmates can craft that's an upgrade for your characters"
+									onClick={() => setView("upgrades")}
+								>
+									Crafts for me
+									{upgrades ? <span className="num text-xs text-muted-foreground">{kept.length}</span> : null}
+								</button>
+								<button
+									type="button"
+									className={SEGMENT}
+									data-active={showCraft}
+									aria-pressed={showCraft}
+									title="What your characters can craft that's an upgrade for someone in the guild"
+									onClick={() => setView("craft")}
+								>
+									Crafts for others
+									{canCraft ? <span className="num text-xs text-muted-foreground">{asChar.length}</span> : null}
+								</button>
+							</div>
+							{characters.length > 1 ? (
+								<>
+									<span aria-hidden className="mx-1 h-6 w-px bg-(--border-strong) @max-md:hidden" />
+									<CharacterPicker
+										label={showCraft ? "As" : "For"}
+										allLabel={showCraft ? "All my crafters" : "All my characters"}
+										characters={characters}
+										value={char?.slug ?? ""}
+										onChange={setChar}
+									/>
+								</>
+							) : null}
+						</>
 					) : null}
 					<Input
 						ref={inputRef}
@@ -360,16 +391,20 @@ function CraftingPage() {
 							</option>
 						))}
 					</select>
-					{showUpgrades && upgrades ? (
-						<label className="ml-auto flex h-10 cursor-pointer @max-md:order-last items-center gap-2 pl-2 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground">
-							<Switch checked={showRemoved} onCheckedChange={setShowRemoved} />
-							Show removed
-							{removedCount ? <span className="num text-xs">{removedCount}</span> : null}
-						</label>
-					) : null}
 				</div>
 			</div>
 
+			{/* Crafts for me: the markers' key, and Show removed on the right (there even when everything is removed). */}
+			{showUpgrades && forMe.length > 0 ? (
+				<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+					<MarkerLegend />
+					<label className="ml-auto flex cursor-pointer items-center gap-2 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground">
+						<Switch checked={showRemoved} onCheckedChange={setShowRemoved} />
+						Show removed
+						{removedCount ? <span className="num text-xs">{removedCount}</span> : null}
+					</label>
+				</div>
+			) : null}
 			{showLearn ? null : loading ? (
 				<p className="py-10 text-center text-sm text-muted-foreground">
 					{showCraft
@@ -378,7 +413,9 @@ function CraftingPage() {
 				</p>
 			) : showCraft && asChar.length === 0 ? (
 				<p className={EMPTY}>
-					None of {char?.name ?? "your character"}'s recipes beats what anyone in the guild wears right now.
+					{char
+						? `None of ${char.name}'s recipes beats what anyone in the guild wears right now.`
+						: "None of your characters' recipes beats what anyone in the guild wears right now."}
 				</p>
 			) : showCraft ? (
 				results.length === 0 ? (
@@ -406,17 +443,25 @@ function CraftingPage() {
 				)
 			) : showUpgrades && upgrades && source.length === 0 ? (
 				<p className={EMPTY}>
-					{upgrades.noGear.some((c) => c.slug === char?.slug)
-						? `Nothing to compare with until we've read ${char?.name}'s gear.`
-						: `Nothing the guild can craft beats what ${char?.name} wears right now.`}
+					{char && upgrades.noGear.some((c) => c.slug === char.slug)
+						? `Nothing to compare with until we've read ${char.name}'s gear.`
+						: char
+							? `Nothing the guild can craft beats what ${char.name} wears right now.`
+							: "Nothing the guild can craft beats what your characters wear right now."}
+					{!char && upgrades.noGear.length ? (
+						<span className="mt-1 block text-xs">
+							We haven't read {upgrades.noGear.map((c) => c.name).join(", ")}'s gear yet.
+						</span>
+					) : null}
 					{removedCount ? (
 						<span className="mt-1 block text-xs">
 							{removedCount} removed; "Show removed" puts {removedCount === 1 ? "it" : "them"} back in view.
 						</span>
 					) : null}
-					{upgrades.strict.some((c) => c.slug === char?.slug) ? (
+					{upgrades.strict.some((c) => !char || c.slug === char.slug) ? (
 						<span className="mt-1 block text-xs">
-							"Only these" in {char?.name}'s Preferences leaves other armor or weapon types out.
+							"Only these" in {char ? `${char.name}'s` : "a character's"} Preferences leaves other armor or weapon types
+							out.
 						</span>
 					) : null}
 				</p>
@@ -425,22 +470,18 @@ function CraftingPage() {
 					<p className={EMPTY}>No upgrades match "{deferred.trim()}".</p>
 				) : (
 					<div className="space-y-3">
-						{groupRows(results.slice(0, limit)).map(({ group, rows }) => (
-							<GroupCard key={group.kind} title={group.title} hint={group.hint} count={rows.length}>
-								{rows.map((r) => (
-									<UpgradeRow
-										key={r.recipeId}
-										recipe={r}
-										region={params.region}
-										member={member}
-										onDismiss={onDismiss}
-									/>
-								))}
-							</GroupCard>
+						{byCharacter(results, characters).map(({ character, rows }) => (
+							<CharacterUpgrades
+								key={character.slug}
+								character={character}
+								rows={rows}
+								region={params.region}
+								member={member}
+								// All characters and no search: each card shows its best few until asked.
+								collapse={!char && !deferred.trim()}
+								onRemove={onRemove}
+							/>
 						))}
-						{results.length > limit ? (
-							<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
-						) : null}
 						<Footnote region={params.region} characters={me?.characters} />
 					</div>
 				)
@@ -475,6 +516,15 @@ function CraftingPage() {
 					<CouldLearn rows={couldLearn} region={params.region} onSeeAll={() => setView("learn")} />
 				</div>
 			)}
+			<RemoveDialog
+				row={confirming}
+				onCancel={() => setConfirming(null)}
+				onConfirm={(dontAsk) => {
+					if (dontAsk) setSkipRemoveConfirm();
+					if (confirming) setRemoved(confirming, true);
+					setConfirming(null);
+				}}
+			/>
 		</div>
 	);
 }
@@ -669,7 +719,7 @@ function groupRows(rows: Row[]) {
 	);
 }
 
-/** One group of an upgrade view: a card with its title, how many, what it means, and the rows. */
+/** One group of Crafts for others: a card with its title, how many, what it means, column heads and the rows. */
 function GroupCard({
 	title,
 	hint,
@@ -688,6 +738,11 @@ function GroupCard({
 				<span className="num text-xs text-muted-foreground">{count}</span>
 				<span className="ml-1 truncate text-xs text-muted-foreground @max-md:hidden">{hint}</span>
 			</header>
+			<div className={cn(HEADS, "grid", CRAFT_COLS)}>
+				<span>Item</span>
+				<span>Who it's for</span>
+				<span>You craft it as</span>
+			</div>
 			<ul className="divide-y divide-border/60">{children}</ul>
 		</section>
 	);
@@ -695,8 +750,13 @@ function GroupCard({
 
 /** A row in a group card: stacked on a narrow pane (phones), columns on a wide one. */
 const ROW = "grid grid-cols-1 gap-x-5 gap-y-2 px-4 py-3";
-/** Upgrades for me: item, why, crafters, Request and Remove. */
-const FOR_ME_COLS = "items-center @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.8fr)_auto]";
+/** Crafts for me: item, why, crafters, Request and Remove (after the verdict marker). */
+const FOR_ME_COLS = "items-start @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_minmax(0,0.8fr)_auto]";
+/** Column heads over a card's rows: wide panes only (rows stack on phones). */
+const HEADS = "gap-x-5 border-b border-border/60 px-4 pt-2 pb-1.5 text-xs text-muted-foreground @max-2xl:hidden";
+/** One half of the Crafts for me / Crafts for others switch. */
+const SEGMENT =
+	"inline-flex items-center gap-1.5 rounded-[5px] px-3 text-[13px] whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground data-[active=true]:bg-(--selected) data-[active=true]:text-foreground data-[active=true]:shadow-[inset_0_0_0_1px_rgb(255_176_96/0.28)] @max-md:flex-1 @max-md:justify-center";
 /** Upgrades I can craft: item, who it's for and why, your crafter and who asked. */
 const CRAFT_COLS = "items-start @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,0.9fr)]";
 
@@ -730,56 +790,257 @@ function ItemCell({ recipe }: { recipe: GuildRecipe }) {
 	return <RecipeItem recipe={recipe} size={36} detail={recipe.profession} />;
 }
 
+type Character = { slug: string; name: string; classId: number; level?: number };
+
 /**
- * Upgrades for me: the item, why it's better for the character in view (the
- * picker says who; the card says what kind), who can make it, Request, and
- * Remove (or Restore, under Show removed).
+ * Crafts for me, grouped by character in the viewer's order: removed items
+ * last, then upgrades, possible upgrades and empty slots, biggest gain first.
+ */
+function byCharacter(rows: Row[], characters: Character[]) {
+	const rank = (r: Row) => (r.for?.[0]?.removed ? 9 : kindRank(r.for?.[0]?.kind ?? "maybe"));
+	return characters
+		.map((character) => ({
+			character,
+			rows: rows
+				.filter((r) => r.for?.[0]?.slug === character.slug)
+				.sort(
+					(a, b) =>
+						rank(a) - rank(b) || (b.for?.[0]?.gain ?? 0) - (a.for?.[0]?.gain ?? 0) || a.name.localeCompare(b.name),
+				),
+		}))
+		.filter((g) => g.rows.length > 0);
+}
+
+/** Rows a character's card shows (all characters, no search) before "Show N more". */
+const COLLAPSED = 5;
+
+/** One of the viewer's characters: who, level, how many, column heads, and their rows. */
+function CharacterUpgrades({
+	character,
+	rows,
+	region,
+	member,
+	collapse,
+	onRemove,
+}: {
+	character: Character;
+	rows: Row[];
+	region: string;
+	member?: Member;
+	collapse: boolean;
+	onRemove: (row: Row) => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const shown = collapse && !open ? rows.slice(0, COLLAPSED) : rows;
+	const count = rows.filter((r) => !r.for?.[0]?.removed).length;
+	return (
+		<section className="surface-card overflow-hidden">
+			<header className="flex min-w-0 items-baseline gap-2 border-b border-border/60 px-4 py-2.5">
+				<Link
+					to="/c/$region/$slug"
+					params={{ region, slug: character.slug }}
+					className="text-sm font-semibold hover:underline"
+				>
+					<ClassText classId={character.classId}>{character.name}</ClassText>
+				</Link>
+				{character.level ? (
+					<span className="text-xs text-muted-foreground">
+						level <span className="num">{character.level}</span>
+					</span>
+				) : null}
+				<span className="ml-1 text-xs text-muted-foreground">
+					<span className="num">{count}</span> {count === 1 ? "upgrade" : "upgrades"}
+				</span>
+			</header>
+			<div className={cn(HEADS, "flex gap-3")}>
+				<span className="w-6 flex-none" />
+				<div className={cn("grid min-w-0 flex-1 gap-x-5", FOR_ME_COLS)}>
+					<span>Item</span>
+					<span>Why it's better</span>
+					<span>Crafted by</span>
+					<span />
+				</div>
+			</div>
+			<ul className="divide-y divide-border/60">
+				{shown.map((r) => (
+					<UpgradeRow key={r.recipeId} recipe={r} region={region} member={member} onRemove={onRemove} />
+				))}
+			</ul>
+			{rows.length > shown.length ? (
+				<button
+					type="button"
+					onClick={() => setOpen(true)}
+					className="w-full border-t border-border/60 px-4 py-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+				>
+					Show <span className="num">{rows.length - shown.length}</span> more
+				</button>
+			) : null}
+		</section>
+	);
+}
+
+/** What each marker means, in Crafts for me's words (the hover says the same). */
+const MARKER_HINTS: Record<MarkerKind, string> = {
+	upgrade: "More of your stats, nothing lost",
+	maybe:
+		"A small gain, some of a stat you rank given up, your second spec, a few levels from now, or an armor type you don't want",
+	empty: "Plain armor with no stats, for a slot you have nothing in",
+	removed: "Never suggested for this character again, here or in the game's tooltips. Restore puts it back.",
+};
+
+/** The markers' key, above the cards. */
+function MarkerLegend() {
+	return (
+		<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+			{(["upgrade", "maybe", "empty"] as const).map((k) => (
+				<span key={k} className="inline-flex items-center gap-1.5" title={MARKER_HINTS[k]}>
+					<VerdictGlyph kind={k} size={18} />
+					{MARKER_LABELS[k]}
+				</span>
+			))}
+		</div>
+	);
+}
+
+/**
+ * Crafts for me: how good it is (the marker), the item, why it's better for
+ * this character, who can make it, Request, and Remove (or Restore, under
+ * Show removed).
  */
 function UpgradeRow({
 	recipe,
 	region,
 	member,
-	onDismiss,
+	onRemove,
 }: {
 	recipe: Row;
 	region: string;
 	member?: Member;
-	onDismiss: (itemId: number, removed: boolean) => void;
+	onRemove: (row: Row) => void;
 }) {
 	const h = recipe.for?.[0];
-	const itemId = recipe.item?.itemId;
+	const kind: MarkerKind = h?.removed ? "removed" : (h?.kind ?? "maybe");
 	return (
-		<li className={cn(ROW, FOR_ME_COLS)}>
-			<ItemCell recipe={recipe} />
-			<div className="min-w-0 text-[13px]">
-				<p>
-					<UpgradeWhy text={h?.why} />
-				</p>
-				<p className="truncate text-xs text-muted-foreground">
-					{h?.spec}
-					{h?.at ? ` · from level ${h.at}` : null}
-				</p>
-			</div>
-			<CrafterNames recipe={recipe} region={region} />
-			<div className="flex items-center gap-1.5 @2xl:justify-end">
-				<CraftRequest recipe={recipe} member={member} />
-				{h && itemId !== undefined ? (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="text-muted-foreground"
-						title={
-							h.removed
-								? "Suggest this for this character again"
-								: "Never suggest this for this character again, here or in the game's tooltips"
-						}
-						onClick={() => onDismiss(itemId, !h.removed)}
-					>
-						{h.removed ? "Restore" : "Remove"}
-					</Button>
-				) : null}
+		<li className="flex gap-3 px-4 py-3">
+			{/* Level with the item icon's top, a touch lower so it sits even with it. */}
+			<VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} className="mt-0.5 flex-none" />
+			<div className={cn("grid min-w-0 flex-1 grid-cols-1 gap-x-5 gap-y-2", FOR_ME_COLS)}>
+				<ItemCell recipe={recipe} />
+				<div className="min-w-0 text-[13px]">
+					<p>
+						<UpgradeWhy text={h?.why} />
+					</p>
+					<p className="truncate text-xs text-muted-foreground">
+						{h?.spec}
+						{h?.at ? ` · from level ${h.at}` : null}
+					</p>
+				</div>
+				<CrafterNames recipe={recipe} region={region} />
+				<div className="flex items-center gap-1.5 @2xl:justify-end">
+					<CraftRequest recipe={recipe} member={member} />
+					{h && recipe.item ? (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="text-muted-foreground"
+							title={
+								h.removed
+									? "Suggest this for this character again"
+									: "Never suggest this for this character again, here or in the game's tooltips"
+							}
+							onClick={() => onRemove(recipe)}
+						>
+							{h.removed ? "Restore" : "Remove"}
+						</Button>
+					) : null}
+				</div>
 			</div>
 		</li>
+	);
+}
+
+/** "Don't ask again" on the Remove dialog, per browser. */
+const SKIP_REMOVE_CONFIRM = "guildie:skip-remove-confirm";
+
+function skipRemoveConfirm() {
+	try {
+		return localStorage.getItem(SKIP_REMOVE_CONFIRM) === "1";
+	} catch {
+		return false;
+	}
+}
+
+function setSkipRemoveConfirm() {
+	try {
+		localStorage.setItem(SKIP_REMOVE_CONFIRM, "1");
+	} catch {
+		// Private windows and blocked storage: it asks again next time.
+	}
+}
+
+/** Remove asks first: what goes, for whom, and how to get it back (Show removed). */
+function RemoveDialog({
+	row,
+	onCancel,
+	onConfirm,
+}: {
+	row: Row | null;
+	onCancel: () => void;
+	onConfirm: (dontAsk: boolean) => void;
+}) {
+	const [dontAsk, setDontAsk] = useState(false);
+	// Keep the last row while the dialog fades out.
+	const last = useRef(row);
+	if (row) last.current = row;
+	const r = row ?? last.current;
+	const h = r?.for?.[0];
+	const item = r?.item;
+	return (
+		<Dialog.Root
+			open={!!row}
+			onOpenChange={(next) => {
+				if (!next) onCancel();
+			}}
+		>
+			<Dialog.Portal>
+				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+				<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+					<Dialog.Title className="text-[15px] font-semibold">Remove from {h?.name}'s upgrades?</Dialog.Title>
+					{item ? (
+						<div className="mt-3 flex items-center gap-2.5 rounded-md border border-border bg-well px-3 py-2.5">
+							<ItemIcon icon={item.icon} quality={item.quality} size={28} />
+							<span className="min-w-0">
+								<span className="block truncate" style={{ color: QUALITY_COLORS[item.quality ?? "COMMON"] }}>
+									{item.name}
+								</span>
+								<span className="block truncate text-xs text-muted-foreground">
+									{h ? `${MARKER_LABELS[h.kind]} for ${h.name} · ${h.spec}` : null}
+								</span>
+							</span>
+						</div>
+					) : null}
+					<Dialog.Description className="mt-3 text-pretty text-muted-foreground">
+						It won't be suggested for {h?.name} again, here or in the game's tooltips. To see it again, turn on{" "}
+						<span className="text-foreground">Show removed</span>, where you can put it back.
+					</Dialog.Description>
+					<label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-muted-foreground select-none hover:text-foreground">
+						<input
+							type="checkbox"
+							checked={dontAsk}
+							onChange={(e) => setDontAsk(e.target.checked)}
+							className="size-4 accent-(--highlight)"
+						/>
+						Don't ask again
+					</label>
+					<div className="mt-5 flex justify-end gap-2">
+						<Button variant="outline" onClick={onCancel}>
+							Cancel
+						</Button>
+						<Button onClick={() => onConfirm(dontAsk)}>Remove</Button>
+					</div>
+				</Dialog.Popup>
+			</Dialog.Portal>
+		</Dialog.Root>
 	);
 }
 
@@ -927,6 +1188,7 @@ function CraftRequest({ recipe, member }: { recipe: GuildRecipe; member?: Member
 function CharacterPicker({
 	label,
 	hideLabel,
+	allLabel,
 	characters,
 	value,
 	onChange,
@@ -934,6 +1196,8 @@ function CharacterPicker({
 	label: string;
 	/** Only the name shows; the label is for screen readers. */
 	hideLabel?: boolean;
+	/** A first choice for all of them ("All my characters"), value "". */
+	allLabel?: string;
 	characters: { slug: string; name: string; classId: number }[];
 	value: string;
 	onChange: (slug: string) => void;
@@ -946,14 +1210,16 @@ function CharacterPicker({
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
-				aria-label={`${label}: ${current?.name ?? ""}`}
+				aria-label={`${label}: ${current?.name ?? allLabel ?? ""}`}
 				className="h-10 min-w-0 whitespace-nowrap rounded-md border border-input bg-well bg-(image:--select-chevron) bg-size-[0.75rem] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-3 text-left text-sm @max-md:flex-1"
 			>
-				{hideLabel ? null : <span className="text-muted-foreground">{label} </span>}
-				{current ? named(current) : null}
+				{/* Phones: the name alone, so it and the profession fit side by side. */}
+				{hideLabel ? null : <span className="text-muted-foreground @max-md:hidden">{label} </span>}
+				{current ? named(current) : allLabel}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent className="w-auto min-w-(--anchor-width)">
 				<DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(String(v))}>
+					{allLabel ? <DropdownMenuRadioItem value="">{allLabel}</DropdownMenuRadioItem> : null}
 					{characters.map((c) => (
 						<DropdownMenuRadioItem key={c.slug} value={c.slug}>
 							{named(c)}
