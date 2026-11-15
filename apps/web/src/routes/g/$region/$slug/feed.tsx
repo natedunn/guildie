@@ -20,7 +20,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
@@ -187,10 +187,7 @@ function FeedPage() {
 						const dayStats = statsBySince.get(day.start);
 						return (
 							<section key={day.start}>
-								{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
-								<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">
-									{day.label}
-								</h2>
+								<DayHeader>{day.label}</DayHeader>
 								{dayStats && <DayStats day={dayStats} label={day.label} />}
 								<ul className="surface-card divide-y divide-border overflow-hidden">
 									{groupDay(day.events).map((row) => (
@@ -222,6 +219,53 @@ function FeedPage() {
 
 type FeedData = Extract<NonNullable<FunctionReturnType<typeof api.feed.list>>, { hidden: false }>;
 type Event = FeedData["events"][number];
+
+/**
+ * A day's heading. It sticks to the top of the pane as the day scrolls by,
+ * clear over the page until then; stuck, a frosted backing fades in under
+ * it so what scrolls beneath stays out of the way. Over the cards' hairlines
+ * (z-index 2).
+ */
+function DayHeader({ children }: { children: ReactNode }) {
+	const ref = useRef<HTMLHeadingElement>(null);
+	const [stuck, setStuck] = useState(false);
+	useEffect(() => {
+		const el = ref.current;
+		const pane = el?.closest(".app-content, main");
+		if (!el || !(pane instanceof HTMLElement)) return;
+		let frame = 0;
+		const check = () => {
+			frame = 0;
+			// Stuck: at the pane's top edge, past its padding (the frosted bar's room).
+			const top = pane.getBoundingClientRect().top + Number.parseFloat(getComputedStyle(pane).paddingTop || "0");
+			setStuck(el.getBoundingClientRect().top <= top + 0.5 && pane.scrollTop > 0);
+		};
+		const onScroll = () => {
+			if (!frame) frame = requestAnimationFrame(check);
+		};
+		check();
+		pane.addEventListener("scroll", onScroll, { passive: true });
+		window.addEventListener("resize", onScroll);
+		return () => {
+			pane.removeEventListener("scroll", onScroll);
+			window.removeEventListener("resize", onScroll);
+			if (frame) cancelAnimationFrame(frame);
+		};
+	}, []);
+	return (
+		<h2
+			ref={ref}
+			data-stuck={stuck || undefined}
+			className="group/day sticky top-0 z-10 isolate py-1.5 text-xs font-medium text-muted-foreground"
+		>
+			<span
+				aria-hidden
+				className="frosted pointer-events-none absolute inset-y-0 -inset-x-3 -z-10 border-b border-border opacity-0 transition-opacity duration-200 [mask-image:linear-gradient(90deg,transparent,#000_0.75rem,#000_calc(100%-0.75rem),transparent)] group-data-stuck/day:opacity-100"
+			/>
+			{children}
+		</h2>
+	);
+}
 
 /** Days the stat cards sum up at most (convex/feed.ts days). */
 const STAT_DAYS = 31;
