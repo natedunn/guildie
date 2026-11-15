@@ -426,6 +426,35 @@ test("for you: not an upgrade, can't use, needs a level; and the setting", funct
     GuildieDB.settings = nil
 end)
 
+test("for you: while fishing, your build from before the pole, not the fishing gear", function()
+    wow.state.time = vectors.members.Brisket.seen + 60
+    GuildieDB.settings = nil
+    local strong = {
+        id = 4101, name = "Strong Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 2,
+        stats = { ITEM_MOD_AGILITY_SHORT = 20, RESISTANCE0_NAME = 80 },
+    }
+    local pole = {
+        id = 6256, name = "Fishing Pole", equipLoc = "INVTYPE_2HWEAPON", classID = 2, subclassID = 20,
+        stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 1.2 },
+    }
+    stubItems({ GLOVES, WORN_GLOVES, strong, pole })
+    local gear = { [10] = strong }
+    playAs(vectors.members.Brisket, gear)
+    eq(plain(hover(GLOVES)[1]), "You | not an upgrade")
+    -- A fishing addon swaps in the pole and takes the gloves off.
+    gear[10], gear[16] = nil, pole
+    wow.fire("PLAYER_EQUIPMENT_CHANGED")
+    eq(plain(hover(GLOVES)[1]), "You | not an upgrade", "the gloves from before, not an empty slot")
+    -- Off the pole: what you wear now again.
+    gear[10], gear[16] = WORN_GLOVES, nil
+    wow.fire("PLAYER_EQUIPMENT_CHANGED")
+    eq(plain(hover(GLOVES)[1]), "You | upgrade")
+    -- Fishing since before this session: the site's build (gloves worth 8).
+    playAs(vectors.members.Brisket, { [10] = WORN_GLOVES, [16] = pole })
+    eq(plain(hover(WORN_GLOVES)[1]), "You | not an upgrade", "the fishing gloves aren't counted as worn")
+    eq(U.fishing(), true)
+end)
+
 test("for you: older guild data without your characters, or another character", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     stubItems({ GLOVES })

@@ -11,6 +11,7 @@ import { addBlizzardRecipes, blizzardPartTimes } from "./profile";
 import { isSampleGuild } from "./sample";
 import { vEquippedItem, vTalentTree } from "./schema";
 import { dungeonOfKillStatistic } from "./shared/dungeons";
+import { keepBuild } from "./shared/fishing";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import { FLAVORS, type Region } from "./shared/wow";
 
@@ -410,6 +411,12 @@ export const applyProfile = internalMutation({
 		if (!character) return;
 		const now = Date.now();
 		const patch: Partial<Doc<"characters">> = { profileSyncedAt: now, profileMissing: missing };
+		// Logged out while fishing: keep the gear (and its time and item level)
+		// from before the pole (shared/fishing.ts).
+		if (keepBuild(data.equipment, character.equipment)) {
+			data.equipment = undefined;
+			data.averageItemLevel = undefined;
+		}
 		// Remember when Blizzard's talents last changed, to compare with addon uploads.
 		if (data.talentTrees && JSON.stringify(data.talentTrees) !== JSON.stringify(character.talentTrees)) {
 			patch.talentsChangedAt = now;

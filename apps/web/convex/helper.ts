@@ -13,6 +13,7 @@ import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedi
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonCraft, type AddonRequest, addonRequests, refreshMats } from "./requests";
 import type { vTalentTree } from "./schema";
+import { keepBuild } from "./shared/fishing";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
 import type { ItemInfo } from "./shared/itemInfo";
 import { mergeCompletedQuestIds } from "./shared/quests";
@@ -238,7 +239,10 @@ export const ingest = mutation({
 				averageItemLevel: c.equipment.averageItemLevel,
 				items: c.equipment.items,
 			};
-			const equipment = newer(incomingGear, existing?.equipment);
+			// Gear read while fishing keeps the build from before (shared/fishing.ts).
+			const equipment = keepBuild(incomingGear?.items, existing?.equipment?.items)
+				? existing?.equipment
+				: newer(incomingGear, existing?.equipment);
 			const incomingProfessions: SnapshotFields["professions"] = c.professions && {
 				capturedAt: c.professions.capturedAt,
 				list: c.professions.list,

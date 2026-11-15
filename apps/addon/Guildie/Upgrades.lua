@@ -621,8 +621,22 @@ local function readEquipped(slot)
     return id, U.readItem(link, U.tooltipLines(nil, data))
 end
 
+--- True while a fishing pole is in your main hand. Fishing addons swap one in
+--- and often take off or swap other gear too (a fishing hat, boots, no
+--- off hand): that's not your build, so "For you" keeps comparing with the
+--- gear you wore before (and the site keeps that gear too: shared/fishing.ts).
+local function fishing()
+    local link = GetInventoryItemLink and GetInventoryItemLink("player", 16)
+    if not link then return false end
+    local _, _, _, _, _, classID, subclassID = apiItemInfoInstant(link)
+    return classID == 2 and subclassID == 20
+end
+U.fishing = fishing
+
 -- Your live profile, until your gear or level changes (or an item loads).
 local liveCache
+-- The last complete live profile without a fishing pole: your build while you fish.
+local lastBuild
 local watcher = CreateFrame and CreateFrame("Frame")
 if watcher and watcher.RegisterEvent then
     for _, event in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "GET_ITEM_INFO_RECEIVED" }) do
@@ -630,7 +644,7 @@ if watcher and watcher.RegisterEvent then
     end
     watcher:SetScript("OnEvent", function() liveCache = nil end)
 end
-function U.forgetLive() liveCache = nil end
+function U.forgetLive() liveCache, lastBuild = nil, nil end
 
 -- ---- The tooltip rows ---------------------------------------------------------------
 
@@ -660,14 +674,28 @@ function U.mineRow(item, itemID, color)
         live = liveCache.live
     else
         local level = UnitLevel and UnitLevel("player")
-        local complete = true
-        live = U.liveMember(m, data.rules, (level and level > 0) and level or nil, function(slot)
-            local id, read, never = readEquipped(slot)
-            if id and not read and not never then complete = false end
-            return id, read
-        end)
-        -- Kept only once every worn item has loaded (else built again next time).
-        if complete then liveCache = { member = m, live = live } end
+        level = (level and level > 0) and level or nil
+        if fishing() then
+            -- Your build from before the pole, else the site's (it keeps the
+            -- gear from before too), at your level now.
+            local before = lastBuild and lastBuild.member == m and lastBuild.live or m
+            live = {}
+            for k, v in pairs(before) do live[k] = v end
+            live.level = level or before.level
+            liveCache = { member = m, live = live }
+        else
+            local complete = true
+            live = U.liveMember(m, data.rules, level, function(slot)
+                local id, read, never = readEquipped(slot)
+                if id and not read and not never then complete = false end
+                return id, read
+            end)
+            -- Kept only once every worn item has loaded (else built again next time).
+            if complete then
+                liveCache = { member = m, live = live }
+                lastBuild = liveCache
+            end
+        end
     end
     local right = U.forYou(item, itemID, live, data.rules)
     if not right then return nil end
