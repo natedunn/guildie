@@ -78,10 +78,12 @@ print("Live pixel physical sizing passed")
 
 ns.livePixels.set("enabled", true)
 ns.livePixels.corner("bottom")
-local bottomY = GuildieDB.livePixels.y
-assert(bottomY < -GuildieDB.livePixels.x, "bottom left sits below top left")
+local function shown() return pixelFrame.points[1][4], pixelFrame.points[1][5] end
+local bottomX, bottomY = shown()
+assert(bottomY < -bottomX, "bottom left sits below top left")
 ns.livePixels.corner("top")
-assert(math.abs(GuildieDB.livePixels.y + GuildieDB.livePixels.x) < 0.00001, "top left uses inset")
+local topX, topY = shown()
+assert(math.abs(topY + topX) < 0.00001, "top left uses inset")
 assert(GuildieDB.livePixels.enabled, "moving preserves export preference")
 Guildie_OnAddonCompartmentClick()
 assert(GuildieWindow:IsShown() and GuildieWindow.page == "status", "addon compartment opens Status")
@@ -105,7 +107,7 @@ for _, scale in ipairs({0.6, 1, 1.25}) do
         ns.livePixels.set("size", size)
         for _, edge in ipairs({"top", "bottom"}) do
             ns.livePixels.corner(edge)
-            local x, y = GuildieDB.livePixels.x, GuildieDB.livePixels.y
+            local x, y = shown()
             local left = (-8 * 0.75 + x * scale) * ratio
             local top = (908 * 0.75 + y * scale) * ratio
             assert(math.abs(left - 12) < 0.00001, "physical left inset")
@@ -118,7 +120,9 @@ for _, scale in ipairs({0.6, 1, 1.25}) do
 end
 GuildieDB.livePixels.corner, GuildieDB.livePixels.x, GuildieDB.livePixels.y = nil, -9999, 9999
 wow.fire("UI_SCALE_CHANGED")
-assert(GuildieDB.livePixels.x > 0 and GuildieDB.livePixels.y < 0, "unsafe saved position is clamped")
+assert(pixelFrame.points[1][4] > 0 and pixelFrame.points[1][5] < 0, "unsafe saved position is clamped on screen")
+assert(GuildieDB.livePixels.x == -9999 and GuildieDB.livePixels.y == 9999,
+    "clamping does not overwrite the saved custom position")
 GetPhysicalScreenSize = nil
 -- The square moves only in the game's Edit Mode, opened by the player.
 -- Guildie never opens it (entering it from addon code taints its setup):

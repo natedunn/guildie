@@ -95,9 +95,12 @@ local function restorePosition()
     local position = options()
     if position.corner == "top" or position.corner == "bottom" then
         local left, bottom, _, top = bounds()
-        position.x, position.y = place(left, position.corner == "bottom" and bottom or top)
+        place(left, position.corner == "bottom" and bottom or top)
     elseif type(position) == "table" and type(position.x) == "number" and type(position.y) == "number" then
-        position.x, position.y = place(position.x, position.y)
+        -- Startup and display changes can temporarily report smaller bounds.
+        -- Clamp the frame for visibility without replacing the player's saved
+        -- coordinates; a later login/display event restores their position.
+        place(position.x, position.y)
     else
         place(defaultPosition())
     end
