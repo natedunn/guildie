@@ -6,7 +6,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
 import { useDeferredValue, useMemo, useState } from "react";
-import { AddonDialog, AddonDialogTitle, AddonIcon, AddonLine, CurseForgeLink } from "@/components/addon-list";
+import { AddonDialog, AddonDialogTitle, AddonIcon, AddonLine, AddonSiteLink } from "@/components/addon-list";
 import { ClassText } from "@/components/class-name";
 import { SectionTitle } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
@@ -256,7 +256,7 @@ function AddonHeader({ addon, total }: { addon: AddonRow; total: number }) {
 				<AddonDialogTitle className="text-[15px] leading-snug font-semibold">{addon.title}</AddonDialogTitle>
 				{addon.summary && <p className="mt-0.5 text-xs text-pretty text-muted-foreground">{addon.summary}</p>}
 				<div className="mt-2 flex flex-wrap items-center gap-2">
-					{addon.url && <CurseForgeLink url={addon.url} />}
+					{addon.url && <AddonSiteLink addon={addon} />}
 					<span className="num text-xs text-muted-foreground">
 						{addon.users.length} of {total} {total === 1 ? "player" : "players"}
 					</span>

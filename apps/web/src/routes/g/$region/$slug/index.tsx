@@ -1,4 +1,5 @@
 import { api } from "@convex/_generated/api";
+import { ROSTER_MIN_LEVEL } from "@convex/shared/characters";
 import { ARMOR_SUBCLASS, CLASS_RULES, type ProficiencyType, proficienciesOf } from "@convex/shared/proficiencies";
 import { PRIORITY_STATS } from "@convex/shared/statPriority";
 import { canPrefer, typesOf } from "@convex/shared/upgrades";
@@ -52,9 +53,9 @@ export const Route = createFileRoute("/g/$region/$slug/")({
 	component: GuildPage,
 });
 
-/** Who the Filter menu leaves out; everyone by default. */
-type Filters = { maxOnly: boolean; unpublished: boolean; unclaimed: boolean };
-const NO_FILTERS: Filters = { maxOnly: false, unpublished: true, unclaimed: true };
+/** Who the Filter menu leaves out; by default only characters under level 10. */
+type Filters = { maxOnly: boolean; underMin: boolean; unpublished: boolean; unclaimed: boolean };
+const NO_FILTERS: Filters = { maxOnly: false, underMin: false, unpublished: true, unclaimed: true };
 
 /** Members who joined within this long get a "New" tag. */
 const NEW_FOR_MS = 7 * 86_400_000;
@@ -112,6 +113,7 @@ function Roster({ members }: { members: Member[] }) {
 				(words.length === 0 || ((text) => words.every((w) => text.includes(w)))(haystack(m))) &&
 				(classFilter === null || m.classId === classFilter) &&
 				(!filters.maxOnly || m.level === 60) &&
+				(filters.underMin || m.level >= ROSTER_MIN_LEVEL) &&
 				(filters.unpublished || !!m.synced) &&
 				(filters.unclaimed || m.claimed),
 		);
@@ -137,6 +139,9 @@ function Roster({ members }: { members: Member[] }) {
 			return sort.desc ? -cmp : cmp;
 		});
 	}, [members, search, classFilter, filters, sort]);
+
+	// Under level 10 are hidden by default; say how many next to Filter.
+	const hiddenLow = filters.underMin ? 0 : members.filter((m) => m.level < ROSTER_MIN_LEVEL).length;
 
 	// For "New": render time is close enough.
 	const now = Date.now();
@@ -207,7 +212,19 @@ function Roster({ members }: { members: Member[] }) {
 							</button>
 						))}
 				</div>
-				<FilterMenu filters={filters} onChange={setFilters} />
+				<div className="ml-auto flex items-center gap-2">
+					{hiddenLow > 0 && (
+						<button
+							type="button"
+							className="text-xs text-muted-foreground hover:text-foreground"
+							title="Show them"
+							onClick={() => setFilters({ ...filters, underMin: true })}
+						>
+							<span className="num">{hiddenLow}</span> under level {ROSTER_MIN_LEVEL} hidden
+						</button>
+					)}
+					<FilterMenu filters={filters} onChange={setFilters} />
+				</div>
 			</div>
 
 			<Tabs value={view} onValueChange={(v) => setView(v as View)}>
@@ -313,6 +330,11 @@ function Roster({ members }: { members: Member[] }) {
 										</TooltipContent>
 									</Tooltip>
 								)}
+								{m.main && (
+									<span className="pill ml-1.5 px-1.5 py-0 text-[0.6875rem]" title="Their main">
+										Main
+									</span>
+								)}
 								{m.joinedAt !== undefined && now - m.joinedAt < NEW_FOR_MS && (
 									<span className="pill ml-1.5 px-1.5 py-0 text-[0.6875rem]" title={`Joined ${ago(m.joinedAt)}`}>
 										New
@@ -367,7 +389,7 @@ function FilterMenu({ filters, onChange }: { filters: Filters; onChange: (next: 
 	const toggle = (key: keyof Filters) => (checked: boolean) => onChange({ ...filters, [key]: checked });
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger className="chip ml-auto" data-active={active > 0}>
+			<DropdownMenuTrigger className="chip" data-active={active > 0}>
 				<HugeiconsIcon icon={FilterHorizontalIcon} size={13} strokeWidth={1.75} />
 				Filter
 				{active > 0 && <span className="num text-muted-foreground">{active}</span>}
@@ -375,6 +397,9 @@ function FilterMenu({ filters, onChange }: { filters: Filters; onChange: (next: 
 			<DropdownMenuContent align="end" className="w-56">
 				<DropdownMenuCheckboxItem checked={filters.maxOnly} onCheckedChange={toggle("maxOnly")}>
 					Level 60 only
+				</DropdownMenuCheckboxItem>
+				<DropdownMenuCheckboxItem checked={filters.underMin} onCheckedChange={toggle("underMin")}>
+					Show under level {ROSTER_MIN_LEVEL}
 				</DropdownMenuCheckboxItem>
 				<DropdownMenuCheckboxItem checked={filters.unpublished} onCheckedChange={toggle("unpublished")}>
 					Show unpublished characters

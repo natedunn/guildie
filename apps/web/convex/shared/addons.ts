@@ -123,9 +123,23 @@ export type AddonRow = {
 	folders: string[];
 	summary?: string;
 	logo?: string;
+	/** Its page: CurseForge's, or a path on this site for Guildie itself. */
 	url?: string;
+	/** Who the link goes to, for its label. */
+	site?: "CurseForge" | "Guildie";
 	categories: string[];
 	users: AddonUser[];
+};
+
+/** Addons that aren't on CurseForge but we know: Guildie itself. Folder (lowercase) → info. */
+export const BUILT_IN_ADDONS: Record<string, CatalogInfo> = {
+	guildie: {
+		name: "Guildie",
+		summary: "Shares your character with your guild on Guildie and adds guild suggestions to item tooltips.",
+		logo: "/icons/icon-192.png",
+		url: "/settings/addon",
+		categories: ["Guild"],
+	},
 };
 
 /**
@@ -175,7 +189,8 @@ export function summarizeAddons(
 			(a, b) => a.name.length - b.name.length || a.name.localeCompare(b.name),
 		);
 		const main = entries[0];
-		const info = group.curseId ? catalog.get(group.curseId) : undefined;
+		const builtIn = group.curseId ? undefined : BUILT_IN_ADDONS[main.name.toLowerCase()];
+		const info = group.curseId ? catalog.get(group.curseId) : builtIn;
 		const users = [...group.byPerson.entries()]
 			.map(([person, theirs]) => {
 				const mine = theirs.find((e) => e.name.toLowerCase() === main.name.toLowerCase()) ?? theirs[0];
@@ -189,6 +204,7 @@ export function summarizeAddons(
 			summary: info?.summary ?? tidyNotes(entries.find((e) => e.notes)?.notes),
 			logo: info?.logo,
 			url: info?.url,
+			...(info?.url ? { site: builtIn ? ("Guildie" as const) : ("CurseForge" as const) } : {}),
 			categories: info?.categories ?? [],
 			users,
 		});

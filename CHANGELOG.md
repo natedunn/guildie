@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** Pick your main under Settings → Account, and the roster marks it. Pin any of your characters to the sidebar from the same list; characters under level 5 stay out of it unless you pin them, with a View all link to the rest.
+
+### Improvements
+
+- **Guildie:** The roster hides characters under level 10 by default and says how many next to Filter; turn on "Show under level 10" to see them.
+
 ### Fixes
 
 - **Guildie, Addon:** Fishing no longer throws off gear upgrades. While a fishing pole is in your main hand (and a fishing addon has swapped or taken off other gear), tooltips, your profile and guildmates' suggestions keep comparing with the gear you wore before you started fishing.
@@ -52,6 +60,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Guildie:** Guildie shows its own icon and description on the Addons page, with a link to set it up.
 - **Guildie:** More addons on the Addons page get their CurseForge icon, description and categories, including Auctionator, Baganator, RareScanner and Dialogue UI, even when the addon itself doesn't say which CurseForge project it is. Descriptions that were cut off now end with "…".
 
 ### Fixes

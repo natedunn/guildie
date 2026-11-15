@@ -2,11 +2,14 @@ import { api } from "@convex/_generated/api";
 import { className } from "@convex/shared/wow";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { convexQuery } from "@convex-dev/react-query";
+import { PinIcon, PinOffIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { AddonShareControl } from "@/components/addon-list";
 import { AiConnections } from "@/components/ai-connections";
 import { ClassText } from "@/components/class-name";
@@ -14,6 +17,7 @@ import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { startClaim } from "@/lib/claim";
 import { desktop, useInDesktopApp } from "@/lib/desktop";
 import { ago } from "@/lib/format";
@@ -43,6 +47,9 @@ function Account() {
 									<TableHead>Class</TableHead>
 									<TableHead className="text-right">Level</TableHead>
 									<TableHead className="text-right">Region</TableHead>
+									<TableHead className="w-0">
+										<span className="sr-only">Main and sidebar</span>
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -60,11 +67,20 @@ function Account() {
 										<TableCell className="text-muted-foreground">{c.classId ? className(c.classId) : ""}</TableCell>
 										<TableCell className="num text-right">{c.level ?? ""}</TableCell>
 										<TableCell className="text-right text-muted-foreground">{c.region.toUpperCase()}</TableCell>
+										<TableCell className="py-1">
+											<CharacterToggles character={c} />
+										</TableCell>
 									</TableRow>
 								))}
 							</TableBody>
 						</Table>
 					</div>
+				)}
+				{viewer.characters.length > 0 && (
+					<p className="mt-2 text-xs text-muted-foreground">
+						Star your main to mark it on the roster. Characters under level 5 stay out of the sidebar unless you pin
+						them.
+					</p>
 				)}
 				<ClaimCharacters />
 			</section>
@@ -97,6 +113,70 @@ function Account() {
 				</p>
 			</section>
 		</div>
+	);
+}
+
+type ViewerCharacter = NonNullable<FunctionReturnType<typeof api.users.viewer>>["characters"][number];
+
+/** Per character: mark it as my main (one at most), and pin it to the sidebar or take it out. */
+function CharacterToggles({ character: c }: { character: ViewerCharacter }) {
+	const setMain = useMutation(api.users.setMain);
+	const setInSidebar = useMutation(api.users.setInSidebar);
+	const key = { region: c.region, slug: c.slug };
+	return (
+		<div className="flex justify-end gap-0.5">
+			<Toggle
+				pressed={c.isMain}
+				label={c.isMain ? "Your main. Click to unmark" : "Mark as your main"}
+				onClick={() => void setMain({ character: c.isMain ? null : key })}
+			>
+				<HugeiconsIcon
+					icon={StarIcon}
+					size={15}
+					strokeWidth={1.75}
+					className={c.isMain ? "fill-current text-highlight" : undefined}
+				/>
+			</Toggle>
+			<Toggle
+				pressed={c.inSidebar}
+				label={c.inSidebar ? "In your sidebar. Click to remove" : "Pin to your sidebar"}
+				onClick={() => void setInSidebar({ ...key, shown: !c.inSidebar })}
+			>
+				<HugeiconsIcon icon={c.inSidebar ? PinIcon : PinOffIcon} size={15} strokeWidth={1.75} />
+			</Toggle>
+		</div>
+	);
+}
+
+function Toggle({
+	pressed,
+	label,
+	onClick,
+	children,
+}: {
+	pressed: boolean;
+	label: string;
+	onClick: () => void;
+	children: ReactNode;
+}) {
+	return (
+		<Tooltip>
+			<TooltipTrigger
+				render={
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						aria-pressed={pressed}
+						aria-label={label}
+						className={pressed ? "text-foreground" : "text-muted-foreground/60"}
+						onClick={onClick}
+					/>
+				}
+			>
+				{children}
+			</TooltipTrigger>
+			<TooltipContent>{label}</TooltipContent>
+		</Tooltip>
 	);
 }
 
