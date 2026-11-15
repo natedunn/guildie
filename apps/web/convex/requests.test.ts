@@ -249,9 +249,10 @@ test("ongoing: ends at its date, never goes stale", () => {
 	assert.equal(shouldExpire({ ...r, status: "cancelled" }, NOW + DAY), false);
 });
 
-test("changing a request: your own open item request only", () => {
-	assert.equal(canChange(req(), TODD).ok, true);
+test("changing a request: your own ongoing request only", () => {
 	assert.equal(canChange(ongoing(), TODD).ok, true);
+	assert.equal(canChange(req(), TODD).ok, false, "fixed amounts are cancelled, not changed");
+	assert.equal(canChange(ongoing(), MILLER).ok, false);
 	assert.equal(canChange(req(), MILLER).ok, false);
 	assert.equal(canChange(req({ kind: "craft" }), TODD).ok, false);
 	assert.equal(canChange(req({ status: "claimed", claim: { userId: MILLER } }), TODD).ok, false);
