@@ -457,9 +457,10 @@ function NewRequest({
 				debounced.length >= 2 &&
 				(shown.length === 0 ? (
 					!isFetching && (
-						<p className={cn(DROPDOWN, "px-3 py-2.5 text-[13px] text-muted-foreground")}>
-							No item by that name on Guildie yet.
-						</p>
+						<div className={cn(DROPDOWN, "text-[13px] text-muted-foreground")}>
+							<p className="px-3 py-2.5">No item by that name on Guildie yet.</p>
+							<BrowseCrafting guild={guild} q={debounced} />
+						</div>
 					)
 				) : (
 					<ul className={cn(DROPDOWN, "divide-y divide-border")}>
@@ -532,8 +533,26 @@ function NewRequest({
 								)}
 							</li>
 						))}
+						{/* Pinned to the bottom of the scrolling list, so it shows without scrolling. */}
+						<li className="sticky bottom-0 bg-popover">
+							<BrowseCrafting guild={guild} q={debounced} />
+						</li>
 					</ul>
 				))}
 		</section>
+	);
+}
+
+/** The dropdown's last line: the same search on Crafting, to browse what the guild can make or learn. */
+function BrowseCrafting({ guild, q }: { guild: { region: Region; slug: string }; q: string }) {
+	return (
+		<Link
+			to="/g/$region/$slug/crafting"
+			params={guild}
+			search={{ q }}
+			className="block border-t border-border px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+		>
+			Who in the guild can make or learn "{q}" →
+		</Link>
 	);
 }

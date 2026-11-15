@@ -20,6 +20,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 - **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
 - **Guildie:** Change your ongoing requests (how long they run, the note) right from the Ongoing list, not only under Mine. Fixed-amount requests can no longer be changed: cancel one and ask again instead. The item request form has a title now, and you pick a fixed amount or ongoing inside it.
 - **Guildie:** On the Requests page, search results open over the page instead of pushing your requests down. Click away or press Escape to close them.
+- **Guildie:** Crafting has three tabs now: Who can make, Who can learn and Upgrades, where you pick a character and switch between Get crafted and Craft for others. Searching Who can make also shows recipes nobody in the guild knows yet and who could learn them, and Who can learn finds patterns by what they make ("8 slot bag"). The Requests search links to the same search on Crafting.
 
 ## 0.3.39
 
