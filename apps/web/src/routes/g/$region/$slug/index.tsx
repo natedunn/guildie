@@ -54,8 +54,8 @@ export const Route = createFileRoute("/g/$region/$slug/")({
 });
 
 /** Who the Filter menu leaves out; by default only characters under level 10. */
-type Filters = { maxOnly: boolean; underMin: boolean; unpublished: boolean; unclaimed: boolean };
-const NO_FILTERS: Filters = { maxOnly: false, underMin: false, unpublished: true, unclaimed: true };
+type Filters = { maxOnly: boolean; underMin: boolean; unclaimed: boolean };
+const NO_FILTERS: Filters = { maxOnly: false, underMin: false, unclaimed: true };
 
 type SortKey = "name" | "level" | "class" | "ilvl" | "seen" | "profession";
 
@@ -111,7 +111,6 @@ function Roster({ members }: { members: Member[] }) {
 				(classFilter === null || m.classId === classFilter) &&
 				(!filters.maxOnly || m.level === 60) &&
 				(filters.underMin || m.level >= ROSTER_MIN_LEVEL) &&
-				(filters.unpublished || !!m.synced) &&
 				(filters.unclaimed || m.claimed),
 		);
 		const value = (m: Member): string | number => {
@@ -389,9 +388,6 @@ function FilterMenu({ filters, onChange }: { filters: Filters; onChange: (next: 
 				</DropdownMenuCheckboxItem>
 				<DropdownMenuCheckboxItem checked={filters.underMin} onCheckedChange={toggle("underMin")}>
 					Show under level {ROSTER_MIN_LEVEL}
-				</DropdownMenuCheckboxItem>
-				<DropdownMenuCheckboxItem checked={filters.unpublished} onCheckedChange={toggle("unpublished")}>
-					Show unpublished characters
 				</DropdownMenuCheckboxItem>
 				<DropdownMenuCheckboxItem checked={filters.unclaimed} onCheckedChange={toggle("unclaimed")}>
 					Show unclaimed characters
