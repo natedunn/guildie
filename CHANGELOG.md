@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.38
+
 ### Fixes
 
 - **Addon:** The Live Pixels square keeps its chosen position after reloading the UI, even when the screen dimensions change during startup.
