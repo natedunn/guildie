@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.40
+
 ### New
 
 - **Guildie:** Each day on the Feed opens with three cards: items members sent each other, levels gained and quests completed. Hover one (tap, on phones) to see who led. Quests count once Blizzard's data catches up, after you log out.
