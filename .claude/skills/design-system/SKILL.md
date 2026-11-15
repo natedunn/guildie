@@ -107,7 +107,10 @@ pressed/open state; primary keeps the light fill), inputs and selects (amber
 border and soft ring on focus), switches (amber when on), tabs and
 `PageTabs` (amber underline), tables (warm hover rows, stronger head rule),
 menus and plain tooltips (sheen, lit top edge), the sidebar's active row.
-Item and talent tooltips (`.item-tooltip`) stay the game's.
+Item and talent tooltips (`.item-tooltip`) stay the game's (navy, light grey
+edge, quality and stat colors), lit like the rest: the edge catches light at
+the top and the panel deepens toward the bottom. Item icons (`ItemIcon`) get
+the same treatment on their quality edge.
 
 shadcn primitives (on Base UI) live in `src/components/ui/`. Add new ones with
 the shadcn CLI (`components.json`), then restyle them through the tokens in
@@ -122,6 +125,7 @@ the shadcn CLI (`components.json`), then restyle them through the tokens in
 | `ItemIcon`, `ItemHover`, `ItemTooltipBody` | `components/item.tsx`                             | Item icons with quality edge; hover tooltip like the game's; click opens the item panel (`?item=`) |
 | `ItemSheet`                                | `components/item-sheet.tsx`                       | The item panel (who can craft it, upgrade for whom)                                                |
 | `ClassText`                                | `components/class-name.tsx`                       | Names in class color, or item quality with `quality`                                               |
+| `VerdictMarker`, `VerdictGlyph`           | `components/verdict-marker.tsx`                   | Lit upgrade / possible / empty slot / removed markers, with their meaning on hover                 |
 | `CharacterAvatar`, `UNFETCHED_NOTE`        | `components/character-avatar.tsx`                 | Portraits, with a silhouette for characters Blizzard hasn't published                              |
 | `PaperDoll`                                | `components/paper-doll.tsx`                       | Equipped gear in slot order                                                                        |
 | `TalentTree`                               | `components/talent-tree.tsx`                      | Talent trees from Blizzard's layout                                                                |

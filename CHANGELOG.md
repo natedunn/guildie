@@ -17,6 +17,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Guildie:** Crafting's Upgrades shows all your characters at once, a card each, with a lit marker on every row for an upgrade, a possible upgrade or an empty slot (hover it for what it means), column headings, and a switch between Crafts for me and Crafts for others. Pick one character from the menu to see just theirs. Remove now asks first and says how to get the item back (Show removed), with "Don't ask again".
+- **Guildie:** Item icons and item tooltips have a lit edge that catches the light at the top, like the rest of the app, and keep the game's quality colors and navy tooltip.
 - **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
 - **Guildie:** Change your ongoing requests (how long they run, the note) right from the Ongoing list, not only under Mine. Fixed-amount requests can no longer be changed: cancel one and ask again instead. The item request form has a title now, and you pick a fixed amount or ongoing inside it.
 - **Guildie:** On the Requests page, search results open over the page instead of pushing your requests down. Click away or press Escape to close them.
