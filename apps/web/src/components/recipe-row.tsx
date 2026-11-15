@@ -102,7 +102,14 @@ const normalize = (s: string) =>
 
 export const queryWords = (q: string) => normalize(q).trim().split(" ").filter(Boolean);
 
-type Indexed<T> = { recipe: T; fields: [name: string, kind: string, tooltip: string, reagents: string] };
+type Fields = [name: string, kind: string, tooltip: string, reagents: string];
+export type Indexed<T> = { recipe: T; fields: Fields };
+
+/** One searchable entry from raw text (anything, not only recipes: Crafting's recipe items too). */
+export const indexEntry = <T,>(recipe: T, fields: Fields): Indexed<T> => ({
+	recipe,
+	fields: fields.map(normalize) as Fields,
+});
 
 /**
  * Built once per data change. Fields are searched by word prefix, so "8"
@@ -124,7 +131,7 @@ export function buildIndex<T extends Recipe>(recipes: T[]): Indexed<T>[] {
 const WEIGHTS = [8, 4, 2, 1];
 
 /** Recipes where every word matches somewhere, best first (ties keep index order). */
-export function searchIndex<T extends Recipe>(index: Indexed<T>[], words: string[]): T[] {
+export function searchIndex<T>(index: Indexed<T>[], words: string[]): T[] {
 	if (words.length === 0) return index.map((e) => e.recipe);
 	const hits: { recipe: T; score: number; order: number }[] = [];
 	index.forEach((entry, order) => {

@@ -1,8 +1,9 @@
 import { api } from "@convex/_generated/api";
+import { recipeCandidates } from "@convex/shared/recipeStatus";
 import type { VerdictKind } from "@convex/shared/upgrades";
 import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { useQueries, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -15,6 +16,8 @@ import {
 	buildIndex,
 	compareProfessions,
 	type GuildRecipe,
+	type Indexed,
+	indexEntry,
 	queryWords,
 	RecipeItem,
 	searchIndex,
@@ -35,6 +38,9 @@ import { UpgradeWhy } from "@/components/upgrade-why";
 import { cn } from "@/lib/utils";
 import { VERDICT_HINTS, verdictLabel } from "@/lib/verdict";
 
+// Three tabs, each a question: "Who can make" (the default), "Who can learn"
+// (?view=learn) and "Upgrades" (?view=upgrades or ?view=craft, a toggle inside).
+//
 // "Who can make...": every recipe someone in the guild knows, searched on the
 // client (recipe, item, item kind, tooltip text, reagents). The search and the
 // profession filter live in the URL so a result can be shared in chat.
@@ -70,6 +76,9 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		// awaited: the tabs show with the page.
 		void qc.prefetchQuery(convexQuery(api.crafting.upgradesForMe, args));
 		void qc.prefetchQuery(convexQuery(api.crafting.upgradesICanCraft, args));
+		// Recipe items: the Who can learn count and Who can make's "Nobody knows
+		// these yet". Also not awaited; the page doesn't wait for them.
+		void qc.prefetchQuery(convexQuery(api.crafting.guildRecipeLearners, args));
 		await Promise.all([
 			qc.ensureQueryData(convexQuery(api.crafting.guildCrafting, args)),
 			qc.ensureQueryData(convexQuery(api.requests.me, args)),
@@ -152,9 +161,12 @@ function CraftingPage() {
 	const showCraft = view === "craft" && !!me;
 	const showLearn = view === "learn" && !!me;
 	const { data: learnData } = useQuery({
-		...convexQuery(api.crafting.guildRecipeItems, { region: params.region as Region, slug: params.slug }),
-		enabled: showLearn,
+		...convexQuery(api.crafting.guildRecipeLearners, { region: params.region as Region, slug: params.slug }),
+		enabled: !!me,
 	});
+	const learnRows = useLearnRows(learnData);
+	const learnIndex = useLearnIndex(learnRows, query.trim() !== "" && (showLearn || !view));
+	const neededCount = useMemo(() => learnRows.filter((r) => r.needed).length, [learnRows]);
 	const [showRemoved, setShowRemoved] = useState(false);
 	// The upgrade views are about one of the viewer's characters at a time.
 	const characters = upgrades?.characters ?? [];
@@ -181,6 +193,13 @@ function CraftingPage() {
 	const index = useMemo(() => buildIndex(source), [source]);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
 	const matches = useMemo(() => searchIndex(index, words), [index, words]);
+	// Who can make, searching: recipe items nobody knows yet that match, and who could learn them.
+	const couldLearn = useMemo(() => {
+		if (view || words.length === 0) return [];
+		return searchIndex(learnIndex, words).filter(
+			(r) => !r.known && r.needed && (!profession || r.profession === profession),
+		);
+	}, [learnIndex, words, view, profession]);
 
 	// Counts per profession reflect the current search, so the chips say where the hits are.
 	const counts = useMemo(() => {
@@ -244,34 +263,27 @@ function CraftingPage() {
 							onClick={() => setView(undefined)}
 							count={data.length}
 						>
-							All recipes
+							<span className="@max-md:hidden">Who can make</span>
+							<span className="@md:hidden">Make</span>
 						</PageTabButton>
 						<PageTabButton
-							active={showUpgrades}
-							onClick={() => setView("upgrades")}
-							count={upgrades ? kept.length : undefined}
+							active={showLearn}
+							onClick={() => setView("learn")}
+							count={learnData ? neededCount : undefined}
 						>
-							{/* Short labels where the three don't fit on one line (phones). */}
-							<span className="@max-md:hidden">Upgrades for me</span>
-							<span className="@md:hidden">For me</span>
-						</PageTabButton>
-						<PageTabButton
-							active={showCraft}
-							onClick={() => setView("craft")}
-							count={canCraft ? asChar.length : undefined}
-						>
-							<span className="@max-md:hidden">Upgrades I can craft</span>
-							<span className="@md:hidden">I can craft</span>
-						</PageTabButton>
-						<PageTabButton active={showLearn} onClick={() => setView("learn")}>
 							<span className="@max-md:hidden">Who can learn</span>
 							<span className="@md:hidden">Learn</span>
+						</PageTabButton>
+						<PageTabButton active={showUpgrades || showCraft} onClick={() => setView(showCraft ? "craft" : "upgrades")}>
+							Upgrades
 						</PageTabButton>
 					</PageTabs>
 				) : null}
 				{showLearn ? (
 					<LearnView
 						data={learnData}
+						rows={learnRows}
+						index={learnIndex}
 						region={params.region}
 						query={query}
 						deferred={deferred}
@@ -285,12 +297,33 @@ function CraftingPage() {
 				    learn has its own. */}
 				<div className={cn("flex flex-wrap items-center gap-2", showLearn && "hidden")}>
 					{(showUpgrades || showCraft) && char ? (
-						<CharacterPicker
-							label={showCraft ? "Crafting as" : "For"}
-							characters={characters}
-							value={char.slug}
-							onChange={setChar}
-						/>
+						<CharacterPicker label="Character" hideLabel characters={characters} value={char.slug} onChange={setChar} />
+					) : null}
+					{showUpgrades || showCraft ? (
+						// Which way: upgrades the guild can make for this character, or ones they can make for the guild.
+						<div className="flex gap-1 @max-md:order-first @max-md:basis-full" role="group" aria-label="Which upgrades">
+							<button
+								type="button"
+								className="chip h-10 @max-md:flex-1 @max-md:justify-center"
+								data-active={showUpgrades}
+								aria-pressed={showUpgrades}
+								title="What the guild can craft that's an upgrade for this character"
+								onClick={() => setView("upgrades")}
+							>
+								Get crafted {upgrades ? <span className="num text-xs text-muted-foreground">{kept.length}</span> : null}
+							</button>
+							<button
+								type="button"
+								className="chip h-10 @max-md:flex-1 @max-md:justify-center"
+								data-active={showCraft}
+								aria-pressed={showCraft}
+								title="What this character can craft that's an upgrade for someone in the guild"
+								onClick={() => setView("craft")}
+							>
+								Craft for others{" "}
+								{canCraft ? <span className="num text-xs text-muted-foreground">{asChar.length}</span> : null}
+							</button>
+						</div>
 					) : null}
 					<Input
 						ref={inputRef}
@@ -412,12 +445,15 @@ function CraftingPage() {
 					</div>
 				)
 			) : results.length === 0 ? (
-				<div className={EMPTY}>
-					{deferred.trim() ? <>Nobody in the guild has a recipe matching "{deferred.trim()}".</> : "Nothing here."}
-					<div className="mt-1">Try "bag" or "Mageweave".</div>
+				<div className="space-y-3">
+					<div className={EMPTY}>
+						{deferred.trim() ? <>Nobody in the guild can make "{deferred.trim()}" yet.</> : "Nothing here."}
+						{couldLearn.length === 0 ? <div className="mt-1">Try "bag" or "Mageweave".</div> : null}
+					</div>
+					<CouldLearn rows={couldLearn} region={params.region} onSeeAll={() => setView("learn")} />
 				</div>
 			) : (
-				<div>
+				<div className="space-y-4">
 					{/* Every column at every width: a narrow pane scrolls the list sideways. */}
 					<div className="overflow-x-auto">
 						<div className="min-w-[40rem]">
@@ -436,9 +472,125 @@ function CraftingPage() {
 					{results.length > limit ? (
 						<ShowAll count={results.length} onClick={() => setLimit(Number.POSITIVE_INFINITY)} />
 					) : null}
+					<CouldLearn rows={couldLearn} region={params.region} onSeeAll={() => setView("learn")} />
 				</div>
 			)}
 		</div>
+	);
+}
+
+type LearnRow = ReturnType<typeof useLearnRows>[number];
+
+/**
+ * Recipe items with who in the guild could use each (recipeCandidates, the
+ * rule the addon's tooltips use too), whether anyone could still learn one,
+ * and whether someone knows it.
+ */
+function useLearnRows(data: LearnData | null | undefined) {
+	return useMemo(() => {
+		if (!data) return [];
+		const characters = data.characters.map((c) => ({ ...c, holding: new Set(c.holding) }));
+		return data.items.map((item) => {
+			const learners: Learner[] = recipeCandidates(item.itemId, item, characters);
+			return {
+				...item,
+				learners,
+				needed: learners.some((w) => w.state === "now" || w.state === "later"),
+				known: learners.some((w) => w.state === "knows"),
+			};
+		});
+	}, [data]);
+}
+
+/**
+ * Recipe items searchable like recipes: their name, and (once loaded) what
+ * they make: the crafted item's name, kind and tooltip, and the reagents. So
+ * "8 slot bag" finds the pattern. The crafted-item text is per profession and
+ * the same for every guild; it loads only once `searching`, and until it's in,
+ * names alone match.
+ */
+function useLearnIndex(rows: LearnRow[], searching: boolean) {
+	const [wanted, setWanted] = useState(false);
+	useEffect(() => {
+		if (searching) setWanted(true);
+	}, [searching]);
+	const professionIds = useMemo(() => [...new Set(rows.map((r) => r.professionId))].sort((a, b) => a - b), [rows]);
+	const texts = useQueries({
+		queries: professionIds.map((professionId) => ({
+			...convexQuery(api.crafting.recipeItemSearch, { professionId }),
+			enabled: wanted,
+		})),
+		combine: (results) => results.map((r) => r.data),
+	});
+	return useMemo(() => {
+		const made = new Map<number, [string, string, string, string]>();
+		for (const list of texts) for (const [itemId, ...rest] of list ?? []) made.set(itemId, rest);
+		return rows.map((r) => {
+			const m = made.get(r.itemId);
+			return indexEntry(r, [
+				`${r.name} ${m?.[0] ?? ""}`,
+				`${m?.[1] ?? ""} ${r.profession}`,
+				m?.[2] ?? "",
+				m?.[3] ?? "",
+			]);
+		});
+	}, [rows, texts]);
+}
+
+/** "Could learn" hints shown under Who can make's results. */
+const COULD_LEARN = 5;
+
+/**
+ * Under Who can make's results: recipes nobody knows yet that match the
+ * search, and who could learn them. Turns "nobody can make it" into who to
+ * send the pattern to.
+ */
+function CouldLearn({ rows, region, onSeeAll }: { rows: LearnRow[]; region: string; onSeeAll: () => void }) {
+	if (rows.length === 0) return null;
+	return (
+		<section className="surface-card overflow-hidden">
+			<header className="flex min-w-0 items-baseline gap-2 border-b border-border/60 px-4 py-2.5">
+				<h3 className="text-[0.8125rem] font-semibold">Nobody knows these yet</h3>
+				<span className="num text-xs text-muted-foreground">{rows.length}</span>
+				<span className="ml-1 truncate text-xs text-muted-foreground @max-md:hidden">
+					Who could learn them, if someone finds the recipe
+				</span>
+			</header>
+			<ul className="divide-y divide-border/60">
+				{rows.slice(0, COULD_LEARN).map((r) => (
+					<li
+						key={r.itemId}
+						className="grid grid-cols-1 items-center gap-x-4 gap-y-1 px-4 py-2 text-sm @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]"
+					>
+						<ItemHover
+							item={{ itemId: r.itemId, name: r.name, quality: r.quality, icon: r.icon }}
+							className="flex min-w-0 items-center gap-2.5"
+						>
+							<ItemIcon icon={r.icon} quality={r.quality} size={28} className="block flex-none" />
+							<span className="min-w-0">
+								<span className="block truncate hover:underline" style={{ color: QUALITY_COLORS[r.quality] }}>
+									{r.name}
+								</span>
+								<span className="block truncate text-xs text-muted-foreground">
+									{r.profession}
+									{r.skill ? <span className="num"> {r.skill}</span> : null}
+								</span>
+							</span>
+						</ItemHover>
+						<LearnerSummary who={r.learners} region={region} profession={r.profession} />
+					</li>
+				))}
+			</ul>
+			{rows.length > COULD_LEARN ? (
+				<button
+					type="button"
+					onClick={onSeeAll}
+					className="w-full border-t border-border/60 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+				>
+					See all {rows.length} in Who can learn
+				</button>
+			) : null}
+		</section>
 	);
 }
 
@@ -774,11 +926,14 @@ function CraftRequest({ recipe, member }: { recipe: GuildRecipe; member?: Member
  */
 function CharacterPicker({
 	label,
+	hideLabel,
 	characters,
 	value,
 	onChange,
 }: {
 	label: string;
+	/** Only the name shows; the label is for screen readers. */
+	hideLabel?: boolean;
 	characters: { slug: string; name: string; classId: number }[];
 	value: string;
 	onChange: (slug: string) => void;
@@ -794,7 +949,7 @@ function CharacterPicker({
 				aria-label={`${label}: ${current?.name ?? ""}`}
 				className="h-10 min-w-0 whitespace-nowrap rounded-md border border-input bg-well bg-(image:--select-chevron) bg-size-[0.75rem] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-3 text-left text-sm @max-md:flex-1"
 			>
-				<span className="text-muted-foreground">{label} </span>
+				{hideLabel ? null : <span className="text-muted-foreground">{label} </span>}
 				{current ? named(current) : null}
 			</DropdownMenuTrigger>
 			<DropdownMenuContent className="w-auto min-w-(--anchor-width)">
@@ -810,7 +965,7 @@ function CharacterPicker({
 	);
 }
 
-type LearnData = NonNullable<FunctionReturnType<typeof api.crafting.guildRecipeItems>>;
+type LearnData = NonNullable<FunctionReturnType<typeof api.crafting.guildRecipeLearners>>;
 
 /**
  * Who can learn: recipe items for the guild's professions, searched by name,
@@ -819,6 +974,8 @@ type LearnData = NonNullable<FunctionReturnType<typeof api.crafting.guildRecipeI
  */
 function LearnView({
 	data,
+	rows,
+	index,
 	region,
 	query,
 	deferred,
@@ -827,6 +984,8 @@ function LearnView({
 	setProfession,
 }: {
 	data: LearnData | null | undefined;
+	rows: LearnRow[];
+	index: Indexed<LearnRow>[];
 	region: string;
 	query: string;
 	deferred: string;
@@ -836,23 +995,11 @@ function LearnView({
 }) {
 	const [neededOnly, setNeededOnly] = useState(true);
 	const [limit, setLimit] = useState(PAGE);
-	const rows = useMemo(() => {
-		if (!data) return [];
-		return data.items.map((item) => ({
-			...item,
-			learners: item.who.map((w): Learner => ({ ...data.characters[w.i], state: w.state, skill: w.skill })),
-			needed: item.who.some((w) => w.state === "now" || w.state === "later"),
-		}));
-	}, [data]);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
+	// Same matching as Who can make: word starts, best matches first.
 	const matches = useMemo(
-		() =>
-			rows.filter((r) => {
-				if (neededOnly && !r.needed) return false;
-				const text = `${r.name} ${r.profession}`.toLowerCase();
-				return words.every((w) => text.includes(w));
-			}),
-		[rows, words, neededOnly],
+		() => searchIndex(index, words).filter((r) => !neededOnly || r.needed),
+		[index, words, neededOnly],
 	);
 	const counts = useMemo(() => {
 		const c = new Map<string, number>();

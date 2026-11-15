@@ -380,8 +380,10 @@ already (in bags or bank, not learned), or **knows it**. The rule is
   (`heldUnlearned`). Members of the guild only; nothing else in their
   inventory is shared.
 - **On the site:** the item panel's "Who can learn it" (guild pages), the
-  Crafting page's "Who can learn" tab (`crafting.guildRecipeItems`, search by
-  name, "Only ones someone needs" on by default), and under recipe items on
+  Crafting page's "Who can learn" tab (`crafting.guildRecipeLearners`: each
+  character once, states worked out on the page with `recipeCandidates`;
+  searched like recipes, with `crafting.recipeItemSearch` for what each item
+  makes; "Only ones someone needs" on by default), and under recipe items on
   Inventory (across the player's guilds, their own characters included).
 - **In game:** `recipes = { items = { [itemId] = { profession, skill (0:
   unknown), recipeId, more recipeIds (0.15.0) } }, ranks = { [itemId] = {
