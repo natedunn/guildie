@@ -173,3 +173,16 @@ test("notes cut short in game end at a word", () => {
 	);
 	assert.equal(tidyNotes("Short."), "Short.");
 });
+
+test("Guildie itself isn't on CurseForge: its own icon, description and a link to its page here", () => {
+	const [row] = summarizeAddons([{ list: [{ name: "Guildie", version: "0.20.0", notes: "Old notes" }] }]);
+	assert.equal(row.logo, "/icons/icon-192.png");
+	assert.equal(row.url, "/settings/addon");
+	assert.equal(row.site, "Guildie");
+	assert.deepEqual(row.categories, ["Guild"]);
+	const [curse] = summarizeAddons(
+		[{ list: [{ name: "Questie", curseId: 1 }] }],
+		new Map([[1, { url: "https://www.curseforge.com/wow/addons/questie" }]]),
+	);
+	assert.equal(curse.site, "CurseForge");
+});

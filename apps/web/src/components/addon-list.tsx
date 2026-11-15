@@ -3,6 +3,7 @@ import { api } from "@convex/_generated/api";
 import { ADDON_SHARES, type AddonRow, type AddonShare } from "@convex/shared/addons";
 import { Cancel01Icon, LinkSquare02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { type ReactNode, useState } from "react";
@@ -60,18 +61,44 @@ export function AddonLine({ addon, aside, compact }: { addon: AddonRow; aside?: 
 	);
 }
 
-/** A link to the addon's CurseForge page. */
-export function CurseForgeLink({ url, className }: { url: string; className?: string }) {
+/** A link to the addon's page: CurseForge in a new window, or a page on this site. */
+function AddonPageLink({
+	addon,
+	className,
+	children,
+	...rest
+}: {
+	addon: Pick<AddonRow, "url">;
+	className?: string;
+	children: ReactNode;
+	"aria-label"?: string;
+	title?: string;
+}) {
+	const url = addon.url ?? "";
+	if (url.startsWith("/")) {
+		return (
+			<Link to={url} className={className} {...rest}>
+				{children}
+			</Link>
+		);
+	}
 	return (
-		<a
-			href={url}
-			target="_blank"
-			rel="noreferrer"
+		<a href={url} target="_blank" rel="noreferrer" className={className} {...rest}>
+			{children}
+		</a>
+	);
+}
+
+/** The addon's page as a button: "CurseForge", or "Guildie" for our own. */
+export function AddonSiteLink({ addon, className }: { addon: Pick<AddonRow, "url" | "site">; className?: string }) {
+	return (
+		<AddonPageLink
+			addon={addon}
 			className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5", className)}
 		>
-			CurseForge
+			{addon.site ?? "CurseForge"}
 			<HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.75} />
-		</a>
+		</AddonPageLink>
 	);
 }
 
@@ -91,16 +118,14 @@ export function AddonList({ addons, className }: { addons: AddonRow[]; className
 									</span>
 								)}
 								{a.url ? (
-									<a
-										href={a.url}
-										target="_blank"
-										rel="noreferrer"
-										aria-label={`${a.title} on CurseForge`}
-										title="CurseForge"
+									<AddonPageLink
+										addon={a}
+										aria-label={`${a.title} on ${a.site ?? "CurseForge"}`}
+										title={a.site ?? "CurseForge"}
 										className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground"
 									>
 										<HugeiconsIcon icon={LinkSquare02Icon} size={14} strokeWidth={1.75} />
-									</a>
+									</AddonPageLink>
 								) : (
 									<span aria-hidden className="size-7" />
 								)}
