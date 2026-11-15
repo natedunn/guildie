@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
+
 ## 0.3.39
 
 ### New
