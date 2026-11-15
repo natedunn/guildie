@@ -198,15 +198,15 @@ export function validateNew(input: { ongoing?: boolean; quantity: number; note?:
 }
 
 /**
- * May `userId` change this request (switch between fixed amount and ongoing,
- * the quantity, how long, the note)? Their own item requests, until someone
- * claims one: nobody's claim gets pulled out from under them.
+ * May `userId` change this request (how long, the note)? Only their own
+ * ongoing requests. Fixed amounts can't be changed (what about one already
+ * partly or fully delivered?): cancel it and ask again.
  */
 export function canChange(req: RequestLike, userId: string): Verdict {
 	if (req.requester !== userId) return no("Only the requester can do that.");
 	if (!isActive(req.status)) return no("This request is closed.");
 	if (req.kind !== "item") return no("Craft requests can't be changed. Cancel it and ask again.");
-	if (req.status !== "open") return no("Someone already claimed it. Mark it done, or release the claim, first.");
+	if (!req.ongoing) return no("Fixed requests can't be changed. Cancel it and ask again.");
 	return yes;
 }
 

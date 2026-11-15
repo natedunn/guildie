@@ -695,15 +695,13 @@ export const setDeclared = mutation({
 });
 
 /**
- * The requester changes their own item request while nobody has claimed it:
- * fixed amount ↔ ongoing, the quantity, how long (from now), the note.
+ * The requester changes their own ongoing request: how long (from now), the
+ * note. Fixed amounts aren't changed, only cancelled (canChange).
  */
 export const update = mutation({
 	args: {
 		requestId: v.id("requests"),
-		ongoing: v.boolean(),
-		quantity: v.optional(v.number()),
-		/** Ongoing: 14, 30 or 90 days from now; left out keeps the end date it has. */
+		/** 14, 30 or 90 days from now; left out keeps the end date it has. */
 		days: v.optional(v.number()),
 		note: v.optional(v.string()),
 	},
@@ -715,31 +713,16 @@ export const update = mutation({
 		const verdict = canChange(ruleView(r), userId);
 		if (!verdict.ok) throw new ConvexError(verdict.error);
 		const now = Date.now();
-		// Switching kinds counts against the other kind's cap; staying put doesn't.
-		const others = (await activeOf(ctx, userId)).filter(
-			(x) => x.guildId === r.guildId && x._id !== r._id && !!x.ongoing === args.ongoing,
-		);
-		let fields: { quantity: number; note?: string };
-		let until: number | undefined;
+		let note: string | undefined;
+		let until = r.until;
 		try {
-			fields = validateNew({
-				ongoing: args.ongoing,
-				quantity: args.quantity ?? r.quantity,
-				note: args.note,
-				openCount: others.length,
-			});
-			if (args.ongoing)
-				until =
-					args.days !== undefined || !r.ongoing || r.until === undefined ? ongoingUntil(args.days ?? 0, now) : r.until;
+			// openCount 0: it's already one of theirs, so the cap doesn't apply.
+			({ note } = validateNew({ ongoing: true, quantity: 0, note: args.note, openCount: 0 }));
+			if (args.days !== undefined || until === undefined) until = ongoingUntil(args.days ?? 0, now);
 		} catch (error) {
 			throw new ConvexError((error as Error).message);
 		}
-		await ctx.db.patch(r._id, {
-			...fields,
-			ongoing: args.ongoing || undefined,
-			until,
-			lastActivityAt: now,
-		});
+		await ctx.db.patch(r._id, { note, until, lastActivityAt: now });
 	},
 });
 
