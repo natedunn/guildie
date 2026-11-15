@@ -1,7 +1,7 @@
 import { Popover } from "@base-ui/react/popover";
 import { api } from "@convex/_generated/api";
 import { DUNGEON_BY_KEY, dungeonArtUrl } from "@convex/shared/dungeons";
-import { gameIconUrl, REACTION_GAME_ICON, REACTION_LABEL, REACTIONS, type Reaction } from "@convex/shared/reactions";
+import { REACTION_ICON, REACTION_LABEL, REACTIONS, type Reaction } from "@convex/shared/reactions";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
@@ -20,18 +20,20 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { Fragment, type ReactNode, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
+import { DayStats } from "@/components/feed-day-stats";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
-import { PageTabButton, PageTabs } from "@/components/page-tabs";
-import { feedDayStart, feedDaysAgo } from "@/lib/feed-day";
+import { Input } from "@/components/ui/input";
+import { addDays, feedDayLabel, feedDayStart } from "@/lib/feed-day";
 import { cn } from "@/lib/utils";
 
 // Feed: what the guild's members did, newest first, by day: level-ups,
 // first dungeon clears, dungeon quests turned in, and requests made,
-// claimed and fulfilled (convex/feed.ts). Filters live in the URL.
+// claimed and fulfilled (convex/feed.ts). The kind filter lives in the URL;
+// the member search (rows naming a character, either side) doesn't.
 // Days only, never times: Blizzard tells us hours late. A day runs from 4am
 // (lib/feed-day.ts), so a late night counts with its evening. Within a day, alike
 // events share a row: everyone who cleared a dungeon, everyone who turned in
@@ -39,6 +41,8 @@ import { cn } from "@/lib/utils";
 // first merge into one).
 // Members react to rows (convex/feedReactions.ts); a grouped row's reactions
 // are its events' together, each player counted once per reaction.
+// Each day opens with its stat cards: items sent, levels gained, quests
+// completed, with the leaders on hover (components/feed-day-stats.tsx).
 
 type Show = "all" | "levels" | "dungeons" | "quests" | "requests";
 type Search = { show?: Show };
@@ -49,6 +53,12 @@ const SHOW_LABEL: Record<Show, string> = {
 	dungeons: "Dungeons",
 	quests: "Quests",
 	requests: "Requests",
+};
+const SHOW_ICON: Partial<Record<Show, typeof InboxIcon>> = {
+	levels: ArrowUpDoubleIcon,
+	dungeons: Castle01Icon,
+	quests: ScrollTextIcon,
+	requests: InboxIcon,
 };
 const PAGE = 100;
 
@@ -70,14 +80,26 @@ function FeedPage() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const [limit, setLimit] = useState(PAGE);
+	const [who, setWho] = useState("");
+	const listArgs = { region: params.region as Region, slug: params.slug, limit };
 	const { data } = useQuery({
-		...convexQuery(api.feed.list, { region: params.region as Region, slug: params.slug, limit }),
+		...convexQuery(api.feed.list, listArgs),
 		placeholderData: keepPreviousData,
 	});
+	// The stat cards' days: those shown, from their events (the viewer's own
+	// 4am days, so client only: the server render has none).
+	const [clientReady, setClientReady] = useState(false);
+	useEffect(() => setClientReady(true), []);
+	const dayRanges = clientReady && data && !data.hidden ? feedDays(data.events) : [];
+	const { data: stats } = useQuery({
+		...convexQuery(api.feed.days, { region: params.region as Region, slug: params.slug, days: dayRanges }),
+		enabled: dayRanges.length > 0,
+		placeholderData: keepPreviousData,
+	});
+	const statsBySince = new Map((stats ?? []).map((d) => [d.since, d]));
 	// Reacting shows at once; the server's answer replaces it.
 	const toggle = useMutation(api.feedReactions.toggle).withOptimisticUpdate((store, { eventIds, reaction }) => {
-		const key = { region: params.region as Region, slug: params.slug, limit };
-		const current = store.getQuery(api.feed.list, key);
+		const current = store.getQuery(api.feed.list, listArgs);
 		if (!current || current.hidden) return;
 		const ids = new Set<string>(eventIds);
 		const had = current.events.some((e) => ids.has(e.id) && e.reactions.some((r) => r.mine && r.reaction === reaction));
@@ -86,7 +108,7 @@ function FeedPage() {
 			name: "You",
 			classId: 0,
 		};
-		store.setQuery(api.feed.list, key, {
+		store.setQuery(api.feed.list, listArgs, {
 			...current,
 			events: current.events.map((e) => {
 				if (had && ids.has(e.id))
@@ -103,7 +125,10 @@ function FeedPage() {
 	const show = search.show ?? "all";
 	const setSearch = (next: Search) =>
 		navigate({ search: (prev) => ({ ...prev, ...next }), replace: true, resetScroll: false });
+	const query = who.trim().toLowerCase();
 	const events = data.events.filter((e) => {
+		if (query && ![e.character.name, e.other?.name, e.otherName].some((n) => n?.toLowerCase().includes(query)))
+			return false;
 		if (e.kind === "level") return show === "all" || show === "levels";
 		if (e.kind === "dungeon") return show === "all" || show === "dungeons";
 		if (e.kind === "quests") return show === "all" || show === "quests";
@@ -112,56 +137,82 @@ function FeedPage() {
 	const days = byDay(events);
 
 	return (
-		<div className="@container max-w-3xl space-y-5 pb-12">
-			<div>
-				{/* No gaps and a shorter label where the five don't fit on one line (phones). */}
-				<PageTabs className="@max-sm:gap-0">
-					{SHOWS.map((s) => (
-						<PageTabButton key={s} active={show === s} onClick={() => setSearch({ show: s === "all" ? undefined : s })}>
-							{s === "levels" ? (
-								<>
-									<span className="@max-sm:hidden">Level-ups</span>
-									<span className="@sm:hidden">Levels</span>
-								</>
-							) : (
-								SHOW_LABEL[s]
-							)}
-						</PageTabButton>
-					))}
-				</PageTabs>
+		<div className="@container/feed pb-12">
+			<div className="mb-4 flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
+				{/* Shorter labels where the five don't fit on one line (phones). */}
+				<div className="flex flex-wrap gap-1">
+					{SHOWS.map((s) => {
+						const icon = SHOW_ICON[s];
+						return (
+							<button
+								key={s}
+								type="button"
+								className="chip"
+								data-active={show === s}
+								onClick={() => setSearch({ show: s === "all" ? undefined : s })}
+							>
+								{icon && (
+									<HugeiconsIcon icon={icon} size={13} strokeWidth={2} className="opacity-80 @max-md/feed:hidden" />
+								)}
+								{s === "levels" ? (
+									<>
+										<span className="@max-md/feed:hidden">Level-ups</span>
+										<span className="@md/feed:hidden">Levels</span>
+									</>
+								) : (
+									SHOW_LABEL[s]
+								)}
+							</button>
+						);
+					})}
+				</div>
+				<Input
+					value={who}
+					onChange={(e) => setWho(e.target.value)}
+					placeholder="Find a member"
+					aria-label="Find a member"
+					className="h-[1.625rem] w-full @lg/feed:ml-auto @lg/feed:w-48"
+				/>
 			</div>
 
-			{days.length === 0 ? (
-				<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
-					Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen.
-				</p>
-			) : (
-				days.map(([day, list]) => (
-					<section key={day}>
-						{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
-						<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">{day}</h2>
-						<ul className="surface-card divide-y divide-border overflow-hidden">
-							{groupDay(list).map((row) => (
-								<EventRow
-									key={row.id}
-									row={row}
-									onReact={(reaction) => void toggle({ eventIds: row.ids, reaction }).catch(() => {})}
-								/>
-							))}
-						</ul>
-					</section>
-				))
-			)}
+			<div className="@container max-w-3xl space-y-5">
+				{days.length === 0 ? (
+					<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
+						{query
+							? "Nobody by that name here."
+							: "Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen."}
+					</p>
+				) : (
+					days.map((day) => {
+						const dayStats = statsBySince.get(day.start);
+						return (
+							<section key={day.start}>
+								<h2 className="py-1.5 text-xs font-medium text-muted-foreground">{day.label}</h2>
+								{dayStats && <DayStats day={dayStats} label={day.label} />}
+								<ul className="surface-card divide-y divide-border overflow-hidden">
+									{groupDay(day.events).map((row) => (
+										<EventRow
+											key={row.id}
+											row={row}
+											onReact={(reaction) => void toggle({ eventIds: row.ids, reaction }).catch(() => {})}
+										/>
+									))}
+								</ul>
+							</section>
+						);
+					})
+				)}
 
-			{data.more && (
-				<button
-					type="button"
-					onClick={() => setLimit((n) => n + PAGE)}
-					className="w-full rounded-md py-2 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-				>
-					Show older
-				</button>
-			)}
+				{data.more && (
+					<button
+						type="button"
+						onClick={() => setLimit((n) => n + PAGE)}
+						className="w-full rounded-md py-2 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					>
+						Show older
+					</button>
+				)}
+			</div>
 		</div>
 	);
 }
@@ -169,24 +220,28 @@ function FeedPage() {
 type FeedData = Extract<NonNullable<FunctionReturnType<typeof api.feed.list>>, { hidden: false }>;
 type Event = FeedData["events"][number];
 
-/** "Today", "Yesterday", then "Monday, Nov 3"; days start at 4am. */
-function byDay(events: Event[]): [string, Event[]][] {
-	const out: [string, Event[]][] = [];
+/** Days the stat cards sum up at most (convex/feed.ts days). */
+const STAT_DAYS = 31;
+
+type Day = { label: string; start: number; events: Event[] };
+
+/** Events by feed day, newest first: "Today", "Yesterday", then "Monday, Nov 3"; days start at 4am. */
+function byDay(events: Event[]): Day[] {
+	const out: Day[] = [];
 	const now = Date.now();
 	for (const e of events) {
-		const d = feedDayStart(e.at);
-		const diff = feedDaysAgo(e.at, now);
-		const label =
-			diff === 0
-				? "Today"
-				: diff === 1
-					? "Yesterday"
-					: d.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+		const start = feedDayStart(e.at).getTime();
 		const last = out.at(-1);
-		if (last && last[0] === label) last[1].push(e);
-		else out.push([label, [e]]);
+		if (last && last.start === start) last.events.push(e);
+		else out.push({ label: feedDayLabel(start, now), start, events: [e] });
 	}
 	return out;
+}
+
+/** The feed days `events` fall on, as ranges for the stat cards (newest first). */
+function feedDays(events: Event[]) {
+	const starts = [...new Set(events.map((e) => feedDayStart(e.at).getTime()))].slice(0, STAT_DAYS);
+	return starts.map((since) => ({ since, until: addDays(since, 1) }));
 }
 
 type Person = Event["character"];
@@ -435,7 +490,7 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 			<div className="min-w-0 flex-1 text-base leading-snug">
 				<div>{text}</div>
 				{/* The kind's icon leads the grey line (on the portraits it would cover a group). */}
-				<div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+				<div className="-mt-px flex items-center gap-1.5 text-sm leading-tight text-muted-foreground">
 					<HugeiconsIcon
 						icon={KIND_ICON[e.kind]}
 						size={14}
@@ -489,11 +544,11 @@ function Portraits({ people }: { people: Person[] }) {
 
 /** A reaction's mark: line icons for the basics, the game's icons for the rest. */
 function ReactionMark({ reaction, size }: { reaction: Reaction; size: number }) {
-	const game = REACTION_GAME_ICON[reaction];
-	if (game)
+	const icon = REACTION_ICON[reaction];
+	if (icon)
 		return (
 			<img
-				src={gameIconUrl(game)}
+				src={icon}
 				alt=""
 				loading="lazy"
 				draggable={false}
@@ -616,7 +671,7 @@ function Reactions({
 
 /** A reaction as a small square tile (the summary): the game's icon, or the line icon on a faint fill. */
 function ReactionTile({ reaction, size }: { reaction: Reaction; size: number }) {
-	if (REACTION_GAME_ICON[reaction]) return <ReactionMark reaction={reaction} size={size} />;
+	if (REACTION_ICON[reaction]) return <ReactionMark reaction={reaction} size={size} />;
 	return (
 		<span
 			className="grid flex-none place-items-center rounded-[4px] bg-secondary text-foreground"
