@@ -56,19 +56,28 @@ export function ItemIcon({
 	empty?: boolean;
 }) {
 	const edge = quality && quality !== "COMMON" && quality !== "POOR" ? QUALITY_COLORS[quality] : undefined;
+	// An empty slot: a plain square (the paper doll dashes its edge).
+	if (empty) {
+		return (
+			<span
+				className={cn("relative inline-block shrink-0 rounded-[4px] border border-white/10 bg-black/40", className)}
+				style={{ width: size, height: size }}
+			/>
+		);
+	}
+	// The edge is the 1px padding showing the lit gradient behind the icon (app.css .item-icon).
 	return (
 		<span
-			className={cn(
-				"relative inline-block shrink-0 overflow-hidden rounded-[4px] border bg-black/40",
-				edge ? "border-[var(--edge)]" : "border-white/10",
-				className,
-			)}
+			data-edge={edge ? "" : undefined}
+			className={cn("item-icon relative inline-block shrink-0 rounded-[4px] p-px", className)}
 			style={{ width: size, height: size, "--edge": edge } as CSSProperties}
 		>
-			{icon && !empty ? (
-				// Blizzard's icons have a dark 1px frame baked in; crop it.
-				<img src={icon} alt="" loading="lazy" draggable={false} className="size-full scale-[1.08] object-cover" />
-			) : null}
+			<span className="block size-full overflow-hidden rounded-[3px] bg-black/60">
+				{icon ? (
+					// Blizzard's icons have a dark 1px frame baked in; crop it.
+					<img src={icon} alt="" loading="lazy" draggable={false} className="size-full scale-[1.08] object-cover" />
+				) : null}
+			</span>
 		</span>
 	);
 }

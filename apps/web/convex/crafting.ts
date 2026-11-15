@@ -373,7 +373,7 @@ export const upgradesForMe = query({
 				a.name.localeCompare(b.name),
 		);
 		return {
-			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId })),
+			characters: viewer.characters.map((c) => ({ slug: c.slug, name: c.name, classId: c.classId, level: c.level })),
 			noGear,
 			/** The viewer's characters whose gear types leave other types out ("Only this type"). */
 			strict: mine
