@@ -15,7 +15,15 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** The Feed sums up the day beside it: items members sent each other and who sent the most, who leveled and how far, who completed the most quests, and the dungeons cleared for the first time and by whom. On phones it sits above the feed, folded until you open Details. Quests count once Blizzard's data catches up, after you log out.
+- **Guildie:** Look back at any day on the Feed: the new day picker shows just that day and its summary. Latest goes back to everything, newest first.
+- **Guildie:** A Thank you reaction on the Feed: praying hands.
+
 ### Improvements
+
+- **Guildie:** The Feed's filters are chips now, with a day picker and a search to find a member's activity.
 
 - **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
 - **Guildie:** Change your ongoing requests (how long they run, the note) right from the Ongoing list, not only under Mine. Fixed-amount requests can no longer be changed: cancel one and ask again instead. The item request form has a title now, and you pick a fixed amount or ongoing inside it.
