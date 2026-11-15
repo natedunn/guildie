@@ -4,7 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { type ActionCtx, internalAction, internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
 import { guildOfProfile } from "./claimRegions";
-import { blizzardWhen, noteClears, noteLevel, noteQuests } from "./feed";
+import { blizzardWhen, noteClears, noteJoined, noteLevel, noteQuests } from "./feed";
 import { setOwner } from "./guilds";
 import { type ItemPreview, tooltipLines } from "./items";
 import { addBlizzardRecipes, blizzardPartTimes } from "./profile";
@@ -145,6 +145,9 @@ export const applyRoster = internalMutation({
 			const row = bySlug.get(member.slug);
 			bySlug.delete(member.slug);
 			let id: Id<"characters">;
+			// Someone new, or back after leaving: the feed says so, except on the
+			// guild's first sync, when everyone is new to us.
+			if (guild.rosterSyncedAt !== undefined && !row?.inRoster) await noteJoined(ctx, guildId, member, now);
 			if (row) {
 				await ctx.db.patch(row._id, { ...member, inRoster: true });
 				id = row._id;

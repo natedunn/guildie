@@ -473,19 +473,21 @@ export const activity = internalQuery({
 			const dungeon = e.dungeon ? (DUNGEON_BY_KEY.get(e.dungeon)?.name ?? e.dungeon) : "";
 			const item = e.itemId !== undefined ? ((await itemRow(ctx, e.itemId))?.name ?? `item ${e.itemId}`) : "";
 			const what =
-				e.kind === "level"
-					? `${who} reached level ${e.level}`
-					: e.kind === "dungeon"
-						? `${who} cleared ${dungeon}`
-						: e.kind === "quests"
-							? `${who} turned in ${e.questIds?.length ?? 0} ${dungeon} quests`
-							: e.kind === "request"
-								? e.ongoing
-									? `${who} is collecting ${item} (ongoing request)`
-									: `${who} asked for ${e.quantity ?? 1}× ${item}`
-								: e.kind === "claim"
-									? `${e.other?.name ?? "Someone"} took ${who}'s request for ${item}`
-									: `${e.other?.name ?? "Someone"} got ${who} ${item}`;
+				e.kind === "joined"
+					? `${who} joined the guild (level ${e.level})`
+					: e.kind === "level"
+						? `${who} reached level ${e.level}`
+						: e.kind === "dungeon"
+							? `${who} cleared ${dungeon}`
+							: e.kind === "quests"
+								? `${who} turned in ${e.questIds?.length ?? 0} ${dungeon} quests`
+								: e.kind === "request"
+									? e.ongoing
+										? `${who} is collecting ${item} (ongoing request)`
+										: `${who} asked for ${e.quantity ?? 1}× ${item}`
+									: e.kind === "claim"
+										? `${e.other?.name ?? "Someone"} took ${who}'s request for ${item}`
+										: `${e.other?.name ?? "Someone"} got ${who} ${item}`;
 			lines.push(`- ${ago(e.at, now)}: ${what}`);
 		}
 		return [`${guild.name}, newest first:`, ...lines].join("\n");
