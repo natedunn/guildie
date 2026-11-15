@@ -138,7 +138,8 @@ function FeedPage() {
 
 	return (
 		<div className="@container/feed pb-12">
-			<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
+			<div className="mb-4 flex max-w-3xl flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
+				{/* Shorter labels where the five don't fit on one line (phones). */}
 				<div className="flex flex-wrap gap-1">
 					{SHOWS.map((s) => {
 						const icon = SHOW_ICON[s];
@@ -150,8 +151,17 @@ function FeedPage() {
 								data-active={show === s}
 								onClick={() => setSearch({ show: s === "all" ? undefined : s })}
 							>
-								{icon && <HugeiconsIcon icon={icon} size={13} strokeWidth={2} className="opacity-80" />}
-								{SHOW_LABEL[s]}
+								{icon && (
+									<HugeiconsIcon icon={icon} size={13} strokeWidth={2} className="opacity-80 @max-md/feed:hidden" />
+								)}
+								{s === "levels" ? (
+									<>
+										<span className="@max-md/feed:hidden">Level-ups</span>
+										<span className="@md/feed:hidden">Levels</span>
+									</>
+								) : (
+									SHOW_LABEL[s]
+								)}
 							</button>
 						);
 					})}

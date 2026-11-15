@@ -100,7 +100,7 @@ function StatCard({
 			>
 				<HugeiconsIcon icon={icon} size={16} strokeWidth={2} className="opacity-85" />
 			</span>
-			<span className="min-w-0 flex-1 text-left">
+			<span className="min-w-0 flex-1 text-left @max-md:w-full">
 				<span
 					className={cn(
 						"num block text-lg leading-tight font-semibold tracking-[-0.02em]",
@@ -109,7 +109,9 @@ function StatCard({
 				>
 					{total.toLocaleString()}
 				</span>
-				<span className="block truncate text-xs text-muted-foreground">{label}</span>
+				<span className="block truncate text-xs text-muted-foreground @max-md:whitespace-normal @max-md:leading-tight">
+					{label}
+				</span>
 			</span>
 			{/* Who's behind it, as a hint there's more on hover; not on narrow cards. */}
 			{leaders.length > 0 && (
