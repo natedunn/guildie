@@ -203,30 +203,43 @@ export const today = query({
 	},
 });
 
-/** A character as the summary shows them: name, class color and portrait. */
+/** Leaders each stat card's hover lists (it says how many more there are). */
+const LEADERS = 4;
+/** Days one `days` call sums up at most. */
+const MAX_DAYS = 31;
+
 type Who = { slug?: string; name: string; classId?: number; avatarUrl?: string };
 
-/** How many of each list the summary sends (it says how many more there are). */
-const SUMMARY_LIST = 20;
-
 /**
- * A feed day summed up (the page's side panel), from `since` to `until`
- * (the viewer's feed day, 4am to 4am): items members sent each other (which
- * items, who sent the most), who leveled and how far, who turned in the most
- * quests, and the dungeons cleared for the first time and by whom.
+ * The feed's daily stat cards: for each day asked (`since` to `until`, the
+ * viewer's feed days, 4am to 4am), items members sent each other, levels
+ * gained and quests completed, each with its leaders (who sent, leveled or
+ * quested most) and how many players there were.
  */
-export const summary = query({
-	args: { region: vRegion, slug: v.string(), since: v.number(), until: v.number() },
-	handler: async (ctx, { region, slug, since, until }) => {
+export const days = query({
+	args: {
+		region: vRegion,
+		slug: v.string(),
+		days: v.array(v.object({ since: v.number(), until: v.number() })),
+	},
+	handler: async (ctx, args) => {
 		const guild = await ctx.db
 			.query("guilds")
-			.withIndex("by_key", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.withIndex("by_key", (q) => q.eq("flavor", "forever").eq("region", args.region).eq("slug", args.slug))
 			.unique();
 		if (!guild || !(await access(ctx, guild)).isMember) return null;
+		const ranges = args.days.slice(0, MAX_DAYS);
+		if (!ranges.length) return [];
+		const from = Math.min(...ranges.map((d) => d.since));
+		const to = Math.max(...ranges.map((d) => d.until));
 		const events = await ctx.db
 			.query("feedEvents")
-			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", since).lt("at", until))
-			.take(3000);
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", from).lt("at", to))
+			.take(5000);
+		const turnIns = await ctx.db
+			.query("questTurnIns")
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", from).lt("at", to))
+			.take(5000);
 
 		// Portraits, read once per character.
 		const avatars = new Map<string, string | undefined>();
@@ -240,128 +253,88 @@ export const summary = query({
 			}
 			return { slug: c.slug, name: c.name, classId: c.classId, avatarUrl: avatars.get(c.slug) };
 		};
+		const characters = new Map<Id<"characters">, Doc<"characters"> | null>();
 
-		// Items sent: confirmed deliveries, plus requests marked fulfilled by
-		// hand that had no confirmed delivery that day.
-		const delivered = new Set<Id<"requests">>();
-		for (const e of events) if (e.kind === "delivery" && e.requestId) delivered.add(e.requestId);
-		const sentItems = new Map<number, number>();
-		const senders = new Map<string, { who: Who; quantity: number; to: Map<string, string> }>();
-		let items = 0;
-		for (const e of events) {
-			const sent =
-				e.kind === "delivery" || (e.kind === "fulfilled" && !e.ongoing && !(e.requestId && delivered.has(e.requestId)));
-			if (!sent) continue;
-			const quantity = e.quantity ?? 1;
-			items += quantity;
-			if (e.itemId !== undefined) sentItems.set(e.itemId, (sentItems.get(e.itemId) ?? 0) + quantity);
-			const from = e.other ? await person(e.other) : e.otherName ? { name: e.otherName } : undefined;
-			if (!from) continue;
-			const key = from.slug ?? `name:${from.name}`;
-			const sender = senders.get(key) ?? { who: from, quantity: 0, to: new Map() };
-			sender.quantity += quantity;
-			sender.to.set(e.character.slug, e.character.name);
-			senders.set(key, sender);
+		const out = [];
+		for (const range of ranges) {
+			const inDay = (at: number) => at >= range.since && at < range.until;
+			const dayEvents = events.filter((e) => inDay(e.at));
+
+			// Items sent: confirmed deliveries, plus requests marked fulfilled by
+			// hand that had no confirmed delivery that day.
+			const delivered = new Set<Id<"requests">>();
+			for (const e of dayEvents) if (e.kind === "delivery" && e.requestId) delivered.add(e.requestId);
+			let items = 0;
+			const senders = new Map<string, { who: Who; quantity: number }>();
+			for (const e of dayEvents) {
+				const sent =
+					e.kind === "delivery" ||
+					(e.kind === "fulfilled" && !e.ongoing && !(e.requestId && delivered.has(e.requestId)));
+				if (!sent) continue;
+				const quantity = e.quantity ?? 1;
+				items += quantity;
+				const who = e.other ? await person(e.other) : e.otherName ? { name: e.otherName } : undefined;
+				if (!who) continue;
+				const key = who.slug ?? `name:${who.name}`;
+				const sender = senders.get(key) ?? { who, quantity: 0 };
+				sender.quantity += quantity;
+				senders.set(key, sender);
+			}
+
+			// Levels: each character's lowest "from" to highest level that day.
+			let levels = 0;
+			const leveled = new Map<string, { who: Who; from: number; to: number }>();
+			for (const e of dayEvents) {
+				if (e.kind !== "level" || e.level === undefined) continue;
+				const fromLevel = e.fromLevel ?? e.level - 1;
+				levels += Math.max(e.level - fromLevel, 0);
+				const seen = leveled.get(e.character.slug);
+				if (seen) {
+					seen.from = Math.min(seen.from, fromLevel);
+					seen.to = Math.max(seen.to, e.level);
+				} else leveled.set(e.character.slug, { who: await person(e.character), from: fromLevel, to: e.level });
+			}
+
+			// Quests: every newly completed quest (questTurnIns), by character.
+			let quests = 0;
+			const byCharacter = new Map<Id<"characters">, number>();
+			for (const t of turnIns) {
+				if (!inDay(t.at)) continue;
+				quests += t.count;
+				byCharacter.set(t.characterId, (byCharacter.get(t.characterId) ?? 0) + t.count);
+			}
+			const questers: { who: Who; count: number }[] = [];
+			for (const [id, count] of [...byCharacter].sort((a, b) => b[1] - a[1]).slice(0, LEADERS)) {
+				if (!characters.has(id)) characters.set(id, await ctx.db.get(id));
+				const c = characters.get(id);
+				if (c) questers.push({ who: await person(c), count });
+			}
+
+			out.push({
+				since: range.since,
+				items: {
+					total: items,
+					players: senders.size,
+					leaders: [...senders.values()].sort((a, b) => b.quantity - a.quantity).slice(0, LEADERS),
+				},
+				levels: {
+					total: levels,
+					players: leveled.size,
+					leaders: [...leveled.values()]
+						.sort((a, b) => b.to - b.from - (a.to - a.from) || b.to - a.to)
+						.slice(0, LEADERS),
+				},
+				quests: { total: quests, players: byCharacter.size, leaders: questers },
+			});
 		}
-		const topItems = [...sentItems].sort((a, b) => b[1] - a[1]).slice(0, 8);
-		const sentRows = await Promise.all(
-			topItems.map(async ([itemId, quantity]) => {
-				const item = await ctx.db
-					.query("items")
-					.withIndex("by_itemId", (q) => q.eq("itemId", itemId))
-					.unique();
-				return {
-					itemId,
-					quantity,
-					name: item?.name ?? `Item ${itemId}`,
-					quality: item?.quality,
-					icon: item?.icon,
-					tooltip: item?.tooltip,
-				};
-			}),
-		);
-
-		// Levels: each character's lowest "from" to highest level that day.
-		const leveled = new Map<string, { who: Who; from: number; to: number }>();
-		let levels = 0;
-		for (const e of events) {
-			if (e.kind !== "level" || e.level === undefined) continue;
-			const from = e.fromLevel ?? e.level - 1;
-			levels += Math.max(e.level - from, 0);
-			const seen = leveled.get(e.character.slug);
-			if (seen) {
-				seen.from = Math.min(seen.from, from);
-				seen.to = Math.max(seen.to, e.level);
-			} else leveled.set(e.character.slug, { who: await person(e.character), from, to: e.level });
-		}
-
-		// First clears, by dungeon.
-		const dungeons = new Map<string, Who[]>();
-		for (const e of events) {
-			if (e.kind !== "dungeon" || !e.dungeon) continue;
-			const list = dungeons.get(e.dungeon) ?? [];
-			if (!list.some((p) => p.slug === e.character.slug)) list.push(await person(e.character));
-			dungeons.set(e.dungeon, list);
-		}
-
-		// Quests: every newly completed quest (questTurnIns), by character.
-		const turnIns = await ctx.db
-			.query("questTurnIns")
-			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", since).lt("at", until))
-			.take(3000);
-		const byCharacter = new Map<Id<"characters">, number>();
-		for (const t of turnIns) byCharacter.set(t.characterId, (byCharacter.get(t.characterId) ?? 0) + t.count);
-		const questers: { who: Who; count: number }[] = [];
-		for (const [id, count] of [...byCharacter].sort((a, b) => b[1] - a[1]).slice(0, SUMMARY_LIST)) {
-			const c = await ctx.db.get(id);
-			if (c) questers.push({ who: await person(c), count });
-		}
-
-		return {
-			items,
-			levels,
-			quests: turnIns.reduce((n, t) => n + t.count, 0),
-			sent: {
-				items: sentRows,
-				/** How many different items, and how many players sent any. */
-				kinds: sentItems.size,
-				senderCount: senders.size,
-				senders: [...senders.values()]
-					.sort((a, b) => b.quantity - a.quantity)
-					.slice(0, SUMMARY_LIST)
-					.map((s) => ({
-						who: s.who,
-						quantity: s.quantity,
-						recipients: s.to.size,
-						/** The one they sent to, when only one. */
-						to: s.to.size === 1 ? [...s.to.values()][0] : undefined,
-					})),
-			},
-			leveled: {
-				count: leveled.size,
-				list: [...leveled.values()]
-					.sort((a, b) => b.to - b.from - (a.to - a.from) || b.to - a.to)
-					.slice(0, SUMMARY_LIST),
-			},
-			questers: { count: byCharacter.size, list: questers },
-			dungeons: [...dungeons]
-				.map(([key, people]) => ({ key, people }))
-				.sort((a, b) => b.people.length - a.people.length),
-		};
+		return out;
 	},
 });
 
 /** The newest events, with what the page shows: avatars, item names and icons, quest titles. */
 export const list = query({
-	args: {
-		region: vRegion,
-		slug: v.string(),
-		limit: v.optional(v.number()),
-		/** One feed day only (the page's day picker): its start and end. */
-		since: v.optional(v.number()),
-		until: v.optional(v.number()),
-	},
-	handler: async (ctx, { region, slug, limit, since, until }) => {
+	args: { region: vRegion, slug: v.string(), limit: v.optional(v.number()) },
+	handler: async (ctx, { region, slug, limit }) => {
 		const guild = await ctx.db
 			.query("guilds")
 			.withIndex("by_key", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
@@ -371,12 +344,7 @@ export const list = query({
 		const take = Math.min(Math.max(limit ?? 100, 1), 300);
 		const events = await ctx.db
 			.query("feedEvents")
-			.withIndex("by_guild", (q) => {
-				const guildOnly = q.eq("guildId", guild._id);
-				if (since === undefined) return guildOnly;
-				const from = guildOnly.gte("at", since);
-				return until === undefined ? from : from.lt("at", until);
-			})
+			.withIndex("by_guild", (q) => q.eq("guildId", guild._id))
 			.order("desc")
 			.take(take + 1);
 		const more = events.length > take;

@@ -5,10 +5,7 @@ import { REACTION_ICON, REACTION_LABEL, REACTIONS, type Reaction } from "@convex
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import {
-	ArrowLeft01Icon,
-	ArrowRight01Icon,
 	ArrowUpDoubleIcon,
-	Calendar03Icon,
 	Castle01Icon,
 	DeliveryBox01Icon,
 	FavouriteIcon,
@@ -27,23 +24,16 @@ import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { CharacterAvatar } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
-import { FeedSummary } from "@/components/feed-summary";
+import { DayStats } from "@/components/feed-day-stats";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { addDays, feedDayFromKey, feedDayKey, feedDayLabel, feedDayStart, feedDaysAgo } from "@/lib/feed-day";
+import { addDays, feedDayLabel, feedDayStart } from "@/lib/feed-day";
 import { cn } from "@/lib/utils";
 
 // Feed: what the guild's members did, newest first, by day: level-ups,
 // first dungeon clears, dungeon quests turned in, and requests made,
-// claimed and fulfilled (convex/feed.ts). Filters (kind, day) live in the URL;
-// the member search doesn't.
+// claimed and fulfilled (convex/feed.ts). The kind filter lives in the URL;
+// the member search (rows naming a character, either side) doesn't.
 // Days only, never times: Blizzard tells us hours late. A day runs from 4am
 // (lib/feed-day.ts), so a late night counts with its evening. Within a day, alike
 // events share a row: everyone who cleared a dungeon, everyone who turned in
@@ -51,13 +41,11 @@ import { cn } from "@/lib/utils";
 // first merge into one).
 // Members react to rows (convex/feedReactions.ts); a grouped row's reactions
 // are its events' together, each player counted once per reaction.
-// The day picker shows the latest (every day) or one day; beside the feed
-// (above it, folded, on narrow panes) is that day's summary, today's for the
-// latest (components/feed-summary.tsx).
+// Each day opens with its stat cards: items sent, levels gained, quests
+// completed, with the leaders on hover (components/feed-day-stats.tsx).
 
 type Show = "all" | "levels" | "dungeons" | "quests" | "requests";
-/** `day`: one feed day ("2026-11-13", lib/feed-day.ts); none for the latest, every day. */
-type Search = { show?: Show; day?: string };
+type Search = { show?: Show };
 const SHOWS: Show[] = ["all", "levels", "dungeons", "quests", "requests"];
 const SHOW_LABEL: Record<Show, string> = {
 	all: "All",
@@ -73,20 +61,12 @@ const SHOW_ICON: Partial<Record<Show, typeof InboxIcon>> = {
 	requests: InboxIcon,
 };
 const PAGE = 100;
-/** How far back the day picker goes, in days. */
-const DAYS_BACK = 60;
-/** Days the day picker's menu lists (the arrows go further). */
-const MENU_DAYS = 14;
 
 export const Route = createFileRoute("/g/$region/$slug/feed")({
 	validateSearch: (search: Record<string, unknown>): Search => ({
 		...(SHOWS.includes(search.show as Show) && search.show !== "all" ? { show: search.show as Show } : {}),
-		...(typeof search.day === "string" && feedDayFromKey(search.day) !== undefined ? { day: search.day } : {}),
 	}),
-	loaderDeps: ({ search }) => ({ day: search.day }),
-	// The latest only: a day's bounds are the viewer's own time (the client asks).
-	loader: async ({ context, params, deps }) => {
-		if (deps.day) return;
+	loader: async ({ context, params }) => {
 		await context.queryClient.ensureQueryData(
 			convexQuery(api.feed.list, { region: params.region as Region, slug: params.slug, limit: PAGE }),
 		);
@@ -95,32 +75,28 @@ export const Route = createFileRoute("/g/$region/$slug/feed")({
 	component: FeedPage,
 });
 
-/** When today's feed day started; client only (the viewer's time), rolling over at 4am. */
-function useFeedToday() {
-	const [today, setToday] = useState<number>();
-	useEffect(() => {
-		const update = () => setToday(feedDayStart(Date.now()).getTime());
-		update();
-		const timer = window.setInterval(update, 60_000);
-		return () => window.clearInterval(timer);
-	}, []);
-	return today;
-}
-
 function FeedPage() {
 	const params = Route.useParams();
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const [limit, setLimit] = useState(PAGE);
 	const [who, setWho] = useState("");
-	const today = useFeedToday();
-	const dayStart = search.day ? feedDayFromKey(search.day) : undefined;
-	const range = dayStart === undefined ? {} : { since: dayStart, until: addDays(dayStart, 1) };
-	const listArgs = { region: params.region as Region, slug: params.slug, limit, ...range };
+	const listArgs = { region: params.region as Region, slug: params.slug, limit };
 	const { data } = useQuery({
 		...convexQuery(api.feed.list, listArgs),
 		placeholderData: keepPreviousData,
 	});
+	// The stat cards' days: those shown, from their events (the viewer's own
+	// 4am days, so client only: the server render has none).
+	const [clientReady, setClientReady] = useState(false);
+	useEffect(() => setClientReady(true), []);
+	const dayRanges = clientReady && data && !data.hidden ? feedDays(data.events) : [];
+	const { data: stats } = useQuery({
+		...convexQuery(api.feed.days, { region: params.region as Region, slug: params.slug, days: dayRanges }),
+		enabled: dayRanges.length > 0,
+		placeholderData: keepPreviousData,
+	});
+	const statsBySince = new Map((stats ?? []).map((d) => [d.since, d]));
 	// Reacting shows at once; the server's answer replaces it.
 	const toggle = useMutation(api.feedReactions.toggle).withOptimisticUpdate((store, { eventIds, reaction }) => {
 		const current = store.getQuery(api.feed.list, listArgs);
@@ -160,24 +136,6 @@ function FeedPage() {
 	});
 	const days = byDay(events);
 
-	// The summary's day: the picked one, or today for the latest.
-	const summaryDay = dayStart ?? today;
-	const summary = summaryDay !== undefined && (
-		<FeedSummary
-			region={params.region}
-			slug={params.slug}
-			since={summaryDay}
-			until={addDays(summaryDay, 1)}
-			label={feedDayLabel(summaryDay)}
-			date={
-				feedDaysAgo(summaryDay) <= 1
-					? new Date(summaryDay).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" })
-					: undefined
-			}
-		/>
-	);
-	const pickedLabel = dayStart === undefined ? undefined : feedDayLabel(dayStart);
-
 	return (
 		<div className="@container/feed pb-12">
 			<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border pb-3">
@@ -198,58 +156,34 @@ function FeedPage() {
 						);
 					})}
 				</div>
-				<div className="flex w-full items-center gap-2 @lg/feed:ml-auto @lg/feed:w-auto">
-					<DayPicker
-						day={dayStart}
-						today={today}
-						onPick={(start) => setSearch({ day: start === undefined ? undefined : feedDayKey(start) })}
-					/>
-					<Input
-						value={who}
-						onChange={(e) => setWho(e.target.value)}
-						placeholder="Find a member"
-						aria-label="Find a member"
-						className="h-[1.625rem] min-w-0 flex-1 @lg/feed:w-48 @lg/feed:flex-none"
-					/>
-				</div>
+				<Input
+					value={who}
+					onChange={(e) => setWho(e.target.value)}
+					placeholder="Find a member"
+					aria-label="Find a member"
+					className="h-[1.625rem] w-full @lg/feed:ml-auto @lg/feed:w-48"
+				/>
 			</div>
 
-			<div className="flex items-start gap-6">
-				<div className="@container max-w-3xl min-w-0 flex-1 space-y-5">
-					<div className="@[66rem]/feed:hidden">
-						{summaryDay !== undefined && (
-							<FeedSummary
-								folded
-								region={params.region}
-								slug={params.slug}
-								since={summaryDay}
-								until={addDays(summaryDay, 1)}
-								label={feedDayLabel(summaryDay)}
-							/>
-						)}
-					</div>
-
-					{days.length === 0 ? (
-						<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
-							{query
-								? "Nobody by that name here."
-								: pickedLabel === "Today"
-									? "Nothing yet today."
-									: pickedLabel === "Yesterday"
-										? "Nothing happened yesterday."
-										: pickedLabel
-											? `Nothing happened on ${pickedLabel}.`
-											: "Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen."}
-						</p>
-					) : (
-						days.map(([day, list]) => (
-							<section key={day}>
+			<div className="@container max-w-3xl space-y-5">
+				{days.length === 0 ? (
+					<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
+						{query
+							? "Nobody by that name here."
+							: "Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen."}
+					</p>
+				) : (
+					days.map((day) => {
+						const dayStats = statsBySince.get(day.start);
+						return (
+							<section key={day.start}>
 								{/* Over the cards' hairlines (z-index 2) as they scroll under it. */}
 								<h2 className="sticky top-0 z-10 bg-background py-1.5 text-xs font-medium text-muted-foreground">
-									{day}
+									{day.label}
 								</h2>
+								{dayStats && <DayStats day={dayStats} label={day.label} />}
 								<ul className="surface-card divide-y divide-border overflow-hidden">
-									{groupDay(list).map((row) => (
+									{groupDay(day.events).map((row) => (
 										<EventRow
 											key={row.id}
 											row={row}
@@ -258,85 +192,20 @@ function FeedPage() {
 									))}
 								</ul>
 							</section>
-						))
-					)}
+						);
+					})
+				)}
 
-					{data.more && (
-						<button
-							type="button"
-							onClick={() => setLimit((n) => n + PAGE)}
-							className="w-full rounded-md py-2 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-						>
-							Show older
-						</button>
-					)}
-				</div>
-				<aside className="sticky top-0 hidden w-[300px] flex-none @[66rem]/feed:block">{summary}</aside>
+				{data.more && (
+					<button
+						type="button"
+						onClick={() => setLimit((n) => n + PAGE)}
+						className="w-full rounded-md py-2 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+					>
+						Show older
+					</button>
+				)}
 			</div>
-		</div>
-	);
-}
-
-/**
- * The feed's day: "Latest" (every day, newest first) or one day. The back
- * arrow goes from the latest to yesterday (the latest starts with today),
- * then a day at a time; forward returns to the latest after yesterday. The
- * label opens a menu of the last two weeks.
- */
-function DayPicker({
-	day,
-	today,
-	onPick,
-}: {
-	/** The picked day's start; undefined for the latest. */
-	day: number | undefined;
-	today: number | undefined;
-	onPick: (start: number | undefined) => void;
-}) {
-	const ago = day === undefined || today === undefined ? undefined : feedDaysAgo(day, today);
-	const pickAgo = (n: number | undefined) =>
-		onPick(n === undefined || today === undefined ? undefined : addDays(today, -n));
-	const step = "chip w-[1.625rem] justify-center px-0 disabled:pointer-events-none disabled:opacity-35";
-	return (
-		<div className="flex flex-none items-center gap-1">
-			<button
-				type="button"
-				aria-label="Day before"
-				className={step}
-				disabled={today === undefined || (ago ?? 0) >= DAYS_BACK}
-				onClick={() => pickAgo(ago === undefined ? 1 : ago + 1)}
-			>
-				<HugeiconsIcon icon={ArrowLeft01Icon} size={14} strokeWidth={2} />
-			</button>
-			<DropdownMenu>
-				<DropdownMenuTrigger className="chip min-w-[5.5rem] justify-center" data-active={day !== undefined}>
-					<HugeiconsIcon icon={Calendar03Icon} size={13} strokeWidth={2} className="opacity-80" />
-					{day === undefined
-						? "Latest"
-						: ago !== undefined && ago <= 1
-							? feedDayLabel(day)
-							: new Date(day).toLocaleDateString([], { month: "short", day: "numeric" })}
-				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" className="w-52">
-					<DropdownMenuItem onClick={() => pickAgo(undefined)}>Latest</DropdownMenuItem>
-					<DropdownMenuSeparator />
-					{today !== undefined &&
-						Array.from({ length: MENU_DAYS }, (_, n) => (
-							<DropdownMenuItem key={n} onClick={() => pickAgo(n)} className={cn(ago === n && "text-highlight")}>
-								{feedDayLabel(addDays(today, -n), today)}
-							</DropdownMenuItem>
-						))}
-				</DropdownMenuContent>
-			</DropdownMenu>
-			<button
-				type="button"
-				aria-label="Day after"
-				className={step}
-				disabled={ago === undefined}
-				onClick={() => pickAgo(ago === undefined || ago <= 1 ? undefined : ago - 1)}
-			>
-				<HugeiconsIcon icon={ArrowRight01Icon} size={14} strokeWidth={2} />
-			</button>
 		</div>
 	);
 }
@@ -344,17 +213,28 @@ function DayPicker({
 type FeedData = Extract<NonNullable<FunctionReturnType<typeof api.feed.list>>, { hidden: false }>;
 type Event = FeedData["events"][number];
 
-/** "Today", "Yesterday", then "Monday, Nov 3"; days start at 4am. */
-function byDay(events: Event[]): [string, Event[]][] {
-	const out: [string, Event[]][] = [];
+/** Days the stat cards sum up at most (convex/feed.ts days). */
+const STAT_DAYS = 31;
+
+type Day = { label: string; start: number; events: Event[] };
+
+/** Events by feed day, newest first: "Today", "Yesterday", then "Monday, Nov 3"; days start at 4am. */
+function byDay(events: Event[]): Day[] {
+	const out: Day[] = [];
 	const now = Date.now();
 	for (const e of events) {
-		const label = feedDayLabel(feedDayStart(e.at).getTime(), now);
+		const start = feedDayStart(e.at).getTime();
 		const last = out.at(-1);
-		if (last && last[0] === label) last[1].push(e);
-		else out.push([label, [e]]);
+		if (last && last.start === start) last.events.push(e);
+		else out.push({ label: feedDayLabel(start, now), start, events: [e] });
 	}
 	return out;
+}
+
+/** The feed days `events` fall on, as ranges for the stat cards (newest first). */
+function feedDays(events: Event[]) {
+	const starts = [...new Set(events.map((e) => feedDayStart(e.at).getTime()))].slice(0, STAT_DAYS);
+	return starts.map((since) => ({ since, until: addDays(since, 1) }));
 }
 
 type Person = Event["character"];

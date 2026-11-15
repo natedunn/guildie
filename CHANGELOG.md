@@ -17,13 +17,12 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### New
 
-- **Guildie:** The Feed sums up the day beside it: items members sent each other and who sent the most, who leveled and how far, who completed the most quests, and the dungeons cleared for the first time and by whom. On phones it sits above the feed, folded until you open Details. Quests count once Blizzard's data catches up, after you log out.
-- **Guildie:** Look back at any day on the Feed: the new day picker shows just that day and its summary. Latest goes back to everything, newest first.
+- **Guildie:** Each day on the Feed opens with three cards: items members sent each other, levels gained and quests completed. Hover one (tap, on phones) to see who led. Quests count once Blizzard's data catches up, after you log out.
 - **Guildie:** A Thank you reaction on the Feed: praying hands.
 
 ### Improvements
 
-- **Guildie:** The Feed's filters are chips now, with a day picker and a search to find a member's activity.
+- **Guildie:** The Feed's filters are chips now, with a search to find a member's activity.
 - **Guildie:** Crafting's Upgrades shows all your characters at once, a card each, with a lit marker on every row for an upgrade, a possible upgrade or an empty slot (hover it for what it means), column headings, and a switch between Crafts for me and Crafts for others. Pick one character from the menu to see just theirs. Remove now asks first and says how to get the item back (Show removed), with "Don't ask again".
 - **Guildie:** Item icons and item tooltips have a lit edge that catches the light at the top, like the rest of the app, and keep the game's quality colors and navy tooltip.
 - **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.

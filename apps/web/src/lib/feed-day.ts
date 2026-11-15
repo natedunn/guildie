@@ -24,20 +24,6 @@ export function addDays(at: number, days: number): number {
 	return d.getTime();
 }
 
-/** A feed day in the URL: its local date, "2026-11-13". */
-export function feedDayKey(start: number): string {
-	const d = new Date(start);
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** When the feed day in the URL starts (4am local), or undefined for a malformed one. */
-export function feedDayFromKey(key: string): number | undefined {
-	const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-	if (!m) return undefined;
-	const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), FEED_DAY_START_HOUR);
-	return Number.isNaN(d.getTime()) ? undefined : d.getTime();
-}
-
 /** "Today", "Yesterday", then "Monday, Nov 3". */
 export function feedDayLabel(start: number, now = Date.now()): string {
 	const ago = feedDaysAgo(start, now);
