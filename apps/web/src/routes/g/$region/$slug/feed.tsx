@@ -493,7 +493,7 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 			<div className="min-w-0 flex-1 text-base leading-snug">
 				<div>{text}</div>
 				{/* The kind's icon leads the grey line (on the portraits it would cover a group). */}
-				<div className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+				<div className="-mt-px flex items-center gap-1.5 text-sm leading-tight text-muted-foreground">
 					<HugeiconsIcon
 						icon={KIND_ICON[e.kind]}
 						size={14}
