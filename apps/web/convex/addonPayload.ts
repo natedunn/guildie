@@ -166,7 +166,7 @@ export type Delivery = {
 	requestId: string;
 	/**
 	 * enchantReceived: a trade that put the requested enchant on the requester's item (addon 0.21.0).
-	 * mailReturned: the sender collected their own mail back, unopened (`other` is who it was for).
+	 * mailReturned: the sender collected their own mail back, unopened (`other` is who it was for; addon 0.22.0).
 	 */
 	kind: "mailSent" | "mailReceived" | "mailReturned" | "tradeSent" | "tradeReceived" | "enchantReceived";
 	other: string;
