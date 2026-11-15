@@ -21,6 +21,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Guildie:** Guildie shows its own icon and description on the Addons page, with a link to set it up.
 - **Guildie:** The roster hides characters under level 10 by default and says how many next to Filter; turn on "Show under level 10" to see them.
 
 ### Fixes
@@ -60,7 +61,6 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Guildie:** Guildie shows its own icon and description on the Addons page, with a link to set it up.
 - **Guildie:** More addons on the Addons page get their CurseForge icon, description and categories, including Auctionator, Baganator, RareScanner and Dialogue UI, even when the addon itself doesn't say which CurseForge project it is. Descriptions that were cut off now end with "…".
 
 ### Fixes
