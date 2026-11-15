@@ -110,14 +110,19 @@ export const get = query({
 			),
 		);
 		const prefs = await Promise.all(claimed.map((claim) => preferencesOf(ctx, claim)));
-		const tags = new Map<Id<"users">, string | undefined>();
-		if (isMember) {
-			for (const claim of claimed) {
-				if (!claim || tags.has(claim.userId)) continue;
-				const user = await ctx.db.get(claim.userId);
-				tags.set(claim.userId, user && !user.hideBattletag ? user.battletag : undefined);
-			}
+		// The players who claimed them: BattleTags (members only) and mains.
+		const players = new Map<Id<"users">, Doc<"users"> | null>();
+		for (const claim of claimed) {
+			if (claim && !players.has(claim.userId)) players.set(claim.userId, await ctx.db.get(claim.userId));
 		}
+		const battletagOf = (userId: Id<"users">) => {
+			const user = players.get(userId);
+			return isMember && user && !user.hideBattletag ? user.battletag : undefined;
+		};
+		const isMain = (c: Doc<"characters">, claim: Doc<"ownedCharacters"> | null) => {
+			const main = claim ? players.get(claim.userId)?.mainCharacter : undefined;
+			return !!main && main.region === c.region && main.slug === c.slug;
+		};
 		return {
 			guild,
 			hidden: false as const,
@@ -153,7 +158,9 @@ export const get = query({
 				// in this guild, unless that was its first roster sync (everyone).
 				joinedAt: c._creationTime > guild._creationTime + JOINED_AFTER_MS ? c._creationTime : undefined,
 				claimed: claimed[i] !== null,
-				battletag: claimed[i] ? tags.get(claimed[i].userId) : undefined,
+				battletag: claimed[i] ? battletagOf(claimed[i].userId) : undefined,
+				/** The player marked it as their main (Account page). */
+				main: isMain(c, claimed[i]),
 				statPriority: statPriority(c.classId, profiles[i].talentTrees, prefs[i].statPriority),
 				// The armor and weapon types the player chose, if any (the roster's Gear view).
 				gearPreference: prefs[i].gearPreference,

@@ -1,12 +1,15 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { vBattlenetProfile } from "./authBattlenet";
 import { guildsOf } from "./guilds";
 import { pickProfile } from "./helper";
 import { isLocalBackend } from "./origins";
+import { preferencesOf, updatePreferences } from "./preferences";
 import { claimSampleCharacter } from "./sample";
+import { vRegion } from "./schema";
+import { inSidebar } from "./shared/characters";
 
 export async function requireUserId(ctx: QueryCtx | MutationCtx) {
 	const userId = await getAuthUserId(ctx);
@@ -122,12 +125,16 @@ export const viewer = query({
 					.first();
 				// The level as the rest of the site shows it: the game's when newer.
 				const level = row ? (await pickProfile(ctx, row)).level : c.level;
+				const { sidebar } = await preferencesOf(ctx, c);
 				return {
 					...c,
 					surname: row?.surname,
 					avatarUrl: row?.avatarUrl,
 					level,
 					classId: row?.classId ?? c.classId,
+					/** In the sidebar: the player's pin, else from level 5. */
+					inSidebar: inSidebar(level, sidebar),
+					isMain: user.mainCharacter?.region === c.region && user.mainCharacter.slug === c.slug,
 				};
 			}),
 		);
@@ -144,6 +151,39 @@ export const viewer = query({
 			visibility: g.visibility,
 		}));
 		return { ...user, characters, guilds };
+	},
+});
+
+/** One of the viewer's claimed characters, or a user-facing error. */
+async function myClaim(ctx: MutationCtx, userId: Id<"users">, region: Doc<"ownedCharacters">["region"], slug: string) {
+	const claim = (
+		await ctx.db
+			.query("ownedCharacters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.collect()
+	).find((c) => c.userId === userId);
+	if (!claim) throw new ConvexError("That isn't one of your characters.");
+	return claim;
+}
+
+/** Account page: pin a character to my sidebar, or take it out. */
+export const setInSidebar = mutation({
+	args: { region: vRegion, slug: v.string(), shown: v.boolean() },
+	handler: async (ctx, { region, slug, shown }) => {
+		const userId = await requireUserId(ctx);
+		await updatePreferences(ctx, await myClaim(ctx, userId, region, slug), { sidebar: shown });
+	},
+});
+
+/** Account page: mark one of my characters as my main, or (null) none. */
+export const setMain = mutation({
+	args: { character: v.union(v.object({ region: vRegion, slug: v.string() }), v.null()) },
+	handler: async (ctx, { character }) => {
+		const userId = await requireUserId(ctx);
+		if (character) await myClaim(ctx, userId, character.region, character.slug);
+		await ctx.db.patch(userId, {
+			mainCharacter: character ? { region: character.region, slug: character.slug } : undefined,
+		});
 	},
 });
 

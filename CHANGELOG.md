@@ -15,6 +15,14 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### New
+
+- **Guildie:** Pick your main under Settings → Account, and the roster marks it. Pin any of your characters to the sidebar from the same list; characters under level 5 stay out of it unless you pin them, with a View all link to the rest.
+
+### Improvements
+
+- **Guildie:** The roster hides characters under level 10 by default and says how many next to Filter; turn on "Show under level 10" to see them.
+
 ## 0.3.38
 
 ### Fixes
