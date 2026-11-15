@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie, Addon:** Fishing no longer throws off gear upgrades. While a fishing pole is in your main hand (and a fishing addon has swapped or taken off other gear), tooltips, your profile and guildmates' suggestions keep comparing with the gear you wore before you started fishing.
+
 ## 0.3.38
 
 ### Fixes

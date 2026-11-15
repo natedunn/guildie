@@ -290,6 +290,13 @@ your last login or reload.
   you wear. It shows for items that can't be traded too (quest rewards,
   loot rolls), where guildmates' rows don't. Setting: "Show whether items are
   an upgrade for you" (`showForYou`, on by default).
+- Fishing: with a fishing pole in the main hand (item class 2, subclass 20)
+  the addon doesn't score what you wear: fishing addons swap in the pole and
+  often take off or swap other gear. Your row compares with the last gear
+  read without the pole this session, else the site's profile. The site
+  does the same for uploads and Blizzard's profile: gear with a pole in the
+  main hand doesn't replace gear without one (`apps/web/convex/shared/fishing.ts`),
+  so guildmates' rows and the profile keep your build.
 - Dialogue UI (experimental, addon 0.19.0): the Dialogue UI addon draws its
   own quest-window tooltips, which the game's tooltip hooks don't reach. When
   it's installed, the addon registers with its public API
