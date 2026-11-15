@@ -1209,7 +1209,9 @@ export async function recordDeliveries(
 		const progress = deliveryProgress(r, event, participants.sender);
 		const patch: Partial<Doc<"requests">> = { ...progress, lastActivityAt: Math.max(r.lastActivityAt, event.at) };
 		if (event.kind.endsWith("Sent") && r.claim) patch.claim = { ...r.claim, sentAt: r.claim.sentAt ?? event.at };
-		if (progress.status === "done") patch.closedAt = Date.now();
+		if (progress.status === "done" && r.status !== "done") patch.closedAt = Date.now();
+		// Mail came back and the request is short again.
+		if (progress.status !== "done" && r.status === "done") patch.closedAt = undefined;
 		await ctx.db.patch(r._id, patch);
 		if (progress.status === "done" && r.status !== "done") await notifyRequester(ctx, r, "requestDone");
 		if (participants.received) {

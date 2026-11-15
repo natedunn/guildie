@@ -135,7 +135,47 @@ local function report(kind, other, items, match)
     GuildieDB.deliveryOutbox[c.guid] = records
     ns.reconcileDeliveries(c)
 end
+-- What this character mailed for requests (31 days, the game returns unopened
+-- mail after 30), kept apart from the outbox so a send already settled can
+-- still be taken back when its mail comes back.
+local function sentLog(guid)
+    GuildieDB.sentLog = GuildieDB.sentLog or {}
+    local log, kept = GuildieDB.sentLog[guid] or {}, {}
+    local oldest = GetServerTime() - MAX_AGE
+    for _, e in ipairs(log) do
+        if (e.at or 0) >= oldest and (e.left or 0) > 0 then kept[#kept + 1] = e end
+    end
+    while #kept > MAX_RECORDS do table.remove(kept, 1) end
+    GuildieDB.sentLog[guid] = kept
+    return kept
+end
+local function requestRow(id, requestId)
+    for _, r in ipairs(GuildieData and GuildieData.requests and GuildieData.requests[id] or {}) do
+        if r.requestId == requestId then return r end
+    end
+end
+-- Mail back from the requester, unopened: the newest send of this item to
+-- them that hasn't come back yet (Open All may split it across takes).
+local function returnedFor(id, quantity, other)
+    local log = sentLog(UnitGUID("player"))
+    for i = #log, 1, -1 do
+        local e = log[i]
+        if e.itemId == id and sameCharacter(other, e.name, e.slug) then
+            e.left = math.max(0, (e.left or 0) - quantity)
+            return e.requestId
+        end
+    end
+end
 local function record(kind, other, items)
+    if kind == "mailReturned" then
+        report(kind, other, items, function(id, quantity)
+            local requestId = returnedFor(id, quantity, other)
+            trace(true, kind, "item", id, "x" .. quantity, "back from", other,
+                requestId and ("-> request " .. requestId) or "-> no send of it to them on record")
+            return requestId
+        end)
+        return
+    end
     local received = kind == "mailReceived" or kind == "tradeReceived"
     report(kind, other, items, function(id, quantity, me)
         local recipient, sender = received and me or other, received and other or me
@@ -146,6 +186,11 @@ local function record(kind, other, items)
             requestId and ("-> request " .. requestId)
                 or craftId and ("-> craft " .. craftId .. " (" .. what .. ")")
                 or ("-> no match (" .. requests .. " requests for this item, " .. matches .. " matched; no craft)"))
+        if requestId and kind == "mailSent" then
+            local r, log = requestRow(id, requestId) or {}, sentLog(UnitGUID("player"))
+            log[#log + 1] = {requestId = requestId, itemId = id, left = quantity, at = GetServerTime(),
+                name = r.name or other, slug = r.slug}
+        end
         return requestId or craftId
     end)
 end
@@ -188,24 +233,26 @@ local function refreshInbox()
     local count = GetInboxNumItems()
     for i = 1, count do
         local _, _, sender, _, _, cod, _, _, _, wasReturned, _, canReply, isGM = GetInboxHeaderInfo(i)
-        -- Player mail only; returned items and COD are not ordinary fulfillment.
-        if sender and not wasReturned and canReply and not isGM and (cod or 0) == 0 then
+        -- Player mail only, no COD. Returned mail is this character's own
+        -- send coming back (`sender` is who it was for): it takes the send back.
+        if sender and (wasReturned or canReply) and not isGM and (cod or 0) == 0 then
             local slots = {}
             for slot = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
                 local _, id, _, quantity = GetInboxItem(i, slot)
                 if id and quantity then slots[slot] = {id = id, quantity = quantity} end
             end
-            inbox[i] = {sender = sender, slots = slots}
+            inbox[i] = {sender = sender, slots = slots, returned = wasReturned and true or false}
         end
     end
 end
 -- How many of an item mail from this sender in the inbox holds now (live,
--- so it holds up when mail is removed and the indexes shift).
-local function inboxCount(sender, id)
+-- so it holds up when mail is removed and the indexes shift); returned mail
+-- and ordinary mail are counted apart.
+local function inboxCount(sender, id, returned)
     local total = 0
     for i = 1, GetInboxNumItems() do
-        local _, _, from = GetInboxHeaderInfo(i)
-        if from == sender then
+        local _, _, from, _, _, _, _, _, _, wasReturned = GetInboxHeaderInfo(i)
+        if from == sender and (wasReturned and true or false) == returned then
             for slot = 1, (ATTACHMENTS_MAX_RECEIVE or 16) do
                 local _, itemId, _, quantity = GetInboxItem(i, slot)
                 if itemId == id and quantity then total = total + quantity end
@@ -226,7 +273,8 @@ local function prepareTake(index, slot)
     end
     pendingTake = nil
     local mail = inbox[index]
-    trace(false, "take", index, slot, "sender", mail and mail.sender or "(not player mail, COD or returned)")
+    trace(false, "take", index, slot, "sender", mail and mail.sender or "(not player mail, or COD)",
+        mail and mail.returned and "(returned)" or "")
     if not mail then return end
     local items, before, inboxBefore = {}, {}, {}
     for n, entry in pairs(mail.slots) do
@@ -235,10 +283,11 @@ local function prepareTake(index, slot)
     for id in pairs(items) do
         before[id] = bagCount(id)
         if before[id] == nil then trace(true, "take", "-> no bag count API"); return end
-        inboxBefore[id] = inboxCount(mail.sender, id)
+        inboxBefore[id] = inboxCount(mail.sender, id, mail.returned)
         trace(false, "take", "item", id, "x" .. items[id], "bags before", before[id], "inbox before", inboxBefore[id])
     end
-    pendingTake = {sender = mail.sender, items = items, before = before, inboxBefore = inboxBefore, started = GetTime()}
+    pendingTake = {sender = mail.sender, returned = mail.returned, items = items, before = before,
+        inboxBefore = inboxBefore, started = GetTime()}
 end
 -- Forever's MAIL_SUCCESS carries no item ID, so a collection counts when both
 -- sides show it: the items left this sender's mail and arrived in the bags,
@@ -248,10 +297,10 @@ finishTake = function()
     if not p or p.ambiguous then return end
     if GetTime() - p.started > 30 then pendingTake = nil; return end
     for id, quantity in pairs(p.items) do
-        local count, left = bagCount(id), p.inboxBefore[id] - inboxCount(p.sender, id)
+        local count, left = bagCount(id), p.inboxBefore[id] - inboxCount(p.sender, id, p.returned)
         trace(false, "collect", "item", id, "left inbox", left, "bags now", count)
         if left >= quantity and count and count - p.before[id] >= quantity then
-            record("mailReceived", p.sender, {[id] = quantity})
+            record(p.returned and "mailReturned" or "mailReceived", p.sender, {[id] = quantity})
             p.items[id] = nil
         end
     end

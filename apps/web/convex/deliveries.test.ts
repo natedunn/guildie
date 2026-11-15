@@ -296,3 +296,42 @@ test("mats progress: one transfer seen from both sides counts once", () => {
 	);
 	assert.deepEqual(sent, [{ itemId: 4306, quantity: 4 }], "adds per reagent");
 });
+
+test("mail that comes back unopened takes the send back, and reopens a request the sends closed", () => {
+	const todd = { name: "Todd", slug: "todd-bonzalezz" };
+	const open = { ...request, status: "open", claim: undefined };
+	let state = { ...open, ...deliveryProgress(open, { kind: "mailSent", quantity: 20 }, todd) };
+	assert.equal(state.status, "done");
+	assert.equal(state.doneByDeliveries, true);
+	// The requester took 4 of it before the rest came back.
+	state = { ...state, ...deliveryProgress(state, { kind: "mailReceived", quantity: 4 }, { name: "Todd" }) };
+	state = { ...state, ...deliveryProgress(state, { kind: "mailReturned", quantity: 16 }, todd) };
+	assert.equal(state.deliveredQuantity, 4);
+	assert.equal(state.sentQuantity, 4);
+	assert.equal(state.status, "open", "reopened");
+	assert.equal(state.doneByDeliveries, undefined);
+	assert.equal(remainingQuantity(state), 16);
+	// More back than was counted (a send from before tallies): never below zero.
+	assert.equal(deliveryProgress(open, { kind: "mailReturned", quantity: 5 }, todd).deliveredQuantity, 0);
+	// Marked done by the requester: a return doesn't reopen it.
+	const marked = { ...open, status: "done" };
+	assert.equal(deliveryProgress(marked, { kind: "mailReturned", quantity: 5 }, todd).status, "done");
+});
+
+test("which returns count", () => {
+	const toddReporter = { ...sender, slug: "todd-bonzalezz", name: "Todd" };
+	const open = { ...request, status: "open", claim: undefined };
+	const back = { ...event, kind: "mailReturned", other: "Receiver-Last" };
+	assert.deepEqual(deliveryOutcome(open, back, toddReporter, now), { use: "returned" });
+	assert.deepEqual(deliveryOutcome({ ...open, status: "done" }, back, toddReporter, now), { use: "returned" });
+	assert.deepEqual(deliveryOutcome({ ...open, status: "cancelled" }, back, toddReporter, now), {
+		rejected: "request closed",
+	});
+	assert.deepEqual(deliveryOutcome(open, { ...back, other: "Someone" }, toddReporter, now), {
+		rejected: "not to the requester",
+	});
+	assert.deepEqual(deliveryOutcome(open, { ...back, itemId: 1 }, toddReporter, now), { rejected: "different item" });
+	assert.deepEqual(deliveryOutcome(open, back, receiver, now), { rejected: "not to the requester" });
+	const c = { guid: "Player-1", name: "Todd", talents: [], capturedAt: now / 1000 };
+	assert(parseCharacter({ ...c, deliveries: [{ ...back, at: now / 1000 }] }, now).ok);
+});

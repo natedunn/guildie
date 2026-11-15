@@ -136,10 +136,13 @@ failures and older payloads. This does not establish Forever API support.
 ## Request delivery acceptance (payload 6; not yet verified in Forever)
 
 This builds on the retained quest backlog. Only ordinary **item** requests are
-tracked; crafted item requests, enchant services, COD, returned mail, and ambiguous
-matches retain the manual workflow. The receiver's report alone counts toward
-completion. A sender report only marks a claimed request sent and records a
-separate sent total. Ongoing requests record receipts without closing.
+tracked; crafted item requests, enchant services, COD and ambiguous matches
+retain the manual workflow. Both sides count: per sender, the request counts the
+larger of what they reported sending and what the requester reported receiving
+from them, so one delivery seen from both sides counts once. Mail the sender
+collects back unopened (`mailReturned`) takes their send back and reopens a
+request the sends had closed (not one the requester marked done). Ongoing
+requests record deliveries without closing.
 
 The addon must have the request in its downloaded GuildieData before the action.
 It binds the event to that request ID. Names: Blizzard's `name` for a Forever
@@ -204,12 +207,13 @@ PC test, using a matching backend/app and both players' updated addons:
    Open the receiver's mailbox without collecting: received stays 0. Collect and
    sync: received becomes 7/20. Repeat uploads/reloads: still 7/20.
 3. Trade the remaining 13. Both click accept, complete and sync: request closes
-   at 20/20. Upload both clients in both orders; sent reports never add receipts.
+   at 20/20. Upload both clients in both orders; a send and its receipt count once.
 4. Repeat with pixel export disabled and reload/logout uploads, and with the
    square covered during delivery then uncovered. Stop/restart the companion.
 5. Cancel/decline a trade, change its offered items, fail mail collection with
-   full bags, send COD, return mail, and collect returned mail. None should count
-   as fulfillment. Test individual attachments and the default/custom open-all
+   full bags, and send COD. None should count as fulfillment. Return a mail
+   unopened and collect it as the sender: the send no longer counts, and a
+   request it had closed reopens. Test individual attachments and the default/custom open-all
    actions. Overlapping/uncorrelated collection operations intentionally fail
    closed and may need manual completion.
 6. Test multiple stacks, partial collections, another character, multiple

@@ -686,8 +686,13 @@ Google/Apple" can't run in an embedded browser. Instead:
 ### Request delivery records (payload 6)
 
 Optional character `deliveries` is an array of at most 200 records: `id`,
-`requestId`, `kind` (`mailSent`, `mailReceived`, `tradeSent`, `tradeReceived`),
-`other` (the other character's name as the game showed it), `itemId`, `quantity`, and `at` (game time seconds).
+`requestId`, `kind` (`mailSent`, `mailReceived`, `tradeSent`, `tradeReceived`,
+`enchantReceived`, and `mailReturned`: the sender took their own mail back
+unopened), `other` (the other character's name as the game showed it), `itemId`,
+`quantity`, and `at` (game time seconds). The addon keeps its sends for 31 days
+(`GuildieDB.sentLog`) so a return finds the request even after the send was
+acknowledged or the request closed. The server must accept `mailReturned`
+before an addon that sends it ships: an unknown kind fails the character.
 The app accepts v6 and earlier formats. Upload ownership checks precede bounded
 internal processing; optional request progress fields and the new
 `requestDeliveryEvents` table are additive, with no migration needed. Existing

@@ -385,10 +385,11 @@ export type DeliveryRejection =
 /**
  * What a report counts toward: the requester receiving what they asked for
  * (`receipt`), a guildmate's own report of sending it to them (`sent`;
- * counts for item requests, see deliveryProgress), or a craft's mats going from the requester to the crafter, as
+ * counts for item requests, see deliveryProgress), that sender getting their
+ * mail back unopened (`returned`, takes the send back), or a craft's mats going from the requester to the crafter, as
  * either of them saw it (`matsSent`, `matsReceived`; progress is the larger).
  */
-export type DeliveryUse = "receipt" | "sent" | "matsSent" | "matsReceived";
+export type DeliveryUse = "receipt" | "sent" | "returned" | "matsSent" | "matsReceived";
 
 type Reporter = { userId: string; slug: string; name: string; guildId: string };
 
@@ -401,7 +402,9 @@ export function deliveryOutcome(
 	reagents: number[] = [],
 ): { use: DeliveryUse } | { rejected: DeliveryRejection } {
 	const no = (rejected: DeliveryRejection) => ({ rejected });
-	if (!["open", "claimed"].includes(r.status)) return no("request closed");
+	// A return can take back a send that closed the request (deliveryProgress reopens it).
+	const returned = e.kind === "mailReturned";
+	if (!["open", "claimed", ...(returned ? ["done"] : [])].includes(r.status)) return no("request closed");
 	if (r.guildId !== reporter.guildId) return no("other guild");
 	if (e.at < r.createdAt) return no("before the request");
 	if (e.at > now + 600000) return no("in the future");
@@ -411,6 +414,11 @@ export function deliveryOutcome(
 	const isRequester = r.userId === reporter.userId && r.character.slug === reporter.slug;
 	const isClaimant = !!r.claim && r.claim.userId === reporter.userId && r.claim.character.slug === reporter.slug;
 
+	if (returned) {
+		if (r.kind !== "item" || r.itemId !== e.itemId) return no("different item");
+		if (isRequester || !sameCharacter(e.other, r.character)) return no("not to the requester");
+		return { use: "returned" };
+	}
 	if (r.kind === "item") {
 		if (e.kind === "enchantReceived") return no("not an enchant");
 		if (r.itemId !== e.itemId) return no("different item");
@@ -512,19 +520,23 @@ const sameSender = (a: { name: string; slug?: string }, b: { name: string; slug?
  * Adds a counted report. Item requests count the sender's own report too, so
  * the count drops when the mail goes out; one delivery seen from both sides
  * counts once, because each sender counts as the larger of what they sent
- * and what the requester got from them. Crafts count receipts only.
+ * and what the requester got from them. Mail that comes back unopened takes
+ * the send back, and reopens a request the sends had closed. Crafts count
+ * receipts only.
  */
 export function deliveryProgress(
 	r: Pick<DeliveryRequest, "status" | "quantity" | "ongoing" | "receivedQuantity" | "sentQuantity"> & {
 		kind?: string;
 		senders?: SenderTally[];
+		claim?: unknown;
+		doneByDeliveries?: boolean;
 	},
 	e: Pick<DeliveryReport, "kind" | "quantity">,
 	from: { name: string; slug?: string } = { name: "" },
 ) {
-	const sent = e.kind.endsWith("Sent");
-	const receivedQuantity = (r.receivedQuantity ?? 0) + (e.kind.endsWith("Received") ? e.quantity : 0);
-	const sentQuantity = (r.sentQuantity ?? 0) + (sent ? e.quantity : 0);
+	const sent = e.kind.endsWith("Sent") && r.kind !== "craft";
+	const returned = e.kind === "mailReturned";
+	const received = e.kind.endsWith("Received");
 	// Receipts counted before per-sender tallies existed stay counted, from no one in particular.
 	const senders: SenderTally[] = (
 		r.senders ?? (r.receivedQuantity ? [{ name: "", sent: 0, received: r.receivedQuantity }] : [])
@@ -535,15 +547,26 @@ export function deliveryProgress(
 		senders.push(tally);
 	}
 	if (!tally.slug && from.slug) tally.slug = from.slug;
-	if (!sent) tally.received += e.quantity;
-	else if (r.kind !== "craft") tally.sent += e.quantity;
+	const before = tally.sent;
+	if (received) tally.received += e.quantity;
+	if (sent) tally.sent += e.quantity;
+	if (returned) tally.sent = Math.max(0, tally.sent - e.quantity);
 	const deliveredQuantity = senders.reduce((n, s) => n + Math.max(s.sent, s.received), 0);
+	const full = !r.ongoing && deliveredQuantity >= r.quantity;
+	const status: RequestStatus = full
+		? "done"
+		: r.status === "done" && r.doneByDeliveries
+			? r.claim
+				? "claimed"
+				: "open"
+			: (r.status as RequestStatus);
 	return {
-		receivedQuantity,
-		sentQuantity,
+		receivedQuantity: (r.receivedQuantity ?? 0) + (received ? e.quantity : 0),
+		sentQuantity: (r.sentQuantity ?? 0) + (sent ? e.quantity : 0) - (returned ? before - tally.sent : 0),
 		senders,
 		deliveredQuantity,
-		status: !r.ongoing && deliveredQuantity >= r.quantity ? ("done" as const) : (r.status as RequestStatus),
+		status,
+		doneByDeliveries: status === "done" ? (r.status === "done" ? r.doneByDeliveries : true) : undefined,
 	};
 }
 
