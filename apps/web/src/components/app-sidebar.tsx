@@ -83,9 +83,11 @@ function SidebarNav() {
 		!!viewer?.guilds.some((m) => m.region === g.region && m.slug === g.slug);
 	// The sync row's guild: the one you're looking at, else your first.
 	const syncGuild = viewer ? (current ?? viewer.guilds[0]) : undefined;
-	const characters = [...(viewer?.characters ?? [])].sort(
-		(a, b) => (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name),
-	);
+	// Low characters stay out unless pinned (Settings → Account).
+	const characters = [...(viewer?.characters ?? [])]
+		.filter((c) => c.inSidebar)
+		.sort((a, b) => (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name));
+	const hiddenCharacters = (viewer?.characters.length ?? 0) - characters.length;
 	return (
 		<nav className="flex min-h-0 flex-1 flex-col text-[0.8125rem]">
 			<div className="flex-none px-2 pt-2">
@@ -188,7 +190,7 @@ function SidebarNav() {
 					</NavSection>
 				)}
 
-				{characters.length > 0 && (
+				{(characters.length > 0 || hiddenCharacters > 0) && (
 					<NavSection title="Characters">
 						{characters.map((c) => (
 							<NavLink
@@ -205,6 +207,17 @@ function SidebarNav() {
 								{c.level ? <span className="num text-xs text-muted-foreground">lvl {c.level}</span> : null}
 							</NavLink>
 						))}
+						{hiddenCharacters > 0 && (
+							<Link
+								to="/settings"
+								hash="characters"
+								className="nav-item text-muted-foreground"
+								title="Characters under level 5 stay out unless you pin them"
+							>
+								<span className="flex-1">View all</span>
+								<span className="num text-xs">{hiddenCharacters} more</span>
+							</Link>
+						)}
 					</NavSection>
 				)}
 			</div>

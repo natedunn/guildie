@@ -123,6 +123,11 @@ export default defineSchema({
 		name: v.optional(v.string()),
 		/** Don't show my BattleTag to guildmates on the roster (Account page). */
 		hideBattletag: v.optional(v.boolean()),
+		/**
+		 * The character the player marked as their main (Account page), if
+		 * any. Counts only while they still claim it; the roster marks it.
+		 */
+		mainCharacter: v.optional(v.object({ region: vRegion, slug: v.string() })),
 		/** Set when a person links Discord for notifications (not built yet). */
 		discordId: v.optional(v.string()),
 	}).index("by_battlenetId", ["battlenetId"]),
@@ -268,6 +273,12 @@ export default defineSchema({
 		 * again, on the site or in anyone's addon tooltips.
 		 */
 		dismissedItems: v.optional(v.array(v.number())),
+		/**
+		 * Shown in the player's sidebar (true) or not (false), if they chose
+		 * with the pin on the Account page. Unset: shown from level 5
+		 * (shared/characters.ts).
+		 */
+		sidebar: v.optional(v.boolean()),
 		updatedAt: v.number(),
 	}).index("by_user_slug", ["userId", "flavor", "region", "slug"]),
 

@@ -5,13 +5,16 @@ import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/
 
 /**
  * What a player chose for one of their characters: stat priority, preferred
- * gear types, items removed from its suggestions. Kept in its own table
+ * gear types, items removed from its suggestions, whether it's in the sidebar. Kept in its own table
  * (characterPreferences), apart from the claim: a claim is what Battle.net
  * says the player owns and gets rewritten on every sign-in, preferences are
  * the player's and only they change them. Nothing else may delete or
  * overwrite them (preferences.test.ts checks the code for it).
  */
-export type Preferences = Pick<Doc<"characterPreferences">, "statPriority" | "gearPreference" | "dismissedItems">;
+export type Preferences = Pick<
+	Doc<"characterPreferences">,
+	"statPriority" | "gearPreference" | "dismissedItems" | "sidebar"
+>;
 
 type Key = Pick<Doc<"ownedCharacters">, "userId" | "flavor" | "region" | "slug">;
 
@@ -36,7 +39,12 @@ export async function preferencesOf(
 	if (!claim) return {};
 	const row = await rowOf(ctx, claim);
 	const from = row ?? claim;
-	return { statPriority: from.statPriority, gearPreference: from.gearPreference, dismissedItems: from.dismissedItems };
+	return {
+		statPriority: from.statPriority,
+		gearPreference: from.gearPreference,
+		dismissedItems: from.dismissedItems,
+		sidebar: row?.sidebar,
+	};
 }
 
 /**

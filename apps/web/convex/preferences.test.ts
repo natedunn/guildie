@@ -13,7 +13,7 @@ const dir = new URL(".", import.meta.url).pathname;
 const files = readdirSync(dir)
 	.filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"))
 	.map((name) => ({ name, text: readFileSync(join(dir, name), "utf8") }));
-const PREFERENCE_FIELDS = /\b(statPriority|gearPreference|dismissedItems)\b/;
+const PREFERENCE_FIELDS = /\b(statPriority|gearPreference|dismissedItems|sidebar)\b/;
 
 /** Every ctx.db write call: its method and the text up to its closing parenthesis. */
 function writes(text: string) {
