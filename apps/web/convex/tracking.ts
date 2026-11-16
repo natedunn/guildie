@@ -127,7 +127,7 @@ export async function trackedReagents(ctx: QueryCtx, userId: Id<"users">) {
 	return { crafts, reagents: [...reagents.values()] };
 }
 
-/** The player's claimed characters, once each. */
+/** The player's claimed characters, once each, without those hidden from Guildie. */
 async function ownedCharacters(ctx: QueryCtx, userId: Id<"users">): Promise<Owned[]> {
 	const owned = await ctx.db
 		.query("ownedCharacters")
@@ -139,6 +139,12 @@ async function ownedCharacters(ctx: QueryCtx, userId: Id<"users">): Promise<Owne
 		const key = `${c.region}/${c.slug}`;
 		if (seen.has(key)) continue;
 		seen.add(key);
+		const roster = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", c.region).eq("slug", c.slug))
+			.first();
+		// Hidden from Guildie by the player: its bags don't count, like on Items.
+		if (roster?.hidden) continue;
 		out.push({ name: c.name, region: c.region, slug: c.slug, classId: c.classId ?? 0 });
 	}
 	return out;
