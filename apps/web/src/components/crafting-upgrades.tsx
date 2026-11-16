@@ -14,7 +14,7 @@ import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
-import { TrackButton } from "@/components/track-button";
+import { RowActions } from "@/components/row-actions";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
@@ -58,11 +58,15 @@ const PAGE = 30;
 /** Guildmates listed under "Who's it for?" before "+N more". */
 const MATES = 2;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
-/** The table's columns: marker, item, who it's for, who crafts it, actions (a fixed width, so the heads line up). Stacked on a narrow pane. */
+/**
+ * The table's columns: marker, item, who it's for, who crafts it, actions (a
+ * fixed width, so the heads line up), with a line between each. Stacked on a
+ * narrow pane, the actions a row of buttons at the bottom.
+ */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_12rem] @2xl:gap-x-5";
-/** Cells after the item: under it on a narrow pane. */
-const CELL = "col-start-2 @2xl:col-start-auto";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_9.5rem] @2xl:gap-x-0";
+/** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
+const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:border-l @2xl:border-border/60 @2xl:px-5";
 
 /** What each marker means (the hover says the same). */
 const MARKER_HINTS: Record<MarkerKind, string> = {
@@ -347,14 +351,14 @@ export function UpgradesView({
 						<div
 							className={cn(
 								COLS,
-								"border-b border-border/60 px-4 pt-2 pb-1.5 text-xs text-muted-foreground @max-2xl:hidden",
+								"border-b border-border/60 px-4 text-xs text-muted-foreground @max-2xl:hidden *:py-2",
 							)}
 						>
 							<span />
-							<span>Item</span>
-							<span>Who's it for?</span>
-							<span>Who crafts it?</span>
-							<span />
+							<span className="@2xl:pl-3">Item</span>
+							<span className={CELL}>Who's it for?</span>
+							<span className={CELL}>Who crafts it?</span>
+							<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-4")} />
 						</div>
 						<ul className="divide-y divide-border/60">
 							{results.slice(0, limit).map((r) => (
@@ -499,16 +503,17 @@ function UpgradeRow({
 	// No Request when one of yours can make it, or when it binds to its crafter (the item's line says so).
 	const canRequest = !row.item?.untradeable && !row.crafters.some((c) => c.mine);
 	return (
-		<li className={cn(COLS, "px-4 py-3")}>
+		<li className={cn(COLS, "px-4 *:py-3 @max-2xl:*:not-first:not-[:nth-child(2)]:pt-1")}>
 			{/* Level with the item icon's top, a touch lower so it sits even with it. */}
-			{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} className="mt-0.5" /> : <span />}
+			<span className="pt-3.5">{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} /> : null}</span>
 			<RecipeItem
+				className="@2xl:pr-5 @2xl:pl-3"
 				recipe={row}
 				size={36}
 				wrap
 				detail={row.item?.untradeable ? `${row.profession} · ${row.item.untradeable}` : row.profession}
 			/>
-			<div className={cn(CELL, "min-w-0")}>
+			<div className={CELL}>
 				<CellHead>Who's it for?</CellHead>
 				{row.shown.length === 0 ? (
 					<p className="text-xs leading-5 text-muted-foreground">Not an upgrade for anyone right now</p>
@@ -518,7 +523,7 @@ function UpgradeRow({
 					<ForCell row={row} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
 				)}
 			</div>
-			<div className={cn(CELL, "min-w-0 @max-2xl:mt-1")}>
+			<div className={CELL}>
 				<CellHead>Who crafts it?</CellHead>
 				<MakersCell
 					crafters={row.crafters}
@@ -530,21 +535,16 @@ function UpgradeRow({
 					<Requested row={row} region={region} guildSlug={guildSlug} />
 				</MakersCell>
 			</div>
-			<div className={cn(CELL, "flex flex-wrap items-center gap-1 @2xl:justify-end")}>
-				{canRequest ? <CraftRequest recipe={row} member={member} /> : null}
-				{member ? <TrackButton recipeId={row.recipeId} /> : null}
-				{canRemove ? (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="text-muted-foreground"
-						title="Never suggest this for your character again, here or in the game's tooltips"
-						onClick={() => onRemove(row)}
-					>
-						Remove
-					</Button>
-				) : null}
-			</div>
+			<RowActions
+				className={cn(
+					CELL,
+					"@max-2xl:mt-2 @max-2xl:border-t @max-2xl:border-border/60 @max-2xl:pt-3! @2xl:pr-0 @2xl:pl-4",
+				)}
+				request={canRequest ? <CraftRequest recipe={row} member={member} /> : null}
+				recipeId={row.recipeId}
+				track={!!member}
+				onRemove={canRemove ? () => onRemove(row) : undefined}
+			/>
 		</li>
 	);
 }
@@ -734,6 +734,7 @@ function Requested({ row, region, guildSlug }: { row: Row; region: string; guild
 export function CraftRequest({
 	recipe,
 	member,
+	className,
 }: {
 	recipe: {
 		recipeId: number;
@@ -742,6 +743,7 @@ export function CraftRequest({
 		crafters: { name: string; slug: string; classId: number; skill?: number }[];
 	};
 	member?: Member;
+	className?: string;
 }) {
 	if (recipe.item?.untradeable) {
 		return <span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>;
@@ -753,7 +755,7 @@ export function CraftRequest({
 			characters={member.characters}
 			size="sm"
 			label="Request"
-			className="flex-none"
+			className={className}
 			target={{
 				kind: "craft",
 				recipeId: recipe.recipeId,

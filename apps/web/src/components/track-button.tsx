@@ -3,7 +3,6 @@ import { convexQuery } from "@convex-dev/react-query";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useState } from "react";
@@ -13,7 +12,7 @@ import { cn } from "@/lib/utils";
 // Track a craft (tracking.ts): its reagents go on Inventory's Tracked crafts,
 // with what you have against what you need, and on the reagents' tooltips in
 // game ("You | need 6 more"). Once tracked, the button says so and links to
-// Inventory; untrack there or with the ×.
+// Inventory; click it again (or Done on Inventory) to stop.
 
 /** The viewer's tracked crafts, recipe id -> how many. Empty when signed out. */
 export function useTracked() {
@@ -21,6 +20,10 @@ export function useTracked() {
 	return new Map((data ?? []).map((t) => [t.recipeId, t.quantity]));
 }
 
+/**
+ * "Track mats", or "✓ Tracking" once tracked (click again to stop). How many
+ * to make is set on Inventory's Tracked crafts, not here.
+ */
 export function TrackButton({
 	recipeId,
 	size = "sm",
@@ -46,44 +49,30 @@ export function TrackButton({
 			);
 	});
 	const [error, setError] = useState<string>();
-	const quantity = tracked.get(recipeId);
-	if (quantity !== undefined) {
-		return (
-			<span className={cn("inline-flex flex-none items-center", className)}>
-				<Link
-					to="/inventory"
-					className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs whitespace-nowrap text-muted-foreground hover:text-foreground"
-					title="Its reagents are on Inventory, and on their tooltips in game"
-				>
-					<HugeiconsIcon icon={Tick02Icon} size={13} strokeWidth={2.25} />
-					Tracked{quantity > 1 ? <span className="num"> ×{quantity}</span> : null}
-				</Link>
-				<button
-					type="button"
-					onClick={() => void untrack({ recipeId })}
-					className="h-7 rounded-md px-1.5 text-xs text-muted-foreground hover:text-foreground"
-					aria-label="Untrack"
-					title="Untrack"
-				>
-					×
-				</button>
-			</span>
-		);
-	}
+	const on = tracked.has(recipeId);
 	return (
 		<Button
-			variant="ghost"
+			variant="outline"
 			size={size}
-			className={cn("flex-none text-muted-foreground", className)}
-			title={error ?? "Track its reagents: what you have and what you still need, here and on tooltips in game"}
+			aria-pressed={on}
+			className={cn("gap-1.5", on ? "text-foreground" : "text-muted-foreground", className)}
+			title={
+				error ??
+				(on
+					? "You're gathering mats for this: they're on Inventory → Tracked crafts and on their tooltips in game. Click to stop tracking."
+					: "Gather mats for this: Inventory and the game's tooltips show what you have and what you still need")
+			}
 			onClick={() => {
 				setError(undefined);
-				track({ recipeId }).catch((e) =>
-					setError(e instanceof ConvexError ? String(e.data) : "Couldn't track it. Try again."),
-				);
+				if (on) void untrack({ recipeId });
+				else
+					track({ recipeId }).catch((e) =>
+						setError(e instanceof ConvexError ? String(e.data) : "Couldn't track it. Try again."),
+					);
 			}}
 		>
-			Track
+			{on ? <HugeiconsIcon icon={Tick02Icon} size={14} strokeWidth={2.25} /> : null}
+			{on ? "Tracking" : "Track mats"}
 		</Button>
 	);
 }
