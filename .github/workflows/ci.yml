@@ -41,7 +41,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r check
-      - run: pnpm -r --if-present test
+      - run: pnpm test
 
   addon:
     name: Addon (Lua)

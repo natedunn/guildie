@@ -27,10 +27,7 @@ on:
         required: false
 
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  actions: write
+  contents: read
 
 concurrency:
   group: game-data
@@ -42,6 +39,11 @@ env:
 
 jobs:
   proficiencies:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: write
     name: Armor and weapon rules
     runs-on: ubuntu-latest
     steps:
@@ -144,3 +146,27 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run ci.yml --ref "$BRANCH"
+
+  patch-triage:
+    name: Broader game update review
+    needs: proficiencies
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test triage before using write credentials
+        run: node --test scripts/game-update-triage.test.mjs
+      - name: Check official notes and report only actionable changes or failures
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROFICIENCIES_RESULT: ${{ needs.proficiencies.result }}
+        run: node scripts/game-update-triage.mjs --write

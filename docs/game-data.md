@@ -126,3 +126,9 @@ The Dungeons page (`/g/<region>/<guild>/dungeons`) reads three sources:
 Blizzard has no quest chains (prerequisites), boss loot or dungeon maps for
 Forever, and the game files don't either: "ready" counts a quest in the log
 as its chain done, and the page links to Wowhead for loot and maps.
+
+## Broader patch changes
+
+The same workflow also runs [game-update triage](game-update-watch.md) for
+potential effects outside proficiencies, with actionable review issues and a
+single failure issue. It does not replace this generator or its review gates.
