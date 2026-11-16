@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.42
+
 ### Improvements
 
 - **Guildie:** New members show up in the guild's Feed when they join (or come back), instead of a "New" tag on the roster.
