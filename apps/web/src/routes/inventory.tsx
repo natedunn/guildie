@@ -16,7 +16,6 @@ import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import { LearnerSummary } from "@/components/recipe-learners";
 import { TrackedCrafts } from "@/components/tracked-crafts";
 import { SearchInput } from "@/components/ui/search-input";
-import { Switch } from "@/components/ui/switch";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +26,13 @@ import { cn } from "@/lib/utils";
 // Two tabs. Items: by category like the game's bag addons (Baganator), or as
 // a list ("Where's my Silk Cloth?": Lich bags 37 · Isai bank 20), filtered by
 // character (all of them together by default, ?character=<slug>; old
-// /c/…/inventory links land here), bags or bank (?where=), and the reagents
-// your tracked crafts use (?tracked). Recipe items in the list say who in
+// /c/…/inventory links land here) and bags or bank (?where=). The reagents
+// your tracked crafts use are outlined in place, with have/need. Recipe items in the list say who in
 // your guilds could learn them. Tracked crafts (?tab=tracked): what you're
 // gathering for, have against need (tracked-crafts.tsx).
 
 type Where = "bags" | "bank";
-type Search = { character?: string; tab?: "tracked"; view?: "list"; where?: Where; tracked?: true };
+type Search = { character?: string; tab?: "tracked"; view?: "list"; where?: Where };
 
 export const Route = createFileRoute("/inventory")({
 	validateSearch: (search: Record<string, unknown>): Search => {
@@ -42,7 +41,6 @@ export const Route = createFileRoute("/inventory")({
 		if (search.tab === "tracked") out.tab = "tracked";
 		if (search.view === "list") out.view = "list";
 		if (search.where === "bags" || search.where === "bank") out.where = search.where;
-		if (search.tracked === true || search.tracked === "1") out.tracked = true;
 		return out;
 	},
 	beforeLoad: ({ context }) => {
@@ -107,7 +105,6 @@ function InventoryPage() {
 						data={data}
 						search={search}
 						set={set}
-						trackedIds={new Set(tracking?.reagents.map((r) => r.itemId))}
 						need={new Map(tracking?.reagents.map((r) => [r.itemId, r.need]))}
 					/>
 				)}
@@ -120,13 +117,11 @@ function Items({
 	data,
 	search,
 	set,
-	trackedIds,
 	need,
 }: {
 	data: Data;
 	search: Search;
 	set: (next: Partial<Search>) => void;
-	trackedIds: Set<number>;
 	need: Map<number, number>;
 }) {
 	const [q, setQ] = useState("");
@@ -134,12 +129,11 @@ function Items({
 	const selected = characters.find((c) => c.slug === search.character);
 	const nameOf = useMemo(() => new Map(characters.map((c) => [c.key, c])), [characters]);
 
-	// Items with the character, bags-or-bank and tracked filters applied, and the search.
-	const filter = (opts: { character?: Character; where?: Where; tracked?: boolean }) => {
+	// Items with the character and bags-or-bank filters applied, and the search.
+	const filter = (opts: { character?: Character; where?: Where }) => {
 		const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
 		const out: Item[] = [];
 		for (const item of data.items) {
-			if (opts.tracked && !trackedIds.has(item.itemId)) continue;
 			const where = item.where.filter(
 				(w) => (!opts.character || w.key === opts.character.key) && (!opts.where || w.part === opts.where),
 			);
@@ -150,7 +144,7 @@ function Items({
 		}
 		return out;
 	};
-	const current = { character: selected, where: search.where, tracked: search.tracked };
+	const current = { character: selected, where: search.where };
 	const shown = filter(current);
 	const listed = selected ? [selected] : characters;
 	const anyRead = listed.some((c) => c.bags || c.bank);
@@ -200,18 +194,9 @@ function Items({
 						{ value: "bank", label: "Bank", count: filter({ ...current, where: "bank" }).length },
 					]}
 				/>
-				{trackedIds.size ? (
-					<label
-						className="flex h-9 cursor-pointer items-center gap-2 px-1 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground"
-						title="Only the reagents your tracked crafts use"
-					>
-						<Switch checked={!!search.tracked} onCheckedChange={(on) => set({ tracked: on ? true : undefined })} />
-						Tracked reagents
-					</label>
-				) : null}
 				<ViewToggle list={list} onChange={(l) => set({ view: l ? "list" : undefined })} />
 			</div>
-			<ReadStatus characters={listed} selected={!!selected} />
+			<ReadStatus characters={listed} selected={!!selected} tracked={need.size > 0} />
 
 			{!anyRead ? (
 				<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-balance text-muted-foreground">
@@ -221,9 +206,7 @@ function Items({
 				<p className="surface-card px-5 py-10 text-center text-[0.8125rem] text-muted-foreground">
 					{q.trim()
 						? `No ${q.trim()} in ${selected ? `${selected.name}'s` : "your"} ${search.where === "bank" ? "bank" : search.where === "bags" ? "bags" : "bags or banks"}.`
-						: search.tracked
-							? "None of your tracked crafts' reagents here yet."
-							: "Empty."}
+						: "Empty."}
 				</p>
 			) : list ? (
 				<ItemList items={shown} single={!!single} nameOf={nameOf} need={need} />
@@ -244,32 +227,55 @@ function readLine(c: Character) {
 }
 
 /** When the addon last read them: one character's bags and bank, or a summary of all of them. */
-function ReadStatus({ characters, selected }: { characters: Character[]; selected: boolean }) {
-	if (selected && characters[0]) return <p className="px-1 text-xs text-muted-foreground">{readLine(characters[0])}</p>;
+function ReadStatus({
+	characters,
+	selected,
+	tracked,
+}: {
+	characters: Character[];
+	selected: boolean;
+	tracked: boolean;
+}) {
+	const key = tracked ? (
+		<span className="ml-auto inline-flex items-center gap-1.5">
+			<span className="inline-block size-2.5 rounded-[3px] ring-2 ring-highlight/80" />
+			Tracked reagents, have/need
+		</span>
+	) : null;
+	if (selected && characters[0])
+		return (
+			<p className="flex flex-wrap gap-x-3 px-1 text-xs text-muted-foreground">
+				{readLine(characters[0])}
+				{key}
+			</p>
+		);
 	const read = characters.filter((c) => c.bags || c.bank);
 	const unread = characters.filter((c) => !c.bags && !c.bank);
 	const latest = Math.max(0, ...read.flatMap((c) => [c.bags?.capturedAt ?? 0, c.bank?.capturedAt ?? 0]));
 	return (
-		<p className="px-1 text-xs text-muted-foreground">
-			{read.length ? (
-				<>
-					{read.length === characters.length ? "All" : read.length} of {characters.length} characters read, last{" "}
-					{ago(latest)}
-				</>
-			) : (
-				"No characters read yet"
-			)}
-			{unread.length && read.length ? (
-				<>
-					{" · Not yet: "}
-					{unread.map((c, i) => (
-						<span key={c.key}>
-							{i > 0 ? ", " : null}
-							<ClassText classId={c.classId}>{c.name}</ClassText>
-						</span>
-					))}
-				</>
-			) : null}
+		<p className="flex flex-wrap gap-x-3 px-1 text-xs text-muted-foreground">
+			<span>
+				{read.length ? (
+					<>
+						{read.length === characters.length ? "All" : read.length} of {characters.length} characters read, last{" "}
+						{ago(latest)}
+					</>
+				) : (
+					"No characters read yet"
+				)}
+				{unread.length && read.length ? (
+					<>
+						{" · Not yet: "}
+						{unread.map((c, i) => (
+							<span key={c.key}>
+								{i > 0 ? ", " : null}
+								<ClassText classId={c.classId}>{c.name}</ClassText>
+							</span>
+						))}
+					</>
+				) : null}
+			</span>
+			{key}
 		</p>
 	);
 }
@@ -322,7 +328,10 @@ function Categories({ items, need }: { items: Item[]; need: Map<number, number> 
 												quality: item.quality,
 												icon: item.icon,
 											}}
-											className="relative block"
+											className={cn(
+												"relative block rounded-[5px]",
+												wanted && "ring-2 ring-highlight/80 ring-offset-2 ring-offset-card",
+											)}
 										>
 											<ItemIcon icon={item.icon} quality={item.quality} size={40} className="block" />
 											{item.total > 1 || wanted ? (
@@ -361,7 +370,13 @@ function ItemList({
 				const name = item.name ?? `Item ${item.itemId}`;
 				const wanted = need.get(item.itemId);
 				return (
-					<li key={item.itemId} className="border-b border-border last:border-b-0">
+					<li
+						key={item.itemId}
+						className={cn(
+							"border-b border-border last:border-b-0",
+							wanted && "shadow-[inset_2px_0_0_var(--highlight)]",
+						)}
+					>
 						<ItemHover
 							item={{ itemId: item.itemId, name, quality: item.quality, icon: item.icon }}
 							className="flex items-center gap-2.5 px-3 py-1.5 text-[0.8125rem] transition-colors hover:bg-[var(--row-hover)]"
@@ -387,7 +402,7 @@ function ItemList({
 							</span>
 							<span className="num text-muted-foreground">
 								×{item.total}
-								{wanted ? <span className="text-xs"> · need {wanted}</span> : null}
+								{wanted ? <span className="text-xs text-foreground/85"> · need {wanted}</span> : null}
 							</span>
 						</ItemHover>
 						{item.recipe ? (
