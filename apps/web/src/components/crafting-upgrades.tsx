@@ -9,6 +9,7 @@ import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
+import { type ListRow, MakersCell } from "@/components/crafting-list";
 import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
@@ -21,12 +22,14 @@ import { MARKER_LABELS, type MarkerKind, VerdictGlyph, VerdictMarker } from "@/c
 import { cn } from "@/lib/utils";
 import { verdictLabel } from "@/lib/verdict";
 
-// Crafting's Upgrades tab: one table, a row per item, of what the guild can
-// craft for the viewer's characters and what theirs can craft for anyone in
-// the guild (crafting.upgrades). Each row says who it's for and who crafts
-// it, the viewer's characters ("Yours") apart from guildmates. Filters on
-// both (anyone, your characters, one of them, guildmates), the kind (upgrade,
-// possible upgrade, empty slot) and the profession sit in menus above it.
+// Crafting's Gear tab for members: one table, a row per item, of what the
+// guild can craft (or could learn to) for the viewer's characters and what
+// theirs can craft for anyone in the guild (crafting.upgrades). Each row says
+// who it's for and who crafts it, the viewer's characters ("Yours") apart
+// from guildmates, and who could learn it. Filters on both (anyone, your
+// characters, one of them, guildmates), the kind (upgrade, possible upgrade,
+// empty slot, or all gear the guild makes) and the profession sit in menus
+// above it.
 
 export type Member = {
 	guild: { region: Region; slug: string };
@@ -38,6 +41,8 @@ type Hit = Data["hits"][number];
 type Help = Hit["for"][number];
 /** A row: the item, and who it's for as the "Show removed" switch has it. */
 type Row = Hit & { shown: Help[] };
+/** Gear's kind filter: a verdict, all of them (undefined), or every piece of gear the guild makes ("all"). */
+export type GearKind = VerdictKind | "all";
 
 /**
  * Whom a filter keeps: anyone (undefined), the viewer's characters
@@ -49,9 +54,8 @@ const keeps = (who: Who, x: { slug: string; mine: boolean }) =>
 
 /** Rows shown before "Show all": each renders item tooltips. */
 const PAGE = 30;
-/** Guildmates listed under "Who's it for?" and "Who crafts it?" before "+N more". */
+/** Guildmates listed under "Who's it for?" before "+N more". */
 const MATES = 2;
-const CRAFTERS = 3;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
 /** The table's columns: marker, item, who it's for, who crafts it, actions (a fixed width, so the heads line up). Stacked on a narrow pane. */
 const COLS =
@@ -81,18 +85,21 @@ export function UpgradesView({
 	kind,
 	profession,
 	setFilters,
+	gear,
 }: {
 	region: string;
 	guildSlug: string;
 	member?: Member;
+	/** All gear the guild makes (guildCrafting), for "All gear": rows for items that aren't anyone's upgrade. */
+	gear: ListRow[];
 	query: string;
 	deferred: string;
 	setQuery: (q: string) => void;
 	inputRef: RefObject<HTMLInputElement | null>;
 	forWho: Who;
 	byWho: Who;
-	/** Only upgrades, possible upgrades or empty slots (for whom `forWho` keeps). */
-	kind?: VerdictKind;
+	/** Only upgrades, possible upgrades or empty slots (for whom `forWho` keeps), or all gear. */
+	kind?: GearKind;
 	profession?: string;
 	setFilters: (next: Filters) => void;
 }) {
@@ -102,13 +109,18 @@ export function UpgradesView({
 	const [limit, setLimit] = useState(PAGE);
 	const words = useMemo(() => queryWords(deferred), [deferred]);
 
-	const rows = useMemo<Row[]>(
-		() =>
-			(data?.hits ?? [])
-				.map((h) => ({ ...h, shown: showRemoved ? h.for : h.for.filter((x) => !x.removed) }))
-				.filter((r) => r.shown.length > 0),
-		[data, showRemoved],
-	);
+	// Every row: the upgrades, then the rest of the guild's gear (for "All gear").
+	const rows = useMemo<Row[]>(() => {
+		const hits = (data?.hits ?? []).map((h) => ({
+			...h,
+			shown: showRemoved ? h.for : h.for.filter((x) => !x.removed),
+		}));
+		const listed = new Set(hits.map((h) => h.recipeId));
+		const rest = gear
+			.filter((g) => !listed.has(g.recipeId))
+			.map((g): Row => ({ ...g, for: [], shown: [], others: 0, requested: [] }));
+		return [...hits, ...rest];
+	}, [data, gear, showRemoved]);
 	const removedCount = useMemo(
 		() => (data?.hits ?? []).reduce((n, h) => n + h.for.filter((x) => x.removed).length, 0),
 		[data],
@@ -128,10 +140,13 @@ export function UpgradesView({
 	);
 	const matched = useMemo(() => searchIndex(index, words), [index, words]);
 
-	// Who it's for and the kind go together: someone the filter keeps, with that verdict.
-	const forOk = (r: Row, who: Who, k?: VerdictKind) =>
-		r.shown.some((x) => keeps(who, x) && (!k || (x.kind === k && !x.removed)));
-	const byOk = (r: Row, who: Who) => r.crafters.some((c) => keeps(who, c));
+	// Who it's for and the kind go together: someone the filter keeps, with that
+	// verdict. All gear: every row, or the ones for whom the filter keeps.
+	const forOk = (r: Row, who: Who, k?: GearKind) =>
+		k === "all"
+			? !who || r.shown.some((x) => keeps(who, x))
+			: r.shown.some((x) => keeps(who, x) && (!k || (x.kind === k && !x.removed)));
+	const byOk = (r: Row, who: Who) => !who || r.crafters.some((c) => keeps(who, c));
 	const profOk = (r: Row, p?: string) => !p || r.profession === p;
 	const results = matched.filter((r) => forOk(r, forWho, kind) && byOk(r, byWho) && profOk(r, profession));
 	// Each filter's counts, with the other filters on.
@@ -140,7 +155,7 @@ export function UpgradesView({
 	const profRows = matched.filter((r) => forOk(r, forWho, kind) && byOk(r, byWho));
 	const counts = {
 		for: (who: Who) => forRows.filter((r) => forOk(r, who, kind)).length,
-		kind: (k?: VerdictKind) => forRows.filter((r) => forOk(r, forWho, k)).length,
+		kind: (k?: GearKind) => forRows.filter((r) => forOk(r, forWho, k)).length,
 		by: (who: Who) => byRows.filter((r) => byOk(r, who)).length,
 		prof: (p?: string) => profRows.filter((r) => profOk(r, p)).length,
 	};
@@ -224,9 +239,9 @@ export function UpgradesView({
 		kind: (
 			<FilterMenu
 				value={kind ?? ""}
-				onChange={(v) => setFilters({ kind: (v || undefined) as VerdictKind | undefined })}
+				onChange={(v) => setFilters({ kind: (v || undefined) as GearKind | undefined })}
 				options={[
-					{ value: "", label: "All kinds", count: counts.kind() },
+					{ value: "", label: "Upgrades", count: counts.kind() },
 					...KINDS.map((k, i) => ({
 						value: k,
 						label: (
@@ -236,8 +251,10 @@ export function UpgradesView({
 							</span>
 						),
 						count: counts.kind(k),
+						indent: true,
 						separate: i === 0,
 					})),
+					{ value: "all", label: "All gear", count: counts.kind("all"), separate: true },
 				]}
 			/>
 		),
@@ -262,8 +279,8 @@ export function UpgradesView({
 			onKeyDown={(e) => {
 				if (e.key === "Escape") setQuery("");
 			}}
-			placeholder="Search upgrades... (boots, Agility, a name)"
-			aria-label="Search upgrades"
+			placeholder="Search gear... (boots, Agility, a name)"
+			aria-label="Search gear"
 			className="h-10 text-[15px]"
 			wrapperClassName="flex-1 basis-64"
 		/>
@@ -291,11 +308,17 @@ export function UpgradesView({
 					<p className="py-10 text-center text-sm text-muted-foreground">
 						{data === null ? "Members only." : "Checking what the guild can craft against everyone's gear..."}
 					</p>
-				) : data.hits.length === 0 ? (
+				) : data.hits.length === 0 && kind !== "all" ? (
 					<NothingYet data={data} />
 				) : results.length === 0 ? (
 					<div className={EMPTY}>
-						{deferred.trim() ? <>No upgrades match "{deferred.trim()}".</> : "No upgrades with these filters."}
+						{deferred.trim() ? (
+							<>
+								No {kind === "all" ? "gear" : "upgrades"} match "{deferred.trim()}".
+							</>
+						) : (
+							`No ${kind === "all" ? "gear" : "upgrades"} with these filters.`
+						)}
 						{filtered ? (
 							<div className="mt-3">
 								<Button variant="outline" size="sm" onClick={() => setFilters({})}>
@@ -308,11 +331,11 @@ export function UpgradesView({
 					<section className="surface-card overflow-hidden">
 						<header className="flex min-w-0 items-center gap-2 border-b border-border/60 px-4 py-2.5">
 							<h3 className="truncate text-[0.8125rem] font-semibold">
-								<Title forWho={forWho} byWho={byWho} name={named} />
+								<Title forWho={forWho} byWho={byWho} name={named} all={kind === "all"} />
 							</h3>
 							<span className="num text-xs text-muted-foreground">{results.length}</span>
 							<span className="ml-1 truncate text-xs text-muted-foreground @max-2xl:hidden">
-								{hintFor(forWho, byWho, named)}
+								{kind === "all" ? "Everything the guild can craft to wear" : hintFor(forWho, byWho, named)}
 							</span>
 							{filtered ? (
 								<Button variant="outline" size="xs" className="ml-auto flex-none" onClick={() => setFilters({})}>
@@ -383,7 +406,7 @@ export function UpgradesView({
 type Named = (who: Who) => { name: string; classId: number } | undefined;
 
 /** "Upgrades for Corwin that Ivar can craft": the table's title, from the filters. */
-function Title({ forWho, byWho, name }: { forWho: Who; byWho: Who; name: Named }) {
+function Title({ forWho, byWho, name, all }: { forWho: Who; byWho: Who; name: Named; all?: boolean }) {
 	const who = (w: Who, mine: string, guild: string) => {
 		if (w === "mine") return mine;
 		if (w === "guild") return guild;
@@ -394,7 +417,7 @@ function Title({ forWho, byWho, name }: { forWho: Who; byWho: Who; name: Named }
 	const crafter = byWho ? who(byWho, "your characters", "guildmates") : null;
 	return (
 		<>
-			Upgrades
+			{all ? "Gear" : "Upgrades"}
 			{target ? <> for {target}</> : null}
 			{crafter ? (
 				<>
@@ -436,8 +459,12 @@ function NothingYet({ data }: { data: Data }) {
 	);
 }
 
-/** The row's marker: the best verdict among whom the filter keeps, or "removed" when all of those are removed. */
-function rowKind(row: Row, forWho: Who): MarkerKind {
+/**
+ * The row's marker: the best verdict among whom the filter keeps, "removed"
+ * when all of those are removed, or none when it's nobody's upgrade (All gear).
+ */
+function rowKind(row: Row, forWho: Who): MarkerKind | null {
+	if (row.shown.filter((x) => keeps(forWho, x)).length === 0 && !row.for.some((x) => x.removed)) return null;
 	const live = row.shown.filter((x) => keeps(forWho, x) && !x.removed);
 	if (live.length === 0) return "removed";
 	return live.reduce<VerdictKind>((best, x) => (kindRank(x.kind) < kindRank(best) ? x.kind : best), live[0].kind);
@@ -473,7 +500,7 @@ function UpgradeRow({
 	return (
 		<li className={cn(COLS, "px-4 py-3")}>
 			{/* Level with the item icon's top, a touch lower so it sits even with it. */}
-			<VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} className="mt-0.5" />
+			{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} className="mt-0.5" /> : <span />}
 			<RecipeItem
 				recipe={row}
 				size={36}
@@ -482,7 +509,9 @@ function UpgradeRow({
 			/>
 			<div className={cn(CELL, "min-w-0")}>
 				<CellHead>Who's it for?</CellHead>
-				{solo ? (
+				{row.shown.length === 0 ? (
+					<p className="text-xs leading-5 text-muted-foreground">Not an upgrade for anyone right now</p>
+				) : solo ? (
 					<SoloFor row={row} slug={solo} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
 				) : (
 					<ForCell row={row} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
@@ -490,7 +519,15 @@ function UpgradeRow({
 			</div>
 			<div className={cn(CELL, "min-w-0 @max-2xl:mt-1")}>
 				<CellHead>Who crafts it?</CellHead>
-				<ByCell row={row} region={region} guildSlug={guildSlug} onMore={more} />
+				<MakersCell
+					crafters={row.crafters}
+					learners={row.learners}
+					region={region}
+					profession={row.profession}
+					onMore={more}
+				>
+					<Requested row={row} region={region} guildSlug={guildSlug} />
+				</MakersCell>
 			</div>
 			<div className={cn(CELL, "flex items-center gap-1.5 @2xl:justify-end")}>
 				{canRequest ? <CraftRequest recipe={row} member={member} /> : null}
@@ -524,7 +561,7 @@ function Person({
 }: {
 	h: Help;
 	region: string;
-	rowKind: MarkerKind;
+	rowKind: MarkerKind | null;
 	onRestore: (slug: string) => void;
 }) {
 	return (
@@ -570,7 +607,7 @@ function ForCell({
 }: {
 	row: Row;
 	region: string;
-	rowKind: MarkerKind;
+	rowKind: MarkerKind | null;
 	onRestore: (slug: string) => void;
 	onMore: () => void;
 }) {
@@ -626,7 +663,7 @@ function SoloFor({
 	row: Row;
 	slug: string;
 	region: string;
-	rowKind: MarkerKind;
+	rowKind: MarkerKind | null;
 	onRestore: (slug: string) => void;
 	onMore: () => void;
 }) {
@@ -653,68 +690,6 @@ function SoloFor({
 				</p>
 			) : null}
 		</div>
-	);
-}
-
-/** "Who crafts it?": yours, then guildmates, with skill; then who asked for it. */
-function ByCell({
-	row,
-	region,
-	guildSlug,
-	onMore,
-}: {
-	row: Row;
-	region: string;
-	guildSlug: string;
-	onMore: () => void;
-}) {
-	const yours = row.crafters.filter((c) => c.mine);
-	const mates = row.crafters.filter((c) => !c.mine);
-	const listed = mates.slice(0, CRAFTERS);
-	const crafter = (c: Crafter) => <CrafterItem key={c.slug} c={c} region={region} profession={row.profession} />;
-	return (
-		<div className="text-[13px]">
-			<ul className="who-list">
-				{yours.length ? (
-					<li>
-						<span className="who-label">Yours</span>
-						<ul>{yours.map(crafter)}</ul>
-					</li>
-				) : null}
-				{mates.length ? (
-					<li>
-						<span className="who-label">Guildmates</span>
-						<ul>
-							{listed.map(crafter)}
-							{mates.length > listed.length ? (
-								<li>
-									<MoreButton count={mates.length - listed.length} onClick={onMore} />
-								</li>
-							) : null}
-						</ul>
-					</li>
-				) : null}
-			</ul>
-			<Requested row={row} region={region} guildSlug={guildSlug} />
-		</div>
-	);
-}
-
-type Crafter = Hit["crafters"][number];
-
-function CrafterItem({ c, region, profession }: { c: Crafter; region: string; profession: string }) {
-	return (
-		<li className="leading-5">
-			<Link
-				to="/c/$region/$slug/professions"
-				params={{ region, slug: c.slug }}
-				search={{ profession }}
-				className="hover:underline"
-			>
-				<ClassText classId={c.classId}>{c.name}</ClassText>
-			</Link>
-			{c.skill !== undefined ? <span className="num ml-1.5 text-xs text-muted-foreground">{c.skill}</span> : null}
-		</li>
 	);
 }
 
@@ -793,10 +768,10 @@ export function CraftRequest({
 const KINDS = ["upgrade", "maybe", "empty"] as const satisfies VerdictKind[];
 
 /** Upgrades' filters as the page passes them on (the ones given change; none given clears them all). */
-export type Filters = { for?: Who; by?: Who; kind?: VerdictKind; profession?: string };
+export type Filters = { for?: Who; by?: Who; kind?: GearKind; profession?: string };
 
 /** Who it's for or who crafts it, as a menu ("For Ivar"): Anyone, My characters, each of them, Guildmates. */
-function WhoPicker({
+export function WhoPicker({
 	label,
 	value,
 	onChange,
@@ -925,14 +900,11 @@ function PeopleDialog({
 	const kind = rowKind(r, undefined);
 	const yours = r.shown.filter((x) => x.mine);
 	const mates = everyone ?? r.shown.filter((x) => !x.mine);
-	const myCrafters = r.crafters.filter((c) => c.mine);
-	const mateCrafters = r.crafters.filter((c) => !c.mine);
 	const person = (h: Help) => (
 		<li key={h.slug}>
 			<Person h={h} region={region} rowKind={kind} onRestore={onRestore} />
 		</li>
 	);
-	const crafter = (c: Crafter) => <CrafterItem key={c.slug} c={c} region={region} profession={r.profession} />;
 	return (
 		<Dialog.Root
 			open={!!row}
@@ -981,22 +953,13 @@ function PeopleDialog({
 						{/* Phones: the short list first, so it isn't under a long one. */}
 						<section className="min-w-0 max-sm:order-first">
 							<h3 className="mb-2 text-xs text-muted-foreground">Who crafts it?</h3>
-							<ul className="who-list text-[13px]">
-								{myCrafters.length ? (
-									<li>
-										<span className="who-label">Yours</span>
-										<ul>{myCrafters.map(crafter)}</ul>
-									</li>
-								) : null}
-								{mateCrafters.length ? (
-									<li>
-										<span className="who-label">
-											Guildmates <span className="num font-normal">{mateCrafters.length}</span>
-										</span>
-										<ul>{mateCrafters.map(crafter)}</ul>
-									</li>
-								) : null}
-							</ul>
+							<MakersCell
+								crafters={r.crafters}
+								learners={r.learners}
+								region={region}
+								profession={r.profession}
+								expanded
+							/>
 							<Requested row={r} region={region} guildSlug={guildSlug} />
 						</section>
 					</div>

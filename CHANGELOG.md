@@ -21,6 +21,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 - **Guildie, App:** Experimental notifications while you play, off until you turn them on in Settings → App. Get a Windows notification when a guildmate mails you something you requested, before you open your mailbox. And get a reminder to /reload when guildmates' gear, levels, requests or recipes have changed a lot since you logged in, so your tooltips catch up.
 - **App:** When WoW opens, the app fetches fresh guild data right away, so your tooltips start with the latest when you enter the world.
 
+### Improvements
+
+- **Guildie:** Crafting is split by what you want made: Gear (upgrades first, or all gear with the new "All gear" filter), Enchants (with armor kits, shield spikes and scopes) and Supplies (potions, food, bags, ammo, materials, with a type filter). Who can learn a recipe now shows right under who makes it, and Gear lists upgrades nobody knows yet with who could learn them. The Who can make and Who can learn tabs are gone.
+
 ### Fixes
 
 - **Guildie:** Level-ups in the Feed land on the day they happened. Blizzard's roster shows levels hours late, so a late-night level-up could show up under the next day.

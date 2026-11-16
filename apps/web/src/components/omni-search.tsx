@@ -691,7 +691,7 @@ function useLocalResults(typed: string) {
 					title: "Upgrades for me",
 					subtitle: sub ?? "Crafting",
 					visual: { kind: "icon", name: "sparkles" },
-					nav: route("/g/$region/$slug/crafting", p, { view: "upgrades", for: "mine" }),
+					nav: route("/g/$region/$slug/crafting", p, { for: "mine" }),
 					keywords: ["crafting", "gear upgrades", "better gear"],
 				});
 				add({
@@ -700,7 +700,7 @@ function useLocalResults(typed: string) {
 					title: "Upgrades I can craft",
 					subtitle: sub ?? "Crafting",
 					visual: { kind: "icon", name: "anvil" },
-					nav: route("/g/$region/$slug/crafting", p, { view: "upgrades", by: "mine" }),
+					nav: route("/g/$region/$slug/crafting", p, { by: "mine" }),
 					keywords: ["crafting", "craft for guildmates", "help"],
 				});
 			}
@@ -781,7 +781,7 @@ function useLocalResults(typed: string) {
 					title: `${prof} recipes`,
 					subtitle: several ? `Crafting · ${home.name}` : "Crafting",
 					visual: { kind: "icon", name: "anvil" },
-					nav: route("/g/$region/$slug/crafting", p, { view: "make", profession: prof }),
+					nav: route("/g/$region/$slug/crafting", p, { profession: prof }),
 					keywords: [prof, `${prof} crafters`],
 				});
 			}
@@ -1206,7 +1206,7 @@ function useRemoteResults(data: ServerResults | undefined, context: Context): Re
 						kind: "route",
 						to: "/g/$region/$slug/crafting",
 						params: { region: g.region, slug: g.slug },
-						search: { view: "make", q: r.name },
+						search: { q: r.name },
 					}
 				: r.item
 					? { kind: "item", itemId: r.item.itemId }
