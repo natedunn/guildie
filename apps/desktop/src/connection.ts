@@ -22,7 +22,7 @@ import { app, net } from "electron";
 import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
 import { forgetToken, loadToken, NOTIFY_OPTIONS, type NotifyOption, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
-import { canTellWowRunning, wowRunning } from "./wow-running.ts";
+import { canTellWowRunning, wowCheckIsCheap, wowRunning } from "./wow-running.ts";
 
 export type Status = {
 	syncIssue?: string;
@@ -63,8 +63,14 @@ const TICK_MS = 2_000;
 const RETRY_MS = 60_000;
 /** How often to ask for notifications while connected. */
 const NOTIFY_MS = 60_000;
-/** How often to look for an open WoW, with reload reminders on. */
-const WOW_CHECK_MS = 30_000;
+/**
+ * How often to look for WoW (wow-running.ts). Often while it's closed, so a
+ * fresh download lands before the player enters the world (when the game
+ * reads GuildieData.lua); while it's open, only to notice it closing. The
+ * slower tasklist fallback: always the open rate.
+ */
+const WOW_CLOSED_CHECK_MS = 5_000;
+const WOW_OPEN_CHECK_MS = 30_000;
 
 export class Connection {
 	/** The site's origin, which the token is kept under. */
@@ -84,6 +90,8 @@ export class Connection {
 	private lastRetry = 0;
 	private lastNotifications = 0;
 	private lastWowCheck = 0;
+	private wowOpen = false;
+	private checkingWow = false;
 	private readonly reloadReminder = new ReloadReminder((text) => {
 		if (settings.notifyOn("reloadReminders")) this.onReloadReminder(text);
 	});
@@ -231,13 +239,32 @@ export class Connection {
 		this.emit();
 	}
 
-	/** Reload reminders: when WoW is open and when it last loaded GuildieData.lua (a /reload saves first). */
+	/**
+	 * Watches for WoW: when it opens, download guild data right away, so the
+	 * game reads fresh data when the player enters the world. For reload
+	 * reminders, also when it last loaded GuildieData.lua (a /reload saves first).
+	 */
 	private watchGame() {
-		if (!settings.notifyOn("reloadReminders") || !canTellWowRunning) return;
-		this.reloadReminder.savedVariables(savedVariablesAt(this.sync.wowFolder));
-		if (Date.now() - this.lastWowCheck < WOW_CHECK_MS) return;
+		if (!canTellWowRunning) return;
+		if (settings.notifyOn("reloadReminders")) this.reloadReminder.savedVariables(savedVariablesAt(this.sync.wowFolder));
+		const every = this.wowOpen || !wowCheckIsCheap(this.log) ? WOW_OPEN_CHECK_MS : WOW_CLOSED_CHECK_MS;
+		if (this.checkingWow || Date.now() - this.lastWowCheck < every) return;
 		this.lastWowCheck = Date.now();
-		void wowRunning().then((running) => this.reloadReminder.gameRunning(running));
+		this.checkingWow = true;
+		void wowRunning(this.log)
+			.then(async (running) => {
+				const opened = running && !this.wowOpen;
+				this.wowOpen = running;
+				if (opened) {
+					this.log("WoW opened: downloading guild data");
+					await this.sync.refreshGuildData();
+				}
+				// After the download: that's what the game will load.
+				this.reloadReminder.gameRunning(running && settings.notifyOn("reloadReminders"));
+			})
+			.finally(() => {
+				this.checkingWow = false;
+			});
 	}
 
 	private updatePixelCapture() {

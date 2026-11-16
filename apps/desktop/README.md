@@ -236,8 +236,17 @@ Off until turned on in Settings → App, each saved in `settings.json`
   (`packages/sync` `ReloadReminder`). When 10 or more changes that tooltips
   use (gear, level-ups, requests, crafters' recipes) piled up while WoW is
   open, it shows a notification to `/reload`; again at most hourly, and only
-  after 10 more. WoW counts as open while a window titled "World of
-  Warcraft…" exists (`src/wow-running.ts`, tasklist every 30 s).
+  after 10 more.
+
+**Fresh data when WoW opens** (always, Windows): the game reads
+`GuildieData.lua` when the player enters the world, so as soon as WoW opens
+the app downloads guild data instead of waiting for its 15-minute refresh.
+WoW counts as open while a top-level window is titled "World of Warcraft…"
+(not a browser tab about it; `src/wow-running.ts`). The app asks Windows
+directly (EnumWindows and GetWindowTextW through koffi, a fraction of a
+millisecond) every 5 s while WoW is closed and every 30 s while it's open.
+If koffi can't load, it uses tasklist every 30 s. The first five checks are
+logged with how long they took.
 
 The additive optional bridge method `setNotifyOption(option, boolean)` turns
 one on or off (`option`: `"itemsMailed"` or `"reloadReminders"`); status adds
