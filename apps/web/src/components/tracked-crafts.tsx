@@ -36,9 +36,6 @@ export function TrackedCrafts() {
 	}
 	return (
 		<section className="space-y-3">
-			<h2 className="text-[0.8125rem] font-semibold">
-				Tracked crafts <span className="num font-normal text-muted-foreground">{data.crafts.length}</span>
-			</h2>
 			<ul className="surface-card divide-y divide-border/60">
 				{data.crafts.map((c) => (
 					<CraftRow key={c.recipeId} craft={c} />

@@ -56,3 +56,26 @@ test("supply types: by subclass, and Blizzard's Other by profession and name", (
 		"other",
 	);
 });
+
+test("inventory categories, like the game's bag addons", async () => {
+	const { itemCategory } = await import("./shared/itemCategories.ts");
+	const it = (name: string, quality: string, kind: string, ...lines: string[]) => ({
+		name,
+		quality,
+		kind,
+		tooltip: lines.map((left) => ({ left })),
+	});
+	assert.equal(itemCategory(it("Pearl-clasped Cloak", "UNCOMMON", "Cloth", "Back")), "equipment");
+	assert.equal(itemCategory(it("Bolt of Silk Cloth", "COMMON", "Cloth")), "tradeGoods");
+	assert.equal(
+		itemCategory(it("Greater Healing Potion", "COMMON", "Potions", "Use: Restores 455 health.")),
+		"consumables",
+	);
+	assert.equal(itemCategory(it("Hearthstone", "COMMON", "Other", "Use: Returns you to Goldshire.")), "consumables");
+	assert.equal(itemCategory(it("Pattern: Red Linen Robe", "UNCOMMON", "Tailoring")), "recipes");
+	assert.equal(itemCategory(it("Kobold Candle", "COMMON", "Quest", "Quest Item")), "quest");
+	assert.equal(itemCategory(it("Broken Fang", "POOR", "Junk")), "junk");
+	assert.equal(itemCategory(it("Mageweave Bag", "COMMON", "Bag", "12 Slot Bag")), "bags");
+	assert.equal(itemCategory(it("Heavy Shot", "COMMON", "Bullet")), "ammo");
+	assert.equal(itemCategory(null), "other");
+});
