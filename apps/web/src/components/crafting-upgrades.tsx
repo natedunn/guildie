@@ -14,7 +14,7 @@ import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
-import { RowActions } from "@/components/row-actions";
+import { REQUEST_ICON, RowActions } from "@/components/row-actions";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
@@ -64,7 +64,7 @@ const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-f
  * narrow pane, the actions a row of buttons at the bottom.
  */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem] @2xl:gap-x-0";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_8.5rem] @2xl:gap-x-0";
 /** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
 const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
 
@@ -537,7 +537,7 @@ function UpgradeRow({
 			</div>
 			<RowActions
 				className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
-				request={canRequest ? <CraftRequest recipe={row} member={member} /> : null}
+				request={canRequest ? <CraftRequest recipe={row} member={member} icon={REQUEST_ICON} /> : null}
 				recipeId={row.recipeId}
 				track={!!member}
 				onHide={canRemove ? () => onRemove(row) : undefined}
@@ -732,6 +732,7 @@ export function CraftRequest({
 	recipe,
 	member,
 	className,
+	icon,
 }: {
 	recipe: {
 		recipeId: number;
@@ -741,6 +742,8 @@ export function CraftRequest({
 	};
 	member?: Member;
 	className?: string;
+	/** Show this icon instead of "Request" (crafting rows' action tray). */
+	icon?: ReactNode;
 }) {
 	if (recipe.item?.untradeable) {
 		return <span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>;
@@ -752,6 +755,7 @@ export function CraftRequest({
 			characters={member.characters}
 			size="sm"
 			label="Request"
+			icon={icon}
 			className={className}
 			target={{
 				kind: "craft",

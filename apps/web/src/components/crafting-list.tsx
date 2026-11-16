@@ -7,7 +7,7 @@ import { ClassText } from "@/components/class-name";
 import { CraftRequest, type Member, WhoPicker } from "@/components/crafting-upgrades";
 import { FilterMenu } from "@/components/filter-menu";
 import { buildIndex, compareProfessions, queryWords, Reagents, RecipeItem, searchIndex } from "@/components/recipe-row";
-import { RowActions } from "@/components/row-actions";
+import { REQUEST_ICON, RowActions } from "@/components/row-actions";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
@@ -45,7 +45,7 @@ const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-f
  * line between each. Stacked on a narrow pane, the actions a row of buttons
  * at the bottom.
  */
-const COLS = "grid grid-cols-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_11rem]";
+const COLS = "grid grid-cols-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_8.5rem]";
 /** Cells after the item: ruled off on a wide pane. */
 const CELL = "min-w-0 @2xl:px-5";
 
@@ -207,7 +207,11 @@ export function RecipeList({
 								</div>
 								<RowActions
 									className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
-									request={r.crafters.some((c) => c.mine) ? null : <CraftRequest recipe={r} member={member} />}
+									request={
+										r.crafters.some((c) => c.mine) || r.item?.untradeable ? null : (
+											<CraftRequest recipe={r} member={member} icon={REQUEST_ICON} />
+										)
+									}
 									recipeId={r.recipeId}
 									track={!!member}
 								/>

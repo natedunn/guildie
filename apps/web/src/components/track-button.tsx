@@ -1,12 +1,13 @@
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
-import { Tick02Icon } from "@hugeicons/core-free-icons";
+import { ShoppingBasketAdd01Icon, ShoppingBasketDone01Icon, Tick02Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { ConvexError } from "convex/values";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // Track a craft (tracking.ts): its reagents go on Inventory's Tracked crafts,
@@ -27,10 +28,13 @@ export function useTracked() {
 export function TrackButton({
 	recipeId,
 	size = "sm",
+	icon,
 	className,
 }: {
 	recipeId: number;
 	size?: "sm" | "xs";
+	/** A basket icon (with a check once tracked) and a tooltip, instead of words. */
+	icon?: boolean;
 	className?: string;
 }) {
 	const tracked = useTracked();
@@ -50,6 +54,42 @@ export function TrackButton({
 	});
 	const [error, setError] = useState<string>();
 	const on = tracked.has(recipeId);
+	const toggle = () => {
+		setError(undefined);
+		if (on) void untrack({ recipeId });
+		else
+			track({ recipeId }).catch((e) =>
+				setError(e instanceof ConvexError ? String(e.data) : "Couldn't track it. Try again."),
+			);
+	};
+	if (icon) {
+		const tip = error ?? (on ? "Tracking mats (click to stop)" : "Track mats");
+		return (
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<Button
+							variant="outline"
+							size={size}
+							aria-pressed={on}
+							aria-label={tip}
+							className={cn(
+								"size-8 px-0",
+								on
+									? "border-highlight/45 bg-selected text-foreground hover:bg-selected"
+									: "text-muted-foreground hover:text-foreground",
+								className,
+							)}
+							onClick={toggle}
+						/>
+					}
+				>
+					<HugeiconsIcon icon={on ? ShoppingBasketDone01Icon : ShoppingBasketAdd01Icon} size={16} strokeWidth={1.75} />
+				</TooltipTrigger>
+				<TooltipContent side="top">{tip}</TooltipContent>
+			</Tooltip>
+		);
+	}
 	return (
 		<Button
 			variant="outline"

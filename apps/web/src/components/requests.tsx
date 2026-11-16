@@ -22,6 +22,7 @@ import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ago, shortDate, timeLeft } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -118,12 +119,15 @@ export function RequestButton({
 	existing,
 	ongoing,
 	label,
+	icon,
 	size = "sm",
 	variant = "outline",
 	className,
 }: {
 	guild: { region: Region; slug: string };
 	target: RequestTarget;
+	/** Show this icon instead of the words (which become its tooltip and label). */
+	icon?: ReactNode;
 	/** The viewer's characters in this guild (to ask as). */
 	characters: Character[];
 	/** Items: the viewer's request for it already, to change. */
@@ -136,18 +140,33 @@ export function RequestButton({
 	className?: string;
 }) {
 	const [open, setOpen] = useState(false);
+	const text =
+		label ??
+		(existing && target.kind === "item"
+			? existing.ongoing
+				? "Change request"
+				: "Your request"
+			: target.kind === "craft"
+				? "Request a craft"
+				: "Request this");
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
-			<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>
-				{label ??
-					(existing && target.kind === "item"
-						? existing.ongoing
-							? "Change request"
-							: "Your request"
-						: target.kind === "craft"
-							? "Request a craft"
-							: "Request this")}
-			</Dialog.Trigger>
+			{icon ? (
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Dialog.Trigger
+								render={<Button variant={variant} size={size} className={className} aria-label={text} />}
+							/>
+						}
+					>
+						{icon}
+					</TooltipTrigger>
+					<TooltipContent side="top">{text}</TooltipContent>
+				</Tooltip>
+			) : (
+				<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>{text}</Dialog.Trigger>
+			)}
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
