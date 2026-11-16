@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.45
+
 ### Fixes
 
 - **App, Addon:** The app installs the new Guildie addon (0.23.0). 0.3.44 left the old one in place, so the tooltip row for tracked crafts' reagents and "upgrade (-3 Int)" didn't reach the game until now.
