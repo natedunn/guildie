@@ -22,7 +22,6 @@ import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ago, shortDate, timeLeft } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -126,7 +125,7 @@ export function RequestButton({
 }: {
 	guild: { region: Region; slug: string };
 	target: RequestTarget;
-	/** Show this icon instead of the words (which become its tooltip and label). */
+	/** An icon before the words. */
 	icon?: ReactNode;
 	/** The viewer's characters in this guild (to ask as). */
 	characters: Character[];
@@ -151,22 +150,10 @@ export function RequestButton({
 				: "Request this");
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
-			{icon ? (
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<Dialog.Trigger
-								render={<Button variant={variant} size={size} className={className} aria-label={text} />}
-							/>
-						}
-					>
-						{icon}
-					</TooltipTrigger>
-					<TooltipContent side="top">{text}</TooltipContent>
-				</Tooltip>
-			) : (
-				<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>{text}</Dialog.Trigger>
-			)}
+			<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>
+				{icon}
+				{text}
+			</Dialog.Trigger>
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup className="fixed top-1/2 left-1/2 z-[70] max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) shadow-(--popover-shadow) transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">

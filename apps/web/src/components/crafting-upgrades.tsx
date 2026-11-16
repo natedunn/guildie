@@ -64,7 +64,7 @@ const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-f
  * narrow pane, the actions a row of buttons at the bottom.
  */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_8.5rem] @2xl:gap-x-0";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem] @2xl:gap-x-0";
 /** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
 const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
 
