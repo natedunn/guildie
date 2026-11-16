@@ -1,42 +1,54 @@
+import { ViewOffSlashIcon } from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 import type { ReactNode } from "react";
 import { TrackButton } from "@/components/track-button";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 /**
- * A Crafting row's actions, in their own column: Request, Track mats and
- * Remove, stacked full width on a wide pane; one row of equal buttons under
- * the row's content on a narrow one. All bordered, so they sit as one group.
+ * A Crafting row's actions, together on a tray (app.css .action-tray):
+ * Request and Track mats, stacked on a wide pane and side by side on a
+ * narrow one, and Hide as an icon (never suggest it for your character
+ * again).
  */
 export function RowActions({
 	request,
 	recipeId,
 	track,
-	onRemove,
+	onHide,
 	className,
 }: {
 	request: ReactNode;
 	recipeId: number;
 	track: boolean;
-	onRemove?: () => void;
+	onHide?: () => void;
 	className?: string;
 }) {
-	if (!request && !track && !onRemove) return <div className={className} />;
+	if (!request && !track && !onHide) return <div className={className} />;
 	return (
-		<div className={cn("flex items-start gap-2 *:flex-1 @2xl:flex-col @2xl:items-stretch @2xl:*:flex-none", className)}>
-			{request}
-			{track ? <TrackButton recipeId={recipeId} /> : null}
-			{onRemove ? (
-				<Button
-					variant="outline"
-					size="sm"
-					className="text-muted-foreground"
-					title="Never suggest this for your character again, here or in the game's tooltips"
-					onClick={onRemove}
-				>
-					Remove
-				</Button>
-			) : null}
+		<div className={className}>
+			<div className="action-tray flex flex-wrap items-center gap-2 p-2">
+				{request ? <div className="flex flex-1 *:flex-1 @2xl:basis-full">{request}</div> : null}
+				{track ? <TrackButton recipeId={recipeId} className="flex-1" /> : null}
+				{onHide ? (
+					<Tooltip>
+						<TooltipTrigger
+							render={
+								<Button
+									variant="ghost"
+									size="sm"
+									className="w-8 flex-none px-0 text-muted-foreground"
+									aria-label="Hide"
+									onClick={onHide}
+								/>
+							}
+						>
+							<HugeiconsIcon icon={ViewOffSlashIcon} size={16} strokeWidth={1.75} />
+						</TooltipTrigger>
+						<TooltipContent side="top">Hide</TooltipContent>
+					</Tooltip>
+				) : null}
+			</div>
 		</div>
 	);
 }

@@ -40,7 +40,7 @@ export type Member = {
 type Data = NonNullable<FunctionReturnType<typeof api.crafting.upgrades>>;
 type Hit = Data["hits"][number];
 type Help = Hit["for"][number];
-/** A row: the item, and who it's for as the "Show removed" switch has it. */
+/** A row: the item, and who it's for as the "Show hidden" switch has it. */
 type Row = Hit & { shown: Help[] };
 /** Gear's kind filter: a verdict, all of them (undefined), or every piece of gear the guild makes ("all"). */
 export type GearKind = VerdictKind | "all";
@@ -64,9 +64,9 @@ const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-f
  * narrow pane, the actions a row of buttons at the bottom.
  */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_9.5rem] @2xl:gap-x-0";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem] @2xl:gap-x-0";
 /** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
-const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:border-l @2xl:border-border/60 @2xl:px-5";
+const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
 
 /** What each marker means (the hover says the same). */
 const MARKER_HINTS: Record<MarkerKind, string> = {
@@ -74,7 +74,7 @@ const MARKER_HINTS: Record<MarkerKind, string> = {
 	maybe:
 		"A small gain, some of a stat they rank given up, their second spec, a few levels from now, or an armor type they don't want",
 	empty: "Plain armor with no stats, for a slot they have nothing in",
-	removed: "Never suggested for your character again, here or in the game's tooltips. Restore puts it back.",
+	removed: "Hidden: never suggested for your character again, here or in the game's tooltips. Restore puts it back.",
 };
 
 export function UpgradesView({
@@ -358,7 +358,7 @@ export function UpgradesView({
 							<span className="@2xl:pl-3">Item</span>
 							<span className={CELL}>Who's it for?</span>
 							<span className={CELL}>Who crafts it?</span>
-							<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-4")} />
+							<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-3")} />
 						</div>
 						<ul className="divide-y divide-border/60">
 							{results.slice(0, limit).map((r) => (
@@ -536,14 +536,11 @@ function UpgradeRow({
 				</MakersCell>
 			</div>
 			<RowActions
-				className={cn(
-					CELL,
-					"@max-2xl:mt-2 @max-2xl:border-t @max-2xl:border-border/60 @max-2xl:pt-3! @2xl:pr-0 @2xl:pl-4",
-				)}
+				className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
 				request={canRequest ? <CraftRequest recipe={row} member={member} /> : null}
 				recipeId={row.recipeId}
 				track={!!member}
-				onRemove={canRemove ? () => onRemove(row) : undefined}
+				onHide={canRemove ? () => onRemove(row) : undefined}
 			/>
 		</li>
 	);
@@ -579,7 +576,7 @@ function Person({
 						: h.at
 							? ` · from level ${h.at}`
 							: null}
-					{h.removed ? " · Removed" : null}
+					{h.removed ? " · Hidden" : null}
 				</span>
 				{h.removed ? (
 					<button
@@ -831,7 +828,7 @@ function RemovedSwitch({
 			)}
 		>
 			<Switch checked={checked} onCheckedChange={onChange} />
-			Show removed
+			Show hidden
 			{count ? <span className="num text-xs">{count}</span> : null}
 		</label>
 	);
@@ -994,7 +991,7 @@ function setSkipRemoveConfirm() {
 
 /**
  * Remove asks first: what goes, for which of your characters (a choice when
- * it's for several), and how to get it back (Show removed).
+ * it's for several), and how to get it back (Show hidden).
  */
 function RemoveDialog({
 	target,
@@ -1028,7 +1025,7 @@ function RemoveDialog({
 				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					<Dialog.Title className="text-[15px] font-semibold">
-						{several ? "Remove from whose upgrades?" : `Remove from ${h?.name}'s upgrades?`}
+						{several ? "Hide from whose upgrades?" : `Hide from ${h?.name}'s upgrades?`}
 					</Dialog.Title>
 					{item ? (
 						<div className="mt-3 flex items-center gap-2.5 rounded-md border border-border bg-well px-3 py-2.5">
@@ -1066,7 +1063,7 @@ function RemoveDialog({
 					) : null}
 					<Dialog.Description className="mt-3 text-pretty text-muted-foreground">
 						It won't be suggested for {h?.name} again, here or in the game's tooltips. To see it again, turn on{" "}
-						<span className="text-foreground">Show removed</span>, where you can put it back.
+						<span className="text-foreground">Show hidden</span>, where you can put it back.
 					</Dialog.Description>
 					<label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-muted-foreground select-none hover:text-foreground">
 						<input
@@ -1081,7 +1078,7 @@ function RemoveDialog({
 						<Button variant="outline" onClick={onCancel}>
 							Cancel
 						</Button>
-						<Button onClick={() => h && onConfirm(h.slug, dontAsk)}>Remove</Button>
+						<Button onClick={() => h && onConfirm(h.slug, dontAsk)}>Hide</Button>
 					</div>
 				</Dialog.Popup>
 			</Dialog.Portal>

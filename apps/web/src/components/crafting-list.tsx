@@ -45,9 +45,9 @@ const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-f
  * line between each. Stacked on a narrow pane, the actions a row of buttons
  * at the bottom.
  */
-const COLS = "grid grid-cols-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_9.5rem]";
+const COLS = "grid grid-cols-1 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_11rem]";
 /** Cells after the item: ruled off on a wide pane. */
-const CELL = "min-w-0 @2xl:border-l @2xl:border-border/60 @2xl:px-5";
+const CELL = "min-w-0 @2xl:px-5";
 
 const keeps = (who: string | undefined, c: { slug: string; mine: boolean }) =>
 	!who || (who === "mine" ? c.mine : who === "guild" ? !c.mine : c.slug === who);
@@ -183,7 +183,7 @@ export function RecipeList({
 						<span className="@2xl:pr-5">Item</span>
 						<span className={CELL}>Who makes it?</span>
 						<span className={CELL}>Reagents</span>
-						<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-4")} />
+						<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-3")} />
 					</div>
 					<ul className="divide-y divide-border/60">
 						{results.slice(0, limit).map((r) => (
@@ -206,10 +206,7 @@ export function RecipeList({
 									<Reagents reagents={r.reagents} />
 								</div>
 								<RowActions
-									className={cn(
-										CELL,
-										"@max-2xl:mt-2 @max-2xl:border-t @max-2xl:border-border/60 @max-2xl:pt-3! @2xl:pr-0 @2xl:pl-4",
-									)}
+									className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
 									request={r.crafters.some((c) => c.mine) ? null : <CraftRequest recipe={r} member={member} />}
 									recipeId={r.recipeId}
 									track={!!member}
