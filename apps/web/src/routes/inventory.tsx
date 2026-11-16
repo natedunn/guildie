@@ -154,7 +154,7 @@ function Items({
 
 	return (
 		<div className="space-y-3">
-			<div className="flex flex-wrap items-center gap-2">
+			<div className="flex flex-wrap items-center gap-2 max-sm:grid max-sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
 				<SearchInput
 					id="inventory-search"
 					value={q}
@@ -162,7 +162,7 @@ function Items({
 					placeholder="Where's my…?"
 					autoComplete="off"
 					className="h-9"
-					wrapperClassName="flex-1 basis-56"
+					wrapperClassName="flex-1 basis-56 max-sm:col-span-3"
 				/>
 				<FilterMenu
 					value={selected?.slug ?? ""}
@@ -189,7 +189,7 @@ function Items({
 					onChange={(v) => set({ where: (v || undefined) as Where | undefined })}
 					className="h-9"
 					options={[
-						{ value: "", label: "Bags and bank", count: filter({ ...current, where: undefined }).length },
+						{ value: "", label: "Bags & bank", count: filter({ ...current, where: undefined }).length },
 						{ value: "bags", label: "Bags", count: filter({ ...current, where: "bags" }).length, separate: true },
 						{ value: "bank", label: "Bank", count: filter({ ...current, where: "bank" }).length },
 					]}
@@ -237,14 +237,14 @@ function ReadStatus({
 	tracked: boolean;
 }) {
 	const key = tracked ? (
-		<span className="ml-auto inline-flex items-center gap-1.5">
+		<span className="inline-flex items-center gap-1.5 sm:ml-auto">
 			<span className="inline-block size-2.5 rounded-[3px] ring-2 ring-highlight/80" />
-			Tracked reagents, have/need
+			Used by your tracked crafts
 		</span>
 	) : null;
 	if (selected && characters[0])
 		return (
-			<p className="flex flex-wrap gap-x-3 px-1 text-xs text-muted-foreground">
+			<p className="flex flex-col gap-1 px-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-3">
 				{readLine(characters[0])}
 				{key}
 			</p>
@@ -253,7 +253,7 @@ function ReadStatus({
 	const unread = characters.filter((c) => !c.bags && !c.bank);
 	const latest = Math.max(0, ...read.flatMap((c) => [c.bags?.capturedAt ?? 0, c.bank?.capturedAt ?? 0]));
 	return (
-		<p className="flex flex-wrap gap-x-3 px-1 text-xs text-muted-foreground">
+		<p className="flex flex-col gap-1 px-1 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-x-3">
 			<span>
 				{read.length ? (
 					<>
@@ -297,7 +297,7 @@ function ViewToggle({ list, onChange }: { list: boolean; onChange: (list: boolea
 		</button>
 	);
 	return (
-		<span className="ml-auto inline-flex h-9 items-center gap-0.5 rounded-md border border-input bg-well p-0.5">
+		<span className="ml-auto inline-flex h-9 flex-none items-center gap-0.5 rounded-md border border-input bg-well p-0.5">
 			{option(!list, GridViewIcon, "Categories", false)}
 			{option(list, ListViewIcon, "List", true)}
 		</span>
@@ -334,10 +334,9 @@ function Categories({ items, need }: { items: Item[]; need: Map<number, number> 
 											)}
 										>
 											<ItemIcon icon={item.icon} quality={item.quality} size={40} className="block" />
-											{item.total > 1 || wanted ? (
+											{item.total > 1 ? (
 												<span className="num pointer-events-none absolute right-0.5 bottom-0 text-[11px] leading-none font-semibold text-white [text-shadow:0_0_2px_#000,0_0_2px_#000,0_0_1px_#000]">
 													{item.total}
-													{wanted ? <span className="text-white/70">/{wanted}</span> : null}
 												</span>
 											) : null}
 										</ItemHover>
@@ -402,7 +401,7 @@ function ItemList({
 							</span>
 							<span className="num text-muted-foreground">
 								×{item.total}
-								{wanted ? <span className="text-xs text-foreground/85"> · need {wanted}</span> : null}
+								{wanted ? <span className="text-xs text-foreground/85"> · for tracked crafts</span> : null}
 							</span>
 						</ItemHover>
 						{item.recipe ? (

@@ -19,9 +19,12 @@ type Craft = Data["crafts"][number];
 type Reagent = Data["reagents"][number];
 type Person = Craft["crafters"][number];
 
-/** Reagent table columns: reagent, have/need, where you have them, where to get more. Stacked when narrow. */
-const COLS =
-	"grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 sm:grid-cols-[minmax(0,1.2fr)_4.5rem_minmax(0,1fr)_minmax(0,1fr)]";
+/**
+ * Reagent table columns: reagent, still needed, where you have them, where to
+ * get more. On a phone: the icon, one column of text (where and more from
+ * under the name), and the number on the right.
+ */
+const COLS = "sm:grid sm:grid-cols-[minmax(0,1.2fr)_5.5rem_minmax(0,1fr)_minmax(0,1fr)] sm:items-center sm:gap-x-4";
 
 export function TrackedCrafts() {
 	const { data } = useQuery(convexQuery(api.tracking.list, {}));
@@ -46,7 +49,7 @@ export function TrackedCrafts() {
 					className={cn(COLS, "border-b border-border/60 px-3 pt-2 pb-1.5 text-xs text-muted-foreground max-sm:hidden")}
 				>
 					<span>Reagent</span>
-					<span className="text-right">Have</span>
+					<span className="text-right">Still need</span>
 					<span>Where</span>
 					<span>More from</span>
 				</div>
@@ -89,8 +92,8 @@ function CraftRow({ craft: c }: { craft: Craft }) {
 	const set = (n: number) => void track({ recipeId: c.recipeId, quantity: Math.max(1, Math.min(999, n)) });
 	const name = c.item?.name ?? c.name;
 	return (
-		<li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 text-[0.8125rem]">
-			<span className="flex min-w-0 flex-1 basis-56 items-center gap-2.5">
+		<li className="flex items-start gap-3 px-3 py-2.5 text-[0.8125rem]">
+			<span className="flex min-w-0 flex-1 items-start gap-2.5">
 				{c.item ? (
 					<ItemHover item={c.item} className="flex-none">
 						<ItemIcon icon={c.item.icon} quality={c.item.quality} size={32} className="block" />
@@ -99,10 +102,10 @@ function CraftRow({ craft: c }: { craft: Craft }) {
 					<ItemIcon icon={ENCHANT_ICON} size={32} className="block flex-none" />
 				)}
 				<span className="min-w-0">
-					<span className="block truncate" style={{ color: c.item ? QUALITY_COLORS[c.item.quality] : undefined }}>
+					<span className="block leading-snug" style={{ color: c.item ? QUALITY_COLORS[c.item.quality] : undefined }}>
 						{name}
 					</span>
-					<span className="block truncate text-xs text-muted-foreground">
+					<span className="mt-0.5 block text-xs text-muted-foreground">
 						{c.short === 0 ? (
 							<span className="text-foreground/85">You have everything for it</span>
 						) : (
@@ -115,7 +118,7 @@ function CraftRow({ craft: c }: { craft: Craft }) {
 					</span>
 				</span>
 			</span>
-			<span className="flex flex-none items-center gap-1">
+			<span className="flex flex-none flex-col items-end gap-1 sm:flex-row sm:items-center">
 				<span className="inline-flex h-7 items-center rounded-md border border-input bg-well">
 					<button
 						type="button"
@@ -189,48 +192,60 @@ function Names({ who, profession, max = 2 }: { who: Person[]; profession: string
 }
 
 function ReagentRow({ reagent: r }: { reagent: Reagent }) {
-	const done = r.have >= r.need;
+	const missing = Math.max(0, r.need - r.have);
+	const item = { itemId: r.itemId, name: r.name, quality: r.quality, icon: r.icon };
+	const where =
+		r.where.length === 0
+			? "None on your characters"
+			: r.where.map((w, i) => (
+					<span key={`${w.name}:${w.part}`}>
+						{i > 0 ? " · " : null}
+						<ClassText classId={w.classId}>{w.name}</ClassText> {w.part} <span className="num">{w.count}</span>
+					</span>
+				));
+	const more =
+		missing === 0 ? null : r.vendor ? (
+			"Vendors sell it"
+		) : r.madeBy ? (
+			<MadeBy who={r.madeBy.crafters} profession={r.madeBy.profession} />
+		) : (
+			"Gather, buy or ask the guild"
+		);
 	return (
-		<li className={cn(COLS, "px-3 py-2")}>
-			<ItemHover
-				item={{ itemId: r.itemId, name: r.name, quality: r.quality, icon: r.icon }}
-				className="flex min-w-0 items-center gap-2.5"
-			>
-				<ItemIcon icon={r.icon} quality={r.quality} size={28} className="block flex-none" />
+		<li className={cn(COLS, "flex items-start gap-3 px-3 py-2.5")}>
+			<span className="flex min-w-0 flex-1 items-start gap-2.5">
+				<ItemHover item={item} className="flex-none">
+					<ItemIcon icon={r.icon} quality={r.quality} size={28} className="block" />
+				</ItemHover>
 				<span className="min-w-0">
-					<span className="block truncate hover:underline" style={{ color: QUALITY_COLORS[r.quality] }}>
-						{r.name}
-					</span>
-					<span className="block truncate text-xs text-muted-foreground" title={r.for.join(", ")}>
-						For {r.for.join(", ")}
-					</span>
+					<ItemHover item={item} className="block leading-snug hover:underline">
+						<span style={{ color: QUALITY_COLORS[r.quality] }}>{r.name}</span>
+					</ItemHover>
+					<span className="block text-xs text-muted-foreground">For {r.for.join(", ")}</span>
+					{/* Phones: where and more from under the name, in the same column. */}
+					<span className="mt-1 block text-xs text-muted-foreground sm:hidden">{where}</span>
+					{more ? <span className="block text-xs text-muted-foreground sm:hidden">{more}</span> : null}
 				</span>
-			</ItemHover>
-			<span className={cn("num text-right whitespace-nowrap", done ? "text-foreground/85" : "text-foreground")}>
-				{r.have}
-				<span className="text-muted-foreground"> / {r.need}</span>
 			</span>
-			<span className="col-span-2 truncate text-xs text-muted-foreground sm:col-span-1">
-				{r.where.length === 0
-					? "None on your characters"
-					: r.where.map((w, i) => (
-							<span key={`${w.name}:${w.part}`}>
-								{i > 0 ? " · " : null}
-								<ClassText classId={w.classId}>{w.name}</ClassText> {w.part} <span className="num">{w.count}</span>
-							</span>
-						))}
-			</span>
-			<span className="col-span-2 truncate text-xs text-muted-foreground sm:col-span-1">
-				{done ? (
-					"Enough"
-				) : r.vendor ? (
-					"Vendors sell it"
-				) : r.madeBy ? (
-					<MadeBy who={r.madeBy.crafters} profession={r.madeBy.profession} />
-				) : (
-					"Gather, buy or ask the guild"
-				)}
-			</span>
+			<Need missing={missing} have={r.have} need={r.need} />
+			<span className="truncate text-xs text-muted-foreground max-sm:hidden">{where}</span>
+			<span className="truncate text-xs text-muted-foreground max-sm:hidden">{more ?? "Nothing, you have enough"}</span>
 		</li>
+	);
+}
+
+/** "5 more" over "have 4 of 9", or "Enough". */
+function Need({ missing, have, need }: { missing: number; have: number; need: number }) {
+	return (
+		<span className="flex-none text-right leading-snug" title={`You have ${have}; your tracked crafts use ${need}`}>
+			{missing === 0 ? (
+				<span className="text-foreground/85">Enough</span>
+			) : (
+				<span className="num text-foreground">{missing} more</span>
+			)}
+			<span className="num block text-xs text-muted-foreground">
+				{missing === 0 ? `have ${have}` : `have ${have} of ${need}`}
+			</span>
+		</span>
 	);
 }
