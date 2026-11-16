@@ -1,8 +1,9 @@
+import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
 import { className } from "@convex/shared/wow";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { convexQuery } from "@convex-dev/react-query";
-import { PinIcon, PinOffIcon, StarIcon } from "@hugeicons/core-free-icons";
+import { PinIcon, PinOffIcon, StarIcon, ViewIcon, ViewOffSlashIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
@@ -48,7 +49,7 @@ function Account() {
 									<TableHead className="text-right">Level</TableHead>
 									<TableHead className="text-right">Region</TableHead>
 									<TableHead className="w-0">
-										<span className="sr-only">Main and sidebar</span>
+										<span className="sr-only">Main, sidebar and hide</span>
 									</TableHead>
 								</TableRow>
 							</TableHeader>
@@ -56,17 +57,33 @@ function Account() {
 								{viewer.characters.map((c) => (
 									<TableRow key={c._id}>
 										<TableCell>
-											<Link
-												to="/c/$region/$slug"
-												params={{ region: c.region, slug: c.slug }}
-												className="font-medium hover:underline underline-offset-4"
-											>
-												<ClassText classId={c.classId}>{c.name}</ClassText>
-											</Link>
+											{c.hidden ? (
+												// No page while hidden.
+												<span className="font-medium opacity-50">
+													<ClassText classId={c.classId}>{c.name}</ClassText>
+												</span>
+											) : (
+												<Link
+													to="/c/$region/$slug"
+													params={{ region: c.region, slug: c.slug }}
+													className="font-medium hover:underline underline-offset-4"
+												>
+													<ClassText classId={c.classId}>{c.name}</ClassText>
+												</Link>
+											)}
+											{c.hidden && <span className="ml-2 text-xs text-muted-foreground">Hidden</span>}
 										</TableCell>
-										<TableCell className="text-muted-foreground">{c.classId ? className(c.classId) : ""}</TableCell>
-										<TableCell className="num text-right">{c.level ?? ""}</TableCell>
-										<TableCell className="text-right text-muted-foreground">{c.region.toUpperCase()}</TableCell>
+										<TableCell className={c.hidden ? "text-muted-foreground/50" : "text-muted-foreground"}>
+											{c.classId ? className(c.classId) : ""}
+										</TableCell>
+										<TableCell className={`num text-right${c.hidden ? " text-muted-foreground/50" : ""}`}>
+											{c.level ?? ""}
+										</TableCell>
+										<TableCell
+											className={c.hidden ? "text-right text-muted-foreground/50" : "text-right text-muted-foreground"}
+										>
+											{c.region.toUpperCase()}
+										</TableCell>
 										<TableCell className="py-1">
 											<CharacterToggles character={c} />
 										</TableCell>
@@ -79,7 +96,7 @@ function Account() {
 				{viewer.characters.length > 0 && (
 					<p className="mt-2 text-xs text-muted-foreground">
 						Star your main to mark it on the roster. Characters under level 5 stay out of the sidebar unless you pin
-						them.
+						them. Hide a character you don't play (a test or retired one) to take it off Guildie.
 					</p>
 				)}
 				<ClaimCharacters />
@@ -137,14 +154,78 @@ function CharacterToggles({ character: c }: { character: ViewerCharacter }) {
 					className={c.isMain ? "fill-current text-highlight" : undefined}
 				/>
 			</Toggle>
-			<Toggle
-				pressed={c.inSidebar}
-				label={c.inSidebar ? "In your sidebar. Click to remove" : "Pin to your sidebar"}
-				onClick={() => void setInSidebar({ ...key, shown: !c.inSidebar })}
-			>
-				<HugeiconsIcon icon={c.inSidebar ? PinIcon : PinOffIcon} size={15} strokeWidth={1.75} />
-			</Toggle>
+			{!c.hidden && (
+				<Toggle
+					pressed={c.inSidebar}
+					label={c.inSidebar ? "In your sidebar. Click to remove" : "Pin to your sidebar"}
+					onClick={() => void setInSidebar({ ...key, shown: !c.inSidebar })}
+				>
+					<HugeiconsIcon icon={c.inSidebar ? PinIcon : PinOffIcon} size={15} strokeWidth={1.75} />
+				</Toggle>
+			)}
+			{c.canHide && <HideToggle character={c} />}
 		</div>
+	);
+}
+
+/**
+ * Take a character off Guildie (asks first), or put it back. While hidden it's
+ * on no roster, feed, menu, search or page, its player's included; this list
+ * is the one place it still shows.
+ */
+function HideToggle({ character: c }: { character: ViewerCharacter }) {
+	const setHidden = useMutation(api.users.setHidden);
+	const [open, setOpen] = useState(false);
+	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const key = { region: c.region, slug: c.slug };
+	const change = async (hidden: boolean) => {
+		setError(null);
+		setPending(true);
+		try {
+			await setHidden({ ...key, hidden });
+			setOpen(false);
+		} catch (err) {
+			setError(err instanceof ConvexError ? String(err.data) : "Couldn't change it. Try again.");
+		} finally {
+			setPending(false);
+		}
+	};
+	if (c.hidden) {
+		return (
+			<Toggle pressed label="Hidden from Guildie. Click to show it again" onClick={() => void change(false)}>
+				<HugeiconsIcon icon={ViewOffSlashIcon} size={15} strokeWidth={1.75} />
+			</Toggle>
+		);
+	}
+	return (
+		<>
+			<Toggle pressed={false} label="Hide from Guildie" onClick={() => setOpen(true)}>
+				<HugeiconsIcon icon={ViewIcon} size={15} strokeWidth={1.75} />
+			</Toggle>
+			<Dialog.Root open={open} onOpenChange={(next) => !pending && setOpen(next)}>
+				<Dialog.Portal>
+					<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+					<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 w-[min(400px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+						<Dialog.Title className="text-[15px] font-semibold">Hide {c.name} from Guildie?</Dialog.Title>
+						<Dialog.Description className="mt-2 text-pretty text-muted-foreground">
+							{c.name} disappears from Guildie, for you and your guild: the roster, the feed (past events too), the
+							Dungeons page, crafting, search, your sidebar and personal pages, and its own page. It keeps syncing in
+							the background, and you can show it again here at any time.
+						</Dialog.Description>
+						{error && <p className="mt-3 text-destructive">{error}</p>}
+						<div className="mt-5 flex justify-end gap-2">
+							<Button variant="outline" disabled={pending} onClick={() => setOpen(false)}>
+								Cancel
+							</Button>
+							<Button disabled={pending} onClick={() => void change(true)}>
+								{pending ? "Hiding…" : "Hide"}
+							</Button>
+						</div>
+					</Dialog.Popup>
+				</Dialog.Portal>
+			</Dialog.Root>
+		</>
 	);
 }
 

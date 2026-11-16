@@ -174,7 +174,8 @@ export const character = query({
 		const guild = await ctx.db.get(character.guildId);
 		if (!guild) return null;
 		const viewer = await access(ctx, guild);
-		if (!viewer.canView) return null;
+		// Hidden by its player: no page, for them too.
+		if (!viewer.canView || character.hidden) return null;
 		const profile = await pickProfile(ctx, character);
 		// The player who claimed it may have chosen its stat priority; only they can change it.
 		const claims = await ctx.db

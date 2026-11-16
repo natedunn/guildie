@@ -10,6 +10,7 @@ import { type ItemPreview, tooltipLines } from "./items";
 import { addBlizzardRecipes, blizzardPartTimes } from "./profile";
 import { isSampleGuild } from "./sample";
 import { vEquippedItem, vTalentTree } from "./schema";
+import { rosterPatch } from "./shared/characters";
 import { dungeonOfKillStatistic } from "./shared/dungeons";
 import { keepBuild } from "./shared/fishing";
 import { TALENT_TREE_BY_ID } from "./shared/foreverTalents";
@@ -145,13 +146,16 @@ export const applyRoster = internalMutation({
 			const row = bySlug.get(member.slug);
 			bySlug.delete(member.slug);
 			let id: Id<"characters">;
+			// Hidden by its player: kept off the roster and the feed (still synced).
+			const hidden = !!row?.hidden;
 			// Someone new, or back after leaving: the feed says so, except on the
 			// guild's first sync, when everyone is new to us.
-			if (guild.rosterSyncedAt !== undefined && !row?.inRoster) await noteJoined(ctx, guildId, member, now);
+			if (guild.rosterSyncedAt !== undefined && !row?.inRoster && !hidden) await noteJoined(ctx, guildId, member, now);
 			if (row) {
-				await ctx.db.patch(row._id, { ...member, inRoster: true });
+				const listing = rosterPatch(row, true);
+				await ctx.db.patch(row._id, { ...member, ...listing });
 				id = row._id;
-				await noteLevel(ctx, { ...row, inRoster: true }, member.level, { at: now, bound: false });
+				await noteLevel(ctx, { ...row, inRoster: listing.inRoster }, member.level, { at: now, bound: false });
 			} else {
 				id = await ctx.db.insert("characters", {
 					...member,
@@ -171,7 +175,7 @@ export const applyRoster = internalMutation({
 		// Whoever is left has left the guild. Kept (not deleted) so claims and
 		// history survive a gquit-and-return.
 		for (const gone of bySlug.values()) {
-			if (gone.inRoster) await ctx.db.patch(gone._id, { inRoster: false });
+			if (gone.inRoster || gone.hidden?.inGuild) await ctx.db.patch(gone._id, rosterPatch(gone, false));
 		}
 		await ctx.db.patch(guildId, {
 			...info,
