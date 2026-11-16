@@ -30,7 +30,7 @@ export const MARKER_LABELS: Record<MarkerKind, string> = {
 	upgrade: "Upgrade",
 	maybe: "Possible upgrade",
 	empty: "Empty slot",
-	removed: "Removed",
+	removed: "Hidden",
 };
 
 /** The glyph alone (also for legends): `size` is the square's side in px. */

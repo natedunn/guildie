@@ -118,12 +118,15 @@ export function RequestButton({
 	existing,
 	ongoing,
 	label,
+	icon,
 	size = "sm",
 	variant = "outline",
 	className,
 }: {
 	guild: { region: Region; slug: string };
 	target: RequestTarget;
+	/** An icon before the words. */
+	icon?: ReactNode;
 	/** The viewer's characters in this guild (to ask as). */
 	characters: Character[];
 	/** Items: the viewer's request for it already, to change. */
@@ -136,17 +139,20 @@ export function RequestButton({
 	className?: string;
 }) {
 	const [open, setOpen] = useState(false);
+	const text =
+		label ??
+		(existing && target.kind === "item"
+			? existing.ongoing
+				? "Change request"
+				: "Your request"
+			: target.kind === "craft"
+				? "Request a craft"
+				: "Request this");
 	return (
 		<Dialog.Root open={open} onOpenChange={setOpen}>
 			<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>
-				{label ??
-					(existing && target.kind === "item"
-						? existing.ongoing
-							? "Change request"
-							: "Your request"
-						: target.kind === "craft"
-							? "Request a craft"
-							: "Request this")}
+				{icon}
+				{text}
 			</Dialog.Trigger>
 			<Dialog.Portal>
 				<Dialog.Backdrop className="fixed inset-0 z-[60] bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />

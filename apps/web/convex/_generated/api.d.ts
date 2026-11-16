@@ -51,6 +51,7 @@ import type * as shared_dungeonResources from "../shared/dungeonResources.js";
 import type * as shared_dungeons from "../shared/dungeons.js";
 import type * as shared_fishing from "../shared/fishing.js";
 import type * as shared_foreverTalents from "../shared/foreverTalents.js";
+import type * as shared_itemCategories from "../shared/itemCategories.js";
 import type * as shared_itemInfo from "../shared/itemInfo.js";
 import type * as shared_mcpText from "../shared/mcpText.js";
 import type * as shared_notifications from "../shared/notifications.js";
@@ -70,6 +71,7 @@ import type * as sources from "../sources.js";
 import type * as statPriority from "../statPriority.js";
 import type * as sync from "../sync.js";
 import type * as talents from "../talents.js";
+import type * as tracking from "../tracking.js";
 import type * as upgradeProfiles from "../upgradeProfiles.js";
 import type * as users from "../users.js";
 
@@ -123,6 +125,7 @@ declare const fullApi: ApiFromModules<{
   "shared/dungeons": typeof shared_dungeons;
   "shared/fishing": typeof shared_fishing;
   "shared/foreverTalents": typeof shared_foreverTalents;
+  "shared/itemCategories": typeof shared_itemCategories;
   "shared/itemInfo": typeof shared_itemInfo;
   "shared/mcpText": typeof shared_mcpText;
   "shared/notifications": typeof shared_notifications;
@@ -142,6 +145,7 @@ declare const fullApi: ApiFromModules<{
   statPriority: typeof statPriority;
   sync: typeof sync;
   talents: typeof talents;
+  tracking: typeof tracking;
   upgradeProfiles: typeof upgradeProfiles;
   users: typeof users;
 }>;

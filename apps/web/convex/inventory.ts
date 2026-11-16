@@ -4,6 +4,7 @@ import { type QueryCtx, query } from "./_generated/server";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { type Learner, learners, type RecipeItemRow, recipeItem } from "./recipeItems";
+import { type ItemCategory, itemCategory } from "./shared/itemCategories";
 import { QUALITY_ORDER } from "./shared/wow";
 
 // Personal → Inventory: the bags and banks of all the viewer's claimed
@@ -34,6 +35,7 @@ export const all = query({
 				quality: string;
 				icon?: string;
 				kind?: string;
+				category: ItemCategory;
 				total: number;
 				where: { key: string; part: Part; count: number }[];
 			}
@@ -82,6 +84,7 @@ export const all = query({
 							quality: known?.quality ?? "COMMON",
 							icon: known?.icon,
 							kind: known?.kind,
+							category: itemCategory(known),
 							total: 0,
 							where: [],
 						};
@@ -100,7 +103,15 @@ export const all = query({
 		return {
 			characters: characters.sort((a, b) => b.level - a.level || a.name.localeCompare(b.name)),
 			items: [...items.values()]
-				.map((i) => ({ ...i, where: i.where.sort((a, b) => b.count - a.count), recipe: recipes.get(i.itemId) }))
+				.map((i) => {
+					const recipe = recipes.get(i.itemId);
+					return {
+						...i,
+						category: recipe ? ("recipes" as const) : i.category,
+						where: i.where.sort((a, b) => b.count - a.count),
+						recipe,
+					};
+				})
 				.sort((a, b) => order(b.quality) - order(a.quality) || (a.name ?? "~").localeCompare(b.name ?? "~")),
 		};
 	},

@@ -14,6 +14,7 @@ import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
+import { REQUEST_ICON, RowActions } from "@/components/row-actions";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
@@ -39,7 +40,7 @@ export type Member = {
 type Data = NonNullable<FunctionReturnType<typeof api.crafting.upgrades>>;
 type Hit = Data["hits"][number];
 type Help = Hit["for"][number];
-/** A row: the item, and who it's for as the "Show removed" switch has it. */
+/** A row: the item, and who it's for as the "Show hidden" switch has it. */
 type Row = Hit & { shown: Help[] };
 /** Gear's kind filter: a verdict, all of them (undefined), or every piece of gear the guild makes ("all"). */
 export type GearKind = VerdictKind | "all";
@@ -57,11 +58,15 @@ const PAGE = 30;
 /** Guildmates listed under "Who's it for?" before "+N more". */
 const MATES = 2;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
-/** The table's columns: marker, item, who it's for, who crafts it, actions (a fixed width, so the heads line up). Stacked on a narrow pane. */
+/**
+ * The table's columns: marker, item, who it's for, who crafts it, actions (a
+ * fixed width, so the heads line up), with a line between each. Stacked on a
+ * narrow pane, the actions a row of buttons at the bottom.
+ */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_9.5rem] @2xl:gap-x-5";
-/** Cells after the item: under it on a narrow pane. */
-const CELL = "col-start-2 @2xl:col-start-auto";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem] @2xl:gap-x-0";
+/** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
+const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
 
 /** What each marker means (the hover says the same). */
 const MARKER_HINTS: Record<MarkerKind, string> = {
@@ -69,7 +74,7 @@ const MARKER_HINTS: Record<MarkerKind, string> = {
 	maybe:
 		"A small gain, some of a stat they rank given up, their second spec, a few levels from now, or an armor type they don't want",
 	empty: "Plain armor with no stats, for a slot they have nothing in",
-	removed: "Never suggested for your character again, here or in the game's tooltips. Restore puts it back.",
+	removed: "Hidden: never suggested for your character again, here or in the game's tooltips. Restore puts it back.",
 };
 
 export function UpgradesView({
@@ -346,14 +351,14 @@ export function UpgradesView({
 						<div
 							className={cn(
 								COLS,
-								"border-b border-border/60 px-4 pt-2 pb-1.5 text-xs text-muted-foreground @max-2xl:hidden",
+								"border-b border-border/60 px-4 text-xs text-muted-foreground @max-2xl:hidden *:py-2",
 							)}
 						>
 							<span />
-							<span>Item</span>
-							<span>Who's it for?</span>
-							<span>Who crafts it?</span>
-							<span />
+							<span className="@2xl:pl-3">Item</span>
+							<span className={CELL}>Who's it for?</span>
+							<span className={CELL}>Who crafts it?</span>
+							<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-3")} />
 						</div>
 						<ul className="divide-y divide-border/60">
 							{results.slice(0, limit).map((r) => (
@@ -498,16 +503,17 @@ function UpgradeRow({
 	// No Request when one of yours can make it, or when it binds to its crafter (the item's line says so).
 	const canRequest = !row.item?.untradeable && !row.crafters.some((c) => c.mine);
 	return (
-		<li className={cn(COLS, "px-4 py-3")}>
+		<li className={cn(COLS, "px-4 *:py-3 @max-2xl:*:not-first:not-[:nth-child(2)]:pt-1")}>
 			{/* Level with the item icon's top, a touch lower so it sits even with it. */}
-			{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} className="mt-0.5" /> : <span />}
+			<span className="pt-3.5">{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} /> : null}</span>
 			<RecipeItem
+				className="@2xl:pr-5 @2xl:pl-3"
 				recipe={row}
 				size={36}
 				wrap
 				detail={row.item?.untradeable ? `${row.profession} · ${row.item.untradeable}` : row.profession}
 			/>
-			<div className={cn(CELL, "min-w-0")}>
+			<div className={CELL}>
 				<CellHead>Who's it for?</CellHead>
 				{row.shown.length === 0 ? (
 					<p className="text-xs leading-5 text-muted-foreground">Not an upgrade for anyone right now</p>
@@ -517,7 +523,7 @@ function UpgradeRow({
 					<ForCell row={row} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
 				)}
 			</div>
-			<div className={cn(CELL, "min-w-0 @max-2xl:mt-1")}>
+			<div className={CELL}>
 				<CellHead>Who crafts it?</CellHead>
 				<MakersCell
 					crafters={row.crafters}
@@ -529,20 +535,13 @@ function UpgradeRow({
 					<Requested row={row} region={region} guildSlug={guildSlug} />
 				</MakersCell>
 			</div>
-			<div className={cn(CELL, "flex items-center gap-1.5 @2xl:justify-end")}>
-				{canRequest ? <CraftRequest recipe={row} member={member} /> : null}
-				{canRemove ? (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="text-muted-foreground"
-						title="Never suggest this for your character again, here or in the game's tooltips"
-						onClick={() => onRemove(row)}
-					>
-						Remove
-					</Button>
-				) : null}
-			</div>
+			<RowActions
+				className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
+				request={canRequest && member ? <CraftRequest recipe={row} member={member} icon={REQUEST_ICON} /> : null}
+				recipeId={row.recipeId}
+				track={!!member}
+				onHide={canRemove ? () => onRemove(row) : undefined}
+			/>
 		</li>
 	);
 }
@@ -577,7 +576,7 @@ function Person({
 						: h.at
 							? ` · from level ${h.at}`
 							: null}
-					{h.removed ? " · Removed" : null}
+					{h.removed ? " · Hidden" : null}
 				</span>
 				{h.removed ? (
 					<button
@@ -732,6 +731,8 @@ function Requested({ row, region, guildSlug }: { row: Row; region: string; guild
 export function CraftRequest({
 	recipe,
 	member,
+	className,
+	icon,
 }: {
 	recipe: {
 		recipeId: number;
@@ -740,6 +741,9 @@ export function CraftRequest({
 		crafters: { name: string; slug: string; classId: number; skill?: number }[];
 	};
 	member?: Member;
+	className?: string;
+	/** Show this icon instead of "Request" (crafting rows' action tray). */
+	icon?: ReactNode;
 }) {
 	if (recipe.item?.untradeable) {
 		return <span className="flex-none text-xs whitespace-nowrap text-muted-foreground">{recipe.item.untradeable}</span>;
@@ -751,7 +755,8 @@ export function CraftRequest({
 			characters={member.characters}
 			size="sm"
 			label="Request"
-			className="flex-none"
+			icon={icon}
+			className={className}
 			target={{
 				kind: "craft",
 				recipeId: recipe.recipeId,
@@ -827,7 +832,7 @@ function RemovedSwitch({
 			)}
 		>
 			<Switch checked={checked} onCheckedChange={onChange} />
-			Show removed
+			Show hidden
 			{count ? <span className="num text-xs">{count}</span> : null}
 		</label>
 	);
@@ -990,7 +995,7 @@ function setSkipRemoveConfirm() {
 
 /**
  * Remove asks first: what goes, for which of your characters (a choice when
- * it's for several), and how to get it back (Show removed).
+ * it's for several), and how to get it back (Show hidden).
  */
 function RemoveDialog({
 	target,
@@ -1024,7 +1029,7 @@ function RemoveDialog({
 				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
 				<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					<Dialog.Title className="text-[15px] font-semibold">
-						{several ? "Remove from whose upgrades?" : `Remove from ${h?.name}'s upgrades?`}
+						{several ? "Hide from whose upgrades?" : `Hide from ${h?.name}'s upgrades?`}
 					</Dialog.Title>
 					{item ? (
 						<div className="mt-3 flex items-center gap-2.5 rounded-md border border-border bg-well px-3 py-2.5">
@@ -1062,7 +1067,7 @@ function RemoveDialog({
 					) : null}
 					<Dialog.Description className="mt-3 text-pretty text-muted-foreground">
 						It won't be suggested for {h?.name} again, here or in the game's tooltips. To see it again, turn on{" "}
-						<span className="text-foreground">Show removed</span>, where you can put it back.
+						<span className="text-foreground">Show hidden</span>, where you can put it back.
 					</Dialog.Description>
 					<label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-muted-foreground select-none hover:text-foreground">
 						<input
@@ -1077,7 +1082,7 @@ function RemoveDialog({
 						<Button variant="outline" onClick={onCancel}>
 							Cancel
 						</Button>
-						<Button onClick={() => h && onConfirm(h.slug, dontAsk)}>Remove</Button>
+						<Button onClick={() => h && onConfirm(h.slug, dontAsk)}>Hide</Button>
 					</div>
 				</Dialog.Popup>
 			</Dialog.Portal>

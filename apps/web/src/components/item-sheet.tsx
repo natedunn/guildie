@@ -11,6 +11,7 @@ import { ClassText } from "@/components/class-name";
 import { ItemIcon, ItemTooltipBody, QUALITY_COLORS, wowheadItemUrl } from "@/components/item";
 import { LearnerList } from "@/components/recipe-learners";
 import { RequestButton, RequestRow } from "@/components/requests";
+import { TrackButton } from "@/components/track-button";
 import { buttonVariants } from "@/components/ui/button";
 import { UpgradeWhy } from "@/components/upgrade-why";
 import { cn } from "@/lib/utils";
@@ -227,6 +228,7 @@ function ItemPanel({ itemId, onClose }: { itemId: number; onClose: () => void })
 										)}
 									</p>
 								)}
+								{member && <TrackButton recipeId={r.recipeId} size="xs" className="float-right" />}
 								{member && r.crafters.length > 0 && !data.untradeable && (
 									<RequestButton
 										guild={member.guild}
