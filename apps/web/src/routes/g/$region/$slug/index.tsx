@@ -57,9 +57,6 @@ export const Route = createFileRoute("/g/$region/$slug/")({
 type Filters = { maxOnly: boolean; underMin: boolean; unclaimed: boolean };
 const NO_FILTERS: Filters = { maxOnly: false, underMin: false, unclaimed: true };
 
-/** Members who joined within this long get a "New" tag. */
-const NEW_FOR_MS = 7 * 86_400_000;
-
 type SortKey = "name" | "level" | "class" | "ilvl" | "seen" | "profession";
 
 function GuildPage() {
@@ -141,9 +138,6 @@ function Roster({ members }: { members: Member[] }) {
 
 	// Under level 10 are hidden by default; say how many next to Filter.
 	const hiddenLow = filters.underMin ? 0 : members.filter((m) => m.level < ROSTER_MIN_LEVEL).length;
-
-	// For "New": render time is close enough.
-	const now = Date.now();
 
 	const classCounts = useMemo(() => {
 		const counts = new Map<number, number>();
@@ -332,11 +326,6 @@ function Roster({ members }: { members: Member[] }) {
 								{m.main && (
 									<span className="pill ml-1.5 px-1.5 py-0 text-[0.6875rem]" title="Their main">
 										Main
-									</span>
-								)}
-								{m.joinedAt !== undefined && now - m.joinedAt < NEW_FOR_MS && (
-									<span className="pill ml-1.5 px-1.5 py-0 text-[0.6875rem]" title={`Joined ${ago(m.joinedAt)}`}>
-										New
 									</span>
 								)}
 							</TableCell>

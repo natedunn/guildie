@@ -548,10 +548,11 @@ export default defineSchema({
 			v.literal("claim"),
 			v.literal("fulfilled"),
 			v.literal("delivery"),
+			v.literal("joined"),
 		),
 		/** Who it's about (the requester for requests). */
 		character: vRequestCharacter,
-		/** level: the new level, and the one before. */
+		/** level: the new level, and the one before. joined: their level on arrival. */
 		level: v.optional(v.number()),
 		fromLevel: v.optional(v.number()),
 		/** dungeon, quests: the dungeon's key. */

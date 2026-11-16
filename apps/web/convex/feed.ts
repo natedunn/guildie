@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { type MutationCtx, query } from "./_generated/server";
+import { internalMutation, type MutationCtx, query } from "./_generated/server";
 import type { Delivery } from "./addonPayload";
 import { access } from "./guilds";
 import { vRegion } from "./schema";
@@ -15,6 +15,8 @@ import { REACTIONS, type Reaction } from "./shared/reactions";
 //   from the profile sync); same baseline rule.
 // - quests: dungeon quests newly in Blizzard's completed list (profile sync).
 //   Every newly completed quest also counts toward the day (questTurnIns).
+// - joined: a roster sync finds a new member, or one who left coming back.
+//   Not on a guild's first sync (everyone would be "new").
 // - request, claim, fulfilled: requests.ts.
 // Members only, like the guild's other quest and request data.
 //
@@ -65,6 +67,59 @@ export async function noteLevel(ctx: MutationCtx, c: Character, level: number, w
 		fromLevel: c.feedLevel,
 	});
 }
+
+/** A member arrived (sync.applyRoster): a "joined" event, at their level then. */
+export async function noteJoined(
+	ctx: MutationCtx,
+	guildId: Id<"guilds">,
+	c: Pick<Doc<"characters">, "slug" | "name" | "classId" | "level">,
+	at: number,
+) {
+	await ctx.db.insert("feedEvents", { guildId, at, kind: "joined", character: who(c), level: c.level });
+}
+
+/**
+ * Migration: "joined" events for members who arrived before the feed had
+ * them (the roster's old "New" tag, from when we first saw the character),
+ * skipping each guild's first day (its first roster sync) and anyone who
+ * already has one. Safe to run again. Run once per deployment after this
+ * deploys: `npx convex run feed:backfillJoined --deployment <name>`.
+ */
+export const backfillJoined = internalMutation({
+	args: {},
+	handler: async (ctx): Promise<{ added: number }> => {
+		let added = 0;
+		for (const guild of await ctx.db.query("guilds").collect()) {
+			const members = await ctx.db
+				.query("characters")
+				.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
+				.collect();
+			const joined = members.filter((c) => c._creationTime > guild._creationTime + FIRST_SYNC_MS);
+			if (!joined.length) continue;
+			const since = Math.min(...joined.map((c) => c._creationTime));
+			const existing = new Set(
+				(
+					await ctx.db
+						.query("feedEvents")
+						.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", since))
+						.collect()
+				)
+					.filter((e) => e.kind === "joined")
+					.map((e) => e.character.slug),
+			);
+			for (const c of joined) {
+				if (existing.has(c.slug)) continue;
+				// Their level then isn't known; the first one the feed saw is closest.
+				await noteJoined(ctx, guild._id, { ...c, level: c.feedLevel ?? c.level }, Math.floor(c._creationTime));
+				added++;
+			}
+		}
+		return { added };
+	},
+});
+
+/** A guild's first roster sync happens within this long of adding it: those members aren't "joined". */
+const FIRST_SYNC_MS = 86_400_000;
 
 async function fixLevelTime(ctx: MutationCtx, c: Character, level: number, at: number) {
 	const recent = await ctx.db

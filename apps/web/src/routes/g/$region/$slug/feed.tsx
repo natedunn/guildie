@@ -14,6 +14,7 @@ import {
 	ScrollTextIcon,
 	SmilePlusIcon,
 	ThumbsUpIcon,
+	UserAdd01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -30,10 +31,10 @@ import { Input } from "@/components/ui/input";
 import { addDays, feedDayLabel, feedDayStart } from "@/lib/feed-day";
 import { cn } from "@/lib/utils";
 
-// Feed: what the guild's members did, newest first, by day: level-ups,
-// first dungeon clears, dungeon quests turned in, and requests made,
-// claimed and fulfilled (convex/feed.ts). The kind filter lives in the URL;
-// the member search (rows naming a character, either side) doesn't.
+// Feed: what the guild's members did, newest first, by day: who joined,
+// level-ups, first dungeon clears, dungeon quests turned in, and requests
+// made, claimed and fulfilled (convex/feed.ts). The kind filter lives in the
+// URL; the member search (rows naming a character, either side) doesn't.
 // Days only, never times: Blizzard tells us hours late. A day runs from 4am
 // (lib/feed-day.ts), so a late night counts with its evening. Within a day, alike
 // events share a row: everyone who cleared a dungeon, everyone who turned in
@@ -132,6 +133,7 @@ function FeedPage() {
 		if (e.kind === "level") return show === "all" || show === "levels";
 		if (e.kind === "dungeon") return show === "all" || show === "dungeons";
 		if (e.kind === "quests") return show === "all" || show === "quests";
+		if (e.kind === "joined") return show === "all";
 		return show === "all" || show === "requests";
 	});
 	const days = byDay(events);
@@ -180,7 +182,7 @@ function FeedPage() {
 					<p className="surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground">
 						{query
 							? "Nobody by that name here."
-							: "Nothing here yet. Level-ups, first dungeon clears, dungeon quests and requests show up as they happen."}
+							: "Nothing here yet. New members, level-ups, first dungeon clears, dungeon quests and requests show up as they happen."}
 					</p>
 				) : (
 					days.map((day) => {
@@ -285,11 +287,13 @@ function groupDay(events: Event[]): Row[] {
 	const byKey = new Map<string, Row>();
 	for (const e of merged) {
 		const key =
-			e.kind === "level"
-				? `level:${e.level}`
-				: e.kind === "dungeon" || e.kind === "quests"
-					? `${e.kind}:${e.dungeon}`
-					: undefined;
+			e.kind === "joined"
+				? "joined"
+				: e.kind === "level"
+					? `level:${e.level}`
+					: e.kind === "dungeon" || e.kind === "quests"
+						? `${e.kind}:${e.dungeon}`
+						: undefined;
 		const row = key ? byKey.get(key) : undefined;
 		if (row) {
 			row.ids.push(...(mergedIds.get(e) ?? [e.id]));
@@ -313,6 +317,7 @@ function groupDay(events: Event[]): Row[] {
 }
 
 const KIND_ICON = {
+	joined: UserAdd01Icon,
 	level: ArrowUpDoubleIcon,
 	dungeon: Castle01Icon,
 	quests: ScrollTextIcon,
@@ -324,6 +329,7 @@ const KIND_ICON = {
 
 /** The grey line's words when a row has nothing else to say there. */
 const KIND_LABEL = {
+	joined: "New member",
 	level: "Level-up",
 	dungeon: "First clear",
 	quests: "Dungeon quests",
@@ -396,6 +402,10 @@ function EventRow({ row, onReact }: { row: Row; onReact: (reaction: Reaction) =>
 	/** A dungeon's art, along the row's right edge. */
 	let art: string | undefined;
 	switch (e.kind) {
+		case "joined":
+			text = <>{everyone} joined the guild</>;
+			if (!several && e.level !== undefined) detail = <span className="num">Level {e.level}</span>;
+			break;
 		case "level":
 			text = (
 				<>
