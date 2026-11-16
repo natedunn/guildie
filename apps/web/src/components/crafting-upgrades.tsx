@@ -537,7 +537,7 @@ function UpgradeRow({
 			</div>
 			<RowActions
 				className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
-				request={canRequest ? <CraftRequest recipe={row} member={member} icon={REQUEST_ICON} /> : null}
+				request={canRequest && member ? <CraftRequest recipe={row} member={member} icon={REQUEST_ICON} /> : null}
 				recipeId={row.recipeId}
 				track={!!member}
 				onHide={canRemove ? () => onRemove(row) : undefined}

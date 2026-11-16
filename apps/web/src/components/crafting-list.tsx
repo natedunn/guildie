@@ -208,7 +208,7 @@ export function RecipeList({
 								<RowActions
 									className={cn(CELL, "@max-2xl:pt-2! @2xl:pr-0 @2xl:pl-3")}
 									request={
-										r.crafters.some((c) => c.mine) || r.item?.untradeable ? null : (
+										!member || r.crafters.some((c) => c.mine) || r.item?.untradeable ? null : (
 											<CraftRequest recipe={r} member={member} icon={REQUEST_ICON} />
 										)
 									}
