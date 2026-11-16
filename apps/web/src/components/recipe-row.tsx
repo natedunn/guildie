@@ -28,10 +28,13 @@ export function RecipeItem({
 	recipe,
 	size = 28,
 	detail,
+	wrap,
 	className,
 }: {
 	recipe: Recipe;
 	size?: number;
+	/** Long names wrap (top-aligned) instead of ending in "...". */
+	wrap?: boolean;
 	/** A second line under the name (after the recipe's own name when it differs), e.g. the profession. */
 	detail?: string;
 	className?: string;
@@ -39,7 +42,7 @@ export function RecipeItem({
 	const { item } = recipe;
 	const showRecipeName = item && item.name.toLowerCase() !== recipe.name.toLowerCase();
 	return (
-		<div className={cn("flex min-w-0 items-center gap-2.5", className)}>
+		<div className={cn("flex min-w-0 gap-2.5", wrap ? "items-start" : "items-center", className)}>
 			{item ? (
 				<ItemHover item={item} className="shrink-0">
 					<ItemIcon icon={item.icon} quality={item.quality} size={size} className="block" />
@@ -51,14 +54,14 @@ export function RecipeItem({
 			)}
 			<div className="min-w-0 leading-tight">
 				{item ? (
-					<ItemHover item={item} className="block truncate hover:underline">
+					<ItemHover item={item} className={cn("block hover:underline", !wrap && "truncate")}>
 						<span style={{ color: QUALITY_COLORS[item.quality ?? "COMMON"] }}>{item.name}</span>
 					</ItemHover>
 				) : (
-					<div className="truncate">{recipe.name}</div>
+					<div className={cn(!wrap && "truncate")}>{recipe.name}</div>
 				)}
 				{showRecipeName || detail ? (
-					<div className="mt-0.5 truncate text-xs text-muted-foreground">
+					<div className={cn("mt-0.5 text-xs text-muted-foreground", !wrap && "truncate")}>
 						{[showRecipeName ? recipe.name : undefined, detail].filter(Boolean).join(" · ")}
 					</div>
 				) : null}

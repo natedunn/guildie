@@ -675,6 +675,93 @@ select:not([multiple]) {
 			inset 0 0 0 1px rgb(255 240 215 / 0.1);
 	}
 
+	/* Nested lists on guide lines (Crafting's Upgrades): each item draws its
+	   own piece of the line and a rounded elbow, so the line stops at the
+	   last one. Solid colors (the border token, mixed over what's behind):
+	   the pieces overlap, and a see-through line would show it. */
+	.filter-tree,
+	.filter-tree ul,
+	.who-list,
+	.who-list ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.filter-tree li,
+	.who-list ul li {
+		position: relative;
+	}
+	/* The sidebar's filters, on the page's background; 32px rows. */
+	.filter-tree ul {
+		--guide: #3c3830;
+		margin-left: 17px;
+		padding-left: 9px;
+	}
+	.filter-tree ul > li::before {
+		content: "";
+		position: absolute;
+		left: -9px;
+		top: 0;
+		width: 7px;
+		height: 16px;
+		border-left: 1px solid var(--guide);
+		border-bottom: 1px solid var(--guide);
+		border-bottom-left-radius: 4px;
+	}
+	.filter-tree ul > li:not(:last-child)::after {
+		content: "";
+		position: absolute;
+		left: -9px;
+		top: 12px;
+		bottom: 0;
+		border-left: 1px solid var(--guide);
+	}
+	/* A table cell's groups (Yours, Guildmates), on a card; 20px lines. */
+	.who-list {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+	}
+	.who-label {
+		display: block;
+		font-size: 11.5px;
+		font-weight: 600;
+		line-height: 18px;
+		letter-spacing: 0.02em;
+		color: var(--muted-foreground);
+	}
+	.who-list ul {
+		--guide: #423c33;
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 3px 0 0 3px;
+		padding-left: 12px;
+	}
+	.who-list ul > li::before {
+		content: "";
+		position: absolute;
+		left: -12px;
+		top: -6px;
+		width: 8px;
+		height: 16px;
+		border-left: 1px solid var(--guide);
+		border-bottom: 1px solid var(--guide);
+		border-bottom-left-radius: 4px;
+	}
+	.who-list ul > li:first-child::before {
+		top: -3px;
+		height: 13px;
+	}
+	.who-list ul > li:not(:last-child)::after {
+		content: "";
+		position: absolute;
+		left: -12px;
+		top: 6px;
+		bottom: -6px;
+		border-left: 1px solid var(--guide);
+	}
+
 	/* ---- Tables: hairlines, quiet heads, a fill under the pointer ---- */
 
 	[data-slot="table"] thead tr {

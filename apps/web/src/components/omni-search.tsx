@@ -691,7 +691,7 @@ function useLocalResults(typed: string) {
 					title: "Upgrades for me",
 					subtitle: sub ?? "Crafting",
 					visual: { kind: "icon", name: "sparkles" },
-					nav: route("/g/$region/$slug/crafting", p, { view: "upgrades" }),
+					nav: route("/g/$region/$slug/crafting", p, { view: "upgrades", for: "mine" }),
 					keywords: ["crafting", "gear upgrades", "better gear"],
 				});
 				add({
@@ -700,7 +700,7 @@ function useLocalResults(typed: string) {
 					title: "Upgrades I can craft",
 					subtitle: sub ?? "Crafting",
 					visual: { kind: "icon", name: "anvil" },
-					nav: route("/g/$region/$slug/crafting", p, { view: "craft" }),
+					nav: route("/g/$region/$slug/crafting", p, { view: "upgrades", by: "mine" }),
 					keywords: ["crafting", "craft for guildmates", "help"],
 				});
 			}

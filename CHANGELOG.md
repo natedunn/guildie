@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** Crafting's Upgrades is one table now: what the guild can craft for your characters and what yours can craft for anyone, together. Each row says who it's for and who crafts it, yours first and then guildmates. Narrow it down from the sidebar (menus on smaller windows): who it's for, who crafts it (anyone, your characters, one of them, or guildmates) and the profession. Each row lists two guildmates; "+N more" opens everyone it's for and everyone who crafts it. Remove asks which of your characters when an item suits several.
+
 ## 0.3.40
 
 ### New
