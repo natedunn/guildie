@@ -142,12 +142,12 @@ over an empty slot.
 
 ### 6. The verdict and the order
 
-| Verdict              | When                                                                                                                                                                    |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Upgrade**          | Gain of 15% or more, usable now, main spec, and an armor type they want                                                                                                 |
-| **Possible upgrade** | Anything else that gains 3% or more: a smaller gain, only their second spec, usable within 3 levels, or an armor type they don't want                                   |
-| **Empty slot**       | Plain armor (no stats: white and grey items) for a slot they have nothing in                                                                                            |
-| Nothing              | Under 3%, or under 1 point; plain armor over anything they wear                                                                                                         |
+| Verdict              | When                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Upgrade**          | Gain of 15% or more, usable now, main spec, and an armor type they want                                                               |
+| **Possible upgrade** | Anything else that gains 3% or more: a smaller gain, only their second spec, usable within 3 levels, or an armor type they don't want |
+| **Empty slot**       | Plain armor (no stats: white and grey items) for a slot they have nothing in                                                          |
+| Nothing              | Under 3%, or under 1 point; plain armor over anything they wear                                                                       |
 
 Plain armor only has armor, so whatever they wear in that slot almost always
 has stats it would lose; it's only worth wearing over nothing. Plain weapons

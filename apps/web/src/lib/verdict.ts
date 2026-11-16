@@ -13,7 +13,6 @@ export function verdictLabel(kind: VerdictKind, at?: number) {
 /** What each verdict means, for a tooltip. */
 export const VERDICT_HINTS: Record<VerdictKind, string> = {
 	upgrade: "A clear gain by their stat weights, what they give up counted",
-	maybe:
-		"A small gain, their second spec, a few levels from now, or an armor type they don't want",
+	maybe: "A small gain, their second spec, a few levels from now, or an armor type they don't want",
 	empty: "Plain armor with no stats, for a slot they have nothing in",
 };
