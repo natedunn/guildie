@@ -1,4 +1,5 @@
--- Adds a Guildie block to item tooltips: whether it's an upgrade for you
+-- Adds a Guildie block to item tooltips: how many more of a reagent your
+-- tracked crafts need ("You | need 6 more"), whether it's an upgrade for you
 -- ("You | upgrade", Upgrades.lua), guild requests for this item ("Todd
 -- wants all you have" for ongoing ones, "Miller requesting 20"), guildmates
 -- whose known recipes use it (reagents), who could learn it (recipe items:
@@ -203,6 +204,45 @@ local function requestRows(itemID)
 end
 ns.requestRows = requestRows
 
+--- Reagents for your tracked crafts (GuildieData.tracked, addon 0.23.0):
+--- "You | need 6 more (4/10) for Greater Healing Potion ×5", or "You | have
+--- all 10 for ...". The character you're on counts live (bags, and the bank
+--- as the game last saw it); your other characters as Guildie last read
+--- them. Setting: "Say how many you need for tracked crafts" (showTracked).
+local function trackedRow(itemID)
+    local s = GuildieDB and GuildieDB.settings
+    if s and s.showTracked == false then return nil end
+    local all = GuildieData and type(GuildieData.tracked) == "table" and GuildieData.tracked
+    local entry = all and all[itemID]
+    if type(entry) ~= "table" or type(entry.need) ~= "number" then return nil end
+    local counts = type(entry.have) == "table" and entry.have or {}
+    local me = UnitName and UnitName("player")
+    local have = 0
+    for name, count in pairs(counts) do
+        if name ~= me and type(count) == "number" then have = have + count end
+    end
+    local get = C_Item and C_Item.GetItemCount or GetItemCount
+    local ok, live = pcall(function() return get and get(itemID, true) end)
+    if ok and type(live) == "number" then
+        have = have + live
+    elseif type(counts[me]) == "number" then
+        have = have + counts[me]
+    end
+    local right
+    if have >= entry.need then
+        right = string.format("have all %d", entry.need)
+    else
+        right = string.format("need %d more (%d/%d)", entry.need - have, have, entry.need)
+    end
+    local crafts = type(entry.crafts) == "table" and entry.crafts or {}
+    if type(crafts[1]) == "string" then
+        right = right .. " for " .. crafts[1]
+        if #crafts > 1 then right = right .. string.format(" +%d", #crafts - 1) end
+    end
+    return { left = "You", right = right }
+end
+ns.trackedRow = trackedRow
+
 --- The item in this tooltip, read for the gear rules (Upgrades.lua), or nil.
 local function gearItem(tooltip, data, link, lines)
     if not ns.upgrades then return nil end
@@ -236,6 +276,9 @@ local function rowsFor(tooltip, itemID, data, link)
     local okItem, item = pcall(gearItem, tooltip, data, link, lines)
     if not okItem then item = nil end
     local rows = {}
+    -- Your tracked crafts' reagents first: what you're out gathering.
+    local okTracked, tracked = pcall(trackedRow, itemID)
+    if okTracked and tracked then table.insert(rows, tracked) end
     -- Yours first: it's for you whether or not it can be traded (quest rewards, loot rolls).
     local okMine, mine = pcall(function() return item and ns.upgrades.mineRow(item, itemID, classColored) end)
     if okMine and mine then table.insert(rows, mine) end

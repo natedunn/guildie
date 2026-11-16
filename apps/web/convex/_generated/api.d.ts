@@ -70,6 +70,7 @@ import type * as sources from "../sources.js";
 import type * as statPriority from "../statPriority.js";
 import type * as sync from "../sync.js";
 import type * as talents from "../talents.js";
+import type * as tracking from "../tracking.js";
 import type * as upgradeProfiles from "../upgradeProfiles.js";
 import type * as users from "../users.js";
 
@@ -142,6 +143,7 @@ declare const fullApi: ApiFromModules<{
   statPriority: typeof statPriority;
   sync: typeof sync;
   talents: typeof talents;
+  tracking: typeof tracking;
   upgradeProfiles: typeof upgradeProfiles;
   users: typeof users;
 }>;

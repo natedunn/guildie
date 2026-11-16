@@ -7,6 +7,7 @@ import { ClassText } from "@/components/class-name";
 import { CraftRequest, type Member, WhoPicker } from "@/components/crafting-upgrades";
 import { FilterMenu } from "@/components/filter-menu";
 import { buildIndex, compareProfessions, queryWords, Reagents, RecipeItem, searchIndex } from "@/components/recipe-row";
+import { TrackButton } from "@/components/track-button";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
@@ -41,7 +42,7 @@ const LEARNERS = 2;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
 /** Item, who makes it, reagents, actions (fixed, so the heads line up). Stacked on a narrow pane. */
 const COLS =
-	"grid grid-cols-1 items-start gap-x-5 gap-y-2 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_7rem]";
+	"grid grid-cols-1 items-start gap-x-5 gap-y-2 @2xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.8fr)_10.5rem]";
 
 const keeps = (who: string | undefined, c: { slug: string; mine: boolean }) =>
 	!who || (who === "mine" ? c.mine : who === "guild" ? !c.mine : c.slug === who);
@@ -193,8 +194,9 @@ export function RecipeList({
 								/>
 								<MakersCell crafters={r.crafters} learners={r.learners} region={region} profession={r.profession} />
 								<Reagents reagents={r.reagents} className="@max-2xl:hidden" />
-								<div className="flex items-center @2xl:justify-end">
+								<div className="flex flex-wrap items-center gap-1 @2xl:justify-end">
 									{r.crafters.some((c) => c.mine) ? null : <CraftRequest recipe={r} member={member} />}
+									{member ? <TrackButton recipeId={r.recipeId} /> : null}
 								</div>
 							</li>
 						))}

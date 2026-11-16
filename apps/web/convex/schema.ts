@@ -230,6 +230,19 @@ export default defineSchema({
 		.index("by_slug", ["flavor", "region", "slug"])
 		.index("by_profileSyncedAt", ["inRoster", "profileSyncedAt"]),
 
+	/**
+	 * Crafts a player is gathering reagents for (Inventory's "Tracked crafts",
+	 * and "You | need 6 more" on reagent tooltips in game): the recipe and how
+	 * many to make. Per player, not per character: reagents count across all
+	 * their characters' bags and banks. tracking.ts.
+	 */
+	trackedCrafts: defineTable({
+		userId: v.id("users"),
+		recipeId: v.number(),
+		quantity: v.number(),
+		addedAt: v.number(),
+	}).index("by_user", ["userId", "recipeId"]),
+
 	/** Characters a person proved they own, via Battle.net's account profile. */
 	ownedCharacters: defineTable({
 		userId: v.id("users"),

@@ -19,6 +19,7 @@ import type { ItemInfo } from "./shared/itemInfo";
 import { mergeCompletedQuestIds } from "./shared/quests";
 import { addonRecipes, type PackedAddonRecipes, packAddonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
+import { trackedReagents } from "./tracking";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
 
@@ -627,6 +628,7 @@ type GuildDataBase = {
 	crafts: GuildData["crafts"];
 	recipes: GuildData["recipes"];
 	notifications: GuildData["notifications"];
+	tracked: GuildData["tracked"];
 };
 
 export type GuildData = {
@@ -684,7 +686,26 @@ export type GuildData = {
 	 * ("Miller will craft your Silk Bandage ×2"). notifications.ts.
 	 */
 	notifications: { id: string; text: string }[];
+	/**
+	 * Reagents for the player's tracked crafts, by item id (addon 0.23.0+;
+	 * older addons ignore it): how many all those crafts need, how many each
+	 * of their characters has (bags and bank, as last read), and which crafts
+	 * ("Greater Healing Potion ×5"). The tooltip's "You | need 6 more" row;
+	 * the addon counts the character you're on live. tracking.ts.
+	 */
+	tracked: Record<string, { need: number; have: Record<string, number>; crafts: string[] }>;
 };
+
+/** GuildData.tracked: the player's tracked crafts' reagents, counts by character name. */
+async function addonTracked(ctx: QueryCtx, userId: Id<"users">): Promise<GuildData["tracked"]> {
+	const out: GuildData["tracked"] = {};
+	for (const r of (await trackedReagents(ctx, userId)).reagents) {
+		const have: Record<string, number> = {};
+		for (const w of r.where) have[w.name] = (have[w.name] ?? 0) + w.count;
+		out[r.itemId] = { need: r.need, have, crafts: r.for };
+	}
+	return out;
+}
 
 /** The token's guilds (those its claimed characters are in) and their members. */
 export const guildDataBase = internalQuery({
@@ -797,6 +818,7 @@ export const guildDataBase = internalQuery({
 			crafts: requests.crafts,
 			recipes: packAddonRecipes(addonRecipes(taught, recipeCharacters)),
 			notifications: await forGame(ctx, row.userId),
+			tracked: await addonTracked(ctx, row.userId),
 		};
 	},
 });
@@ -849,6 +871,7 @@ export const guildData = action({
 			crafts: base.crafts,
 			recipes: base.recipes,
 			notifications: base.notifications,
+			tracked: base.tracked,
 		};
 	},
 });

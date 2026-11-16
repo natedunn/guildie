@@ -14,6 +14,7 @@ import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
+import { TrackButton } from "@/components/track-button";
 import { Button } from "@/components/ui/button";
 import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
@@ -59,7 +60,7 @@ const MATES = 2;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
 /** The table's columns: marker, item, who it's for, who crafts it, actions (a fixed width, so the heads line up). Stacked on a narrow pane. */
 const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_9.5rem] @2xl:gap-x-5";
+	"grid grid-cols-[1.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_12rem] @2xl:gap-x-5";
 /** Cells after the item: under it on a narrow pane. */
 const CELL = "col-start-2 @2xl:col-start-auto";
 
@@ -529,8 +530,9 @@ function UpgradeRow({
 					<Requested row={row} region={region} guildSlug={guildSlug} />
 				</MakersCell>
 			</div>
-			<div className={cn(CELL, "flex items-center gap-1.5 @2xl:justify-end")}>
+			<div className={cn(CELL, "flex flex-wrap items-center gap-1 @2xl:justify-end")}>
 				{canRequest ? <CraftRequest recipe={row} member={member} /> : null}
+				{member ? <TrackButton recipeId={row.recipeId} /> : null}
 				{canRemove ? (
 					<Button
 						variant="ghost"

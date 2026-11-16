@@ -9,6 +9,7 @@ import { ViewAs } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { Page, PageHeader } from "@/components/page-header";
 import { LearnerSummary } from "@/components/recipe-learners";
+import { TrackedCrafts } from "@/components/tracked-crafts";
 import { SearchInput } from "@/components/ui/search-input";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,8 @@ import { cn } from "@/lib/utils";
 // of the last time it was open). "Where's my Silk Cloth?": Lich bags 37 ·
 // Isai bank 20. Only you see it (inventory:all). `?character=<slug>` shows
 // one character (old /c/…/inventory links land here). Recipe items say who
-// in your guilds could learn them ("Can learn Brenna · Knows it 3").
+// in your guilds could learn them ("Can learn Brenna · Knows it 3"). Tracked
+// crafts come first: their reagents, have against need (tracked-crafts.tsx).
 
 type Search = { character?: string };
 
@@ -29,7 +31,10 @@ export const Route = createFileRoute("/inventory")({
 		if (!context.token) throw redirect({ to: "/sign-in", search: { next: "/inventory" } });
 	},
 	loader: async ({ context }) => {
-		await context.queryClient.ensureQueryData(convexQuery(api.inventory.all, {}));
+		await Promise.all([
+			context.queryClient.ensureQueryData(convexQuery(api.inventory.all, {})),
+			context.queryClient.ensureQueryData(convexQuery(api.tracking.list, {})),
+		]);
 	},
 	head: () => ({ meta: [{ title: "Inventory · Guildie" }] }),
 	component: InventoryPage,
@@ -82,6 +87,7 @@ function InventoryPage() {
 					</p>
 				) : (
 					<>
+						<TrackedCrafts />
 						<div className="space-y-3">
 							<SearchInput
 								id="inventory-search"

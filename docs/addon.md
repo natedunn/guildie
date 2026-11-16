@@ -313,6 +313,16 @@ your last login or reload.
 - Recipe items (addon 0.14.0): `recipes`; see "Recipe items".
 - Notifications (addon 0.21.0): `notifications`, `[{ id, text }]`, recent
   unread ones meant for the game; see "Notifications".
+- Tracked crafts (addon 0.23.0): `tracked`, by reagent item id, `{ need,
+  have = { [characterName] = count }, crafts = { "Greater Healing Potion ×5" } }`
+  for the crafts the player tracks on the site (Inventory, `convex/tracking.ts`):
+  how many all of them need and how many each of their characters holds (bags
+  and bank, as last uploaded). The reagent's tooltip gets a row first in the
+  block: "You | need 6 more (4/10) for Greater Healing Potion ×5", or "You |
+  have all 10 for ...". The character you're on counts live
+  (`GetItemCount(id, true)`: bags, and the bank as the game last saw it), the
+  others from `have`. Setting: "Say how many you need for tracked crafts"
+  (`showTracked`, on by default). Tests: `tests/tracked_test.lua`.
 - The file is generated as data literals only (`packages/sync/src/luaData.ts`,
   tested), since the game runs addon files as code.
 
