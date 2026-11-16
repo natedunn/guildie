@@ -165,3 +165,43 @@ test("plural data nouns and class heading context survive edited-line analysis",
 test("untrusted issue authors cannot spoof managed review markers", () => {
 	assert.equal(findIssue([{ number: 3, user: { login: "attacker" }, body: marker("123") }], "123"), undefined);
 });
+
+test("spoofed state and unrelated closed source links cannot suppress a new review", async () => {
+	const { run } = await import("./game-update-triage.mjs");
+	const realFetch = globalThis.fetch;
+	const prior = { ...process.env };
+	process.env.GITHUB_REPOSITORY = "natedunn/guildie";
+	process.env.GH_TOKEN = "test-token";
+	const sourceUrl = "https://worldofwarcraft.blizzard.com/en-us/news/123/wow-forever-hotfixes";
+	const state = { 123: { url: sourceUrl, hash: hash("old"), lines: [hash("old").slice(0, 16)] } };
+	const stateBody = `<!-- guildie-game-watch-state:v1 -->\n\`\`\`json\n${JSON.stringify(state)}\n\`\`\``;
+	const issues = [
+		{ number: 2, user: { login: "attacker" }, body: "<!-- guildie-game-watch-state:v1 --> invalid" },
+		{ number: 1, user: { login: "github-actions[bot]" }, body: stateBody },
+		{ number: 3, user: { login: "natedunn" }, state: "closed", body: `Old discussion: ${sourceUrl}` },
+	];
+	const writes = [];
+	globalThis.fetch = async (url, options = {}) => {
+		if (url.includes("api.github.com")) {
+			if ((options.method || "GET") === "GET") return Response.json(issues);
+			writes.push({ url, body: JSON.parse(options.body) });
+			return Response.json({ number: 4 });
+		}
+		if (url.endsWith("/news")) return new Response('<a href="/news/123/wow-forever-hotfixes">Update</a>');
+		return new Response(
+			'<title>Forever hotfixes</title><div class="detail"><p>Shaman talent damage has increased for several abilities in the latest hotfix.</p><p>These are official changes to World of Warcraft Forever.</p></div>',
+		);
+	};
+	try {
+		await run({ write: true });
+		assert.ok(writes.some(({ body }) => body.body.includes(marker("123"))));
+		assert.ok(writes.some(({ url }) => url.endsWith("issues/1")));
+		assert.ok(!writes.some(({ url }) => url.endsWith("issues/2")));
+	} finally {
+		globalThis.fetch = realFetch;
+		for (const key of ["GITHUB_REPOSITORY", "GH_TOKEN"]) {
+			if (prior[key] === undefined) delete process.env[key];
+			else process.env[key] = prior[key];
+		}
+	}
+});
