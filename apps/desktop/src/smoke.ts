@@ -77,7 +77,7 @@ export async function runSmokeTest(
 		check(
 			"bridge has exactly the agreed functions",
 			security.keys ===
-				"addon,checkForUpdates,chooseWowFolder,getState,getStatus,isDesktop,onStatus,restartToUpdate,setLivePixels,setToken,signIn,signOut,uploadNow,version",
+				"addon,checkForUpdates,chooseWowFolder,getState,getStatus,isDesktop,onStatus,restartToUpdate,setLivePixels,setNotifyOption,setToken,signIn,signOut,uploadNow,version",
 			security.keys,
 		);
 		check('html[data-desktop="true"]', security.dataset === "true");
@@ -118,6 +118,16 @@ export async function runSmokeTest(
 		check(
 			"capture can be disabled",
 			!(await page<{ livePixelsEnabled?: boolean }>("window.guildieDesktop.getStatus()")).livePixelsEnabled,
+		);
+		const badOption = await rejects('window.guildieDesktop.setNotifyOption("everything", true)');
+		check("notification options reject unknown ones", badOption.startsWith("rejected"), badOption);
+		const badSwitch = await rejects('window.guildieDesktop.setNotifyOption("itemsMailed", "yes")');
+		check("notification options reject non-boolean input", badSwitch.startsWith("rejected"), badSwitch);
+		await page('window.guildieDesktop.setNotifyOption("itemsMailed", true)');
+		check(
+			"items mailed notifications can be turned on",
+			(await page<{ notify?: { itemsMailed?: boolean } }>("window.guildieDesktop.getStatus()")).notify?.itemsMailed ===
+				true,
 		);
 		check("setToken rejects a malformed token", bad.startsWith("rejected"), bad);
 		const unknown = await rejects('window.guildieDesktop.setToken("gld_' + "x".repeat(32) + '")');

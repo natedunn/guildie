@@ -77,10 +77,10 @@ async function tokenOwner(ctx: QueryCtx, token: string) {
  * notifications, each once (notifications.ts takeToasts). null: unknown token.
  */
 export const takeToasts = mutation({
-	args: { token: v.string() },
-	handler: async (ctx, { token }) => {
+	args: { token: v.string(), optIn: v.optional(v.array(v.string())) },
+	handler: async (ctx, { token, optIn }) => {
 		const row = await tokenOwner(ctx, token);
-		return row ? await takeToastsFor(ctx, row.userId) : null;
+		return row ? await takeToastsFor(ctx, row.userId, optIn?.slice(0, 20)) : null;
 	},
 });
 

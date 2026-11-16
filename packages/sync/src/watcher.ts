@@ -78,6 +78,18 @@ export function loadedAddonVersion(wow?: string): string | null | undefined {
 }
 let lastRead: { file: string; at: number; version: string | null } | undefined;
 
+/** When the game last saved Guildie.lua (at /reload or logout), newest account first. */
+export function savedVariablesAt(wow?: string): number | undefined {
+	let newest: number | undefined;
+	for (const file of findSavedVariables(wow)) {
+		try {
+			const at = statSync(file).mtimeMs;
+			if (newest === undefined || at > newest) newest = at;
+		} catch {}
+	}
+	return newest;
+}
+
 /** Every installed copy of the addon: <wow>/_*_/Interface/AddOns/Guildie. */
 export function findAddonFolders(wow?: string): string[] {
 	const found: string[] = [];

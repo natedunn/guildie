@@ -43,6 +43,24 @@ export async function notifyRequester(ctx: MutationCtx, r: Doc<"requests">, kind
 	await notify(ctx, r.userId, r, kind, actor);
 }
 
+/** Tell a requester a guildmate mailed them something for it: "Brenna mailed you 7 Silk Cloth". */
+export async function notifyMailed(
+	ctx: MutationCtx,
+	r: Doc<"requests">,
+	mailed: { itemId: number; quantity: number },
+	actor: Actor,
+) {
+	const item = await ctx.db
+		.query("items")
+		.withIndex("by_itemId", (q) => q.eq("itemId", mailed.itemId))
+		.first();
+	const name = item?.name ?? (await requestName(ctx, r)).name;
+	await notify(ctx, r.userId, r, "itemsMailed", actor, {
+		name,
+		quantity: mailed.quantity > 1 ? mailed.quantity : undefined,
+	});
+}
+
 /** Tell someone (the requester, or the crafter asked) something happened to a request. */
 export async function notify(
 	ctx: MutationCtx,
@@ -50,6 +68,7 @@ export async function notify(
 	r: Doc<"requests">,
 	kind: NotificationKind,
 	actor?: Actor,
+	what?: { name: string; quantity?: number },
 ) {
 	const guild = await ctx.db.get(r.guildId);
 	if (!guild) return;
@@ -61,7 +80,7 @@ export async function notify(
 		kind,
 		requestId: r._id,
 		...(actor ? { actor: { name: actor.name, slug: actor.slug, classId: actor.classId } } : {}),
-		text: notificationText(kind, await requestName(ctx, r), actor),
+		text: notificationText(kind, what ?? (await requestName(ctx, r)), actor),
 		link: `/g/${guild.region}/${guild.slug}/requests?view=${view}`,
 		at: Date.now(),
 	});
@@ -133,9 +152,10 @@ export const markAllRead = mutation({
 /**
  * For the Windows app (helper.takeToasts): recent ones meant for the
  * desktop that no app has shown yet, marked shown. With the app on two
- * computers, whichever asks first shows it.
+ * computers, whichever asks first shows it. `optIn`: the opt-in kinds this
+ * app shows (CHANNELS desktop "optIn"); older apps send none.
  */
-export async function takeToasts(ctx: MutationCtx, userId: Id<"users">) {
+export async function takeToasts(ctx: MutationCtx, userId: Id<"users">, optIn: string[] = []) {
 	const now = Date.now();
 	const rows = await ctx.db
 		.query("notifications")
@@ -149,7 +169,9 @@ export async function takeToasts(ctx: MutationCtx, userId: Id<"users">) {
 	const toasts: { id: string; text: string; link: string }[] = [];
 	for (const n of rows) {
 		await ctx.db.patch(n._id, { toastedAt: now });
-		if (n.readAt === undefined && CHANNELS[n.kind].desktop) toasts.push({ id: n._id, text: n.text, link: n.link });
+		const desktop = CHANNELS[n.kind].desktop;
+		if (n.readAt === undefined && (desktop === true || (desktop === "optIn" && optIn.includes(n.kind))))
+			toasts.push({ id: n._id, text: n.text, link: n.link });
 	}
 	return toasts;
 }

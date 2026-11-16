@@ -3,7 +3,7 @@
 // addon's GuildieData.lua fresh. The host (helper or desktop app) decides when
 // it's connected and calls tick() every couple of seconds while it is.
 
-import type { Api } from "./api.ts";
+import type { Api, GuildData } from "./api.ts";
 import type { Log } from "./config.ts";
 import { writeGuildData } from "./luaData.ts";
 import { Outbox } from "./outbox.ts";
@@ -22,8 +22,8 @@ export type SyncEvents = {
 	onUpload?: (upload: LastUpload) => void;
 	/** Characters the site doesn't know as yours yet (each named once). */
 	onUnmatched?: (names: string[]) => void;
-	/** Guild data was downloaded (and written where it changed). */
-	onGuildData?: (at: number) => void;
+	/** Guild data was downloaded (and written where it changed), with what was written. */
+	onGuildData?: (at: number, data: GuildData) => void;
 };
 
 /** "brenna-ironfoot" -> "Brenna". */
@@ -215,6 +215,6 @@ export class SyncEngine {
 		}
 		writeGuildData(folders, data, this.events.log);
 		this.guildDataAt = Date.now();
-		this.events.onGuildData?.(this.guildDataAt);
+		this.events.onGuildData?.(this.guildDataAt, data);
 	}
 }

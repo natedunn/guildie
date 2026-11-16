@@ -39,6 +39,8 @@ if (isGuildieUrl(location.href)) {
 		restartToUpdate: () => ipcRenderer.invoke("guildie:restart-to-update"),
 		checkForUpdates: () => ipcRenderer.invoke("guildie:check-updates"),
 		setLivePixels: (enabled: unknown) => ipcRenderer.invoke("guildie:live-pixels", enabled),
+		setNotifyOption: (option: unknown, enabled: unknown) =>
+			ipcRenderer.invoke("guildie:notify-option", option, enabled),
 		onStatus: (callback: unknown) => {
 			if (typeof callback !== "function") throw new TypeError("onStatus needs a function");
 			// The page gets the status only, never Electron's event object.

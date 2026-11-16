@@ -219,6 +219,39 @@ installing the addon into a real WoW: Forever folder (and the folder swap
 while the game runs; if Windows won't rename the folder the app overwrites
 the files one by one instead), self-updates from a release (needs two
 releases to see one), and Start with Windows surviving an update.
+## Experimental notifications while you play
+
+Off until turned on in Settings → App, each saved in `settings.json`
+(`notify`), on this computer:
+
+- **Items mailed for your requests** (`itemsMailed`): the app asks
+  `/api/helper/notifications` for the opt-in kind `itemsMailed` too ("Brenna
+  mailed you 7 Silk Cloth", written when a guildmate's addon reports mailing
+  something for your request that you haven't collected yet). Off: the site
+  leaves them out (they stay in the site's inbox).
+- **Reload reminders** (`reloadReminders`, Windows only): the game reads
+  `GuildieData.lua` only at login and `/reload`. The app remembers the guild
+  data it loaded then (WoW opening, or Guildie.lua saved, which the game does
+  at `/reload` and logout) and compares each download with it
+  (`packages/sync` `ReloadReminder`). When 10 or more changes that tooltips
+  use (gear, level-ups, requests, crafters' recipes) piled up while WoW is
+  open, it shows a notification to `/reload`; again at most hourly, and only
+  after 10 more.
+
+**Fresh data when WoW opens** (always, Windows): the game reads
+`GuildieData.lua` when the player enters the world, so as soon as WoW opens
+the app downloads guild data instead of waiting for its 15-minute refresh.
+WoW counts as open while a top-level window is titled "World of Warcraft…"
+(not a browser tab about it; `src/wow-running.ts`). The app asks Windows
+directly (EnumWindows and GetWindowTextW through koffi, a fraction of a
+millisecond) every 5 s while WoW is closed and every 30 s while it's open.
+If koffi can't load, it uses tasklist every 30 s. The first five checks are
+logged with how long they took.
+
+The additive optional bridge method `setNotifyOption(option, boolean)` turns
+one on or off (`option`: `"itemsMailed"` or `"reloadReminders"`); status adds
+`notify: { itemsMailed, reloadReminders, reloadRemindersAvailable }`.
+
 ## Experimental live pixel sync
 
 The current integration is documented in [live sync](../../docs/live-sync.md).

@@ -7,7 +7,7 @@ import type { Delivery } from "./addonPayload";
 import { noteDelivery, noteRequest } from "./feed";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
-import { notify, notifyRequester } from "./notifications";
+import { notify, notifyMailed, notifyRequester } from "./notifications";
 import { vRegion } from "./schema";
 import { untradeable } from "./shared/itemInfo";
 import {
@@ -24,6 +24,7 @@ import {
 	deliveryProgress,
 	EXPIRE_MS,
 	isStale,
+	mailNews,
 	matsAdd,
 	matsCheck,
 	matsProgress,
@@ -1197,6 +1198,9 @@ export async function recordDeliveries(
 		if (progress.status !== "done" && r.status === "done") patch.closedAt = undefined;
 		await ctx.db.patch(r._id, patch);
 		if (progress.status === "done" && r.status !== "done") await notifyRequester(ctx, r, "requestDone");
+		// Mailed by a guildmate (not one of the requester's own characters) and not collected yet.
+		if (userId !== r.userId && mailNews(r, event, participants.sender))
+			await notifyMailed(ctx, r, event, { name: character.name, slug: character.slug, classId: character.classId });
 		if (participants.received) {
 			await noteDelivery(
 				ctx,
