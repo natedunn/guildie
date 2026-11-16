@@ -5,8 +5,9 @@ import { HelperTokens } from "@/components/helper-tokens";
 import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { AllReleasesLink, WhatsNew } from "@/components/whats-new";
-import { desktop, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
+import { desktop, type NotifyOption, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
 import { ago } from "@/lib/format";
 import { markSeen } from "@/lib/release-notes";
 import { Row, Rows } from "./addon";
@@ -29,6 +30,7 @@ function AppSettings() {
 	return (
 		<div className="max-w-3xl pb-12">
 			{inApp ? <ThisApp /> : <GetTheApp />}
+			{inApp && <NotifyWhilePlaying />}
 			<section id="whats-new" className="mt-10 scroll-mt-4">
 				<div className="flex items-baseline justify-between gap-3">
 					<SectionTitle>What's new</SectionTitle>
@@ -78,6 +80,70 @@ function ThisApp() {
 						Check for updates
 					</Button>
 				) : null}
+			</div>
+		</section>
+	);
+}
+
+/** Experimental Windows notifications while you play (apps/desktop/README.md). */
+function NotifyWhilePlaying() {
+	const status = useDesktopStatus();
+	const app = desktop();
+	const [error, setError] = useState<string | null>(null);
+	const notify = status?.notify;
+	if (!app?.setNotifyOption || !notify) return null;
+	const set = async (option: NotifyOption, on: boolean) => {
+		setError(null);
+		try {
+			await app.setNotifyOption?.(option, on);
+		} catch {
+			setError("That didn't work. Try again.");
+		}
+	};
+	return (
+		<section className="mt-10">
+			<SectionTitle>Experimental: notifications while you play</SectionTitle>
+			<div className="surface-card mt-2 space-y-4 p-4 text-[0.8125rem]">
+				<label className="flex items-start gap-3">
+					<Switch
+						className="mt-0.5"
+						checked={notify.itemsMailed}
+						onCheckedChange={(on) => void set("itemsMailed", on)}
+					/>
+					<span>
+						Items mailed for your requests
+						<span className="mt-1 block text-muted-foreground">
+							When a guildmate mails you something you asked for, a Windows notification tells you to check your
+							mailbox. It comes once their Guildie app uploads the mail they sent.
+						</span>
+					</span>
+				</label>
+				<label className="flex items-start gap-3">
+					<Switch
+						className="mt-0.5"
+						checked={notify.reloadReminders}
+						disabled={!notify.reloadRemindersAvailable}
+						onCheckedChange={(on) => void set("reloadReminders", on)}
+					/>
+					<span>
+						Reload reminders
+						<span className="mt-1 block text-muted-foreground">
+							The addon only gets new guild data at login or /reload. When a lot has changed since then (guildmates'
+							gear and levels, requests, recipes) while WoW is open, a Windows notification suggests a /reload so
+							tooltips catch up. At most once an hour.
+							{!notify.reloadRemindersAvailable && " Windows only."}
+						</span>
+					</span>
+				</label>
+				<p className="text-muted-foreground">
+					Windows may hold notifications while a game is fullscreen: check Settings → System → Notifications → Do not
+					disturb, or play in windowed fullscreen.
+				</p>
+				{error && (
+					<p className="text-destructive" role="alert">
+						{error}
+					</p>
+				)}
 			</div>
 		</section>
 	);

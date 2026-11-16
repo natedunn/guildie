@@ -12,10 +12,14 @@ export type NotificationKind =
 	| "craftDeclined"
 	| "askLapsed"
 	| "craftWithdrawn"
-	| "craftBackedOut";
+	| "craftBackedOut"
+	| "itemsMailed";
 
-/** Where each kind is shown besides the site's inbox. */
-export const CHANNELS: Record<NotificationKind, { desktop: boolean; game: boolean }> = {
+/**
+ * Where each kind is shown besides the site's inbox. desktop "optIn": only
+ * apps that ask for it (an experimental setting in Settings → App) show it.
+ */
+export const CHANNELS: Record<NotificationKind, { desktop: boolean | "optIn"; game: boolean }> = {
 	craftClaimed: { desktop: true, game: true },
 	craftSent: { desktop: true, game: true },
 	requestDone: { desktop: true, game: false },
@@ -28,6 +32,8 @@ export const CHANNELS: Record<NotificationKind, { desktop: boolean; game: boolea
 	craftDeclined: { desktop: true, game: true },
 	askLapsed: { desktop: false, game: false },
 	craftBackedOut: { desktop: true, game: false },
+	// A guildmate's addon reported mailing you something for your request, before you've collected it.
+	itemsMailed: { desktop: "optIn", game: false },
 };
 
 /** Only recent ones become a system notification or a chat line (the app or game may have been off for days). */
@@ -63,5 +69,7 @@ export function notificationText(kind: NotificationKind, what: { name: string; q
 			return `${who} cancelled their craft request for ${what.name}${times}`;
 		case "craftBackedOut":
 			return `${who} can't craft your ${what.name} after all. Ask someone else?`;
+		case "itemsMailed":
+			return `${who} mailed you ${count}${what.name}`;
 	}
 }

@@ -22,3 +22,15 @@ test("channels: crafts reach the app and the game; completion the app; expiry on
 	assert.deepEqual(where("requestDone"), { desktop: true, game: false });
 	assert.deepEqual(where("requestExpired"), { desktop: false, game: false });
 });
+
+test("items mailed: the mailed amount, shown only by apps that opt in, never in game", () => {
+	assert.equal(
+		notificationText("itemsMailed", { name: "Silk Cloth", quantity: 7 }, { name: "Brenna" }),
+		"Brenna mailed you 7 Silk Cloth",
+	);
+	assert.equal(
+		notificationText("itemsMailed", { name: "Heavy Linen Gloves" }, { name: "Brenna" }),
+		"Brenna mailed you Heavy Linen Gloves",
+	);
+	assert.deepEqual(CHANNELS.itemsMailed, { desktop: "optIn", game: false });
+});

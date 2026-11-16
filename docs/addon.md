@@ -322,19 +322,22 @@ What happened to a player's requests, written once with its text when it
 happens (`convex/notifications.ts`, text and channels in
 `shared/notifications.ts`), kept 60 days:
 
-| Kind             | When                             | Site inbox | Windows app | In game |
-| ---------------- | -------------------------------- | ---------- | ----------- | ------- |
-| `craftClaimed`   | someone claims your craft        | yes        | yes         | yes     |
-| `craftSent`      | the claimant marks it sent       | yes        | yes         | yes     |
-| `requestDone`    | deliveries complete your request | yes        | yes         | no      |
-| `requestExpired` | the daily cron expires it        | yes        | no          | no      |
+| Kind             | When                                 | Site inbox | Windows app | In game |
+| ---------------- | ------------------------------------ | ---------- | ----------- | ------- |
+| `craftClaimed`   | someone claims your craft            | yes        | yes         | yes     |
+| `craftSent`      | the claimant marks it sent           | yes        | yes         | yes     |
+| `requestDone`    | deliveries complete your request     | yes        | yes         | no      |
+| `requestExpired` | the daily cron expires it            | yes        | no          | no      |
+| `itemsMailed`    | a guildmate mails you what you asked | yes        | opt-in      | no      |
 
 - **Site:** Personal → Notifications (`/notifications`), unread count in the
   sidebar. Opening it marks everything read.
 - **Windows app:** asks `POST /api/helper/notifications` every minute while
   connected and shows each as a system notification; clicking opens the
   request. Only ones from the last 24 hours, unread, each once (with the app
-  on two computers, the first to ask shows it).
+  on two computers, the first to ask shows it). Opt-in kinds (`itemsMailed`)
+  only when the app asks for them (an experimental switch in Settings → App;
+  apps/desktop/README.md, which also covers the app's reload reminders).
 - **In game:** `GuildieData.notifications`, unread ones from the last 7 days;
   the addon prints each once in chat at login or `/reload`
   (`ns.announceNotifications`, UI.lua), remembering the ids in

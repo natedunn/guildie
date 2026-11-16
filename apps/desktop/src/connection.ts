@@ -13,16 +13,24 @@ import {
 	type LastUpload,
 	type Log,
 	loadedAddonVersion,
+	ReloadReminder,
 	SyncEngine,
 	savedLivePixelsEnabled,
+	savedVariablesAt,
 } from "@guildie/sync";
 import { app, net } from "electron";
 import { type CaptureConfig, LivePixels, type PixelStatus } from "./live-pixels.ts";
-import { forgetToken, loadToken, saveToken, settings } from "./settings.ts";
+import { forgetToken, loadToken, NOTIFY_OPTIONS, type NotifyOption, saveToken, settings } from "./settings.ts";
 import type { UpdateState } from "./updater.ts";
+import { canTellWowRunning, wowRunning } from "./wow-running.ts";
 
 export type Status = {
 	syncIssue?: string;
+	/**
+	 * The experimental notifications while you play (Settings → App):
+	 * `reloadRemindersAvailable` false where the app can't tell WoW is open.
+	 */
+	notify: Record<NotifyOption, boolean> & { reloadRemindersAvailable: boolean };
 	livePixelsEnabled?: boolean;
 	livePixelsAvailable?: boolean;
 	livePixels?: PixelStatus;
@@ -55,6 +63,8 @@ const TICK_MS = 2_000;
 const RETRY_MS = 60_000;
 /** How often to ask for notifications while connected. */
 const NOTIFY_MS = 60_000;
+/** How often to look for an open WoW, with reload reminders on. */
+const WOW_CHECK_MS = 30_000;
 
 export class Connection {
 	/** The site's origin, which the token is kept under. */
@@ -73,6 +83,10 @@ export class Connection {
 	private timer: NodeJS.Timeout | undefined;
 	private lastRetry = 0;
 	private lastNotifications = 0;
+	private lastWowCheck = 0;
+	private readonly reloadReminder = new ReloadReminder((text) => {
+		if (settings.notifyOn("reloadReminders")) this.onReloadReminder(text);
+	});
 	private readonly pixels: LivePixels | undefined;
 	private pixelStatus: PixelStatus | undefined;
 	private pixelsEnabled = false;
@@ -82,6 +96,8 @@ export class Connection {
 	onNotice: (title: string, body: string) => void = () => {};
 	/** A notification from the site to show (main shows it; clicking opens `url`). */
 	onSiteNotification: (text: string, url: string) => void = () => {};
+	/** Enough changed in the guild since WoW loaded GuildieData.lua: suggest a /reload. */
+	onReloadReminder: (text: string) => void = () => {};
 	/** The WoW folder was chosen (main installs or updates the addon there). */
 	onWowFolder: (folder: string) => void = () => {};
 
@@ -105,7 +121,10 @@ export class Connection {
 				},
 				onIssue: () => this.emit(),
 				onUpload: () => this.emit(),
-				onGuildData: () => this.emit(),
+				onGuildData: (_at, data) => {
+					this.reloadReminder.guildData(data);
+					this.emit();
+				},
 				onUnmatched: (names) =>
 					this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
 			},
@@ -128,6 +147,11 @@ export class Connection {
 	get status(): Status {
 		return {
 			syncIssue: this.sync.issue,
+			notify: {
+				itemsMailed: settings.notifyOn("itemsMailed"),
+				reloadReminders: canTellWowRunning && settings.notifyOn("reloadReminders"),
+				reloadRemindersAvailable: canTellWowRunning,
+			},
 			livePixelsEnabled: this.pixelsEnabled,
 			livePixelsAvailable: !!this.pixels,
 			livePixels: this.pixelStatus,
@@ -196,6 +220,26 @@ export class Connection {
 		this.emit();
 	}
 
+	/** Turns one of the experimental notifications on or off (Settings → App). */
+	setNotify(option: unknown, enabled: unknown) {
+		if (!NOTIFY_OPTIONS.includes(option as NotifyOption)) throw new Error("Unknown notification option");
+		if (typeof enabled !== "boolean") throw new Error("Expected a boolean");
+		if (option === "reloadReminders" && enabled && !canTellWowRunning) throw new Error("Reload reminders need Windows");
+		settings.setNotify(option as NotifyOption, enabled);
+		// Off: forget WoW was open, so turning it back on starts from what's loaded then.
+		if (option === "reloadReminders" && !enabled) this.reloadReminder.gameRunning(false);
+		this.emit();
+	}
+
+	/** Reload reminders: when WoW is open and when it last loaded GuildieData.lua (a /reload saves first). */
+	private watchGame() {
+		if (!settings.notifyOn("reloadReminders") || !canTellWowRunning) return;
+		this.reloadReminder.savedVariables(savedVariablesAt(this.sync.wowFolder));
+		if (Date.now() - this.lastWowCheck < WOW_CHECK_MS) return;
+		this.lastWowCheck = Date.now();
+		void wowRunning().then((running) => this.reloadReminder.gameRunning(running));
+	}
+
 	private updatePixelCapture() {
 		if (!this.pixels) return;
 		const savedEnabled = !this.automaticPixels || savedLivePixelsEnabled(this.sync.wowFolder);
@@ -215,6 +259,7 @@ export class Connection {
 			this.emit();
 		}
 		if (this.account) {
+			this.watchGame();
 			if (Date.now() - this.lastNotifications > NOTIFY_MS) {
 				this.lastNotifications = Date.now();
 				void this.checkNotifications();
@@ -231,7 +276,9 @@ export class Connection {
 	/** The site's notifications for this account, shown once each (notifications.ts on the site). */
 	private async checkNotifications() {
 		try {
-			for (const n of (await this.api.notifications()) ?? []) this.onSiteNotification(n.text, this.origin + n.link);
+			const optIn = settings.notifyOn("itemsMailed") ? ["itemsMailed"] : [];
+			for (const n of (await this.api.notifications(optIn)) ?? [])
+				this.onSiteNotification(n.text, this.origin + n.link);
 		} catch (e) {
 			this.log(`Couldn't check notifications: ${(e as Error).message}`);
 		}

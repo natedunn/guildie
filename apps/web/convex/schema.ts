@@ -710,6 +710,7 @@ export default defineSchema({
 			v.literal("askLapsed"),
 			v.literal("craftWithdrawn"),
 			v.literal("craftBackedOut"),
+			v.literal("itemsMailed"),
 		),
 		requestId: v.optional(v.id("requests")),
 		/** Who did it, when someone did. */

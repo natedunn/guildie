@@ -131,6 +131,7 @@ const startWithSystem =
 
 /** The sync status as the page sees it. */
 const publicStatus = ({
+	notify: notifyOptions,
 	livePixels,
 	livePixelsEnabled,
 	livePixelsAvailable,
@@ -144,6 +145,7 @@ const publicStatus = ({
 	updateReady,
 	update,
 }: Status) => ({
+	notify: notifyOptions,
 	livePixels,
 	livePixelsEnabled,
 	livePixelsAvailable,
@@ -203,6 +205,7 @@ app.whenReady().then(async () => {
 	connection.onNotice = notify;
 	// The site's notifications ("Miller will craft your Silk Bandage"): clicking opens the request.
 	connection.onSiteNotification = (text, url) => notify("Guildie", text, () => showWindow(url));
+	connection.onReloadReminder = (text) => notify("Guildie", text);
 	log(`Guildie ${__VERSION__} for ${origin}`);
 
 	// ---- The addon: installed and kept up to date in WoW: Forever ----
@@ -353,6 +356,10 @@ app.whenReady().then(async () => {
 	ipcMain.handle(
 		"guildie:live-pixels",
 		pageOnly((enabled: unknown) => connection.setLivePixels(enabled)),
+	);
+	ipcMain.handle(
+		"guildie:notify-option",
+		pageOnly((option: unknown, enabled: unknown) => connection.setNotify(option, enabled)),
 	);
 	ipcMain.handle("guildie:addon-info", pageOnly(addonInfo));
 	ipcMain.handle(

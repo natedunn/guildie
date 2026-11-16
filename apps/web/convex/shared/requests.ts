@@ -524,6 +524,21 @@ const sameSender = (a: { name: string; slug?: string }, b: { name: string; slug?
  * the send back, and reopens a request the sends had closed. Crafts count
  * receipts only.
  */
+/**
+ * A sender's mail the requester hasn't reported collecting yet, so worth
+ * telling them about (notification "itemsMailed"). `r` as it was before
+ * this report; `from`: the sender.
+ */
+export function mailNews(
+	r: { senders?: SenderTally[] },
+	e: Pick<DeliveryReport, "kind" | "quantity">,
+	from: { name: string; slug?: string },
+) {
+	if (e.kind !== "mailSent") return false;
+	const tally = r.senders?.find((s) => sameSender(s, from));
+	return !tally || tally.received < tally.sent + e.quantity;
+}
+
 export function deliveryProgress(
 	r: Pick<DeliveryRequest, "status" | "quantity" | "ongoing" | "receivedQuantity" | "sentQuantity"> & {
 		kind?: string;

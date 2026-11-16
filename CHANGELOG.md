@@ -18,6 +18,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### New
 
 - **Guildie:** Hide a character you don't play, like a test or retired one, from Settings → Your characters. It disappears from Guildie for you and your guild (roster, feed, Dungeons, crafting, search, your sidebar and its page) but keeps syncing, so you can show it again there any time.
+- **Guildie, App:** Experimental notifications while you play, off until you turn them on in Settings → App. Get a Windows notification when a guildmate mails you something you requested, before you open your mailbox. And get a reminder to /reload when guildmates' gear, levels, requests or recipes have changed a lot since you logged in, so your tooltips catch up.
 
 ### Fixes
 

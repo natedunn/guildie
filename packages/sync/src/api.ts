@@ -91,10 +91,11 @@ export class Api {
 	/**
 	 * Notifications to show as system notifications, each handed out once
 	 * (`link`: a path on the site). null when the token is unknown or revoked;
-	 * an empty list from a site without notifications.
+	 * an empty list from a site without notifications. `optIn`: the opt-in
+	 * kinds to include ("itemsMailed"); a site that doesn't know one ignores it.
 	 */
-	async notifications(): Promise<{ id: string; text: string; link: string }[] | null> {
-		const res = await this.fetch("/api/helper/notifications", { method: "POST" });
+	async notifications(optIn: string[] = []): Promise<{ id: string; text: string; link: string }[] | null> {
+		const res = await this.fetch("/api/helper/notifications", { method: "POST", body: JSON.stringify({ optIn }) });
 		if (res.status === 401) return null;
 		if (res.status === 404) return [];
 		if (!res.ok) throw new Error(`Guildie answered ${res.status}`);

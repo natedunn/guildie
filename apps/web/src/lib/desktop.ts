@@ -35,7 +35,12 @@ export type GuildieDesktop = {
 	/** Check for an app update now (app 0.3.5+). */
 	checkForUpdates?(): Promise<UpdateState>;
 	setLivePixels?(enabled: boolean): Promise<void>;
+	/** The experimental notifications while you play, in Settings → App (app 0.3.44+). */
+	setNotifyOption?(option: NotifyOption, enabled: boolean): Promise<void>;
 };
+
+/** Items a guildmate mailed for your requests; reminders to /reload when the guild changed a lot. */
+export type NotifyOption = "itemsMailed" | "reloadReminders";
 
 /** Where the app's self-update stands (apps/desktop/src/updater.ts). */
 export type UpdateState =
@@ -63,6 +68,8 @@ export type AddonInfo = {
 
 export type DesktopStatus = {
 	syncIssue?: string;
+	/** The experimental notifications (app 0.3.44+); reload reminders need Windows. */
+	notify?: Record<NotifyOption, boolean> & { reloadRemindersAvailable: boolean };
 	livePixelsEnabled?: boolean;
 	livePixelsAvailable?: boolean;
 	livePixels?: "waiting" | "waiting-game" | "searching" | "calibrating" | "receiving" | "stale" | "stopped" | "failed";

@@ -18,7 +18,13 @@ type Stored = {
 	trayNoticeShown?: boolean;
 	/** False after the player uninstalls the addon: don't put it back until they install it again. */
 	addonManaged?: boolean;
+	/** Experimental notifications while you play (Settings → App), all off until turned on. */
+	notify?: Partial<Record<NotifyOption, boolean>>;
 };
+
+/** The experimental notifications: guildmates mailing you what you asked for; reminders to /reload. */
+export const NOTIFY_OPTIONS = ["itemsMailed", "reloadReminders"] as const;
+export type NotifyOption = (typeof NOTIFY_OPTIONS)[number];
 
 const file = () => join(app.getPath("userData"), "settings.json");
 
@@ -90,6 +96,13 @@ export const settings = {
 	},
 	set addonManaged(on: boolean) {
 		load().addonManaged = on ? undefined : false;
+		save();
+	},
+	notifyOn(option: NotifyOption) {
+		return load().notify?.[option] === true;
+	},
+	setNotify(option: NotifyOption, on: boolean) {
+		load().notify = { ...load().notify, [option]: on };
 		save();
 	},
 	get trayNoticeShown() {
