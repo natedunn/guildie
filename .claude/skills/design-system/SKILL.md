@@ -126,6 +126,7 @@ the shadcn CLI (`components.json`), then restyle them through the tokens in
 | `ItemSheet`                                | `components/item-sheet.tsx`                       | The item panel (who can craft it, upgrade for whom)                                                |
 | `ClassText`                                | `components/class-name.tsx`                       | Names in class color, or item quality with `quality`                                               |
 | `VerdictMarker`, `VerdictGlyph`            | `components/verdict-marker.tsx`                   | Lit upgrade / possible / empty slot / removed markers, with their meaning on hover                 |
+| `.filter-tree`, `.who-list` (CSS)          | `styles/app.css`                                  | Nested lists on guide lines with rounded elbows (Upgrades' sidebar filters and table cells)        |
 | `CharacterAvatar`, `UNFETCHED_NOTE`        | `components/character-avatar.tsx`                 | Portraits, with a silhouette for characters Blizzard hasn't published                              |
 | `PaperDoll`                                | `components/paper-doll.tsx`                       | Equipped gear in slot order                                                                        |
 | `TalentTree`                               | `components/talent-tree.tsx`                      | Talent trees from Blizzard's layout                                                                |
