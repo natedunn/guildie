@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.44
+
 ### New
 
 - **Guildie:** Hide a character you don't play, like a test or retired one, from Settings → Your characters. It disappears from Guildie for you and your guild (roster, feed, Dungeons, crafting, search, your sidebar and its page) but keeps syncing, so you can show it again there any time.
