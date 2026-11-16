@@ -549,10 +549,10 @@ function BrowseCrafting({ guild, q }: { guild: { region: Region; slug: string };
 		<Link
 			to="/g/$region/$slug/crafting"
 			params={guild}
-			search={{ view: "make", q }}
+			search={{ q }}
 			className="block border-t border-border px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 		>
-			Who in the guild can make or learn "{q}" →
+			Who in the guild can make "{q}" →
 		</Link>
 	);
 }

@@ -45,6 +45,7 @@ import type * as sample from "../sample.js";
 import type * as search from "../search.js";
 import type * as shared_addons from "../shared/addons.js";
 import type * as shared_characters from "../shared/characters.js";
+import type * as shared_craftGroups from "../shared/craftGroups.js";
 import type * as shared_dungeonQuests from "../shared/dungeonQuests.js";
 import type * as shared_dungeonResources from "../shared/dungeonResources.js";
 import type * as shared_dungeons from "../shared/dungeons.js";
@@ -116,6 +117,7 @@ declare const fullApi: ApiFromModules<{
   search: typeof search;
   "shared/addons": typeof shared_addons;
   "shared/characters": typeof shared_characters;
+  "shared/craftGroups": typeof shared_craftGroups;
   "shared/dungeonQuests": typeof shared_dungeonQuests;
   "shared/dungeonResources": typeof shared_dungeonResources;
   "shared/dungeons": typeof shared_dungeons;

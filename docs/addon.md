@@ -382,12 +382,15 @@ already (in bags or bank, not learned), or **knows it**. The rule is
   recipe items for a profession they have that they haven't learned
   (`heldUnlearned`). Members of the guild only; nothing else in their
   inventory is shared.
-- **On the site:** the item panel's "Who can learn it" (guild pages), the
-  Crafting page's "Who can learn" tab (`crafting.guildRecipeLearners`: each
-  character once, states worked out on the page with `recipeCandidates`;
-  searched like recipes, with `crafting.recipeItemSearch` for what each item
-  makes; "Only ones someone needs" on by default), and under recipe items on
-  Inventory (across the player's guilds, their own characters included).
+- **On the site:** the item panel's "Who can learn it" (guild pages); on
+  Crafting, "Could learn" under each recipe's crafters (`couldLearn` in
+  `crafting.ts`: can learn now or has one), Gear rows for recipes nobody
+  knows yet that would help the viewer's characters, and a search's "Nobody
+  knows these yet" (`crafting.guildRecipeLearners`: each character once,
+  states worked out on the page with `recipeCandidates`; searched like
+  recipes, with `crafting.recipeItemSearch` for what each item makes); and
+  under recipe items on Inventory (across the player's guilds, their own
+  characters included).
 - **In game:** `recipes = { items = { [itemId] = { profession, skill (0:
   unknown), recipeId, more recipeIds (0.15.0) } }, ranks = { [itemId] = {
   profession, skill, max skill it unlocks } } (0.15.0; apart, so 0.14.0

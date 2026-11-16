@@ -60,6 +60,11 @@ const SLOT_NAMES: Record<string, string> = {
 	Relic: "RELIC",
 };
 
+/** Where an item is worn ("Two-Hand", "Back"), from its tooltip, or undefined for anything not worn. */
+export function equipSlot(lines: { left: string }[]): string | undefined {
+	return lines.find((l) => SLOT_NAMES[l.left.trim()])?.left.trim();
+}
+
 /** Equip locations that are weapons (item class 2). */
 export const WEAPON_INV_TYPES = new Set([
 	"WEAPON",
