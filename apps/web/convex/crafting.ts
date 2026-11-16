@@ -73,7 +73,7 @@ export const characterProfessions = query({
 			.first();
 		if (!character) return null;
 		const guild = await ctx.db.get(character.guildId);
-		if (!guild || !(await access(ctx, guild)).canView) return null;
+		if (!guild || !(await access(ctx, guild)).canView || character.hidden) return null;
 		const items = new Map<number, Doc<"items"> | null>();
 		const profile = await pickProfile(ctx, character);
 		return await Promise.all(

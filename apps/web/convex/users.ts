@@ -9,7 +9,7 @@ import { isLocalBackend } from "./origins";
 import { preferencesOf, updatePreferences } from "./preferences";
 import { claimSampleCharacter } from "./sample";
 import { vRegion } from "./schema";
-import { inSidebar } from "./shared/characters";
+import { hiddenPatch, inSidebar } from "./shared/characters";
 
 export async function requireUserId(ctx: QueryCtx | MutationCtx) {
 	const userId = await getAuthUserId(ctx);
@@ -126,14 +126,19 @@ export const viewer = query({
 				// The level as the rest of the site shows it: the game's when newer.
 				const level = row ? (await pickProfile(ctx, row)).level : c.level;
 				const { sidebar } = await preferencesOf(ctx, c);
+				const hidden = !!row?.hidden;
 				return {
 					...c,
 					surname: row?.surname,
 					avatarUrl: row?.avatarUrl,
 					level,
 					classId: row?.classId ?? c.classId,
-					/** In the sidebar: the player's pin, else from level 5. */
-					inSidebar: inSidebar(level, sidebar),
+					/** In the sidebar: the player's pin, else from level 5; never while hidden. */
+					inSidebar: !hidden && inSidebar(level, sidebar),
+					/** Taken off Guildie by the player (setHidden). */
+					hidden,
+					/** Hiding needs a roster row: characters in no guild aren't listed anywhere anyway. */
+					canHide: !!row,
 					isMain: user.mainCharacter?.region === c.region && user.mainCharacter.slug === c.slug,
 				};
 			}),
@@ -193,5 +198,28 @@ export const setHideBattletag = mutation({
 	handler: async (ctx, { hide }) => {
 		const userId = await requireUserId(ctx);
 		await ctx.db.patch(userId, { hideBattletag: hide || undefined });
+	},
+});
+
+/**
+ * Account page: take one of my characters off Guildie (a test or retired
+ * character), or put it back. While hidden it's on no roster, feed, menu,
+ * search or page, mine included; it keeps syncing for when it's back.
+ */
+export const setHidden = mutation({
+	args: { region: vRegion, slug: v.string(), hidden: v.boolean() },
+	handler: async (ctx, { region, slug, hidden }) => {
+		const userId = await requireUserId(ctx);
+		await myClaim(ctx, userId, region, slug);
+		const rows = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.collect();
+		if (!rows.length) throw new ConvexError("That character isn't in a guild on Guildie yet.");
+		const now = Date.now();
+		for (const row of rows) {
+			const change = hiddenPatch(row, hidden, now);
+			if (change) await ctx.db.patch(row._id, change);
+		}
 	},
 });

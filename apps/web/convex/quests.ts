@@ -257,6 +257,8 @@ export const mine = query({
 				.query("characters")
 				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
 				.first();
+			// Hidden from Guildie by the player: off this page too.
+			if (row?.hidden) continue;
 			const profile = row ? await pickProfile(ctx, row) : null;
 			characters.push({
 				key,

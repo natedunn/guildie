@@ -837,7 +837,7 @@ function useLocalResults(typed: string) {
 				nav: route("/quests", undefined, { view: "zone" }),
 				keywords: ["quest log", "area"],
 			});
-			const characters = [...viewer.characters].sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
+			const characters = viewer.characters.filter((c) => !c.hidden).sort((a, b) => (b.level ?? 0) - (a.level ?? 0));
 			for (const c of characters) {
 				const p = { region: c.region, slug: c.slug };
 				const who = { classId: c.classId ?? undefined };

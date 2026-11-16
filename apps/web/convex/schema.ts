@@ -207,8 +207,20 @@ export default defineSchema({
 		profileSyncedAt: v.optional(v.number()),
 		/** 404 from the profile endpoint: under level 10 or not logged out yet. */
 		profileMissing: v.optional(v.boolean()),
-		/** Still in the guild as of the last roster sync. */
+		/**
+		 * Still in the guild as of the last roster sync, and not hidden: listed
+		 * as a member. Everything that lists a guild's members goes by this.
+		 */
 		inRoster: v.boolean(),
+		/**
+		 * Its player took it off Guildie (Settings → Your characters,
+		 * users.setHidden): while set, inRoster stays false, so no roster, feed,
+		 * menu or search lists it, and it has no page (for the player too).
+		 * Syncs still update it in the background.
+		 * `inGuild` is what the roster says meanwhile, so showing it again puts
+		 * it back where it belongs. Only the player changes it; syncs keep it.
+		 */
+		hidden: v.optional(v.object({ at: v.number(), inGuild: v.boolean() })),
 		/** The highest level the guild's feed has seen (feed.ts); unset until first seen, so history isn't replayed. */
 		feedLevel: v.optional(v.number()),
 		/** Dungeons (shared/dungeons.ts keys) whose final boss they've killed, from Blizzard's statistics; unset until first read. */

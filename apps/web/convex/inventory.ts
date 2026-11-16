@@ -54,6 +54,8 @@ export const all = query({
 				.query("characters")
 				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
 				.first();
+			// Hidden from Guildie by the player: off this page too.
+			if (roster?.hidden) continue;
 			if (roster?.inRoster) guildIds.add(roster.guildId);
 			const summary = (part: Doc<"inventories">["bags"]) =>
 				part ? { capturedAt: part.capturedAt, items: part.items.length } : null;

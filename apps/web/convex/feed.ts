@@ -358,16 +358,26 @@ export const days = query({
 			.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", from).lt("at", to))
 			.take(5000);
 
-		// Portraits, read once per character.
+		// Portraits, read once per character; and who their players hid from
+		// Guildie, whose numbers don't count (past ones too).
 		const avatars = new Map<string, string | undefined>();
+		const hiddenSlugs = new Set<string>();
+		const look = async (slug: string) => {
+			if (avatars.has(slug)) return;
+			const row = await ctx.db
+				.query("characters")
+				.withIndex("by_slug", (q) => q.eq("flavor", guild.flavor).eq("region", guild.region).eq("slug", slug))
+				.first();
+			avatars.set(slug, row?.avatarUrl);
+			if (row?.hidden) hiddenSlugs.add(slug);
+		};
+		const isHidden = async (slug: string | undefined) => {
+			if (!slug) return false;
+			await look(slug);
+			return hiddenSlugs.has(slug);
+		};
 		const person = async (c: { slug: string; name: string; classId: number }): Promise<Who> => {
-			if (!avatars.has(c.slug)) {
-				const row = await ctx.db
-					.query("characters")
-					.withIndex("by_slug", (q) => q.eq("flavor", guild.flavor).eq("region", guild.region).eq("slug", c.slug))
-					.first();
-				avatars.set(c.slug, row?.avatarUrl);
-			}
+			await look(c.slug);
 			return { slug: c.slug, name: c.name, classId: c.classId, avatarUrl: avatars.get(c.slug) };
 		};
 		const characters = new Map<Id<"characters">, Doc<"characters"> | null>();
@@ -375,7 +385,10 @@ export const days = query({
 		const out = [];
 		for (const range of ranges) {
 			const inDay = (at: number) => at >= range.since && at < range.until;
-			const dayEvents = events.filter((e) => inDay(e.at));
+			const dayEvents = [];
+			for (const e of events) {
+				if (inDay(e.at) && !(await isHidden(e.character.slug)) && !(await isHidden(e.other?.slug))) dayEvents.push(e);
+			}
 
 			// Items sent: confirmed deliveries, plus requests marked fulfilled by
 			// hand that had no confirmed delivery that day.
@@ -417,6 +430,8 @@ export const days = query({
 			const byCharacter = new Map<Id<"characters">, number>();
 			for (const t of turnIns) {
 				if (!inDay(t.at)) continue;
+				if (!characters.has(t.characterId)) characters.set(t.characterId, await ctx.db.get(t.characterId));
+				if (characters.get(t.characterId)?.hidden) continue;
 				quests += t.count;
 				byCharacter.set(t.characterId, (byCharacter.get(t.characterId) ?? 0) + t.count);
 			}
@@ -486,6 +501,8 @@ export const list = query({
 		}
 
 		const avatars = new Map<string, string | undefined>();
+		// Characters their players hid from Guildie: their events go, past ones too.
+		const hidden = new Set<string>();
 		const items = new Map<number, Doc<"items"> | null>();
 		const quests = new Map<number, string | undefined>();
 		for (const e of shown) {
@@ -496,6 +513,7 @@ export const list = query({
 					.withIndex("by_slug", (q) => q.eq("flavor", guild.flavor).eq("region", guild.region).eq("slug", c.slug))
 					.first();
 				avatars.set(c.slug, row?.avatarUrl);
+				if (row?.hidden) hidden.add(c.slug);
 			}
 			if (e.itemId !== undefined && !items.has(e.itemId)) {
 				const id = e.itemId;
@@ -519,37 +537,39 @@ export const list = query({
 		return {
 			hidden: false as const,
 			more,
-			events: shown.map((e) => {
-				const item = e.itemId !== undefined ? items.get(e.itemId) : undefined;
-				return {
-					id: e._id,
-					at: e.at,
-					reactions: reactions.get(e._id) ?? [],
-					kind: e.kind,
-					character: { ...e.character, avatarUrl: avatars.get(e.character.slug) },
-					other: e.other && { ...e.other, avatarUrl: avatars.get(e.other.slug) },
-					level: e.level,
-					fromLevel: e.fromLevel,
-					dungeon: e.dungeon,
-					quests: e.questIds?.map((id) => quests.get(id) ?? `Quest ${id}`),
-					requestKind: e.requestKind,
-					quantity: e.quantity,
-					ongoing: e.ongoing,
-					otherName: e.otherName,
-					deliveryMethod: e.deliveryMethod,
-					requestCompleted: e.requestCompleted,
-					item:
-						e.itemId !== undefined
-							? {
-									itemId: e.itemId,
-									name: item?.name ?? `Item ${e.itemId}`,
-									quality: item?.quality,
-									icon: item?.icon,
-									tooltip: item?.tooltip,
-								}
-							: undefined,
-				};
-			}),
+			events: shown
+				.filter((e) => !hidden.has(e.character.slug) && !(e.other && hidden.has(e.other.slug)))
+				.map((e) => {
+					const item = e.itemId !== undefined ? items.get(e.itemId) : undefined;
+					return {
+						id: e._id,
+						at: e.at,
+						reactions: reactions.get(e._id) ?? [],
+						kind: e.kind,
+						character: { ...e.character, avatarUrl: avatars.get(e.character.slug) },
+						other: e.other && { ...e.other, avatarUrl: avatars.get(e.other.slug) },
+						level: e.level,
+						fromLevel: e.fromLevel,
+						dungeon: e.dungeon,
+						quests: e.questIds?.map((id) => quests.get(id) ?? `Quest ${id}`),
+						requestKind: e.requestKind,
+						quantity: e.quantity,
+						ongoing: e.ongoing,
+						otherName: e.otherName,
+						deliveryMethod: e.deliveryMethod,
+						requestCompleted: e.requestCompleted,
+						item:
+							e.itemId !== undefined
+								? {
+										itemId: e.itemId,
+										name: item?.name ?? `Item ${e.itemId}`,
+										quality: item?.quality,
+										icon: item?.icon,
+										tooltip: item?.tooltip,
+									}
+								: undefined,
+					};
+				}),
 		};
 	},
 });
