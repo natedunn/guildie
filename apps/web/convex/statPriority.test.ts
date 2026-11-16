@@ -160,11 +160,45 @@ test("a custom priority changes the verdict: Intellect gloves for an Enhancement
 	])!;
 	assert.equal(judge(intGloves, shaman(), r), undefined, "talents' weights: under a point more, not worth a line");
 	const custom = judge(intGloves, shaman({ stats: ["STRENGTH", "INTELLECT", "AGILITY"] }), r);
-	assert.equal(custom?.kind, "maybe", "Strength, Intellect, Agility: worth it, but 2 Strength is given up: possible");
+	assert.equal(custom?.kind, "upgrade", "Strength, Intellect, Agility: worth it by the weights");
+	assert.deepEqual(custom?.lost, [{ stat: "STRENGTH", by: 2 }], "the 2 Strength given up is noted");
 	assert.equal(r.specs[custom!.spec].name, "Str/Int/Agi");
 });
 
-test("steepness: Agility pants for a Strength-first shaman are a possible upgrade, or nothing when steep", () => {
+test("giving up a priority stat: Seal of Sylvanas over a Stamina and Intellect ring", () => {
+	const r = upgradeRules();
+	const ring = (name: string, lines: string[]) => ({
+		slot: name === "Skull Ring" ? "FINGER_1" : "FINGER_2",
+		itemId: name === "Skull Ring" ? 1 : 2,
+		name,
+		quality: "UNCOMMON",
+		info: itemInfoFromTooltip([{ left: "Finger" }, ...lines.map((left) => ({ left }))]),
+	});
+	const todd = upgradeMember(
+		{
+			name: "Todd",
+			classId: 7,
+			level: 30,
+			seenMs: 0,
+			talentTrees: [tree("Enhancement", 21)],
+			equipment: [
+				ring("Skull Ring", ["+3 Stamina", "+3 Intellect"]),
+				ring("Zircon Band of the Eagle", ["+3 Stamina", "+3 Intellect"]),
+			],
+			statPriority: {
+				stats: ["STRENGTH", "ATTACK_POWER", "INTELLECT", "AGILITY", "CRIT_RATING", "STAMINA", "SPIRIT"],
+				tiers: [1, 1, 0.5, 0.25, 0.25, 0.1, 0.1],
+			},
+		},
+		r,
+	)!;
+	const seal = itemInfoFromTooltip([{ left: "Finger" }, { left: "+8 Stamina" }, { left: "Equip: +6 Attack Power." }])!;
+	const v = judge(seal, todd, r);
+	assert.equal(v?.kind, "upgrade", "3.8 over 1.8: the weights already count the Intellect");
+	assert.deepEqual(v?.lost, [{ stat: "INTELLECT", by: 3 }]);
+});
+
+test("steepness: Agility pants for a Strength-first shaman are an upgrade, or nothing when steep", () => {
 	const r = upgradeRules();
 	const worn = [
 		{
@@ -193,13 +227,11 @@ test("steepness: Agility pants for a Strength-first shaman are a possible upgrad
 		{ left: "82 Armor" },
 		{ left: "+8 Agility" },
 	])!;
-	assert.equal(
-		judge(pants, shaman(), r)?.kind,
-		"maybe",
-		"Balanced: 8 Agility is worth more than 4 Strength, but it gives Strength up",
-	);
+	const balanced = judge(pants, shaman(), r);
+	assert.equal(balanced?.kind, "upgrade", "Balanced: 8 Agility is worth more than 4 Strength");
+	assert.deepEqual(balanced?.lost, [{ stat: "STRENGTH", by: 4 }], "with the Strength given up noted");
 	assert.equal(judge(pants, shaman([1, 0.55, 0.35]), r), undefined, "Steep: it isn't");
-	assert.equal(judge(pants, shaman([1, 0.9, 0.8]), r)?.kind, "maybe", "Even: still gives up Strength");
+	assert.equal(judge(pants, shaman([1, 0.9, 0.8]), r)?.kind, "upgrade", "Even: worth it too");
 	assert.notEqual(shaman([1, 0.55, 0.35]).spec, shaman().spec, "own shares: their own spec key");
 	const better = itemInfoFromTooltip([
 		{ left: "Legs", right: "Leather" },

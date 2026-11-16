@@ -1,7 +1,7 @@
 import type { VerdictKind } from "@convex/shared/upgrades";
 
 // How a gear suggestion's verdict reads (shared/upgrades.ts judge): an
-// upgrade (a clear gain, nothing of their priority stats lost), a possible
+// upgrade (a clear gain by their stat weights), a possible
 // upgrade (the player decides), or plain armor for an empty slot.
 
 export function verdictLabel(kind: VerdictKind, at?: number) {
@@ -12,8 +12,7 @@ export function verdictLabel(kind: VerdictKind, at?: number) {
 
 /** What each verdict means, for a tooltip. */
 export const VERDICT_HINTS: Record<VerdictKind, string> = {
-	upgrade: "More of their priority stats, nothing lost",
-	maybe:
-		"A small gain, some of a priority stat given up, their second spec, a few levels from now, or an armor type they don't want",
+	upgrade: "A clear gain by their stat weights, what they give up counted",
+	maybe: "A small gain, their second spec, a few levels from now, or an armor type they don't want",
 	empty: "Plain armor with no stats, for a slot they have nothing in",
 };

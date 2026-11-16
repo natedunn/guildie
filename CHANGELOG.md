@@ -28,6 +28,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Improvements
 
 - **Guildie:** Crafting is split by what you want made: Gear (upgrades first, or all gear with the new "All gear" filter), Enchants (with armor kits, shield spikes and scopes) and Supplies (potions, food, bags, ammo, materials, with a type filter). Who can learn a recipe now shows right under who makes it, and Gear lists upgrades nobody knows yet with who could learn them. The Who can make and Who can learn tabs are gone.
+- **Guildie, Addon:** Gear suggestions go by your stat weights: an item that's clearly better is an upgrade even when it gives up some of a stat you rank, and the in-game tooltip says what you'd lose ("upgrade (-3 Int)").
 
 ### Fixes
 

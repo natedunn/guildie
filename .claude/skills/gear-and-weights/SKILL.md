@@ -37,10 +37,12 @@ useless to the spec (`minFit`) don't suit it; a stat the spec names
 (a player's whole own list, `fit`; else `stats`) always counts as useful
 (`fitOf`). Compare with what they wear in
 that slot (weaker ring/trinket, main+off hand for a two-hander). **Upgrade:**
-gain ≥ `upgrade` (15%), usable now, main spec, a wanted armor type, none of
-the spec's priority stats (`stats`) lower than worn (member `keys`).
+gain ≥ `upgrade` (15%), usable now, main spec, a wanted armor type. The
+spec's priority stats (`stats`) it has less of than worn (member `keys`)
+don't change the verdict (the weights count them) but ride on it as `lost`
+("upgrade (-3 Int)" in the addon).
 **Possible upgrade** (kind `maybe`): anything else with gain ≥ `maybe`
-(3%): a priority stat given up, second spec, usable within `levelsAhead`, or body armor of a type they
+(3%): second spec, usable within `levelsAhead`, or body armor of a type they
 don't want (`off`: not on their loose list, or with no list two+ types below
 the class's best; scored × `offTypeFactors` by level). Every verdict needs a
 net gain of `minGain` points. **Empty slot:** plain armor (no stats) only

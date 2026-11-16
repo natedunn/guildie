@@ -271,9 +271,9 @@ your last login or reload.
   "Brisket | upgrade (Feral)", "Pip | possible upgrade (Str/Int/Agi)", "Miller | possible upgrade (lvl 24)",
   "Todd | possible upgrade (Enhancement, cloth)", "Skurg | empty slot (Arms)". Upgrade:
   15%+ better than what they wear there (and at least a point of their main
-  stat), usable now, main spec, an armor type they want, none of
-  their priority stats lower. Possible upgrade: anything else 3%+ better,
-  some of a priority stat given up, their second spec, usable within 3 levels, or an armor type they don't
+  stat), usable now, main spec, an armor type they want; what it gives
+  up of their priority stats is noted ("upgrade (-3 Int)"). Possible upgrade: anything else 3%+ better,
+  their second spec, usable within 3 levels, or an armor type they don't
   want. Empty slot: plain armor (no stats) for a slot they have nothing in. Nothing for items soulbound to
   you. The site's item panel lists the same, with why ("+6 Agility, +4
   Stamina over Embossed Leather Gloves"). About 20 KB of the file for a guild
