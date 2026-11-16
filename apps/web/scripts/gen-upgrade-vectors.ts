@@ -267,6 +267,7 @@ const members: Record<string, any> = {
 		weaponStrict: true,
 	},
 };
+const lostList = (lost?: { stat: string; by: number }[]) => (lost ?? []).map((l) => `${l.stat}:${l.by}`).join(",");
 const verdictOut = (v: any) =>
 	v
 		? {
@@ -277,6 +278,8 @@ const verdictOut = (v: any) =>
 				second: v.second ?? false,
 				against: v.against,
 				off: v.off ?? null,
+				// "STRENGTH:3,ARMOR:20": priority stats given up, in order.
+				lost: lostList(v.lost),
 			}
 		: null;
 const judgeCases: [string, string, string, number?][] = [
@@ -315,9 +318,9 @@ const judgeCases: [string, string, string, number?][] = [
 	["maces, swords, bows only: a dagger left out", "dagger", "MacesSwordsBows"],
 	["maces, swords, bows only: a bow first among ranged", "bow", "MacesSwordsBows"],
 	["more of every priority stat: an upgrade", "strMailGloves", "Sturdy"],
-	["less armor than worn: a possible upgrade", "thinStrGloves", "Sturdy"],
-	["gives up Strength for Agility: a possible upgrade", "mailAgiGloves", "Sturdy"],
-	["ring vs the weaker ring: its Strength is given up", "agiRingPlain", "Sturdy"],
+	["less armor than worn: still judged by the weights, armor noted as lost", "thinStrGloves", "Sturdy"],
+	["gives up Strength for Agility: judged by the weights, Strength noted as lost", "mailAgiGloves", "Sturdy"],
+	["ring vs the weaker ring: its Strength noted as lost", "agiRingPlain", "Sturdy"],
 	["spell power counts as spell damage: an upgrade", "clothIntHead", "Sparky"],
 	["no priority stats known: an upgrade as before", "clothIntHead", "Frosty"],
 	["removed by the player: never suggested", "leatherAgiGloves", "Picky", 6001],

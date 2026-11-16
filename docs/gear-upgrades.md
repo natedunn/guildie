@@ -144,8 +144,8 @@ over an empty slot.
 
 | Verdict              | When                                                                                                                                                                    |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Upgrade**          | Gain of 15% or more, usable now, main spec, an armor type they want, and none of their priority stats goes down                                                         |
-| **Possible upgrade** | Anything else that gains 3% or more: a smaller gain, some of a priority stat given up, only their second spec, usable within 3 levels, or an armor type they don't want |
+| **Upgrade**          | Gain of 15% or more, usable now, main spec, and an armor type they want                                                                                                 |
+| **Possible upgrade** | Anything else that gains 3% or more: a smaller gain, only their second spec, usable within 3 levels, or an armor type they don't want                                   |
 | **Empty slot**       | Plain armor (no stats: white and grey items) for a slot they have nothing in                                                                                            |
 | Nothing              | Under 3%, or under 1 point; plain armor over anything they wear                                                                                                         |
 
@@ -156,14 +156,18 @@ what someone holds.
 
 Priority stats are the spec's `stats` (a tree's three, or the first five of
 a player's own three to ten: `KEPT_STATS`; the rest still count in the
-weights). An item that gives some of one up is only worth it by the
-weights, and the weights are a best guess, so it's a Possible upgrade and
-the player decides: +8 Agility for −4 Strength is one for a Strength-first
-shaman at Balanced, and nothing at Steep. To check, members carry their priority stats on what they wear
+weights). Giving some of one up doesn't change the verdict: the weights
+already subtract it, and the 15% bar leaves room for their being a best
+guess (Pawn and Zygor also go by the weights alone). +8 Agility for −4
+Strength is an Upgrade for a Strength-first shaman at Balanced, and
+nothing at Steep. The verdict says what's given up (`lost`, from
+`lostStats`), and the addon's rows show it: "upgrade (-3 Int)", at most
+two. To check, members carry their priority stats on what they wear
 (`keys`, per slot; `keyValue` counts armor for Armor and spell power toward
-spell damage and healing). Unknown worn items count as none. Older addons
-and older guild data without `keys` or `stats` say Upgrade as before.
-(Addons from before 0.20.0 still call it a Trade-off.)
+spell damage and healing). Unknown worn items count as none. The site's
+item panel shows the same in its why ("+6 Attack Power, +5 Stamina, -3
+Intellect over ..."). Addons before this change still make these a
+Possible upgrade (from 0.20.0; before that, a Trade-off).
 
 The list puts every Upgrade before every Possible upgrade before every Empty
 slot, then

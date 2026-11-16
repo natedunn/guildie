@@ -70,9 +70,8 @@ const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
 
 /** What each marker means (the hover says the same). */
 const MARKER_HINTS: Record<MarkerKind, string> = {
-	upgrade: "More of their stats, nothing lost",
-	maybe:
-		"A small gain, some of a stat they rank given up, their second spec, a few levels from now, or an armor type they don't want",
+	upgrade: "A clear gain by their stat weights, what they give up counted",
+	maybe: "A small gain, their second spec, a few levels from now, or an armor type they don't want",
 	empty: "Plain armor with no stats, for a slot they have nothing in",
 	removed: "Hidden: never suggested for your character again, here or in the game's tooltips. Restore puts it back.",
 };

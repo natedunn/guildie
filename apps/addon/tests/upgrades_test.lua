@@ -76,6 +76,9 @@ test("shared vectors: judge", function()
             eq(v.second or false, c.expect.second, c.name .. " second")
             eq(list(v.against), list(c.expect.against), c.name .. " against")
             eq(v.off, c.expect.off, c.name .. " off")
+            local lost = {}
+            for _, l in ipairs(v.lost or {}) do table.insert(lost, l.stat .. ":" .. tostring(l.by)) end
+            eq(table.concat(lost, ","), c.expect.lost, c.name .. " lost")
         end
     end
 end)
@@ -248,7 +251,7 @@ test("a player's own stat priority: a custom spec the site adds to the rules", f
     eq(plain(added[1]), "Brisket | upgrade (Agi/Sta/Str)")
 end)
 
-test("giving up a priority stat: a possible upgrade, after upgrades", function()
+test("giving up a priority stat: judged by the weights, what's lost noted", function()
     wow.state.time = vectors.members.Brisket.seen + 60
     local mailGloves = {
         id = 4254, name = "Chain Gloves", equipLoc = "INVTYPE_HAND", classID = 4, subclassID = 3,
@@ -261,7 +264,9 @@ test("giving up a priority stat: a possible upgrade, after upgrades", function()
     local added = hover(mailGloves)
     eq(#added, 2)
     eq(plain(added[1]), "Miller | upgrade (Arms)")
-    eq(plain(added[2]), "Sturdy | possible upgrade (Str/Agi/Sta)")
+    eq(plain(added[2]), "Sturdy | upgrade (Str/Agi/Sta, -3 Str)")
+    -- The same on your own row.
+    eq(U.forYou(vectors.items.mailAgiGloves, nil, vectors.members.Sturdy, rules), "upgrade (-3 Str)")
 end)
 
 test("nothing that can't be traded: Binds when picked up, Quest Item; reagent line too", function()

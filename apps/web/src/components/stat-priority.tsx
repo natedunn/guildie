@@ -276,8 +276,8 @@ function HowWeightingWorks({ stats, tiers }: { stats: string[]; tiers: number[] 
 					{firstIsStat && last && (
 						<p>
 							Say an item gives 4 less {label(first)} and 8 more {label(last.s)}:{" "}
-							<span className="text-foreground">{worth ? "worth it" : "not worth it"}</span>. Items like that show as
-							possible upgrades, never as plain upgrades.
+							<span className="text-foreground">{worth ? "worth it" : "not worth it"}</span>. Gear suggestions go by
+							that, and in game they say what you'd give up.
 						</p>
 					)}
 				</div>

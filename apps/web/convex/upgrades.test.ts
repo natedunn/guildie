@@ -39,6 +39,8 @@ test("shared vectors: judge", () => {
 		assert.equal(v.second ?? false, c.expect.second, c.name);
 		assert.deepEqual(v.against, c.expect.against, c.name);
 		assert.equal(v.off ?? null, c.expect.off, c.name);
+		const lost = (v.lost ?? []).map((l) => `${l.stat}:${l.by}`).join(",");
+		assert.equal(lost, c.expect.lost, `${c.name} lost`);
 	}
 });
 

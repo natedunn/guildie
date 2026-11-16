@@ -286,19 +286,22 @@ function U.keyValue(item, stat)
     return own
 end
 
---- Whether the item has less of one of the spec's priority stats (spec.stats,
---- from the rules) than what it replaces (member keys; unknown items: none).
-local function loses(item, m, stats, against)
-    if type(stats) ~= "table" then return false end
+--- The spec's priority stats (spec.stats, from the rules) the item has less of
+--- than what it replaces (member keys; unknown items: none), in the spec's
+--- order: { { stat = "INTELLECT", by = 3 }, ... } (lostStats in upgrades.ts).
+function U.lostStats(item, m, stats, against)
+    local lost = {}
+    if type(stats) ~= "table" then return lost end
     for _, k in ipairs(stats) do
         local worn = 0
         for _, slot in ipairs(against) do
             local values = m.keys and m.keys[slot]
             worn = worn + ((values and values[k]) or 0)
         end
-        if U.keyValue(item, k) < worn then return true end
+        local v = U.keyValue(item, k)
+        if v < worn then table.insert(lost, { stat = k, by = worn - v }) end
     end
-    return false
+    return lost
 end
 
 -- A weapon type the class only uses when the player chooses it
@@ -313,7 +316,7 @@ end
 
 local KIND_RANK = { upgrade = 0, maybe = 1, empty = 2 }
 
---- { kind = "upgrade"|"maybe"|"empty", gain, spec, at?, second?, against, off? } or nil.
+--- { kind = "upgrade"|"maybe"|"empty", gain, spec, at?, second?, against, off?, lost? } or nil.
 function U.judge(item, m, rules, itemID)
     -- Removed by the player on the site (optional: older GuildieData.lua files lack it).
     if itemID and contains(m.dismissed, itemID) then return nil end
@@ -329,14 +332,17 @@ function U.judge(item, m, rules, itemID)
     end
     local minGain = rules.minGain or 0
     if main and main.gain >= rules.maybe and main.net >= minGain then
-        -- Upgrade only when it's clear: anything else ("maybe") is a possible
-        -- upgrade the player decides, including giving up a priority stat.
+        -- Upgrade when it's clear: anything else ("maybe") is a possible upgrade
+        -- the player decides. Giving up a priority stat doesn't change the
+        -- verdict (the weights count it); `lost` says what's given up.
         local kind = "maybe"
-        if main.gain >= rules.upgrade and not later and main.off == nil then
-            local spec = rules.specs[m.spec]
-            if not loses(item, m, spec and spec.stats, main.against) then kind = "upgrade" end
-        end
-        return { kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later, off = main.off }
+        if main.gain >= rules.upgrade and not later and main.off == nil then kind = "upgrade" end
+        local spec = rules.specs[m.spec]
+        local lost = U.lostStats(item, m, spec and spec.stats, main.against)
+        return {
+            kind = kind, gain = main.gain, spec = m.spec, against = main.against, at = later, off = main.off,
+            lost = #lost > 0 and lost or nil,
+        }
     end
     if m.spec2 and m.slots2 then
         local second = gainFor(item, m, m.spec2, m.slots2, rules)
@@ -577,8 +583,26 @@ end
 local ARMOR_NAMES = { [1] = "cloth", [2] = "leather", [3] = "mail", [4] = "plate" }
 local LABELS = { upgrade = "upgrade", maybe = "possible upgrade", empty = "empty slot" }
 
+-- Short stat names for "-3 Int" (STAT_SHORT in upgrades.ts).
+local STAT_SHORT = {
+    STRENGTH = "Str", AGILITY = "Agi", STAMINA = "Sta", INTELLECT = "Int", SPIRIT = "Spi",
+    ATTACK_POWER = "AP", SPELL_DAMAGE_DONE = "Spell dmg", SPELL_HEALING_DONE = "Healing",
+    CRIT_RATING = "Crit", HIT_RATING = "Hit", DEFENSE_SKILL_RATING = "Def", MANA_REGENERATION = "MP5",
+    ARMOR = "Armor",
+}
+
+--- What a verdict gives up of the priority stats, as notes: "-3 Int"; at most two.
+function U.lostNotes(v, notes)
+    for i, l in ipairs(v.lost or {}) do
+        if i > 2 then break end
+        local by = l.by == math.floor(l.by) and string.format("%d", l.by) or string.format("%.1f", l.by)
+        table.insert(notes, "-" .. by .. " " .. (STAT_SHORT[l.stat] or l.stat))
+    end
+    return notes
+end
+
 --- What the item is to you, as a row's right side: "upgrade",
---- "possible upgrade (cloth)", "empty slot", "not an upgrade",
+--- "upgrade (-3 Int)", "possible upgrade (cloth)", "empty slot", "not an upgrade",
 --- "needs lvl 30", "can't use"; nil when you wear it.
 function U.forYou(item, itemID, m, rules)
     if itemID and contains(m.worn, itemID) then return nil end
@@ -604,6 +628,7 @@ function U.forYou(item, itemID, m, rules)
     end
     if v.off and ARMOR_NAMES[v.off] then table.insert(notes, ARMOR_NAMES[v.off]) end
     if v.at then table.insert(notes, "lvl " .. v.at) end
+    U.lostNotes(v, notes)
     if #notes > 0 then text = text .. " (" .. table.concat(notes, ", ") .. ")" end
     return text
 end
@@ -729,6 +754,7 @@ function U.lines(item, itemID, color)
         if spec and (v.second or not v.at) then table.insert(notes, spec.name) end
         if v.off and ARMOR_NAMES[v.off] then table.insert(notes, ARMOR_NAMES[v.off]) end
         if v.at then table.insert(notes, "lvl " .. v.at) end
+        U.lostNotes(v, notes)
         local right = (LABELS[v.kind] or "possible upgrade") .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or "")
         -- Already in order (suggest): upgrades, then possible upgrades.
         table.insert(rows, { left = color(p.member.name, p.member.classId), right = right })

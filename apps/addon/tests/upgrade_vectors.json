@@ -692,7 +692,8 @@
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -712,7 +713,8 @@
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": 2
+				"off": 2,
+				"lost": ""
 			}
 		},
 		{
@@ -726,7 +728,8 @@
 				"at": null,
 				"second": false,
 				"against": [1],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -740,7 +743,8 @@
 				"at": null,
 				"second": true,
 				"against": [1],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -754,7 +758,8 @@
 				"at": null,
 				"second": false,
 				"against": [16, 17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -768,7 +773,8 @@
 				"at": 25,
 				"second": false,
 				"against": [16, 17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -790,7 +796,8 @@
 				"at": null,
 				"second": false,
 				"against": [12],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -804,7 +811,8 @@
 				"at": 40,
 				"second": false,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -824,7 +832,8 @@
 				"at": null,
 				"second": false,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -838,7 +847,8 @@
 				"at": null,
 				"second": false,
 				"against": [17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -858,7 +868,8 @@
 				"at": null,
 				"second": false,
 				"against": [18],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -884,7 +895,8 @@
 				"at": null,
 				"second": false,
 				"against": [15],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -898,7 +910,8 @@
 				"at": null,
 				"second": true,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -912,7 +925,8 @@
 				"at": null,
 				"second": false,
 				"against": [16, 17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -926,7 +940,8 @@
 				"at": null,
 				"second": false,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -958,7 +973,8 @@
 				"at": null,
 				"second": false,
 				"against": [17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -972,7 +988,8 @@
 				"at": null,
 				"second": false,
 				"against": [16, 17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -986,7 +1003,8 @@
 				"at": null,
 				"second": false,
 				"against": [17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1000,7 +1018,8 @@
 				"at": null,
 				"second": false,
 				"against": [18],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1014,7 +1033,8 @@
 				"at": null,
 				"second": false,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1028,7 +1048,8 @@
 				"at": null,
 				"second": false,
 				"against": [5],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1048,7 +1069,8 @@
 				"at": null,
 				"second": false,
 				"against": [16, 17],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1074,49 +1096,53 @@
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
-			"name": "less armor than worn: a possible upgrade",
+			"name": "less armor than worn: still judged by the weights, armor noted as lost",
 			"item": "thinStrGloves",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "maybe",
+				"kind": "upgrade",
 				"gain": 1.3200000000000003,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": null
+				"off": null,
+				"lost": "ARMOR:20"
 			}
 		},
 		{
-			"name": "gives up Strength for Agility: a possible upgrade",
+			"name": "gives up Strength for Agility: judged by the weights, Strength noted as lost",
 			"item": "mailAgiGloves",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "maybe",
+				"kind": "upgrade",
 				"gain": 0.68,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": null
+				"off": null,
+				"lost": "STRENGTH:3"
 			}
 		},
 		{
-			"name": "ring vs the weaker ring: its Strength is given up",
+			"name": "ring vs the weaker ring: its Strength noted as lost",
 			"item": "agiRingPlain",
 			"member": "Sturdy",
 			"expect": {
-				"kind": "maybe",
+				"kind": "upgrade",
 				"gain": 1.0333333333333332,
 				"spec": "WARRIOR:0:STRENGTH,AGILITY,STAMINA,ARMOR",
 				"at": null,
 				"second": false,
 				"against": [11],
-				"off": null
+				"off": null,
+				"lost": "STRENGTH:3"
 			}
 		},
 		{
@@ -1130,7 +1156,8 @@
 				"at": null,
 				"second": false,
 				"against": [1],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1144,7 +1171,8 @@
 				"at": null,
 				"second": false,
 				"against": [1],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1166,7 +1194,8 @@
 				"at": null,
 				"second": false,
 				"against": [10],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1188,7 +1217,8 @@
 				"at": null,
 				"second": false,
 				"against": [12],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1208,7 +1238,8 @@
 				"at": null,
 				"second": false,
 				"against": [3],
-				"off": 1
+				"off": 1,
+				"lost": ""
 			}
 		},
 		{
@@ -1222,7 +1253,8 @@
 				"at": null,
 				"second": false,
 				"against": [3],
-				"off": 1
+				"off": 1,
+				"lost": ""
 			}
 		},
 		{
@@ -1236,7 +1268,8 @@
 				"at": null,
 				"second": false,
 				"against": [3],
-				"off": 1
+				"off": 1,
+				"lost": ""
 			}
 		},
 		{
@@ -1250,7 +1283,8 @@
 				"at": null,
 				"second": false,
 				"against": [1],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1270,7 +1304,8 @@
 				"at": null,
 				"second": false,
 				"against": [1],
-				"off": 1
+				"off": 1,
+				"lost": ""
 			}
 		},
 		{
@@ -1290,7 +1325,8 @@
 				"at": null,
 				"second": false,
 				"against": [18],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1304,7 +1340,8 @@
 				"at": null,
 				"second": false,
 				"against": [9],
-				"off": null
+				"off": null,
+				"lost": ""
 			}
 		},
 		{
@@ -1556,7 +1593,7 @@
 			"now": 2003600,
 			"skip": [],
 			"max": 6,
-			"expect": ["Rage:upgrade", "Miller:upgrade", "Arrow:maybe", "Sturdy:maybe"]
+			"expect": ["Rage:upgrade", "Miller:upgrade", "Sturdy:upgrade", "Arrow:maybe"]
 		}
 	]
 }

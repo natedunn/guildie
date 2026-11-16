@@ -17,14 +17,15 @@ import { CLASS_TOKENS, DEFAULT_TREE, SPECS, STAT_POINTS, THRESHOLDS, type Weight
 //    DPS terms. An item whose stats are of little use to a spec doesn't suit it.
 // 3. Compared with what they wear where it would go: the weaker ring or
 //    trinket, main hand plus off hand for a two-hander, and so on.
-// 4. Upgrade: gain of `upgrade` or more, usable now, main spec, an armor
-//    type they want, and none of the spec's priority stats (`stats`, the
-//    first five) lower than what it replaces. Anything else that gains at
-//    least `maybe` is a "possible upgrade" (kind "maybe"): a smaller gain,
-//    some of a priority stat given up, only the second spec, usable within
-//    `levelsAhead` levels ("at 24"), or armor of a type they don't want
-//    (`offTypeFactors`). The player decides those. Every one adds at least
-//    `minGain` points.
+// 4. Upgrade: gain of `upgrade` or more, usable now, main spec and an armor
+//    type they want. Anything else that gains at least `maybe` is a
+//    "possible upgrade" (kind "maybe"): a smaller gain, only the second
+//    spec, usable within `levelsAhead` levels ("at 24"), or armor of a type
+//    they don't want (`offTypeFactors`). The player decides those. Every one
+//    adds at least `minGain` points. Giving up some of a priority stat
+//    (`stats`, the first five) doesn't change the verdict (the weights
+//    already count it, like Pawn's), but the verdict says what's lost
+//    (`lost`: "upgrade (-3 Int)").
 // 5. Plain armor (armor and no stats: white and grey items) only for an empty
 //    slot, as "empty slot": anything worn there has stats it would lose.
 //
@@ -69,7 +70,7 @@ export type Rules = {
 	points: Record<string, number>;
 	/**
 	 * "DRUID:1" (class token, tree index) -> name, weights and its priority
-	 * stats, first to last (the first five of a player's own: losing any of them keeps it from being an upgrade).
+	 * stats, first to last (the first five of a player's own: what an item gives up of them is noted, `lost`).
 	 * `fit`: every stat a player's own list names (missing: `stats`); those
 	 * always count as suiting the spec (fitOf).
 	 */
@@ -133,7 +134,7 @@ export type GearPrefs = Pick<
 >;
 
 export type Verdict = {
-	/** Upgrade (a clear gain, nothing of their priority stats lost), or a possible upgrade ("maybe"). */
+	/** Upgrade (a clear gain), or a possible upgrade ("maybe"). */
 	kind: VerdictKind;
 	/** (new - current) / current, current at least `minBase`. */
 	gain: number;
@@ -147,6 +148,8 @@ export type Verdict = {
 	against: number[];
 	/** Body armor of a type they don't want (armor subclass, cloth 1 ... plate 4): why it's only a possible upgrade. */
 	off?: number;
+	/** The main spec's priority stats it has less of than what it replaces, first to last, and how much less. */
+	lost?: { stat: string; by: number }[];
 };
 
 /** "maybe": a possible upgrade; "empty": plain armor (no stats) for a slot they have nothing in. */
@@ -378,7 +381,7 @@ export function customWeights(
 /** Fewest and most stats a player's own priority names. */
 export const MIN_STATS = 3;
 export const MAX_STATS = 10;
-/** Losing one of the first this many keeps an item from being an upgrade (more would make hardly anything one). */
+/** Of these first this many, what an item gives up is noted on its verdict (`lost`). */
 export const KEPT_STATS = 5;
 
 /** Three to ten distinct stats a priority can name, or undefined. */
@@ -738,17 +741,20 @@ export function keyValue(item: ItemInfo, stat: string) {
 }
 
 /**
- * Whether the item has less of one of the spec's priority stats than what it
- * replaces (`against`). Unknown worn items count as none.
+ * The spec's priority stats the item has less of than what it replaces
+ * (`against`), in the spec's order, and how much less. Unknown worn items
+ * count as none.
  */
-function loses(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, against: number[]) {
-	if (!stats) return false;
+export function lostStats(item: ItemInfo, m: UpgradeMember, stats: string[] | undefined, against: number[]) {
+	const lost: { stat: string; by: number }[] = [];
+	if (!stats) return lost;
 	for (const k of stats) {
 		let worn = 0;
 		for (const slot of against) worn += m.keys?.[slot]?.[k] ?? 0;
-		if (keyValue(item, k) < worn) return true;
+		const v = keyValue(item, k);
+		if (v < worn) lost.push({ stat: k, by: worn - v });
 	}
-	return false;
+	return lost;
 }
 
 /** Upgrade, possible upgrade ("maybe"), empty slot, or nothing, for one guildmate. */
@@ -768,15 +774,18 @@ export function judge(item: ItemInfo, m: UpgradeMember, rules: Rules, itemId?: n
 	}
 	const minGain = rules.minGain ?? 0;
 	if (main && main.gain >= rules.maybe && main.net >= minGain) {
-		const kind =
-			main.gain >= rules.upgrade &&
-			!later &&
-			main.off === undefined &&
-			!loses(item, m, rules.specs[m.spec]?.stats, main.against)
-				? "upgrade"
-				: "maybe";
+		const kind = main.gain >= rules.upgrade && !later && main.off === undefined ? "upgrade" : "maybe";
 		const off = main.off !== undefined ? { off: main.off } : {};
-		return { kind, gain: main.gain, spec: m.spec, against: main.against, ...extra, ...off };
+		const lost = lostStats(item, m, rules.specs[m.spec]?.stats, main.against);
+		return {
+			kind,
+			gain: main.gain,
+			spec: m.spec,
+			against: main.against,
+			...extra,
+			...off,
+			...(lost.length ? { lost } : {}),
+		};
 	}
 	if (m.spec2 && m.slots2) {
 		const second = gainFor(item, m, m.spec2, m.slots2, rules);
