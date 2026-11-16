@@ -1,5 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { recipeCandidates } from "@convex/shared/recipeStatus";
+import type { VerdictKind } from "@convex/shared/upgrades";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQueries, useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -7,7 +8,8 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
-import { CraftRequest, type Member, UpgradesView } from "@/components/crafting-upgrades";
+import { CraftRequest, type Filters, type Member, UpgradesView } from "@/components/crafting-upgrades";
+import { FilterMenu } from "@/components/filter-menu";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { PageTabButton, PageTabs } from "@/components/page-tabs";
 import { type Learner, LearnerSummary } from "@/components/recipe-learners";
@@ -22,12 +24,12 @@ import {
 	searchIndex,
 } from "@/components/recipe-row";
 import { RetryingErrorPage } from "@/components/status-pages";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-// Three tabs, each a question: "Who can make" (the default), "Who can learn"
-// (?view=learn) and "Upgrades" (?view=upgrades).
+// Three tabs: "Upgrades" (the default, members only), "Who can make"
+// (?view=make; the default for anyone else) and "Who can learn" (?view=learn).
 //
 // "Who can make...": every recipe someone in the guild knows, searched on the
 // client (recipe, item, item kind, tooltip text, reagents). The search and the
@@ -40,13 +42,13 @@ import { cn } from "@/lib/utils";
 // formula...) for the guild's professions, with who could learn it now or
 // later, who already has one and who knows it: is it worth sending someone?
 
-type View = "upgrades" | "learn";
+type View = "upgrades" | "make" | "learn";
 /**
  * Upgrades' filters, `for` (who it's for) and `by` (who crafts it): "mine"
  * (the viewer's characters), "guild" (guildmates) or a character's slug;
  * anyone when missing.
  */
-type Search = { q?: string; profession?: string; view?: View; for?: string; by?: string };
+type Search = { q?: string; profession?: string; view?: View; for?: string; by?: string; kind?: VerdictKind };
 
 export const Route = createFileRoute("/g/$region/$slug/crafting")({
 	validateSearch: (search: Record<string, unknown>): Search => {
@@ -56,9 +58,10 @@ export const Route = createFileRoute("/g/$region/$slug/crafting")({
 		if (typeof search.profession === "string") out.profession = search.profession;
 		// "craft" was Upgrades' old Crafts for others.
 		if (search.view === "upgrades" || search.view === "craft") out.view = "upgrades";
-		if (search.view === "learn") out.view = "learn";
+		if (search.view === "make" || search.view === "learn") out.view = search.view;
 		if (typeof search.for === "string") out.for = search.for;
 		if (typeof search.by === "string") out.by = search.by;
+		if (search.kind === "upgrade" || search.kind === "maybe" || search.kind === "empty") out.kind = search.kind;
 		// Old links: ?char= was who it's for (Crafts for me) or who crafts it (Crafts for others).
 		if (typeof search.char === "string") {
 			if (search.view === "craft") out.by ??= search.char;
@@ -109,7 +112,6 @@ function CraftingPage() {
 	const deferred = useDeferredValue(query);
 	const [limit, setLimit] = useState(PAGE);
 	const profession = search.profession;
-	const view = search.view;
 
 	// Typing stays local (instant); the URL follows a beat later, replacing
 	// the history entry so Back doesn't step through every keystroke.
@@ -147,14 +149,16 @@ function CraftingPage() {
 		? { guild: { region: params.region as Region, slug: params.slug }, characters: me.characters }
 		: undefined;
 
-	const showUpgrades = view === "upgrades" && !!me;
-	const showLearn = view === "learn" && !!me;
+	// Upgrades and Who can learn are for members; Upgrades is their default.
+	const view: View = !me ? "make" : (search.view ?? "upgrades");
+	const showUpgrades = view === "upgrades";
+	const showLearn = view === "learn";
 	const { data: learnData } = useQuery({
 		...convexQuery(api.crafting.guildRecipeLearners, { region: params.region as Region, slug: params.slug }),
 		enabled: !!me,
 	});
 	const learnRows = useLearnRows(learnData);
-	const learnIndex = useLearnIndex(learnRows, query.trim() !== "" && (showLearn || !view));
+	const learnIndex = useLearnIndex(learnRows, query.trim() !== "" && view !== "upgrades");
 	const neededCount = useMemo(() => learnRows.filter((r) => r.needed).length, [learnRows]);
 	const source: GuildRecipe[] = data ?? [];
 
@@ -163,7 +167,7 @@ function CraftingPage() {
 	const matches = useMemo(() => searchIndex(index, words), [index, words]);
 	// Who can make, searching: recipe items nobody knows yet that match, and who could learn them.
 	const couldLearn = useMemo(() => {
-		if (view || words.length === 0) return [];
+		if (view !== "make" || words.length === 0) return [];
 		return searchIndex(learnIndex, words).filter(
 			(r) => !r.known && r.needed && (!profession || r.profession === profession),
 		);
@@ -195,15 +199,27 @@ function CraftingPage() {
 
 	const setProfession = (p?: string) =>
 		navigate({ search: (prev) => ({ ...prev, profession: p }), replace: true, resetScroll: false });
-	const setView = (v?: View) =>
-		navigate({ search: (prev) => ({ ...prev, view: v, profession: undefined }), replace: true, resetScroll: false });
-	// Upgrades' filters: the ones given change, the others stay; none given clears all three.
-	const setFilters = (next: { for?: string; by?: string; profession?: string }) =>
+	const setView = (v: View) =>
+		navigate({
+			// Upgrades is the default: no ?view= for it. Filters belong to the tab they were set on.
+			search: (prev) => ({
+				...prev,
+				view: v === "upgrades" ? undefined : v,
+				profession: undefined,
+				for: undefined,
+				by: undefined,
+				kind: undefined,
+			}),
+			replace: true,
+			resetScroll: false,
+		});
+	// Upgrades' filters: the ones given change, the others stay; none given clears them all.
+	const setFilters = (next: Filters) =>
 		navigate({
 			search: (prev) => {
 				const clear = Object.keys(next).length === 0;
-				const pick = <K extends keyof typeof next>(k: K) => (clear ? undefined : k in next ? next[k] : prev[k]);
-				return { ...prev, for: pick("for"), by: pick("by"), profession: pick("profession") };
+				const pick = <K extends keyof Filters>(k: K) => (clear ? undefined : k in next ? next[k] : prev[k]);
+				return { ...prev, for: pick("for"), by: pick("by"), kind: pick("kind"), profession: pick("profession") };
 			},
 			replace: true,
 			resetScroll: false,
@@ -215,7 +231,10 @@ function CraftingPage() {
 			<div className="space-y-3">
 				{me ? (
 					<PageTabs>
-						<PageTabButton active={!showUpgrades && !showLearn} onClick={() => setView(undefined)} count={data.length}>
+						<PageTabButton active={showUpgrades} onClick={() => setView("upgrades")}>
+							Upgrades
+						</PageTabButton>
+						<PageTabButton active={view === "make"} onClick={() => setView("make")} count={data.length}>
 							<span className="@max-md:hidden">Who can make</span>
 							<span className="@md:hidden">Make</span>
 						</PageTabButton>
@@ -226,9 +245,6 @@ function CraftingPage() {
 						>
 							<span className="@max-md:hidden">Who can learn</span>
 							<span className="@md:hidden">Learn</span>
-						</PageTabButton>
-						<PageTabButton active={showUpgrades} onClick={() => setView("upgrades")}>
-							Upgrades
 						</PageTabButton>
 					</PageTabs>
 				) : null}
@@ -256,15 +272,16 @@ function CraftingPage() {
 						inputRef={inputRef}
 						forWho={search.for}
 						byWho={search.by}
+						kind={search.kind}
 						profession={profession}
 						setFilters={setFilters}
 					/>
 				) : null}
 				{/* One row: the search and the profession. Wraps on phones. Who can learn and Upgrades have their own. */}
 				<div className={cn("flex flex-wrap items-center gap-2", (showLearn || showUpgrades) && "hidden")}>
-					<Input
+					<SearchInput
 						ref={inputRef}
-						type="search"
+						large
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						onKeyDown={(e) => {
@@ -272,22 +289,17 @@ function CraftingPage() {
 						}}
 						placeholder="Who can make... (bag, Mageweave, 8 slot bag)"
 						aria-label="Search recipes the guild can craft"
-						// Phones: a row of its own, under the picker and the profession.
-						className="h-10 min-w-0 flex-1 basis-64 text-[15px] @max-md:order-last @max-md:basis-full"
+						className="h-10 text-[15px]"
+						// Phones: a row of its own, under the profession.
+						wrapperClassName="flex-1 basis-64 @max-md:order-last @max-md:basis-full"
 					/>
-					<select
-						aria-label="Profession"
-						value={profession ?? ""}
-						onChange={(e) => setProfession(e.target.value || undefined)}
-						className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:flex-1"
-					>
-						<option value="">All professions ({matches.length})</option>
-						{professions.map((p) => (
-							<option key={p} value={p}>
-								{p} ({counts.get(p) ?? 0})
-							</option>
-						))}
-					</select>
+					<ProfessionMenu
+						value={profession}
+						onChange={setProfession}
+						total={matches.length}
+						professions={professions.map((p) => [p, counts.get(p) ?? 0])}
+						className="@max-md:flex-1"
+					/>
 				</div>
 			</div>
 
@@ -323,6 +335,33 @@ function CraftingPage() {
 				</div>
 			)}
 		</div>
+	);
+}
+
+/** "All professions (341)" or one of them, as a menu like Upgrades' filters. */
+function ProfessionMenu({
+	value,
+	onChange,
+	total,
+	professions,
+	className,
+}: {
+	value?: string;
+	onChange: (p?: string) => void;
+	total: number;
+	professions: [name: string, count: number][];
+	className?: string;
+}) {
+	return (
+		<FilterMenu
+			value={value ?? ""}
+			onChange={(v) => onChange(v || undefined)}
+			options={[
+				{ value: "", label: "All professions", count: total },
+				...professions.map(([p, n], i) => ({ value: p, label: p, count: n, separate: i === 0 })),
+			]}
+			className={className}
+		/>
 	);
 }
 
@@ -546,8 +585,8 @@ function LearnView({
 	return (
 		<>
 			<div className="flex flex-wrap items-center gap-2">
-				<Input
-					type="search"
+				<SearchInput
+					large
 					value={query}
 					onChange={(e) => setQuery(e.target.value)}
 					onKeyDown={(e) => {
@@ -555,21 +594,16 @@ function LearnView({
 					}}
 					placeholder="Who can learn... (Pattern: Red Linen Robe, Mageweave)"
 					aria-label="Search recipe items"
-					className="h-10 min-w-0 flex-1 basis-64 text-[15px] @max-md:order-last @max-md:basis-full"
+					className="h-10 text-[15px]"
+					wrapperClassName="flex-1 basis-64 @max-md:order-last @max-md:basis-full"
 				/>
-				<select
-					aria-label="Profession"
-					value={profession ?? ""}
-					onChange={(e) => setProfession(e.target.value || undefined)}
-					className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:flex-1"
-				>
-					<option value="">All professions ({matches.length})</option>
-					{professions.map((p) => (
-						<option key={p} value={p}>
-							{p} ({counts.get(p) ?? 0})
-						</option>
-					))}
-				</select>
+				<ProfessionMenu
+					value={profession}
+					onChange={setProfession}
+					total={matches.length}
+					professions={professions.map((p) => [p, counts.get(p) ?? 0])}
+					className="@max-md:flex-1"
+				/>
 				<label
 					className="ml-auto flex h-10 cursor-pointer items-center gap-2 pl-2 text-[0.8125rem] text-muted-foreground select-none hover:text-foreground"
 					title="Hide recipe items that everyone with the profession already knows or has"

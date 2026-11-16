@@ -2,13 +2,11 @@ import { api } from "@convex/_generated/api";
 import { dungeonArtUrl } from "@convex/shared/dungeons";
 import type { Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
-import { Search01Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { DoneMark, DungeonArt, MembersOnly, ViewAs, viewAsSearch, viewerKey } from "@/components/dungeon";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Dungeons: a card per dungeon, lowest level first: its loading-screen art,
@@ -47,15 +45,12 @@ function DungeonsPage() {
 	return (
 		<div className="@container pb-12">
 			<div className="mb-4 flex flex-wrap items-center gap-3">
-				<div className="relative w-full @lg:w-64">
-					<HugeiconsIcon
-						icon={Search01Icon}
-						size={14}
-						strokeWidth={1.75}
-						className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
-					/>
-					<Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search dungeons" className="pl-8" />
-				</div>
+				<SearchInput
+					value={q}
+					onChange={(e) => setQ(e.target.value)}
+					placeholder="Search dungeons"
+					wrapperClassName="w-full @lg:w-64"
+				/>
 				<div className="ml-auto flex items-center gap-3">
 					{person && (
 						<span className="num text-xs text-muted-foreground">

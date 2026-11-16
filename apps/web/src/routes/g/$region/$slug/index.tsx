@@ -28,7 +28,7 @@ import {
 	DropdownMenuContent,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -175,11 +175,11 @@ function Roster({ members }: { members: Member[] }) {
 	return (
 		<section className="@container pb-10">
 			<div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
-				<Input
+				<SearchInput
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
 					placeholder="Search"
-					className="w-full sm:w-64"
+					wrapperClassName="w-full sm:w-64"
 				/>
 				<div className="flex flex-wrap gap-1">
 					<button

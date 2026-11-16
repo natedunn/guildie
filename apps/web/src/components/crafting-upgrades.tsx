@@ -9,19 +9,12 @@ import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 import { ClassText } from "@/components/class-name";
+import { FilterMenu, type FilterOption } from "@/components/filter-menu";
 import { ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { compareProfessions, indexEntry, queryWords, RecipeItem, searchIndex } from "@/components/recipe-row";
 import { RequestButton } from "@/components/requests";
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Switch } from "@/components/ui/switch";
 import { UpgradeWhy } from "@/components/upgrade-why";
 import { MARKER_LABELS, type MarkerKind, VerdictGlyph, VerdictMarker } from "@/components/verdict-marker";
@@ -32,8 +25,8 @@ import { verdictLabel } from "@/lib/verdict";
 // craft for the viewer's characters and what theirs can craft for anyone in
 // the guild (crafting.upgrades). Each row says who it's for and who crafts
 // it, the viewer's characters ("Yours") apart from guildmates. Filters on
-// both (anyone, your characters, one of them, guildmates) and the profession
-// sit in a sidebar on a wide pane and in menus above the table on a narrow one.
+// both (anyone, your characters, one of them, guildmates), the kind (upgrade,
+// possible upgrade, empty slot) and the profession sit in menus above it.
 
 export type Member = {
 	guild: { region: Region; slug: string };
@@ -85,6 +78,7 @@ export function UpgradesView({
 	inputRef,
 	forWho,
 	byWho,
+	kind,
 	profession,
 	setFilters,
 }: {
@@ -97,8 +91,10 @@ export function UpgradesView({
 	inputRef: RefObject<HTMLInputElement | null>;
 	forWho: Who;
 	byWho: Who;
+	/** Only upgrades, possible upgrades or empty slots (for whom `forWho` keeps). */
+	kind?: VerdictKind;
 	profession?: string;
-	setFilters: (next: { for?: Who; by?: Who; profession?: string }) => void;
+	setFilters: (next: Filters) => void;
 }) {
 	const args = { region: region as Region, slug: guildSlug };
 	const { data } = useQuery(convexQuery(api.crafting.upgrades, args));
@@ -132,16 +128,19 @@ export function UpgradesView({
 	);
 	const matched = useMemo(() => searchIndex(index, words), [index, words]);
 
-	const forOk = (r: Row, who: Who) => r.shown.some((x) => keeps(who, x));
+	// Who it's for and the kind go together: someone the filter keeps, with that verdict.
+	const forOk = (r: Row, who: Who, k?: VerdictKind) =>
+		r.shown.some((x) => keeps(who, x) && (!k || (x.kind === k && !x.removed)));
 	const byOk = (r: Row, who: Who) => r.crafters.some((c) => keeps(who, c));
 	const profOk = (r: Row, p?: string) => !p || r.profession === p;
-	const results = matched.filter((r) => forOk(r, forWho) && byOk(r, byWho) && profOk(r, profession));
+	const results = matched.filter((r) => forOk(r, forWho, kind) && byOk(r, byWho) && profOk(r, profession));
 	// Each filter's counts, with the other filters on.
 	const forRows = matched.filter((r) => byOk(r, byWho) && profOk(r, profession));
-	const byRows = matched.filter((r) => forOk(r, forWho) && profOk(r, profession));
-	const profRows = matched.filter((r) => forOk(r, forWho) && byOk(r, byWho));
+	const byRows = matched.filter((r) => forOk(r, forWho, kind) && profOk(r, profession));
+	const profRows = matched.filter((r) => forOk(r, forWho, kind) && byOk(r, byWho));
 	const counts = {
-		for: (who: Who) => forRows.filter((r) => forOk(r, who)).length,
+		for: (who: Who) => forRows.filter((r) => forOk(r, who, kind)).length,
+		kind: (k?: VerdictKind) => forRows.filter((r) => forOk(r, forWho, k)).length,
 		by: (who: Who) => byRows.filter((r) => byOk(r, who)).length,
 		prof: (p?: string) => profRows.filter((r) => profOk(r, p)).length,
 	};
@@ -166,7 +165,7 @@ export function UpgradesView({
 	}, [data, characters]);
 	const professions = useMemo(() => [...new Set(rows.map((r) => r.profession))].sort(compareProfessions), [rows]);
 
-	useEffect(() => setLimit(PAGE), [deferred, forWho, byWho, profession, showRemoved]);
+	useEffect(() => setLimit(PAGE), [deferred, forWho, byWho, kind, profession, showRemoved]);
 
 	// Remove (or put back) an item for one of the viewer's characters: gone
 	// from the list at once (optimistic), then from the item panel and, after
@@ -202,110 +201,92 @@ export function UpgradesView({
 		who && who !== "mine" && who !== "guild"
 			? (characters.find((c) => c.slug === who) ?? crafters.find((c) => c.slug === who))
 			: undefined;
-	const filtered = !!(forWho || byWho || profession);
-
-	const sidebar = (
-		<aside className="space-y-5 @max-5xl:hidden">
-			<FilterTree
-				title="Who's it for?"
+	const filtered = !!(forWho || byWho || kind || profession);
+	const menus = {
+		for: (
+			<WhoPicker
+				label="For"
 				value={forWho}
 				onChange={(v) => setFilters({ for: v })}
 				count={counts.for}
-				characters={characters.map((c) => ({ ...c, meta: undefined }))}
+				characters={characters}
 			/>
-			<FilterTree
-				title="Who crafts it?"
+		),
+		by: (
+			<WhoPicker
+				label="Crafted by"
 				value={byWho}
 				onChange={(v) => setFilters({ by: v })}
 				count={counts.by}
-				characters={crafters.map((c) => ({ ...c, meta: c.skill }))}
+				characters={crafters}
 			/>
-			<div>
-				<h3 className={TREE_TITLE}>Professions</h3>
-				<ul className="filter-tree">
-					<li>
-						<TreeItem active={!profession} onClick={() => setFilters({ profession: undefined })} count={counts.prof()}>
-							All
-						</TreeItem>
-						<ul>
-							{professions
-								.filter((p) => p === profession || counts.prof(p) > 0)
-								.map((p) => (
-									<li key={p}>
-										<TreeItem
-											active={profession === p}
-											onClick={() => setFilters({ profession: p })}
-											count={counts.prof(p)}
-										>
-											{p}
-										</TreeItem>
-									</li>
-								))}
-						</ul>
-					</li>
-				</ul>
-			</div>
-			<RemovedSwitch checked={showRemoved} onChange={setShowRemoved} count={removedCount} className="px-2.5" />
-		</aside>
+		),
+		kind: (
+			<FilterMenu
+				value={kind ?? ""}
+				onChange={(v) => setFilters({ kind: (v || undefined) as VerdictKind | undefined })}
+				options={[
+					{ value: "", label: "All kinds", count: counts.kind() },
+					...KINDS.map((k, i) => ({
+						value: k,
+						label: (
+							<span className="inline-flex items-center gap-2">
+								<VerdictGlyph kind={k} size={16} />
+								{MARKER_LABELS[k]}
+							</span>
+						),
+						count: counts.kind(k),
+						separate: i === 0,
+					})),
+				]}
+			/>
+		),
+		prof: (
+			<FilterMenu
+				value={profession ?? ""}
+				onChange={(v) => setFilters({ profession: v || undefined })}
+				options={[
+					{ value: "", label: "All professions", count: counts.prof() },
+					...professions.map((p, i) => ({ value: p, label: p, count: counts.prof(p), separate: i === 0 })),
+				]}
+			/>
+		),
+	};
+
+	const search = (
+		<SearchInput
+			ref={inputRef}
+			large
+			value={query}
+			onChange={(e) => setQuery(e.target.value)}
+			onKeyDown={(e) => {
+				if (e.key === "Escape") setQuery("");
+			}}
+			placeholder="Search upgrades... (boots, Agility, a name)"
+			aria-label="Search upgrades"
+			className="h-10 text-[15px]"
+			wrapperClassName="flex-1 basis-64"
+		/>
 	);
 
 	return (
-		<div className="@5xl:grid @5xl:grid-cols-[13.5rem_minmax(0,1fr)] @5xl:items-start @5xl:gap-6">
-			{sidebar}
+		<div>
 			<div className="min-w-0 space-y-3">
-				<div className="flex flex-wrap items-center gap-2">
-					<Input
-						ref={inputRef}
-						type="search"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-						onKeyDown={(e) => {
-							if (e.key === "Escape") setQuery("");
-						}}
-						placeholder="Search upgrades... (boots, Agility, a name)"
-						aria-label="Search upgrades"
-						className="h-10 min-w-0 flex-1 basis-64 text-[15px] @max-md:order-last @max-md:basis-full"
-					/>
-					{/* Narrow panes: the sidebar's filters as menus. */}
-					<div className="flex min-w-0 flex-wrap items-center gap-2 @5xl:hidden @max-md:grid @max-md:basis-full @max-md:grid-cols-2">
-						<WhoPicker
-							label="For"
-							value={forWho}
-							onChange={(v) => setFilters({ for: v })}
-							count={counts.for}
-							characters={characters}
-						/>
-						<WhoPicker
-							label="Crafted by"
-							value={byWho}
-							onChange={(v) => setFilters({ by: v })}
-							count={counts.by}
-							characters={crafters}
-						/>
-						<select
-							aria-label="Profession"
-							value={profession ?? ""}
-							onChange={(e) => setFilters({ profession: e.target.value || undefined })}
-							className="h-10 min-w-0 rounded-md border bg-well pl-3 text-sm @max-md:col-span-2"
-						>
-							<option value="">All professions ({counts.prof()})</option>
-							{professions.map((p) => (
-								<option key={p} value={p}>
-									{p} ({counts.prof(p)})
-								</option>
-							))}
-						</select>
-					</div>
-				</div>
-				<div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-					<MarkerLegend />
+				{search}
+				{/* The filters as menus; a 2x2 grid on phones. */}
+				<div className="flex flex-wrap items-center gap-2 @max-md:grid @max-md:grid-cols-2">
+					{menus.for}
+					{menus.by}
+					{menus.kind}
+					{menus.prof}
 					<RemovedSwitch
 						checked={showRemoved}
 						onChange={setShowRemoved}
 						count={removedCount}
-						className="ml-auto @5xl:hidden"
+						className="ml-auto pl-2 @max-md:col-span-2 @max-md:ml-0"
 					/>
 				</div>
+				<MarkerLegend />
 				{!data ? (
 					<p className="py-10 text-center text-sm text-muted-foreground">
 						{data === null ? "Members only." : "Checking what the guild can craft against everyone's gear..."}
@@ -599,7 +580,7 @@ function ForCell({
 	// Guildmates past the listed few (the server counts them all).
 	const more = row.others - listed.length;
 	return (
-		<ul className="who-list text-[13px]">
+		<ul className="who-list people text-[13px]">
 			{yours.length ? (
 				<li>
 					<span className="who-label">Yours</span>
@@ -809,97 +790,12 @@ export function CraftRequest({
 	);
 }
 
-const TREE_TITLE = "px-2.5 pb-1.5 text-xs font-semibold text-muted-foreground";
+const KINDS = ["upgrade", "maybe", "empty"] as const satisfies VerdictKind[];
 
-function TreeItem({
-	active,
-	onClick,
-	count,
-	strong,
-	children,
-}: {
-	active: boolean;
-	onClick: () => void;
-	count: number;
-	/** A group ("My characters"): full-strength text. */
-	strong?: boolean;
-	children: ReactNode;
-}) {
-	return (
-		<button
-			type="button"
-			aria-pressed={active}
-			onClick={onClick}
-			className={cn(
-				"flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2.5 text-left text-[13px] transition-colors hover:bg-accent hover:text-foreground",
-				strong ? "text-foreground" : "text-muted-foreground",
-				active && "bg-(--selected) text-foreground shadow-[inset_0_0_0_1px_rgb(255_176_96/0.2)]",
-				count === 0 && !active && "opacity-60",
-			)}
-		>
-			<span className="flex min-w-0 items-baseline gap-2 truncate">{children}</span>
-			<span className="num ml-auto text-xs text-muted-foreground">{count}</span>
-		</button>
-	);
-}
+/** Upgrades' filters as the page passes them on (the ones given change; none given clears them all). */
+export type Filters = { for?: Who; by?: Who; kind?: VerdictKind; profession?: string };
 
-/** A sidebar filter: Anyone > My characters > each of them, and Guildmates. */
-function FilterTree({
-	title,
-	value,
-	onChange,
-	count,
-	characters,
-}: {
-	title: string;
-	value: Who;
-	onChange: (v: Who) => void;
-	count: (who: Who) => number;
-	characters: { slug: string; name: string; classId: number; meta?: number }[];
-}) {
-	return (
-		<div>
-			<h3 className={TREE_TITLE}>{title}</h3>
-			<ul className="filter-tree">
-				<li>
-					<TreeItem active={!value} onClick={() => onChange(undefined)} count={count(undefined)}>
-						Anyone
-					</TreeItem>
-					<ul>
-						{characters.length ? (
-							<li>
-								<TreeItem active={value === "mine"} onClick={() => onChange("mine")} count={count("mine")} strong>
-									My characters
-								</TreeItem>
-								{characters.length ? (
-									<ul>
-										{characters.map((c) => (
-											<li key={c.slug}>
-												<TreeItem active={value === c.slug} onClick={() => onChange(c.slug)} count={count(c.slug)}>
-													<ClassText classId={c.classId}>{c.name}</ClassText>
-													{c.meta !== undefined ? (
-														<span className="num text-xs text-muted-foreground">{c.meta}</span>
-													) : null}
-												</TreeItem>
-											</li>
-										))}
-									</ul>
-								) : null}
-							</li>
-						) : null}
-						<li>
-							<TreeItem active={value === "guild"} onClick={() => onChange("guild")} count={count("guild")} strong>
-								Guildmates
-							</TreeItem>
-						</li>
-					</ul>
-				</li>
-			</ul>
-		</div>
-	);
-}
-
-/** The sidebar filter as a menu, for narrow panes ("For: Ivar"). */
+/** Who it's for or who crafts it, as a menu ("For Ivar"): Anyone, My characters, each of them, Guildmates. */
 function WhoPicker({
 	label,
 	value,
@@ -913,47 +809,27 @@ function WhoPicker({
 	count: (who: Who) => number;
 	characters: { slug: string; name: string; classId: number }[];
 }) {
-	const current = characters.find((c) => c.slug === value);
-	// Inline color: the menu's highlight restyles descendants' text color through classes.
-	const named = (c: { name: string; classId: number }) => (
-		<span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>
-	);
-	const text = current
-		? named(current)
-		: value === "mine"
-			? "My characters"
-			: value === "guild"
-				? "Guildmates"
-				: "Anyone";
-	const item = (v: string, children: ReactNode, n: number) => (
-		<DropdownMenuRadioItem key={v} value={v}>
-			<span className="flex w-full items-baseline gap-3">
-				{children}
-				<span className="num ml-auto text-xs text-muted-foreground">{n}</span>
-			</span>
-		</DropdownMenuRadioItem>
-	);
+	const options: FilterOption[] = [{ value: "", label: "Anyone", count: count(undefined) }];
+	if (characters.length) {
+		options.push({ value: "mine", label: "My characters", count: count("mine"), separate: true });
+		for (const c of characters)
+			options.push({
+				value: c.slug,
+				// Inline color: the menu's highlight restyles text color through classes.
+				label: <span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>,
+				count: count(c.slug),
+				indent: true,
+			});
+	}
+	options.push({ value: "guild", label: "Guildmates", count: count("guild"), separate: true });
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger className="h-10 min-w-0 whitespace-nowrap rounded-md border border-input bg-well bg-(image:--select-chevron) bg-size-[0.75rem] bg-position-[right_0.5rem_center] bg-no-repeat pr-7 pl-3 text-left text-sm truncate @max-md:flex-1">
-				<span className="text-muted-foreground">{label} </span>
-				{text}
-			</DropdownMenuTrigger>
-			<DropdownMenuContent className="w-auto min-w-(--anchor-width)">
-				<DropdownMenuRadioGroup value={value ?? ""} onValueChange={(v) => onChange(String(v) || undefined)}>
-					{item("", "Anyone", count(undefined))}
-					{characters.length ? item("mine", "My characters", count("mine")) : null}
-					{characters.length > 1 ? (
-						<>
-							<DropdownMenuSeparator />
-							{characters.map((c) => item(c.slug, <span className="pl-3">{named(c)}</span>, count(c.slug)))}
-						</>
-					) : null}
-					<DropdownMenuSeparator />
-					{item("guild", "Guildmates", count("guild"))}
-				</DropdownMenuRadioGroup>
-			</DropdownMenuContent>
-		</DropdownMenu>
+		<FilterMenu
+			label={label}
+			value={value ?? ""}
+			onChange={(v) => onChange(v || undefined)}
+			options={options}
+			className="@max-md:min-w-0"
+		/>
 	);
 }
 
@@ -1078,7 +954,7 @@ function PeopleDialog({
 					<div className="grid min-h-0 gap-x-8 gap-y-6 overflow-y-auto px-5 py-4 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
 						<section className="min-w-0">
 							<h3 className="mb-2 text-xs text-muted-foreground">Who's it for?</h3>
-							<ul className="who-list text-[13px]">
+							<ul className="who-list people text-[13px]">
 								{yours.length ? (
 									<li>
 										<span className="who-label">Yours</span>

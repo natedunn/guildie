@@ -9,7 +9,7 @@ import { ViewAs } from "@/components/dungeon";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { Page, PageHeader } from "@/components/page-header";
 import { LearnerSummary } from "@/components/recipe-learners";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { ago } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -83,13 +83,13 @@ function InventoryPage() {
 				) : (
 					<>
 						<div className="space-y-3">
-							<Input
+							<SearchInput
 								id="inventory-search"
 								value={q}
 								onChange={(e) => setQ(e.target.value)}
 								placeholder="Where's my…?"
 								autoComplete="off"
-								className="max-w-sm"
+								wrapperClassName="max-w-sm"
 							/>
 							<ViewAs
 								label="Character"

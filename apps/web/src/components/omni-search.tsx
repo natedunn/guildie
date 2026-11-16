@@ -781,7 +781,7 @@ function useLocalResults(typed: string) {
 					title: `${prof} recipes`,
 					subtitle: several ? `Crafting · ${home.name}` : "Crafting",
 					visual: { kind: "icon", name: "anvil" },
-					nav: route("/g/$region/$slug/crafting", p, { profession: prof }),
+					nav: route("/g/$region/$slug/crafting", p, { view: "make", profession: prof }),
 					keywords: [prof, `${prof} crafters`],
 				});
 			}
@@ -1206,7 +1206,7 @@ function useRemoteResults(data: ServerResults | undefined, context: Context): Re
 						kind: "route",
 						to: "/g/$region/$slug/crafting",
 						params: { region: g.region, slug: g.slug },
-						search: { q: r.name },
+						search: { view: "make", q: r.name },
 					}
 				: r.item
 					? { kind: "item", itemId: r.item.itemId }
