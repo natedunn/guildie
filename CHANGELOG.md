@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.43
+
 ### Improvements
 
 - **Guildie:** Crafting opens on Upgrades now. Its filters are menus above the table at every size, with a new one for the kind: upgrades, possible upgrades or empty slots. The profession menus on Crafting match them. More room between the people in each list.
