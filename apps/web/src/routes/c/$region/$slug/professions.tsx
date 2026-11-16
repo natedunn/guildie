@@ -7,7 +7,7 @@ import type { FunctionReturnType } from "convex/server";
 import { type ReactNode, useDeferredValue, useMemo, useState } from "react";
 import { sourceNote } from "@/components/character-data";
 import { buildIndex, compareProfessions, queryWords, Reagents, RecipeItem, searchIndex } from "@/components/recipe-row";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 
 // A character's professions: the list on the left, the selected one's known
@@ -131,13 +131,13 @@ function RecipeList({ profession }: { profession: Profession }) {
 					</span>
 				</h2>
 				{total > 0 ? (
-					<Input
-						type="search"
+					<SearchInput
 						value={filter}
 						onChange={(e) => setFilter(e.target.value)}
 						placeholder="Filter recipes"
 						aria-label={`Filter ${profession.name} recipes`}
-						className="h-8 w-full @lg:w-56"
+						className="h-8"
+						wrapperClassName="w-full @lg:w-56"
 					/>
 				) : null}
 			</div>

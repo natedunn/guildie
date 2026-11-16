@@ -9,7 +9,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { AddonDialog, AddonDialogTitle, AddonIcon, AddonLine, AddonSiteLink } from "@/components/addon-list";
 import { ClassText } from "@/components/class-name";
 import { SectionTitle } from "@/components/page-header";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { cn } from "@/lib/utils";
 
 // Addons: what the guild's players run in game, most used first, from those
@@ -110,12 +110,13 @@ function AddonsPage() {
 								<span className="num text-foreground">{addons.length}</span> addons from{" "}
 								<span className="num text-foreground">{total}</span> {total === 1 ? "player" : "players"}
 							</button>
-							<Input
+							<SearchInput
 								value={query}
 								onChange={(e) => setQuery(e.target.value)}
 								placeholder="Filter addons"
 								aria-label="Filter addons"
-								className="h-8 w-full max-w-60"
+								className="h-8"
+								wrapperClassName="w-full max-w-60"
 							/>
 						</div>
 						{categories.length > 1 && (

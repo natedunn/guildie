@@ -27,7 +27,7 @@ import { ClassText } from "@/components/class-name";
 import { MembersOnly } from "@/components/dungeon";
 import { DayStats } from "@/components/feed-day-stats";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { addDays, feedDayLabel, feedDayStart } from "@/lib/feed-day";
 import { cn } from "@/lib/utils";
 
@@ -168,12 +168,13 @@ function FeedPage() {
 						);
 					})}
 				</div>
-				<Input
+				<SearchInput
 					value={who}
 					onChange={(e) => setWho(e.target.value)}
 					placeholder="Find a member"
 					aria-label="Find a member"
-					className="h-[1.625rem] w-full @lg/feed:ml-auto @lg/feed:w-48"
+					className="h-[1.625rem]"
+					wrapperClassName="w-full @lg/feed:ml-auto @lg/feed:w-48"
 				/>
 			</div>
 

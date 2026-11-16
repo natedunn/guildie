@@ -9,7 +9,7 @@ import { ClassText } from "@/components/class-name";
 import { ItemHover, ItemIcon, QUALITY_COLORS } from "@/components/item";
 import { type ExistingRequest, RequestButton, RequestRow, type RequestView, useNow } from "@/components/requests";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SearchInput } from "@/components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { shortDate, timeLeft } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -437,9 +437,9 @@ function NewRequest({
 			<label htmlFor="request-search" className="text-[13px] font-medium">
 				What do you need?
 			</label>
-			<Input
+			<SearchInput
 				id="request-search"
-				className="mt-1.5"
+				wrapperClassName="mt-1.5"
 				value={q}
 				onChange={(e) => {
 					setQ(e.target.value);
@@ -549,7 +549,7 @@ function BrowseCrafting({ guild, q }: { guild: { region: Region; slug: string };
 		<Link
 			to="/g/$region/$slug/crafting"
 			params={guild}
-			search={{ q }}
+			search={{ view: "make", q }}
 			className="block border-t border-border px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 		>
 			Who in the guild can make or learn "{q}" →
