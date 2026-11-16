@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { shortDate, timeLeft } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 // Guild requests: members ask for items and crafts. Items: guildmates send
 // some, and the requester's addon counts what arrives. Crafts: asked of one
@@ -185,7 +186,7 @@ function RequestsPage() {
 				view === "mine" ? (
 					<MyOngoing requests={shown} guild={guild} characters={data.characters} />
 				) : (
-					<OngoingList requests={shown} />
+					<OngoingList requests={shown} guild={guild} characters={data.characters} />
 				)
 			) : (
 				<ul className="surface-card divide-y divide-border [&>li]:px-3.5">
@@ -238,9 +239,18 @@ function ItemCell({ r, sub }: { r: RequestView; sub: ReactNode }) {
 
 /**
  * Ongoing requests, one row per item with everyone who wants it (several
- * tailors after Silk is the usual case). "I can help" adds how many you have.
+ * tailors after Silk is the usual case). "I can help" adds how many you have;
+ * your own can be changed from here too.
  */
-function OngoingList({ requests }: { requests: RequestView[] }) {
+function OngoingList({
+	requests,
+	guild,
+	characters,
+}: {
+	requests: RequestView[];
+	guild: { region: Region; slug: string };
+	characters: { slug: string; name: string; classId: number }[];
+}) {
 	useNow();
 	const groups = useMemo(() => {
 		const byItem = new Map<number, RequestView[]>();
@@ -254,6 +264,7 @@ function OngoingList({ requests }: { requests: RequestView[] }) {
 		<ul className="surface-card divide-y divide-border">
 			{groups.map((rows) => {
 				const have = rows.find((r) => r.have)?.have;
+				const mine = rows.find((r) => r.mine);
 				return (
 					<li key={rows[0]._id} className="flex items-center gap-3 px-3.5 py-2 text-[13px]">
 						<ItemCell
@@ -281,10 +292,40 @@ function OngoingList({ requests }: { requests: RequestView[] }) {
 								You have <span className="num">{have}</span>
 							</span>
 						) : null}
+						{mine && <ChangeOngoing request={mine} guild={guild} characters={characters} />}
 					</li>
 				);
 			})}
 		</ul>
+	);
+}
+
+/** Change your own ongoing request (how long, the note), or stop it, in the request form. */
+function ChangeOngoing({
+	request: r,
+	guild,
+	characters,
+}: {
+	request: RequestView;
+	guild: { region: Region; slug: string };
+	characters: { slug: string; name: string; classId: number }[];
+}) {
+	if (!r.item) return null;
+	return (
+		<RequestButton
+			guild={guild}
+			characters={characters}
+			size="xs"
+			label="Change"
+			existing={asExisting(r)}
+			target={{
+				kind: "item",
+				itemId: r.item.itemId,
+				name: r.item.name,
+				quality: r.item.quality,
+				icon: r.item.icon,
+			}}
+		/>
 	);
 }
 
@@ -312,22 +353,7 @@ function MyOngoing({
 							</>
 						}
 					/>
-					{r.item && (
-						<RequestButton
-							guild={guild}
-							characters={characters}
-							size="xs"
-							label="Change"
-							existing={asExisting(r)}
-							target={{
-								kind: "item",
-								itemId: r.item.itemId,
-								name: r.item.name,
-								quality: r.item.quality,
-								icon: r.item.icon,
-							}}
-						/>
-					)}
+					<ChangeOngoing request={r} guild={guild} characters={characters} />
 					<StopButton request={r} />
 				</li>
 			))}
@@ -365,6 +391,10 @@ function Empty({ children }: { children: ReactNode }) {
  * "What do you need?": search items by name, then request the item, or (when
  * someone else in the guild can make it) a craft.
  */
+/** The search results: a popover under the box, scrolling by itself. */
+const DROPDOWN =
+	"absolute inset-x-0 top-full z-30 mt-1.5 max-h-[min(26rem,60dvh)] overflow-y-auto overscroll-contain rounded-(--card-radius) border border-border-strong bg-popover bg-(image:--card-sheen) shadow-(--popover-shadow)";
+
 function NewRequest({
 	guild,
 	characters,
@@ -387,8 +417,23 @@ function NewRequest({
 		placeholderData: (previous) => previous,
 	});
 	const shown = debounced.length >= 2 ? (results ?? []) : [];
+	// The results float over the page instead of pushing it down. Clicking
+	// elsewhere or Escape closes them; typing or focusing the box opens them again.
+	const [open, setOpen] = useState(false);
+	const box = useRef<HTMLElement>(null);
+	useEffect(() => {
+		if (!open) return;
+		const away = (e: PointerEvent) => {
+			const target = e.target as Element | null;
+			// The request form is a dialog portaled out of here: clicks in it don't count.
+			if (!target || box.current?.contains(target) || target.closest("[role=dialog]")) return;
+			setOpen(false);
+		};
+		document.addEventListener("pointerdown", away);
+		return () => document.removeEventListener("pointerdown", away);
+	}, [open]);
 	return (
-		<section>
+		<section ref={box} className="relative">
 			<label htmlFor="request-search" className="text-[13px] font-medium">
 				What do you need?
 			</label>
@@ -396,15 +441,29 @@ function NewRequest({
 				id="request-search"
 				className="mt-1.5"
 				value={q}
-				onChange={(e) => setQ(e.target.value)}
+				onChange={(e) => {
+					setQ(e.target.value);
+					setOpen(true);
+				}}
+				onFocus={() => setOpen(true)}
+				onKeyDown={(e) => {
+					if (e.key === "Escape") setOpen(false);
+				}}
+				aria-expanded={open && debounced.length >= 2}
 				placeholder="Search items: Silk Cloth, Mageweave Bag, Healing Potion…"
 				autoComplete="off"
 			/>
-			{debounced.length >= 2 &&
+			{open &&
+				debounced.length >= 2 &&
 				(shown.length === 0 ? (
-					!isFetching && <p className="mt-2 text-[13px] text-muted-foreground">No item by that name on Guildie yet.</p>
+					!isFetching && (
+						<div className={cn(DROPDOWN, "text-[13px] text-muted-foreground")}>
+							<p className="px-3 py-2.5">No item by that name on Guildie yet.</p>
+							<BrowseCrafting guild={guild} q={debounced} />
+						</div>
+					)
 				) : (
-					<ul className="surface-card mt-2 divide-y divide-border">
+					<ul className={cn(DROPDOWN, "divide-y divide-border")}>
 						{shown.map((item) => (
 							<li key={item.itemId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-[13px]">
 								<ItemHover
@@ -452,7 +511,7 @@ function NewRequest({
 												quality: item.quality,
 												icon: item.icon,
 											}}
-											label={item.mine ? "Change request" : "Request item"}
+											label={item.mine ? (item.mine.ongoing ? "Change request" : "Your request") : "Request item"}
 										/>
 										{item.craft && (
 											<RequestButton
@@ -474,8 +533,26 @@ function NewRequest({
 								)}
 							</li>
 						))}
+						{/* Pinned to the bottom of the scrolling list, so it shows without scrolling. */}
+						<li className="sticky bottom-0 bg-popover">
+							<BrowseCrafting guild={guild} q={debounced} />
+						</li>
 					</ul>
 				))}
 		</section>
+	);
+}
+
+/** The dropdown's last line: the same search on Crafting, to browse what the guild can make or learn. */
+function BrowseCrafting({ guild, q }: { guild: { region: Region; slug: string }; q: string }) {
+	return (
+		<Link
+			to="/g/$region/$slug/crafting"
+			params={guild}
+			search={{ q }}
+			className="block border-t border-border px-3 py-2 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+		>
+			Who in the guild can make or learn "{q}" →
+		</Link>
 	);
 }

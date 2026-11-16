@@ -22,7 +22,6 @@ import { ENCHANT_ICON, ItemHover, ItemIcon, isEnchant, QUALITY_COLORS } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ago, shortDate, timeLeft } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -142,7 +141,9 @@ export function RequestButton({
 			<Dialog.Trigger render={<Button variant={variant} size={size} className={className} />}>
 				{label ??
 					(existing && target.kind === "item"
-						? "Change request"
+						? existing.ongoing
+							? "Change request"
+							: "Your request"
 						: target.kind === "craft"
 							? "Request a craft"
 							: "Request this")}
@@ -219,7 +220,8 @@ const DURATIONS: { days: OngoingDays; label: string }[] = [
 /**
  * Items: a fixed amount (guildmates send some; it closes when it all arrives) or
  * ongoing (send me any you have, for 2 weeks to 3 months). One request per
- * item: with `existing`, this changes that one, switching kinds included.
+ * item: with `existing`, an ongoing one changes (how long, the note) and a
+ * fixed one can only be cancelled, to ask again.
  */
 function ItemRequestForm({
 	guild,
@@ -240,15 +242,15 @@ function ItemRequestForm({
 	const update = useMutation(api.requests.update);
 	const act = useMutation(api.requests.act);
 	const [ongoing, setOngoing] = useState(startOngoing);
-	const [quantity, setQuantity] = useState(existing && !existing.ongoing ? String(existing.quantity) : "20");
+	const [quantity, setQuantity] = useState("20");
 	// Changing an ongoing request: no duration picked keeps its end date.
 	const [days, setDays] = useState<OngoingDays | undefined>(existing?.ongoing ? undefined : DEFAULT_ONGOING_DAYS);
 	const [note, setNote] = useState(existing?.note ?? "");
 	const [character, setCharacter] = useState(characters[0]?.slug);
 	const [error, setError] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
-	const claimed = existing && existing.status !== "open";
-	const switching = !!existing && existing.ongoing !== ongoing;
+	// A fixed amount isn't changed (what if some already arrived?): cancel it and ask again.
+	const fixed = !!existing && !existing.ongoing;
 	const q = Math.floor(Number(quantity)) || 0;
 
 	const run = async (fn: () => Promise<unknown>, fallback: string) => {
@@ -269,9 +271,7 @@ function ItemRequestForm({
 				existing
 					? update({
 							requestId: existing.requestId as Id<"requests">,
-							ongoing,
-							quantity: ongoing ? undefined : Number(quantity),
-							days: ongoing ? (switching ? (days ?? DEFAULT_ONGOING_DAYS) : days) : undefined,
+							days,
 							note: note.trim() || undefined,
 						})
 					: create({
@@ -299,34 +299,50 @@ function ItemRequestForm({
 				void submit();
 			}}
 		>
-			<div className="-mx-4 -mt-4 flex items-center justify-between border-b border-border pr-2.5 pl-1.5">
-				<Tabs value={ongoing ? "ongoing" : "fixed"} onValueChange={(v) => setOngoing(v === "ongoing")}>
-					<TabsList className="h-10 border-b-0">
-						<TabsTrigger value="fixed">Fixed amount</TabsTrigger>
-						<TabsTrigger value="ongoing" disabled={claimed}>
-							Ongoing
-						</TabsTrigger>
-					</TabsList>
-				</Tabs>
+			<div className="flex items-start gap-3">
+				<ItemIcon icon={target.icon} quality={target.quality} size={36} empty={!target.icon} />
+				<div className="min-w-0 flex-1">
+					<Dialog.Title className="text-sm font-semibold">
+						{!existing ? "Request an item" : fixed ? "Your request" : "Change your ongoing request"}
+					</Dialog.Title>
+					<p className="truncate text-[13px]" style={{ color: QUALITY_COLORS[target.quality ?? "COMMON"] }}>
+						{target.name}
+					</p>
+				</div>
 				<CloseButton />
 			</div>
 
-			<div className="flex items-center gap-3">
-				<ItemIcon icon={target.icon} quality={target.quality} size={36} empty={!target.icon} />
-				<Dialog.Title
-					className="min-w-0 flex-1 truncate text-sm font-medium"
-					style={{ color: QUALITY_COLORS[target.quality ?? "COMMON"] }}
-				>
-					{target.name}
-				</Dialog.Title>
-			</div>
-
-			{claimed ? (
+			{fixed ? (
 				<p className="text-[13px] text-muted-foreground">
-					Someone already claimed your request for this. Mark it done, or release the claim, on the Requests page.
+					You asked for <span className="num text-foreground">{existing?.quantity}</span>. A fixed amount can't be
+					changed: cancel it, then ask again for a different amount or as ongoing.
 				</p>
 			) : (
 				<>
+					{/* Only a new request picks its kind: an existing one stays what it is. */}
+					{!existing && (
+						<Field label="How much" as="div">
+							<div className="flex flex-wrap gap-1" role="group" aria-label="How much">
+								{(
+									[
+										[false, "A fixed amount"],
+										[true, "Ongoing: any they have"],
+									] as const
+								).map(([value, label]) => (
+									<button
+										key={label}
+										type="button"
+										className="chip"
+										data-active={ongoing === value}
+										aria-pressed={ongoing === value}
+										onClick={() => setOngoing(value)}
+									>
+										{label}
+									</button>
+								))}
+							</div>
+						</Field>
+					)}
 					{!existing && <AskingAs characters={characters} value={character} onChange={setCharacter} />}
 
 					{ongoing ? (
@@ -365,7 +381,7 @@ function ItemRequestForm({
 						</>
 					) : (
 						<div className="grid grid-cols-[6rem_1fr] gap-3">
-							<Field label={existing ? "Total quantity" : "Quantity"}>
+							<Field label="Quantity">
 								<Input
 									type="number"
 									min={1}
@@ -386,48 +402,37 @@ function ItemRequestForm({
 						</div>
 					)}
 
-					{switching ? (
-						<p className="rounded-md border border-border bg-muted px-3 py-2 text-xs">
-							This replaces your {existing?.ongoing ? "ongoing request" : `request for ${existing?.quantity}`}. You can
-							have one request per item.
-						</p>
-					) : (
-						<p className="text-xs text-muted-foreground">
-							{ongoing
-								? "Guildmates send any they have, whenever. Their tooltips in game show you want it."
-								: "Guildmates send what they have. With the Guildie app it closes by itself once it all arrives; or mark it done."}
-						</p>
-					)}
+					<p className="text-xs text-muted-foreground">
+						{ongoing
+							? "Guildmates send any they have, whenever. Their tooltips in game show you want it."
+							: "Guildmates send what they have. With the Guildie app it closes by itself once it all arrives; or mark it done."}
+					</p>
 				</>
 			)}
 
 			{error && <p className="text-[13px] text-destructive">{error}</p>}
 			<div className="flex items-center gap-2">
-				{existing && !claimed && (
-					<Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void stop()}>
+				{existing && (
+					<Button
+						type="button"
+						variant={fixed ? "outline" : "ghost"}
+						size="sm"
+						disabled={busy}
+						onClick={() => void stop()}
+					>
 						{existing.ongoing ? "Stop request" : "Cancel request"}
 					</Button>
 				)}
 				<span className="flex-1" />
-				{claimed ? (
-					<Dialog.Close render={<Button type="button" variant="outline" size="sm" />}>Close</Dialog.Close>
+				{fixed ? (
+					<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Close</Dialog.Close>
 				) : (
 					<>
 						{!existing && (
 							<Dialog.Close render={<Button type="button" variant="ghost" size="sm" />}>Cancel</Dialog.Close>
 						)}
 						<Button type="submit" size="sm" disabled={busy || (!ongoing && q < 1)}>
-							{busy
-								? existing
-									? "Saving…"
-									: "Posting…"
-								: !existing
-									? "Post request"
-									: switching
-										? ongoing
-											? "Switch to ongoing"
-											: `Switch to ${q || "fixed"}`
-										: "Save"}
+							{busy ? (existing ? "Saving…" : "Posting…") : existing ? "Save" : "Post request"}
 						</Button>
 					</>
 				)}

@@ -17,8 +17,30 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
 - **Guildie:** New members show up in the guild's Feed when they join (or come back), instead of a "New" tag on the roster.
+
+## 0.3.41
+
+### Improvements
+
+- **Guildie:** Crafting's Upgrades is one table now: what the guild can craft for your characters and what yours can craft for anyone, together. Each row says who it's for and who crafts it, yours first and then guildmates. Narrow it down from the sidebar (menus on smaller windows): who it's for, who crafts it (anyone, your characters, one of them, or guildmates) and the profession. Each row lists two guildmates; "+N more" opens everyone it's for and everyone who crafts it. Remove asks which of your characters when an item suits several.
+
+## 0.3.40
+
+### New
+
+- **Guildie:** Each day on the Feed opens with three cards: items members sent each other, levels gained and quests completed. Hover one (tap, on phones) to see who led. Quests count once Blizzard's data catches up, after you log out.
+- **Guildie:** A Thank you reaction on the Feed: praying hands.
+
+### Improvements
+
+- **Guildie:** The Feed's filters are chips now, with a search to find a member's activity.
+- **Guildie:** Crafting's Upgrades shows all your characters at once, a card each, with a lit marker on every row for an upgrade, a possible upgrade or an empty slot (hover it for what it means), column headings, and a switch between Crafts for me and Crafts for others. Pick one character from the menu to see just theirs. Remove now asks first and says how to get the item back (Show removed), with "Don't ask again".
+- **Guildie:** Item icons and item tooltips have a lit edge that catches the light at the top, like the rest of the app, and keep the game's quality colors and navy tooltip.
+- **Guildie:** The roster's Filter menu drops "Show unpublished characters". Characters under level 10 are the ones it hides now; anyone level 10 or above who hasn't logged out yet still shows, marked as waiting on Blizzard.
+- **Guildie:** Change your ongoing requests (how long they run, the note) right from the Ongoing list, not only under Mine. Fixed-amount requests can no longer be changed: cancel one and ask again instead. The item request form has a title now, and you pick a fixed amount or ongoing inside it.
+- **Guildie:** On the Requests page, search results open over the page instead of pushing your requests down. Click away or press Escape to close them.
+- **Guildie:** Crafting has three tabs now: Who can make, Who can learn and Upgrades, where you pick a character and switch between Get crafted and Craft for others. Searching Who can make also shows recipes nobody in the guild knows yet and who could learn them, and Who can learn finds patterns by what they make ("8 slot bag"). The Requests search links to the same search on Crafting.
 
 ## 0.3.39
 

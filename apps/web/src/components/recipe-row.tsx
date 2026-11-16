@@ -28,10 +28,13 @@ export function RecipeItem({
 	recipe,
 	size = 28,
 	detail,
+	wrap,
 	className,
 }: {
 	recipe: Recipe;
 	size?: number;
+	/** Long names wrap (top-aligned) instead of ending in "...". */
+	wrap?: boolean;
 	/** A second line under the name (after the recipe's own name when it differs), e.g. the profession. */
 	detail?: string;
 	className?: string;
@@ -39,7 +42,7 @@ export function RecipeItem({
 	const { item } = recipe;
 	const showRecipeName = item && item.name.toLowerCase() !== recipe.name.toLowerCase();
 	return (
-		<div className={cn("flex min-w-0 items-center gap-2.5", className)}>
+		<div className={cn("flex min-w-0 gap-2.5", wrap ? "items-start" : "items-center", className)}>
 			{item ? (
 				<ItemHover item={item} className="shrink-0">
 					<ItemIcon icon={item.icon} quality={item.quality} size={size} className="block" />
@@ -51,14 +54,14 @@ export function RecipeItem({
 			)}
 			<div className="min-w-0 leading-tight">
 				{item ? (
-					<ItemHover item={item} className="block truncate hover:underline">
+					<ItemHover item={item} className={cn("block hover:underline", !wrap && "truncate")}>
 						<span style={{ color: QUALITY_COLORS[item.quality ?? "COMMON"] }}>{item.name}</span>
 					</ItemHover>
 				) : (
-					<div className="truncate">{recipe.name}</div>
+					<div className={cn(!wrap && "truncate")}>{recipe.name}</div>
 				)}
 				{showRecipeName || detail ? (
-					<div className="mt-0.5 truncate text-xs text-muted-foreground">
+					<div className={cn("mt-0.5 text-xs text-muted-foreground", !wrap && "truncate")}>
 						{[showRecipeName ? recipe.name : undefined, detail].filter(Boolean).join(" · ")}
 					</div>
 				) : null}
@@ -102,7 +105,14 @@ const normalize = (s: string) =>
 
 export const queryWords = (q: string) => normalize(q).trim().split(" ").filter(Boolean);
 
-type Indexed<T> = { recipe: T; fields: [name: string, kind: string, tooltip: string, reagents: string] };
+type Fields = [name: string, kind: string, tooltip: string, reagents: string];
+export type Indexed<T> = { recipe: T; fields: Fields };
+
+/** One searchable entry from raw text (anything, not only recipes: Crafting's recipe items too). */
+export const indexEntry = <T,>(recipe: T, fields: Fields): Indexed<T> => ({
+	recipe,
+	fields: fields.map(normalize) as Fields,
+});
 
 /**
  * Built once per data change. Fields are searched by word prefix, so "8"
@@ -124,7 +134,7 @@ export function buildIndex<T extends Recipe>(recipes: T[]): Indexed<T>[] {
 const WEIGHTS = [8, 4, 2, 1];
 
 /** Recipes where every word matches somewhere, best first (ties keep index order). */
-export function searchIndex<T extends Recipe>(index: Indexed<T>[], words: string[]): T[] {
+export function searchIndex<T>(index: Indexed<T>[], words: string[]): T[] {
 	if (words.length === 0) return index.map((e) => e.recipe);
 	const hits: { recipe: T; score: number; order: number }[] = [];
 	index.forEach((entry, order) => {

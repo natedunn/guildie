@@ -572,6 +572,19 @@ export default defineSchema({
 	}).index("by_guild", ["guildId", "at"]),
 
 	/**
+	 * How many quests a guild member turned in, per profile sync: the newly
+	 * completed ids in Blizzard's list (any quest, not only dungeons'), dated
+	 * at the character's last logout like the feed's other Blizzard events.
+	 * The feed's daily summary sums them (feed.summary).
+	 */
+	questTurnIns: defineTable({
+		guildId: v.id("guilds"),
+		characterId: v.id("characters"),
+		at: v.number(),
+		count: v.number(),
+	}).index("by_guild", ["guildId", "at"]),
+
+	/**
 	 * Reactions to feed events (feedReactions.ts), by a guild member: one row
 	 * per player, event and reaction. A grouped row on the page ("14 members
 	 * cleared Wailing Caverns") is many events; reacting to it adds a row on

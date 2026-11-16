@@ -16,3 +16,18 @@ export function feedDayStart(at: number): Date {
 export function feedDaysAgo(at: number, now = Date.now()): number {
 	return Math.round((feedDayStart(now).getTime() - feedDayStart(at).getTime()) / 86_400_000);
 }
+
+/** `at` moved by whole days on the local calendar (so 4am stays 4am across DST). */
+export function addDays(at: number, days: number): number {
+	const d = new Date(at);
+	d.setDate(d.getDate() + days);
+	return d.getTime();
+}
+
+/** "Today", "Yesterday", then "Monday, Nov 3". */
+export function feedDayLabel(start: number, now = Date.now()): string {
+	const ago = feedDaysAgo(start, now);
+	if (ago === 0) return "Today";
+	if (ago === 1) return "Yesterday";
+	return new Date(start).toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" });
+}
