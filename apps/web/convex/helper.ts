@@ -308,7 +308,7 @@ export const ingest = mutation({
 			if (character && top.level) {
 				const exact = c.levelAt !== undefined && c.level === top.level;
 				const at = Math.min(exact ? (c.levelAt as number) : top.capturedAt, now);
-				await noteLevel(ctx, character, top.level, { at, exact });
+				await noteLevel(ctx, character, top.level, { at, bound: exact });
 			}
 			// Bound delivery transactions independently of a multi-character upload.
 			if (character && c.deliveries) {

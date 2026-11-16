@@ -23,7 +23,12 @@ import { REACTIONS, type Reaction } from "./shared/reactions";
 // When: Blizzard's data only says what was true at a character's last logout
 // (and we read it minutes to hours later), so events from it are dated at
 // that logout (`lastLoginAt`) when we have it. The addon saves the time of
-// the level-up itself. Either way the page shows only the day, never a time.
+// the level-up itself. The roster has no time at all, so its level-ups are
+// dated when we read them, and the profile sync that follows (or an addon
+// upload) moves them back to when the level was reached. Only ever back: the
+// roster saw the level then, so it can't have come later (an addon whose
+// last save predates the level-up reports when it noticed, not when it
+// happened). Either way the page shows only the day, never a time.
 
 type Character = Pick<Doc<"characters">, "_id" | "guildId" | "slug" | "name" | "classId" | "inRoster" | "feedLevel">;
 
@@ -33,19 +38,23 @@ const who = (c: Pick<Doc<"characters">, "slug" | "name" | "classId">) => ({
 	classId: c.classId,
 });
 
-/** When an event happened, as well as we know it; `exact`: the game saw it happen (the addon). */
-export type When = { at: number; exact: boolean };
+/**
+ * When an event happened, as well as we know it. `bound`: it had happened
+ * by `at` (the addon saw it, or Blizzard's profile as of a logout), so `at`
+ * can date an earlier sighting's event back; not so for a roster read.
+ */
+export type When = { at: number; bound: boolean };
 
-/** Blizzard's view: as of the character's last logout, if we have it (never in the future). */
+/** Blizzard's profile: as of the character's last logout, if we have it (never in the future). */
 export const blizzardWhen = (lastLoginAt: number | undefined): When => ({
 	at: Math.min(Date.now(), lastLoginAt ?? Date.now()),
-	exact: false,
+	bound: lastLoginAt !== undefined,
 });
 
 /**
- * A level the feed hasn't seen: a "level" event (after the baseline). An
- * exact time for a level the roster already reported (the addon's upload
- * comes after Blizzard's) fixes that event's time.
+ * A level the feed hasn't seen: a "level" event (after the baseline). A
+ * bound for a level already reported (the roster's, then the profile's or
+ * the addon's) moves that event back to it.
  */
 export async function noteLevel(ctx: MutationCtx, c: Character, level: number, when: When) {
 	if (c.feedLevel === undefined) {
@@ -53,7 +62,7 @@ export async function noteLevel(ctx: MutationCtx, c: Character, level: number, w
 		return;
 	}
 	if (level <= c.feedLevel) {
-		if (when.exact && level === c.feedLevel) await fixLevelTime(ctx, c, level, when.at);
+		if (when.bound && level === c.feedLevel) await fixLevelTime(ctx, c, level, when.at);
 		return;
 	}
 	await ctx.db.patch(c._id, { feedLevel: level });
@@ -118,6 +127,58 @@ export const backfillJoined = internalMutation({
 	},
 });
 
+/**
+ * Migration: level-ups dated too late, from before levels only moved back.
+ * Each goes back to when the roster first showed it (an addon upload had
+ * moved some later), or to the character's last logout when that's later
+ * than their previous level-up (the roster shows levels hours late). Last
+ * week only. Safe to run again:
+ * `npx convex run feed:backfillLevelTimes --deployment <name>`.
+ */
+export const backfillLevelTimes = internalMutation({
+	args: {},
+	handler: async (ctx): Promise<{ moved: number }> => {
+		const since = Date.now() - 7 * 86_400_000;
+		let moved = 0;
+		for (const guild of await ctx.db.query("guilds").collect()) {
+			const levels = (
+				await ctx.db
+					.query("feedEvents")
+					.withIndex("by_guild", (q) => q.eq("guildId", guild._id).gte("at", since - 7 * 86_400_000))
+					.collect()
+			).filter((e) => e.kind === "level" && e.level !== undefined);
+			const characters = await ctx.db
+				.query("characters")
+				.withIndex("by_guild", (q) => q.eq("guildId", guild._id))
+				.collect();
+			const bySlug = new Map(characters.map((c) => [c.slug, c]));
+			for (const e of levels) {
+				if (e._creationTime < since) continue;
+				let at = Math.min(e.at, Math.floor(e._creationTime));
+				const c = bySlug.get(e.character.slug);
+				const previous = Math.max(
+					0,
+					...levels
+						.filter((p) => p.character.slug === e.character.slug && (p.level ?? 0) < (e.level ?? 0))
+						.map((p) => p._creationTime),
+				);
+				if (c?.lastLoginAt !== undefined && c.level === e.level && c.lastLoginAt > previous) {
+					at = Math.min(at, c.lastLoginAt);
+				}
+				if (at >= e.at) continue;
+				const reactions = await ctx.db
+					.query("feedReactions")
+					.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("eventAt", e.at))
+					.collect();
+				await ctx.db.patch(e._id, { at });
+				for (const r of reactions) if (r.eventId === e._id) await ctx.db.patch(r._id, { eventAt: at });
+				moved++;
+			}
+		}
+		return { moved };
+	},
+});
+
 /** A guild's first roster sync happens within this long of adding it: those members aren't "joined". */
 const FIRST_SYNC_MS = 86_400_000;
 
@@ -128,7 +189,8 @@ async function fixLevelTime(ctx: MutationCtx, c: Character, level: number, at: n
 		.order("desc")
 		.take(200);
 	const event = recent.find((e) => e.kind === "level" && e.level === level && e.character.slug === c.slug);
-	if (!event || event.at === at) return;
+	// Only back (see the top of the file).
+	if (!event || event.at <= at) return;
 	await ctx.db.patch(event._id, { at });
 	// Reactions copy the event's time (feed.list reads them by it).
 	const reactions = await ctx.db
