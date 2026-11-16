@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** Level-ups in the Feed land on the day they happened. Blizzard's roster shows levels hours late, so a late-night level-up could show up under the next day.
+
 ## 0.3.43
 
 ### Improvements

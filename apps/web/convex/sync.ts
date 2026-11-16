@@ -151,7 +151,7 @@ export const applyRoster = internalMutation({
 			if (row) {
 				await ctx.db.patch(row._id, { ...member, inRoster: true });
 				id = row._id;
-				await noteLevel(ctx, { ...row, inRoster: true }, member.level, { at: now, exact: false });
+				await noteLevel(ctx, { ...row, inRoster: true }, member.level, { at: now, bound: false });
 			} else {
 				id = await ctx.db.insert("characters", {
 					...member,
@@ -335,6 +335,7 @@ export const syncCharacter = internalAction({
 			characterId,
 			missing: false,
 			lastLoginAt: profile.data.last_login_timestamp,
+			level: profile.data.level,
 			averageItemLevel: profile.data.average_item_level,
 			gender: profile.data.gender?.type,
 			equipment: equipment.ok
@@ -387,6 +388,8 @@ export const applyProfile = internalMutation({
 		characterId: v.id("characters"),
 		missing: v.boolean(),
 		lastLoginAt: v.optional(v.number()),
+		/** The level as of that logout: dates the feed's level-ups (the roster's lag). */
+		level: v.optional(v.number()),
 		averageItemLevel: v.optional(v.number()),
 		gender: v.optional(v.string()),
 		equipment: v.optional(v.array(vEquippedItem)),
@@ -409,7 +412,7 @@ export const applyProfile = internalMutation({
 		completedQuestIds: v.optional(v.array(v.number())),
 		clearedDungeons: v.optional(v.array(v.string())),
 	},
-	handler: async (ctx, { characterId, missing, questIds, completedQuestIds, clearedDungeons, ...data }) => {
+	handler: async (ctx, { characterId, missing, level, questIds, completedQuestIds, clearedDungeons, ...data }) => {
 		const character = await ctx.db.get(characterId);
 		if (!character) return;
 		const now = Date.now();
@@ -467,6 +470,12 @@ export const applyProfile = internalMutation({
 		if (clearedDungeons) {
 			const character = await ctx.db.get(characterId);
 			if (character) await noteClears(ctx, character, clearedDungeons, blizzardWhen(character.lastLoginAt));
+		}
+		// The level as of the last logout: a level-up the roster hasn't shown
+		// yet, or the time of one it showed only hours later.
+		if (level !== undefined && data.lastLoginAt !== undefined) {
+			const character = await ctx.db.get(characterId);
+			if (character) await noteLevel(ctx, character, level, blizzardWhen(data.lastLoginAt));
 		}
 		if (data.talentTrees) await learnTreeInfo(ctx, data.talentTrees);
 	},
