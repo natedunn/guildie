@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** AI apps settings explain where to connect ChatGPT and Claude, how to enable Guildie in a chat, and how optional character changes and workspace permissions work.
+
 ## 0.3.47
 
 ### Improvements
