@@ -3,7 +3,7 @@ import { useId } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-// How good a suggested item is, as a small lit square at the start of a row:
+// How good a suggested item is, as a small lit square before whom it's for:
 // an upgrade (green up arrow, the tooltips' stat green), a possible one (gold
 // diagonal, the game's tooltip yellow), an empty slot (grey plus), or one the
 // player removed (grey minus). Lit like the cards (app.css .verdict-marker);
@@ -69,13 +69,23 @@ export function VerdictGlyph({ kind, size = 24, className }: { kind: MarkerKind;
 }
 
 /** The marker with its meaning on hover (`hint`: the sentence under the label). */
-export function VerdictMarker({ kind, hint, className }: { kind: MarkerKind; hint: string; className?: string }) {
+export function VerdictMarker({
+	kind,
+	hint,
+	size,
+	className,
+}: {
+	kind: MarkerKind;
+	hint: string;
+	size?: number;
+	className?: string;
+}) {
 	return (
 		<Tooltip>
 			<TooltipTrigger
 				render={<span role="img" aria-label={MARKER_LABELS[kind]} className={cn("inline-flex", className)} />}
 			>
-				<VerdictGlyph kind={kind} />
+				<VerdictGlyph kind={kind} size={size} />
 			</TooltipTrigger>
 			<TooltipContent side="right" className="block max-w-72">
 				<span className="flex items-center gap-2 font-medium">
