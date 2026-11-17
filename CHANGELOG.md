@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.46
+
 ### Improvements
 
 - **Guildie:** Item tooltips show the whole item (what it does, binding, requirements) everywhere, not just the name, in white text that's easier to read. They open above the item, so they no longer cover the items beside it, and they never block hovering the next one.
