@@ -1043,7 +1043,6 @@ export function explain(item: ItemInfo, verdict: Verdict, worn: WornItem[], rule
 	const notes = [
 		verdict.second ? rules.specs[verdict.spec]?.name : undefined,
 		verdict.off !== undefined ? `${ARMOR_TYPE_NAMES[verdict.off] ?? "armor"} isn't their armor type` : undefined,
-		verdict.at ? `at lvl ${verdict.at}` : undefined,
 	].filter(Boolean);
 	return `${what}${over}${notes.length ? `; ${notes.join(", ")}` : ""}`;
 }

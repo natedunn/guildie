@@ -562,7 +562,7 @@ function Person({ h, region, onRestore }: { h: Help; region: string; onRestore: 
 					</button>
 				) : null}
 			</div>
-			<p className={cn("mt-px text-[12.5px] leading-snug", h.removed && "opacity-60")}>
+			<p className={cn("mt-px pl-6 text-[12.5px] leading-snug", h.removed && "opacity-60")}>
 				<UpgradeWhy text={h.why} />
 			</p>
 		</>

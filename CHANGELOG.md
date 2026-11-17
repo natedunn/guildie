@@ -17,7 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
-- **Guildie:** Crafting upgrades show Upgrade, Possible upgrade and Empty slot next to each person the item is for, instead of once for the whole row, so you can see what it means for each of them.
+- **Guildie:** Crafting upgrades show Upgrade, Possible upgrade and Empty slot next to each person the item is for, instead of once for the whole row, so you can see what it means for each of them. The level an upgrade starts at shows once, next to the name, instead of twice (here and in the item panel).
 
 ## 0.3.46
 
