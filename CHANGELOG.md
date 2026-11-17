@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** The guild roster remembers how you sort and filter it, and its search, class, sort and filters are in the address bar, so a link opens the roster as you see it.
+
 ## 0.3.45
 
 ### Fixes
