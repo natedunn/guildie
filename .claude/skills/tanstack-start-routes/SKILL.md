@@ -82,6 +82,27 @@ with `navigate({ search: (prev) => ({ ...prev, q }), replace: true, resetScroll:
 the item panel over any page (`components/item-sheet.tsx`); keep `...prev`
 so you don't drop it.
 
+The router hands every route the raw URL params as well, with only the keys
+your `validateSearch` returned overwritten: `?sort=bogus` still reaches
+`Route.useSearch()` if the validator dropped it. Compare against known values
+(`search.view === "zone"`) or parse again: a key being there doesn't mean
+it passed the validator.
+
+### Remembered views
+
+Some params are also how a player likes to see a page (the roster's sort and
+filters). Use `useRememberedSearch` (`src/lib/view-prefs.ts`): the URL first,
+then what the signed-in player saved (`convex/viewPrefs.ts`, loaded by the
+root loader so the server render has it, no flash), then the page's default,
+which is never written to either. Changing a control writes the URL and
+saves; on arrival, saved settings the URL lacks are copied into it, so the
+address bar is what you see. Remember how-to-look settings only (sort,
+filters, list or grid); search text and selections stay URL-only. A new page
+adds its key to `vViewPrefPages` in `schema.ts`, loose (strings and
+booleans), since the page's `validateSearch` checks saved values too. A
+search box in the URL: `useSearchText` (`src/lib/search-text.ts`). See the
+roster (`g/$region/$slug/index.tsx`).
+
 ## Titles and breadcrumbs
 
 `head()` sets `"<Name> · Guildie"`. The title bar's breadcrumbs

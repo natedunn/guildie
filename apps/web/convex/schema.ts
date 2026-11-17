@@ -115,6 +115,23 @@ const vDeliveryParticipant = v.object({
 
 export const vRequestCharacter = v.object({ slug: v.string(), name: v.string(), classId: v.number() });
 
+/**
+ * The settings each page remembers, by page. Loose on purpose (strings, not
+ * unions): the page checks a saved value with the same function as its URL
+ * params, so renaming an option never breaks a deploy over old rows.
+ */
+export const vViewPrefPages = {
+	roster: v.optional(
+		v.object({
+			sort: v.optional(v.string()),
+			dir: v.optional(v.string()),
+			max: v.optional(v.boolean()),
+			low: v.optional(v.boolean()),
+			unclaimed: v.optional(v.boolean()),
+		}),
+	),
+};
+
 export default defineSchema({
 	users: defineTable({
 		battletag: v.optional(v.string()),
@@ -131,6 +148,16 @@ export default defineSchema({
 		/** Set when a person links Discord for notifications (not built yet). */
 		discordId: v.optional(v.string()),
 	}).index("by_battlenetId", ["battlenetId"]),
+
+	/**
+	 * How a player likes to look at pages: sort orders, filters, list or grid
+	 * (viewPrefs.ts). One row per player, loaded with every page so the server
+	 * render already shows their view. Only viewPrefs.set writes it.
+	 */
+	viewPrefs: defineTable({
+		userId: v.id("users"),
+		...vViewPrefPages,
+	}).index("by_user", ["userId"]),
 
 	guilds: defineTable({
 		flavor: vFlavor,

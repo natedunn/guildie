@@ -15,6 +15,7 @@ import { ConvexAuthStartProvider } from "@/lib/convex-auth-start/provider";
 import { readDesktopInfo } from "@/lib/desktop";
 import { defaultShareMeta } from "@/lib/share";
 import { useRouteShell } from "@/lib/shell";
+import { viewPrefsQuery } from "@/lib/view-prefs";
 import appCss from "@/styles/app.css?url";
 
 export type RouterContext = {
@@ -37,7 +38,11 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		return { token, desktop };
 	},
 	loader: async ({ context }) => {
-		await context.queryClient.ensureQueryData(convexQuery(api.users.viewer, {}));
+		await Promise.all([
+			context.queryClient.ensureQueryData(convexQuery(api.users.viewer, {})),
+			// Remembered views (lib/view-prefs.ts): here so the server render has them.
+			context.queryClient.ensureQueryData(viewPrefsQuery),
+		]);
 	},
 	head: () => ({
 		meta: [

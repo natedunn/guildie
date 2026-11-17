@@ -74,6 +74,7 @@ import type * as talents from "../talents.js";
 import type * as tracking from "../tracking.js";
 import type * as upgradeProfiles from "../upgradeProfiles.js";
 import type * as users from "../users.js";
+import type * as viewPrefs from "../viewPrefs.js";
 
 import type {
   ApiFromModules,
@@ -148,6 +149,7 @@ declare const fullApi: ApiFromModules<{
   tracking: typeof tracking;
   upgradeProfiles: typeof upgradeProfiles;
   users: typeof users;
+  viewPrefs: typeof viewPrefs;
 }>;
 
 /**

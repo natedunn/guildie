@@ -15,9 +15,9 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { FunctionReturnType } from "convex/server";
-import { type ReactNode, useMemo, useState } from "react";
+import { type ReactNode, useMemo } from "react";
 import { UNFETCHED_NOTE } from "@/components/character-avatar";
 import { ClassText } from "@/components/class-name";
 import { AUTO, nameOf, strictness } from "@/components/gear-preference";
@@ -33,11 +33,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ago } from "@/lib/format";
+import { useSearchText } from "@/lib/search-text";
 import { cn } from "@/lib/utils";
+import { useRememberedSearch } from "@/lib/view-prefs";
 
 // The roster has more to show than fits in one table, so it has views:
-// Name and Level always, then each view's columns. The view lives in the URL
-// (?view=stats) so a link opens on it.
+// Name and Level always, then each view's columns. What you're looking at
+// lives in the URL so a link opens on it: the view (?view=stats), the search
+// (?q=), the class (?class=druid), the sort (?sort=ilvl&dir=asc) and the
+// Filter menu (?max=true&low=true&unclaimed=false). Sort and filters are also
+// remembered for signed-in players (lib/view-prefs.ts).
 const VIEWS = [
 	{ key: "overview", label: "Overview" },
 	{ key: "stats", label: "Stat priority" },
@@ -46,18 +51,55 @@ const VIEWS = [
 ] as const;
 type View = (typeof VIEWS)[number]["key"];
 
+type SortKey = "name" | "level" | "class" | "ilvl" | "seen" | "profession";
+const SORT_KEYS: SortKey[] = ["name", "level", "class", "ilvl", "seen", "profession"];
+/** Numbers and dates sort highest first when you pick them; text A to Z. */
+const startsDesc = (key: SortKey) => key === "level" || key === "ilvl" || key === "seen";
+
+/** ?class= is the class's name: "druid". */
+const classSlug = (id: number) => className(id).toLowerCase().replace(/\s+/g, "");
+const CLASS_BY_SLUG = new Map(Object.keys(CLASSES).map((id) => [classSlug(Number(id)), Number(id)]));
+
+/**
+ * Only what differs from the default is in the URL: sort by level (highest
+ * first), under level 10 and level 60-only off, unclaimed characters shown.
+ * `dir` only when it's the other way from how that column starts.
+ */
+type Search = {
+	view?: Exclude<View, "overview">;
+	q?: string;
+	class?: string;
+	sort?: Exclude<SortKey, "level">;
+	dir?: "asc" | "desc";
+	max?: true;
+	low?: true;
+	unclaimed?: false;
+};
+const REMEMBERED = ["sort", "dir", "max", "low", "unclaimed"] as const;
+
+const parseSearch = (search: Record<string, unknown>): Search => {
+	const out: Search = {};
+	if (search.view === "stats" || search.view === "gear" || search.view === "professions") out.view = search.view;
+	// The router parses "?q=60" as a number; take it back as text.
+	if ((typeof search.q === "string" && search.q) || typeof search.q === "number") out.q = String(search.q);
+	if (typeof search.class === "string" && CLASS_BY_SLUG.has(search.class)) out.class = search.class;
+	if (SORT_KEYS.includes(search.sort as SortKey) && search.sort !== "level") out.sort = search.sort as Search["sort"];
+	if (search.dir === "asc" || search.dir === "desc") out.dir = search.dir;
+	if (search.max === true) out.max = true;
+	if (search.low === true) out.low = true;
+	if (search.unclaimed === false) out.unclaimed = false;
+	return out;
+};
+
 export const Route = createFileRoute("/g/$region/$slug/")({
 	// The layout ($slug.tsx) loads the guild and draws its header.
-	validateSearch: (search: Record<string, unknown>): { view?: Exclude<View, "overview"> } =>
-		search.view === "stats" || search.view === "gear" || search.view === "professions" ? { view: search.view } : {},
+	validateSearch: parseSearch,
 	component: GuildPage,
 });
 
 /** Who the Filter menu leaves out; by default only characters under level 10. */
 type Filters = { maxOnly: boolean; underMin: boolean; unclaimed: boolean };
 const NO_FILTERS: Filters = { maxOnly: false, underMin: false, unclaimed: true };
-
-type SortKey = "name" | "level" | "class" | "ilvl" | "seen" | "profession";
 
 function GuildPage() {
 	const params = Route.useParams();
@@ -72,18 +114,33 @@ type GuildData = NonNullable<FunctionReturnType<typeof api.guilds.get>>;
 type Member = Extract<GuildData, { hidden: false }>["members"][number];
 
 function Roster({ members }: { members: Member[] }) {
-	const view: View = Route.useSearch().view ?? "overview";
-	const navigate = useNavigate({ from: Route.fullPath });
-	const setView = (v: View) =>
-		navigate({
-			search: (prev) => ({ ...prev, view: v === "overview" ? undefined : v }),
-			replace: true,
-			resetScroll: false,
+	const { values, set } = useRememberedSearch({
+		page: "roster",
+		search: Route.useSearch(),
+		remembered: REMEMBERED,
+		parse: parseSearch,
+	});
+	const view: View = values.view ?? "overview";
+	const setView = (v: View) => set({ view: v === "overview" ? undefined : v });
+	const [search, setSearch] = useSearchText(values.q, (q) => set({ q }));
+	const classFilter = (values.class && CLASS_BY_SLUG.get(values.class)) ?? null;
+	const setClassFilter = (id: number | null) => set({ class: id === null ? undefined : classSlug(id) });
+	const filters: Filters = {
+		maxOnly: values.max === true,
+		underMin: values.low === true,
+		unclaimed: values.unclaimed !== false,
+	};
+	const setFilters = (f: Filters) =>
+		set({ max: f.maxOnly || undefined, low: f.underMin || undefined, unclaimed: f.unclaimed ? undefined : false });
+	const sortKey: SortKey = values.sort ?? "level";
+	const sort = { key: sortKey, desc: values.dir ? values.dir === "desc" : startsDesc(sortKey) };
+	const setSort = (key: SortKey) => {
+		const desc = sort.key === key ? !sort.desc : startsDesc(key);
+		set({
+			sort: key === "level" ? undefined : key,
+			dir: desc === startsDesc(key) ? undefined : desc ? "desc" : "asc",
 		});
-	const [search, setSearch] = useState("");
-	const [classFilter, setClassFilter] = useState<number | null>(null);
-	const [filters, setFilters] = useState<Filters>(NO_FILTERS);
-	const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: "level", desc: true });
+	};
 
 	const rows = useMemo(() => {
 		// Every word must match somewhere: "night elf druid", "tailoring 60".
@@ -134,7 +191,7 @@ function Roster({ members }: { members: Member[] }) {
 			const cmp = x < y ? -1 : x > y ? 1 : a.name.localeCompare(b.name);
 			return sort.desc ? -cmp : cmp;
 		});
-	}, [members, search, classFilter, filters, sort]);
+	}, [members, search, classFilter, filters.maxOnly, filters.underMin, filters.unclaimed, sort.key, sort.desc]);
 
 	// Under level 10 are hidden by default; say how many next to Filter.
 	const hiddenLow = filters.underMin ? 0 : members.filter((m) => m.level < ROSTER_MIN_LEVEL).length;
@@ -157,9 +214,7 @@ function Roster({ members }: { members: Member[] }) {
 					align === "right" && "flex-row-reverse",
 					sort.key === key && "text-foreground",
 				)}
-				onClick={() =>
-					setSort((s) => ({ key, desc: s.key === key ? !s.desc : key === "level" || key === "ilvl" || key === "seen" }))
-				}
+				onClick={() => setSort(key)}
 			>
 				{label}
 				<HugeiconsIcon

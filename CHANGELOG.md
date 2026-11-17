@@ -19,6 +19,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 - **Guildie:** Item tooltips show the whole item (what it does, binding, requirements) everywhere, not just the name, in white text that's easier to read. They open above the item, so they no longer cover the items beside it, and they never block hovering the next one.
 - **Guildie:** Inventory's character menu is easier to read: the button shows just the name, and counts line up with the check mark.
+- **Guildie:** The guild roster remembers how you sort and filter it, and its search, class, sort and filters are in the address bar, so a link opens the roster as you see it.
 
 ## 0.3.45
 
