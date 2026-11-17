@@ -1,6 +1,6 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { api } from "@convex/_generated/api";
-import { kindRank, type VerdictKind } from "@convex/shared/upgrades";
+import type { VerdictKind } from "@convex/shared/upgrades";
 import { CLASSES, type Region } from "@convex/shared/wow";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +21,6 @@ import { Switch } from "@/components/ui/switch";
 import { UpgradeWhy } from "@/components/upgrade-why";
 import { MARKER_LABELS, type MarkerKind, VerdictGlyph, VerdictMarker } from "@/components/verdict-marker";
 import { cn } from "@/lib/utils";
-import { verdictLabel } from "@/lib/verdict";
 
 // Crafting's Gear tab for members: one table, a row per item, of what the
 // guild can craft (or could learn to) for the viewer's characters and what
@@ -59,14 +58,13 @@ const PAGE = 30;
 const MATES = 2;
 const EMPTY = "surface-card px-4 py-10 text-center text-[0.8125rem] text-muted-foreground";
 /**
- * The table's columns: marker, item, who it's for, who crafts it, actions (a
- * fixed width, so the heads line up), with a line between each. Stacked on a
- * narrow pane, the actions a row of buttons at the bottom.
+ * The table's columns: item, who it's for (each person with their verdict
+ * marker), who crafts it, actions (a fixed width, so the heads line up).
+ * Stacked on a narrow pane, the actions a row of buttons at the bottom.
  */
-const COLS =
-	"grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 @2xl:grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem] @2xl:gap-x-0";
+const COLS = "grid grid-cols-[minmax(0,1fr)] @2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_11rem]";
 /** Cells after the item: under it on a narrow pane; ruled off on a wide one. */
-const CELL = "col-start-2 min-w-0 @2xl:col-start-auto @2xl:px-5";
+const CELL = "min-w-0 @2xl:px-5";
 
 /** What each marker means (the hover says the same). */
 const MARKER_HINTS: Record<MarkerKind, string> = {
@@ -353,8 +351,7 @@ export function UpgradesView({
 								"border-b border-border/60 px-4 text-xs text-muted-foreground @max-2xl:hidden *:py-2",
 							)}
 						>
-							<span />
-							<span className="@2xl:pl-3">Item</span>
+							<span>Item</span>
 							<span className={CELL}>Who's it for?</span>
 							<span className={CELL}>Who crafts it?</span>
 							<span className={cn(CELL, "@2xl:pr-0 @2xl:pl-3")} />
@@ -463,17 +460,6 @@ function NothingYet({ data }: { data: Data }) {
 	);
 }
 
-/**
- * The row's marker: the best verdict among whom the filter keeps, "removed"
- * when all of those are removed, or none when it's nobody's upgrade (All gear).
- */
-function rowKind(row: Row, forWho: Who): MarkerKind | null {
-	if (row.shown.filter((x) => keeps(forWho, x)).length === 0 && !row.for.some((x) => x.removed)) return null;
-	const live = row.shown.filter((x) => keeps(forWho, x) && !x.removed);
-	if (live.length === 0) return "removed";
-	return live.reduce<VerdictKind>((best, x) => (kindRank(x.kind) < kindRank(best) ? x.kind : best), live[0].kind);
-}
-
 function UpgradeRow({
 	row,
 	region,
@@ -494,7 +480,6 @@ function UpgradeRow({
 	/** "+N more": everyone, in a dialog. */
 	onMore: (row: Row) => void;
 }) {
-	const kind = rowKind(row, forWho);
 	const more = () => onMore(row);
 	// One character picked: their line alone, and who else it helps as a note.
 	const solo = forWho && forWho !== "mine" && forWho !== "guild" ? forWho : undefined;
@@ -502,11 +487,9 @@ function UpgradeRow({
 	// No Request when one of yours can make it, or when it binds to its crafter (the item's line says so).
 	const canRequest = !row.item?.untradeable && !row.crafters.some((c) => c.mine);
 	return (
-		<li className={cn(COLS, "px-4 *:py-3 @max-2xl:*:not-first:not-[:nth-child(2)]:pt-1")}>
-			{/* Level with the item icon's top, a touch lower so it sits even with it. */}
-			<span className="pt-3.5">{kind ? <VerdictMarker kind={kind} hint={MARKER_HINTS[kind]} /> : null}</span>
+		<li className={cn(COLS, "px-4 *:py-3 @max-2xl:*:not-first:pt-1")}>
 			<RecipeItem
-				className="@2xl:pr-5 @2xl:pl-3"
+				className="@2xl:pr-5"
 				recipe={row}
 				size={36}
 				wrap
@@ -517,9 +500,9 @@ function UpgradeRow({
 				{row.shown.length === 0 ? (
 					<p className="text-xs leading-5 text-muted-foreground">Not an upgrade for anyone right now</p>
 				) : solo ? (
-					<SoloFor row={row} slug={solo} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
+					<SoloFor row={row} slug={solo} region={region} onRestore={onRestore} onMore={more} />
 				) : (
-					<ForCell row={row} region={region} rowKind={kind} onRestore={onRestore} onMore={more} />
+					<ForCell row={row} region={region} onRestore={onRestore} onMore={more} />
 				)}
 			</div>
 			<div className={CELL}>
@@ -550,31 +533,22 @@ function CellHead({ children }: { children: ReactNode }) {
 	return <p className="mb-1.5 text-xs text-muted-foreground @2xl:hidden">{children}</p>;
 }
 
-/** One person it's for: name, spec (and the verdict when it isn't the row's), why, and Restore when removed. */
-function Person({
-	h,
-	region,
-	rowKind,
-	onRestore,
-}: {
-	h: Help;
-	region: string;
-	rowKind: MarkerKind | null;
-	onRestore: (slug: string) => void;
-}) {
+/** One person it's for: their verdict marker, name, spec, why, and Restore when removed. */
+function Person({ h, region, onRestore }: { h: Help; region: string; onRestore: (slug: string) => void }) {
 	return (
 		<>
-			<div className="flex min-w-0 items-baseline gap-2 leading-5">
+			<div className="flex min-w-0 items-center gap-2 leading-5">
+				<VerdictMarker
+					kind={h.removed ? "removed" : h.kind}
+					hint={MARKER_HINTS[h.removed ? "removed" : h.kind]}
+					size={16}
+				/>
 				<Link to="/c/$region/$slug" params={{ region, slug: h.slug }} className="font-medium hover:underline">
 					<ClassText classId={h.classId}>{h.name}</ClassText>
 				</Link>
 				<span className="truncate text-xs text-muted-foreground">
 					{h.spec}
-					{h.kind !== rowKind && !h.removed
-						? ` · ${verdictLabel(h.kind, h.at)}`
-						: h.at
-							? ` · from level ${h.at}`
-							: null}
+					{h.at ? ` · from level ${h.at}` : null}
 					{h.removed ? " · Hidden" : null}
 				</span>
 				{h.removed ? (
@@ -588,7 +562,7 @@ function Person({
 					</button>
 				) : null}
 			</div>
-			<p className={cn("mt-px text-[12.5px] leading-snug", h.removed && "opacity-60")}>
+			<p className={cn("mt-px pl-6 text-[12.5px] leading-snug", h.removed && "opacity-60")}>
 				<UpgradeWhy text={h.why} />
 			</p>
 		</>
@@ -599,13 +573,11 @@ function Person({
 function ForCell({
 	row,
 	region,
-	rowKind,
 	onRestore,
 	onMore,
 }: {
 	row: Row;
 	region: string;
-	rowKind: MarkerKind | null;
 	onRestore: (slug: string) => void;
 	onMore: () => void;
 }) {
@@ -622,7 +594,7 @@ function ForCell({
 					<ul>
 						{yours.map((h) => (
 							<li key={h.slug}>
-								<Person h={h} region={region} rowKind={rowKind} onRestore={onRestore} />
+								<Person h={h} region={region} onRestore={onRestore} />
 							</li>
 						))}
 					</ul>
@@ -634,7 +606,7 @@ function ForCell({
 					<ul>
 						{listed.map((h) => (
 							<li key={h.slug}>
-								<Person h={h} region={region} rowKind={rowKind} onRestore={onRestore} />
+								<Person h={h} region={region} onRestore={onRestore} />
 							</li>
 						))}
 						{more > 0 ? (
@@ -654,14 +626,12 @@ function SoloFor({
 	row,
 	slug,
 	region,
-	rowKind,
 	onRestore,
 	onMore,
 }: {
 	row: Row;
 	slug: string;
 	region: string;
-	rowKind: MarkerKind | null;
 	onRestore: (slug: string) => void;
 	onMore: () => void;
 }) {
@@ -672,7 +642,7 @@ function SoloFor({
 	const more = rest.length - 1 + extra;
 	return (
 		<div className="text-[13px]">
-			<Person h={h} region={region} rowKind={rowKind} onRestore={onRestore} />
+			<Person h={h} region={region} onRestore={onRestore} />
 			{rest.length ? (
 				<p className="mt-1.5 text-xs text-muted-foreground">
 					Also helps <ClassText classId={rest[0].classId}>{rest[0].name}</ClassText>
@@ -901,12 +871,11 @@ function PeopleDialog({
 		enabled: !!row,
 	});
 	if (!r) return null;
-	const kind = rowKind(r, undefined);
 	const yours = r.shown.filter((x) => x.mine);
 	const mates = everyone ?? r.shown.filter((x) => !x.mine);
 	const person = (h: Help) => (
 		<li key={h.slug}>
-			<Person h={h} region={region} rowKind={kind} onRestore={onRestore} />
+			<Person h={h} region={region} onRestore={onRestore} />
 		</li>
 	);
 	return (
