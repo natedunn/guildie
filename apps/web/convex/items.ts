@@ -1,6 +1,6 @@
 import { type Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import { internalAction, internalMutation, internalQuery, query } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
 import type { vTooltipLine } from "./schema";
 import { itemDescription } from "./shared/search";
@@ -76,6 +76,22 @@ export function tooltipLines(p: ItemPreview): Line[] {
 	if (p.description) push(`"${p.description}"`, { color: YELLOW });
 	return lines;
 }
+
+/**
+ * One item's tooltip lines ("Soulbound", "Use: Returns you to…"), for a
+ * hover whose page didn't load them (components/item.tsx ItemHover). Items
+ * are public game data. Null for an item we don't have.
+ */
+export const tooltip = query({
+	args: { itemId: v.number() },
+	handler: async (ctx, { itemId }) => {
+		const row = await ctx.db
+			.query("items")
+			.withIndex("by_itemId", (q) => q.eq("itemId", itemId))
+			.unique();
+		return row ? { tooltip: row.tooltip } : null;
+	},
+});
 
 /** Which of these items we don't have yet (or have stale). */
 export const missing = internalQuery({

@@ -1,3 +1,6 @@
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { CSSProperties, ReactNode } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -82,7 +85,11 @@ export function ItemIcon({
 	);
 }
 
-/** The tooltip body: name, then Blizzard's lines in their colors. */
+/**
+ * The tooltip body: the name in its quality color, then Blizzard's lines.
+ * The lines are all white: easier to read on the navy than the game's
+ * greens and yellows.
+ */
 export function ItemTooltipBody({ item }: { item: ItemLike }) {
 	return (
 		<div className="min-w-56 max-w-80 space-y-0.5 text-[13px] leading-snug text-white">
@@ -91,15 +98,24 @@ export function ItemTooltipBody({ item }: { item: ItemLike }) {
 					{item.name}
 				</span>
 			</div>
-			{item.itemLevel ? <div className="text-[#ffd100]">Item Level {item.itemLevel}</div> : null}
+			{item.itemLevel ? <div>Item Level {item.itemLevel}</div> : null}
 			{(item.tooltip ?? []).map((line, i) => (
-				<div key={i} className="flex justify-between gap-4" style={line.color ? { color: line.color } : undefined}>
+				<div key={i} className="flex justify-between gap-4">
 					<span>{line.left}</span>
 					{line.right ? <span>{line.right}</span> : null}
 				</div>
 			))}
 		</div>
 	);
+}
+
+/**
+ * The body for a hover whose page passed no lines (bags, reagents): loads
+ * the item's own while the tooltip is open, showing the name meanwhile.
+ */
+function HoverBody({ item }: { item: ItemLike }) {
+	const { data } = useQuery({ ...convexQuery(api.items.tooltip, { itemId: item.itemId }), enabled: !item.tooltip });
+	return <ItemTooltipBody item={item.tooltip || !data ? item : { ...item, tooltip: data.tooltip }} />;
 }
 
 /**
@@ -111,7 +127,7 @@ export function ItemHover({
 	item,
 	children,
 	className,
-	side = "right",
+	side = "top",
 }: {
 	item: ItemLike;
 	children: ReactNode;
@@ -132,7 +148,7 @@ export function ItemHover({
 				{children}
 			</TooltipTrigger>
 			<TooltipContent side={side} sideOffset={8} className="item-tooltip block max-w-none px-3 py-2">
-				<ItemTooltipBody item={item} />
+				<HoverBody item={item} />
 			</TooltipContent>
 		</Tooltip>
 	);

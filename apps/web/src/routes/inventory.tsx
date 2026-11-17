@@ -173,12 +173,8 @@ function Items({
 						...characters.map((c, i) => ({
 							value: c.slug,
 							// Inline color: the menu's highlight restyles text color through classes.
-							label: (
-								<span className="flex min-w-0 flex-col">
-									<span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>
-									<span className="text-xs text-muted-foreground">{readLine(c)}</span>
-								</span>
-							),
+							label: <span style={{ color: CLASSES[c.classId]?.color }}>{c.name}</span>,
+							detail: readLine(c),
 							count: filter({ ...current, character: c }).length,
 							separate: i === 0,
 						})),
