@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 export type FilterOption = {
 	value: string;
 	label: ReactNode;
+	/** A second line under the label, in the menu only ("Bags 1 hr ago · No bank"). */
+	detail?: ReactNode;
 	count?: number;
 	/** Under the one before (a character under "My characters"). */
 	indent?: boolean;
@@ -58,8 +60,12 @@ export function FilterMenu({
 						<Fragment key={o.value}>
 							{o.separate ? <DropdownMenuSeparator /> : null}
 							<DropdownMenuRadioItem value={o.value}>
-								<span className={cn("flex w-full items-baseline gap-3", o.indent && "pl-3")}>
-									{o.label}
+								{/* The count sits centered on the row, level with the check mark. */}
+								<span className={cn("flex w-full items-center gap-4", o.indent && "pl-3")}>
+									<span className="flex min-w-0 flex-col gap-0.5">
+										<span className="truncate">{o.label}</span>
+										{o.detail ? <span className="truncate text-xs text-muted-foreground">{o.detail}</span> : null}
+									</span>
 									{o.count !== undefined ? (
 										<span className="num ml-auto text-xs text-muted-foreground">{o.count}</span>
 									) : null}
