@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** On phones, the roster's column headings stay at the top of the table instead of landing over the rows.
+
 ## 0.3.47
 
 ### Improvements
