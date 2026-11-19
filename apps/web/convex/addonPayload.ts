@@ -676,9 +676,11 @@ export function matchTrainer(
 	catalog: { recipeId: number; name: string; craftedItemId?: number }[],
 ) {
 	const byName = new Map<string, { recipeId: number; craftedItemId?: number }[]>();
+	const byItem = new Map<number, { recipeId: number; craftedItemId?: number }[]>();
 	for (const r of catalog) {
 		const key = r.name.toLowerCase();
 		byName.set(key, [...(byName.get(key) ?? []), r]);
+		if (r.craftedItemId !== undefined) byItem.set(r.craftedItemId, [...(byItem.get(r.craftedItemId) ?? []), r]);
 	}
 	const levels: { recipeId: number; skill: number }[] = [];
 	let ambiguous = 0;
@@ -687,6 +689,8 @@ export function matchTrainer(
 	for (const s of services) {
 		let fits = byName.get(s.name.toLowerCase()) ?? [];
 		if (s.itemId !== undefined && fits.length > 1) fits = fits.filter((r) => r.craftedItemId === s.itemId);
+		// Smelting's trainer lists the bar ("Tin Bar"), the recipe is "Smelt Tin": the item it makes.
+		else if (s.itemId !== undefined && fits.length === 0) fits = byItem.get(s.itemId) ?? [];
 		if (fits.length === 0) unmatched++;
 		else if (fits.length > 1) ambiguous++;
 		else if (!seen.has(fits[0].recipeId)) {

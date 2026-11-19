@@ -275,7 +275,7 @@ your last login or reload.
   each with their skill in the color and with the arrow their profession
   window shows (`Professions-Icon-Skill-High`, `-Medium`, `-Low`), then "+2
   more". With nobody listed, the profession row says "from 125" and the next
-  says why: "Nobody yet (Brenna 98)", "No one has learned it yet" or "Nobody
+  says why: "Nobody yet (Brenna 98)", "No one has the recipe" or "Nobody
   has it". Someone on a request row above isn't listed again. With a
   GuildieData.lua from before `reagentUse`: "Brenna | might want (Tailoring,
   Alchemy)", up to 8, then "+2 more". With "Say
