@@ -9,6 +9,9 @@
 //   any one of several will do: one per side or class). A dungeon quest
 //   after another of the same dungeon's doesn't count toward "picked up"
 //   (you can't have it before you go in).
+// - breadcrumb: an optional quest that only sends you to the next one's
+//   quest giver, who also gives that quest without it (Questie's
+//   breadcrumbForQuestId). Never needed; skipped when the next one is taken.
 // - hidden: in Blizzard's data but not in the game (placeholders, and old
 //   ids Forever replaced with another copy of the same quest).
 //
@@ -25,6 +28,7 @@
 export type QuestFacts = {
 	side?: "alliance" | "horde";
 	after?: number | number[];
+	breadcrumb?: true;
 	hidden?: true;
 };
 
@@ -66,8 +70,10 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	1491: { after: 865 },
 
 	// Blackfathom Deeps
+	1198: { side: A, breadcrumb: true },
 	1200: { side: A, after: 1198 },
 	1275: { side: A, after: 3765 },
+	6562: { side: H, breadcrumb: true },
 	6563: { side: H, after: 6562 },
 	6565: { side: H, after: 6564 },
 
@@ -79,8 +85,10 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	1101: { side: A, after: 1100 },
 
 	// Gnomeregan
+	2923: { side: A, breadcrumb: true },
 	2922: { side: A, after: 2923 },
 	2924: { side: A },
+	2927: { side: A, breadcrumb: true },
 	2926: { side: A, after: 2927 },
 	2930: { side: A },
 	2947: { side: A, after: 2945 },
@@ -161,7 +169,7 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	2340: { side: H, after: 2339 },
 	2341: { side: H, after: 2340 },
 	2361: { side: A, after: 2204 },
-	2398: { side: A },
+	2398: { side: A, breadcrumb: true },
 
 	// Krol'dok Stronghold
 	94968: { side: H },
@@ -182,6 +190,7 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	7065: { side: A },
 
 	// Zul'Farrak
+	2864: { breadcrumb: true },
 	2865: { after: 2864 },
 	2936: { side: H, after: 2935 },
 	2991: { side: A, after: 2990 },
@@ -220,10 +229,11 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	4121: { side: H, after: 4122 },
 	4122: { side: H },
 	4126: { side: A, after: 4128 },
-	4128: { side: A },
+	4128: { side: A, breadcrumb: true },
 	4132: { side: H, after: 4121 },
-	4133: { side: H },
+	4133: { side: H, breadcrumb: true },
 	4134: { side: H, after: 4133 },
+	4324: { breadcrumb: true },
 	4136: { after: 4324 },
 	4241: { side: A, after: 4224 },
 	4242: { side: A, after: 4241 },
@@ -244,7 +254,9 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	4734: { after: 4810 },
 	4735: { after: 4734 },
 	4743: { after: 4742 },
+	4766: { side: A, breadcrumb: true },
 	4764: { side: A, after: 4766 },
+	4769: { side: H, breadcrumb: true },
 	4768: { side: H, after: 4769 },
 	4788: { after: 5065 },
 	4907: { after: 4810 },
@@ -274,8 +286,8 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	7482: { side: A },
 	7488: { side: A, after: 7494 },
 	7489: { side: H, after: 7492 },
-	7492: { side: H },
-	7494: { side: A },
+	7492: { side: H, breadcrumb: true },
+	7494: { side: A, breadcrumb: true },
 	7508: { after: 7507 },
 	7877: { side: H, after: 7461 },
 	8948: { after: 8947 },
@@ -375,7 +387,7 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	3370: { side: A, after: 6981 },
 
 	// Blackfathom Deeps's chains
-	3765: { side: A },
+	3765: { side: A, breadcrumb: true },
 
 	// Stormwind Stockade's chains
 	303: { side: A },
@@ -436,7 +448,7 @@ export const DUNGEON_QUEST_FACTS: Record<number, QuestFacts> = {
 	95786: { side: A, after: 205 },
 
 	// Uldaman's chains
-	707: { side: A },
+	707: { side: A, breadcrumb: true },
 	720: { side: A },
 	723: { side: A, after: 722 },
 	724: { side: A, after: 723 },
