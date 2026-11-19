@@ -72,6 +72,7 @@ import type * as statPriority from "../statPriority.js";
 import type * as sync from "../sync.js";
 import type * as talents from "../talents.js";
 import type * as tracking from "../tracking.js";
+import type * as unclaimed from "../unclaimed.js";
 import type * as upgradeProfiles from "../upgradeProfiles.js";
 import type * as users from "../users.js";
 import type * as viewPrefs from "../viewPrefs.js";
@@ -147,6 +148,7 @@ declare const fullApi: ApiFromModules<{
   sync: typeof sync;
   talents: typeof talents;
   tracking: typeof tracking;
+  unclaimed: typeof unclaimed;
   upgradeProfiles: typeof upgradeProfiles;
   users: typeof users;
   viewPrefs: typeof viewPrefs;

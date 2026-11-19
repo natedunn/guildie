@@ -3,7 +3,14 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalQuery, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { anyUnknown, foldersFor } from "./addonCatalog";
-import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./addonPayload";
+import {
+	type AddonCharacter,
+	blizzardIdFromGuid,
+	LIMITS,
+	lastClaimAt,
+	matchRecipes,
+	parseCharacter,
+} from "./addonPayload";
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
@@ -20,6 +27,7 @@ import { mergeCompletedQuestIds } from "./shared/quests";
 import { addonRecipes, type PackedAddonRecipes, packAddonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
 import { trackedReagents } from "./tracking";
+import { noteUnclaimed } from "./unclaimed";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
 
@@ -104,11 +112,6 @@ export const whoami = query({
 });
 
 /** The number in Player-<server>-<hex>: Blizzard's character id. */
-function blizzardIdFromGuid(guid: string) {
-	const hex = guid.match(/^Player-\d+-([0-9A-Fa-f]+)$/)?.[1];
-	return hex ? Number.parseInt(hex, 16) : undefined;
-}
-
 async function treesFromRanks(ctx: MutationCtx, talents: AddonCharacter["talents"]) {
 	const trees = new Map<string, Infer<typeof vTalentTree>>();
 	for (const t of talents) {
@@ -163,6 +166,7 @@ export const ingest = mutation({
 			.query("ownedCharacters")
 			.withIndex("by_user", (q) => q.eq("userId", row.userId))
 			.collect();
+		const claimedAt = lastClaimAt(owned);
 		const accepted: string[] = [];
 		let inventoryChanged = false;
 		// The addons running: account-wide, so the newest read in this upload.
@@ -194,7 +198,8 @@ export const ingest = mutation({
 			const c = parsed.character;
 			const match = matchOwned(owned, c);
 			if (!match) {
-				unmatched.push(c.name);
+				// Skipped quietly when it's gone from the account or the player forgot it (unclaimed.ts).
+				if (await noteUnclaimed(ctx, row.userId, c, claimedAt, now)) unmatched.push(c.name);
 				continue;
 			}
 			const key = { flavor: match.flavor, region: match.region, slug: match.slug };

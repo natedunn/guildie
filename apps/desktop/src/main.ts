@@ -202,7 +202,7 @@ app.whenReady().then(async () => {
 	}
 	const connection = new Connection(origin, log, pixelConfig);
 	app.on("before-quit", () => connection.stop());
-	connection.onNotice = notify;
+	connection.onNotice = (title, body, url) => notify(title, body, url ? () => showWindow(url) : undefined);
 	// The site's notifications ("Miller will craft your Silk Bandage"): clicking opens the request.
 	connection.onSiteNotification = (text, url) => notify("Guildie", text, () => showWindow(url));
 	connection.onReloadReminder = (text) => notify("Guildie", text);

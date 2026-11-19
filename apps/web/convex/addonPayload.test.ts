@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addonText, curseProjectId, matchRecipes, parseCharacter } from "./addonPayload.ts";
+import {
+	addonText,
+	blizzardIdFromGuid,
+	curseProjectId,
+	lastClaimAt,
+	matchRecipes,
+	noticeUnclaimed,
+	parseCharacter,
+	UNCLAIMED_NOTICE_MS,
+} from "./addonPayload.ts";
 
 const NOW = 1_794_300_000_000;
 const T = NOW / 1000 - 60;
@@ -425,4 +434,25 @@ test("payload 7 from addon 0.20: descriptions and CurseForge project IDs", () =>
 	assert.equal(curseProjectId(" 42 "), 42);
 	assert.equal(curseProjectId(-1), undefined);
 	assert.equal(curseProjectId("1".repeat(12)), undefined);
+});
+
+test("unclaimed characters are named only while claiming could still help", () => {
+	const day = 24 * 60 * 60_000;
+	// Never claimed: a recent character is named, a long-unplayed one isn't.
+	assert.equal(noticeUnclaimed(NOW - day, undefined, NOW), true);
+	assert.equal(noticeUnclaimed(NOW - UNCLAIMED_NOTICE_MS - 1, undefined, NOW), false);
+	// Played after the last claim: new to the account, so named.
+	assert.equal(noticeUnclaimed(NOW - day, NOW - 2 * day, NOW), true);
+	// Played before the last claim yet not on it: deleted (or another account).
+	assert.equal(noticeUnclaimed(NOW - 3 * day, NOW - 2 * day, NOW), false);
+});
+
+test("the Blizzard id is the GUID's trailing hex number", () => {
+	assert.equal(blizzardIdFromGuid("Player-4395-0AB12C3D"), 0x0ab12c3d);
+	assert.equal(blizzardIdFromGuid("Creature-0-1"), undefined);
+});
+
+test("the last claim is the newest claimed row", () => {
+	assert.equal(lastClaimAt([]), undefined);
+	assert.equal(lastClaimAt([{ claimedAt: 5 }, { claimedAt: 9 }, { claimedAt: 7 }]), 9);
 });
