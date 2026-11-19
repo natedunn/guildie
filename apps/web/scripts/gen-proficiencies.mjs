@@ -23,15 +23,13 @@
 // the app uses are in shared/proficiencies.ts (this data plus overrides).
 // .github/workflows/game-data.yml runs this daily and opens a PR on change.
 
-import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { arg as argOf, format as biome, buildInfo, latestBuild, PRODUCT, table, withoutStamp } from "./lib/wago.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(here, "../convex/shared/proficiencies.generated.ts");
-const PRODUCT = "wowf";
-const USER_AGENT = "Guildie game-data check (https://github.com/natedunn/guildie)";
 
 /** Class ids (ChrClasses.ID) to the game's class tokens (ChrClasses.Filename). */
 const CLASSES = {
@@ -79,70 +77,7 @@ const SUSPECT_ROWS = {
 };
 
 const args = process.argv.slice(2);
-const arg = (name) => {
-	const i = args.indexOf(name);
-	return i >= 0 ? args[i + 1] : undefined;
-};
-
-async function get(url) {
-	for (let attempt = 1; ; attempt++) {
-		const res = await fetch(url, { headers: { "User-Agent": USER_AGENT } });
-		if (res.ok) return res;
-		if (attempt >= 3 || res.status < 500) throw new Error(`${url}: HTTP ${res.status}`);
-		await new Promise((r) => setTimeout(r, 2000 * attempt));
-	}
-}
-
-/** RFC 4180-ish CSV (quoted fields may hold commas, quotes and newlines). */
-function parseCsv(text) {
-	const rows = [];
-	let row = [];
-	let field = "";
-	let quoted = false;
-	for (let i = 0; i < text.length; i++) {
-		const c = text[i];
-		if (quoted) {
-			if (c === '"' && text[i + 1] === '"') {
-				field += '"';
-				i++;
-			} else if (c === '"') quoted = false;
-			else field += c;
-		} else if (c === '"') quoted = true;
-		else if (c === ",") {
-			row.push(field);
-			field = "";
-		} else if (c === "\n" || c === "\r") {
-			if (c === "\r" && text[i + 1] === "\n") i++;
-			row.push(field);
-			rows.push(row);
-			row = [];
-			field = "";
-		} else field += c;
-	}
-	if (field || row.length) {
-		row.push(field);
-		rows.push(row);
-	}
-	const [header, ...body] = rows;
-	return body.filter((r) => r.length > 1).map((r) => Object.fromEntries(header.map((h, i) => [h, r[i]])));
-}
-
-async function table(name, build) {
-	const res = await get(`https://wago.tools/db2/${name}/csv?build=${encodeURIComponent(build)}`);
-	return parseCsv(await res.text());
-}
-
-async function latestBuild() {
-	const builds = await (await get("https://wago.tools/api/builds")).json();
-	const list = builds[PRODUCT];
-	if (!Array.isArray(list) || !list.length) throw new Error(`wago.tools lists no ${PRODUCT} builds`);
-	return list[0];
-}
-
-async function buildInfo(version) {
-	const builds = await (await get("https://wago.tools/api/builds")).json();
-	return (builds[PRODUCT] ?? []).find((b) => b.version === version) ?? { version, created_at: "" };
-}
+const arg = (name) => argOf(args, name);
 
 /** Everything the generated file holds, from the three tables. */
 export function compute({ skillLines, skillRaceClassInfo, chrClasses }) {
@@ -264,21 +199,7 @@ function render(build, skills) {
 	return out.join("\n");
 }
 
-/** The file minus the lines naming the build, to tell whether the data changed. */
-const withoutStamp = (text) =>
-	text
-		.split("\n")
-		.filter((l) => !l.includes(" build ") && !l.startsWith("export const GAME_BUILD"))
-		.join("\n");
-
-/** Formats like the repo does (Biome), so the checked-in file passes lint as written. */
-function format(text) {
-	const root = resolve(here, "../../..");
-	const biome = resolve(root, "node_modules/.bin/biome");
-	const res = spawnSync(biome, ["format", `--stdin-file-path=${OUT}`], { cwd: root, input: text, encoding: "utf8" });
-	if (res.status !== 0) throw new Error(`biome format failed: ${res.stderr || res.error}`);
-	return res.stdout;
-}
+const format = (text) => biome(text, OUT);
 
 const title = (token) => token[0] + token.slice(1).toLowerCase();
 

@@ -67,6 +67,94 @@ local function reagentRows(itemID, skip)
 end
 ns.reagentRows = reagentRows
 
+-- The profession window's skill-up colors and arrows (Blizzard_ProfessionsRecipeList):
+-- orange always gives a skill-up, yellow and green a falling chance.
+local SKILL_UP = {
+    orange = { color = "ffff8040", atlas = "Professions-Icon-Skill-High" },
+    yellow = { color = "ffffff00", atlas = "Professions-Icon-Skill-Medium" },
+    green = { color = "ff40bf40", atlas = "Professions-Icon-Skill-Low" },
+}
+local SUB = "   "
+
+--- The arrow as inline text, when the client has the atlas.
+local arrows = {}
+local function arrow(color)
+    local s = SKILL_UP[color]
+    if not s then return "" end
+    if arrows[color] == nil then
+        local has = false
+        if C_Texture and C_Texture.GetAtlasInfo then
+            local ok, info = pcall(C_Texture.GetAtlasInfo, s.atlas)
+            has = ok and info ~= nil
+        end
+        arrows[color] = has and ("|A:" .. s.atlas .. ":12:10|a ") or ""
+    end
+    return arrows[color]
+end
+
+--- A guildmate's skill in the color (and with the arrow) their profession
+--- window shows their best recipe for this reagent in: "|A..|a |cffff8040131|r".
+local function skillText(user)
+    local s = SKILL_UP[user.color]
+    local n = tostring(user.skill or "?")
+    if not s then return n end
+    return arrow(user.color) .. "|c" .. s.color .. n .. "|r"
+end
+ns.skillText = skillText
+
+--- Who'd get the most profession progress out of this reagent
+--- (GuildieData.reagentUse, addon 0.24.0; reagentProgress.ts): per profession
+--- whose recipes use it, "Tailoring | from 125", then the best few
+--- guildmates with their skill ("Todd | ^^ 131", in the window's colors),
+--- "+2 more", or why nobody: "Nobody yet (Brenna 152)", "No one has learned
+--- it yet", "Nobody has it". `skip`: names already on a request row.
+local function useRows(itemID, skip)
+    local data = GuildieData and type(GuildieData.reagentUse) == "table" and GuildieData.reagentUse
+    local entry = data and data[itemID]
+    if type(entry) ~= "table" or type(entry.professions) ~= "table" then return {} end
+    local rows = {}
+    for _, p in ipairs(entry.professions) do
+        if type(p) == "table" and p.name then
+            -- "from" only when nobody's listed: someone who knows a recipe gets
+            -- skill-ups below it (its learn level isn't always known).
+            local header = { left = p.name }
+            table.insert(rows, header)
+            local shown, hidden = 0, 0
+            for _, user in ipairs(type(p.users) == "table" and p.users or {}) do
+                if isMine(user.name) or (skip and skip[user.name]) then
+                    hidden = hidden + 1
+                else
+                    shown = shown + 1
+                    table.insert(rows, { left = SUB .. classColored(user.name, user.classId), right = skillText(user) })
+                end
+            end
+            local more = (tonumber(p.count) or 0) - shown - hidden
+            if more > 0 then
+                table.insert(rows, { left = SUB .. string.format("+%d more", more) })
+            elseif shown == 0 then
+                header.right = p.from and ("from " .. p.from) or nil
+                local why
+                if p.unlearned then
+                    why = "No one has learned it yet"
+                elseif type(p.closest) == "table" and p.closest.name then
+                    why = string.format("Nobody yet (%s %s)", classColored(p.closest.name, p.closest.classId),
+                        tostring(p.closest.skill))
+                elseif p.nobody then
+                    why = "Nobody has it"
+                end
+                if why then
+                    table.insert(rows, { left = SUB .. why })
+                else
+                    -- Everyone listed is already on a request row above.
+                    table.remove(rows)
+                end
+            end
+        end
+    end
+    return rows
+end
+ns.useRows = useRows
+
 --- A list as a set, cached per list (GuildieData is replaced only on /reload).
 local sets = setmetatable({}, { __mode = "k" })
 local function asSet(list)
@@ -289,7 +377,11 @@ local function rowsFor(tooltip, itemID, data, link)
     local bound = binding ~= nil
     if not bound then
         for _, row in ipairs(recipeRows(itemID)) do table.insert(rows, row) end
-        for _, row in ipairs(reagentRows(itemID, ongoing)) do table.insert(rows, row) end
+        -- Who'd progress most with it; a file from before 0.24.0 has only "might want".
+        local use = GuildieData and type(GuildieData.reagentUse) == "table"
+        for _, row in ipairs(use and useRows(itemID, ongoing) or reagentRows(itemID, ongoing)) do
+            table.insert(rows, row)
+        end
     end
     local ok, upgrades = pcall(function() return item and ns.upgrades.lines(item, itemID, classColored) end)
     if ok and upgrades then
