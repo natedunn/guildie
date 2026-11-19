@@ -135,7 +135,7 @@ local function useRows(itemID, skip)
                 header.right = p.from and ("from " .. p.from) or nil
                 local why
                 if p.unlearned then
-                    why = "No one has the recipe"
+                    why = "No one has a recipe that uses it"
                 elseif type(p.closest) == "table" and p.closest.name then
                     why = string.format("Nobody yet (%s %s)", classColored(p.closest.name, p.closest.classId),
                         tostring(p.closest.skill))
