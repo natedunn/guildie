@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { bearerToken, convex, errorResponse, json } from "@/lib/helper-api";
 
 // POST /api/helper/snapshot: the helper uploads what the addon saved.
-// Body: { "version": 1 | 2 | 3, "characters": [ ... ] } (docs/addon.md, "API").
+// Body: { "version": 1 to 7, "characters": [ ... ], "trainers"?: [ ... ] } (docs/addon.md, "API").
 // 200 { accepted: [slug], unmatched: [name], rejected: [name] }. Characters
 // must be claimed by the token's owner; each is checked on its own
 // (convex/addonPayload.ts), so one bad character doesn't sink the rest.
@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/helper/snapshot")({
 				if (!token) return json(401, { error: "Missing token" });
 				const text = await request.text();
 				if (text.length > MAX_BODY_BYTES) return json(413, { error: "Upload too large" });
-				let body: { version?: unknown; characters?: unknown };
+				let body: { version?: unknown; characters?: unknown; trainers?: unknown };
 				try {
 					body = JSON.parse(text);
 				} catch {
@@ -32,7 +32,13 @@ export const Route = createFileRoute("/api/helper/snapshot")({
 					return json(400, { error: `Expected { version: ${PAYLOAD_VERSIONS.join(" or ")}, characters: [...] }` });
 				}
 				try {
-					const result = await convex().mutation(api.helper.ingest, { token, version, characters: body.characters });
+					const result = await convex().mutation(api.helper.ingest, {
+						token,
+						version,
+						characters: body.characters,
+						// Trainer windows the addon read (optional; checked in convex/addonPayload.ts).
+						...(Array.isArray(body.trainers) ? { trainers: body.trainers } : {}),
+					});
 					return json(200, result);
 				} catch (error) {
 					return errorResponse(error);

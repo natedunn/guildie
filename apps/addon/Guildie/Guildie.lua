@@ -15,6 +15,7 @@ local ADDON, ns = ...
 -- 3 (0.8.0) bags and the last bank read; 4 (0.10.0) the quest log. The site
 -- accepts all seven. 5 adds retained quest completion IDs; 6 adds delivery receipts;
 -- 7 the addons running (on the latest character only: they're account-wide).
+-- Trainer reads (`trainers`, beside `characters`) are optional within 7.
 local VERSION = 7
 
 GuildieDB = GuildieDB or {}
@@ -328,7 +329,7 @@ local function capture(reason, recipes)
     for _, c in pairs(GuildieDB.characters) do table.insert(list, c) end
     GuildieDB.version = VERSION
     GuildieDB.addonVersion = addonVersion()
-    GuildieDB.payload = encode({ version = VERSION, characters = list })
+    GuildieDB.payload = encode({ version = VERSION, characters = list, trainers = ns.trainerList() })
     GuildieDB.lastReason = reason
     -- The game wrote GuildieDB to disk when this session's UI loaded; anything
     -- different since then reaches the helper only at the next /reload or logout.
@@ -395,6 +396,70 @@ local function captureRecipes(which, reason)
 end
 ns.captureRecipes = captureRecipes
 
+--- The game build ("1.60.1.70959"), or nil.
+local function gameBuild()
+    if not GetBuildInfo then return nil end
+    local ok, version, build = pcall(GetBuildInfo)
+    if not ok or type(version) ~= "string" then return nil end
+    return build and (version .. "." .. tostring(build)) or version
+end
+
+--- Trainer reads, one per profession: the newest read's list on top of what
+--- earlier trainers of that profession listed (trainers of different ranks
+--- can teach different recipes). Kept across sessions; the site uses them
+--- only while the recipes' levels haven't changed. A new game build starts a
+--- profession over.
+function ns.mergeTrainer(previous, services, unavailableShown, now, build)
+    local list, seen = {}, {}
+    for _, s in ipairs(services) do
+        if not seen[s.name] then
+            seen[s.name] = true
+            table.insert(list, s)
+        end
+    end
+    if previous and previous.build == build then
+        for _, s in ipairs(previous.services or {}) do
+            -- The site takes up to 1000 per profession.
+            if not seen[s.name] and #list < 1000 then
+                seen[s.name] = true
+                table.insert(list, s)
+            end
+        end
+    end
+    return { capturedAt = now, build = build, unavailableShown = unavailableShown, services = list }
+end
+
+--- The trainer reads as the payload sends them ({ profession, ... } each), or nil.
+function ns.trainerList()
+    local list = {}
+    for profession, read in pairs(GuildieDB.trainers or {}) do
+        table.insert(list, {
+            profession = profession,
+            capturedAt = read.capturedAt,
+            build = read.build,
+            unavailableShown = read.unavailableShown,
+            services = read.services,
+        })
+    end
+    if #list == 0 then return nil end
+    table.sort(list, function(a, b) return a.profession < b.profession end)
+    return list
+end
+
+--- A profession trainer's window is open: keep its list, then save.
+local function captureTrainer(reason)
+    local ok, byProfession, unavailableShown = pcall(ns.readTrainer)
+    if not ok or not byProfession then return end
+    local now, build = GetServerTime(), gameBuild()
+    GuildieDB.trainers = GuildieDB.trainers or {}
+    for profession, services in pairs(byProfession) do
+        GuildieDB.trainers[profession] =
+            ns.mergeTrainer(GuildieDB.trainers[profession], services, unavailableShown, now, build)
+    end
+    capture(reason)
+end
+ns.captureTrainer = captureTrainer
+
 --- What the window shows for the current character.
 function ns.current()
     return GuildieDB.characters and GuildieDB.characters[UnitGUID("player")]
@@ -421,6 +486,8 @@ local EVENTS = {
     TRADE_SKILL_LIST_UPDATE = "trade",
     CRAFT_SHOW = "craft",
     CRAFT_UPDATE = "craft",
+    TRAINER_SHOW = "trainer",
+    TRAINER_UPDATE = "trainer",
     BAG_UPDATE = "inventory",
     BAG_UPDATE_DELAYED = "inventory",
     BANKFRAME_OPENED = "inventory",
@@ -442,6 +509,8 @@ local function run(kind, event)
         captureInventory()
     elseif kind == "quests" then
         captureQuests()
+    elseif kind == "trainer" then
+        captureTrainer(event)
     else
         captureRecipes(kind, event)
     end

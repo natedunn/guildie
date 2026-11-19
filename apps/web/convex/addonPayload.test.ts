@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addonText, curseProjectId, matchRecipes, parseCharacter } from "./addonPayload.ts";
+import {
+	addonText,
+	curseProjectId,
+	matchRecipes,
+	matchTrainer,
+	parseCharacter,
+	parseTrainers,
+} from "./addonPayload.ts";
 
 const NOW = 1_794_300_000_000;
 const T = NOW / 1000 - 60;
@@ -425,4 +432,66 @@ test("payload 7 from addon 0.20: descriptions and CurseForge project IDs", () =>
 	assert.equal(curseProjectId(" 42 "), 42);
 	assert.equal(curseProjectId(-1), undefined);
 	assert.equal(curseProjectId("1".repeat(12)), undefined);
+});
+
+test("trainers: checked, known professions only, one read each", () => {
+	const at = Math.floor(NOW / 1000) - 60;
+	const reads = parseTrainers(
+		[
+			{
+				profession: "Tailoring",
+				capturedAt: at,
+				build: "1.60.1.70959",
+				unavailableShown: true,
+				services: [
+					{ name: "Bolt of Silk Cloth", item: 4305, skill: 100 },
+					{ name: "Journeyman Tailoring", skill: 50 },
+					{ name: "Linen Cloak" },
+				],
+			},
+			{ profession: "Tailoring", capturedAt: at, services: [] },
+			{ profession: "Schneiderei", capturedAt: at, services: [] },
+		],
+		NOW,
+	);
+	assert.equal(reads.length, 1);
+	assert.equal(reads[0].professionId, 197);
+	assert.equal(reads[0].capturedAt, at * 1000);
+	assert.equal(reads[0].build, "1.60.1.70959");
+	assert.deepEqual(reads[0].services, [
+		{ name: "Bolt of Silk Cloth", itemId: 4305, skill: 100 },
+		{ name: "Journeyman Tailoring", skill: 50 },
+		{ name: "Linen Cloak", skill: 0 },
+	]);
+	assert.throws(() => parseTrainers([{ profession: "Tailoring", capturedAt: at, services: [{ skill: 5 }] }], NOW));
+	assert.throws(() => parseTrainers([{ profession: "Tailoring", capturedAt: at + 3600, services: [] }], NOW));
+});
+
+test("matchTrainer: only certain matches, at least skill 1", () => {
+	const catalog = [
+		{ recipeId: 2376, name: "Bolt of Silk Cloth", craftedItemId: 4305 },
+		{ recipeId: 10, name: "Basic Campfire", craftedItemId: 1 },
+		{ recipeId: 11, name: "Basic Campfire", craftedItemId: 1 },
+		{ recipeId: 20, name: "Brown Linen Shirt", craftedItemId: 2 },
+		{ recipeId: 21, name: "Brown Linen Shirt", craftedItemId: 3 },
+		{ recipeId: 30, name: "Linen Cloak", craftedItemId: 4 },
+	];
+	const out = matchTrainer(
+		[
+			{ name: "Bolt of Silk Cloth", skill: 100 },
+			{ name: "Basic Campfire", itemId: 1, skill: 1 }, // two recipes make the same thing: skipped
+			{ name: "Brown Linen Shirt", itemId: 3, skill: 10 }, // the item tells them apart
+			{ name: "Brown Linen Shirt", skill: 10 }, // no item: can't tell
+			{ name: "Linen Cloak", skill: 0 },
+			{ name: "Journeyman Tailoring", skill: 50 }, // a rank, not a recipe
+		],
+		catalog,
+	);
+	assert.deepEqual(out.levels, [
+		{ recipeId: 2376, skill: 100 },
+		{ recipeId: 21, skill: 10 },
+		{ recipeId: 30, skill: 1 },
+	]);
+	assert.equal(out.ambiguous, 2);
+	assert.equal(out.unmatched, 1);
 });

@@ -213,6 +213,40 @@ function wow.reset(state)
         if l.item then return link({ id = l.item, name = l.name }) end
         return "|cffffffff|Henchant:" .. (7000 + i) .. "|h[" .. l.name .. "]|h|r"
     end
+    -- Trainers (closed unless state.trainer is set): { kind = 0..3 (Enum.TrainerType),
+    -- unavailableShown, build, services = { { name, type, skill, rank, line, item }, ... } }.
+    -- state.trainerApi "classic" leaves out C_Trainer (IsTradeskillTrainer instead).
+    _G.Enum = _G.Enum or {}
+    _G.Enum.TrainerType = { General = 0, TalentsObsolete = 1, Tradeskills = 2, Pet = 3 }
+    _G.C_Trainer = state.trainerApi ~= "classic"
+            and { GetTrainerType = function() return state.trainer and state.trainer.kind or 0 end }
+        or nil
+    _G.IsTradeskillTrainer = state.trainerApi == "classic"
+            and function() return state.trainer ~= nil and state.trainer.kind == 2 end
+        or nil
+    _G.GetBuildInfo = function() return "1.60.1", state.build or "70959" end
+    local function service(i) return state.trainer and state.trainer.services[i] end
+    _G.GetNumTrainerServices = function() return state.trainer and #state.trainer.services or 0 end
+    _G.GetTrainerServiceInfo = function(i)
+        local s = service(i)
+        if s then return s.name, s.type or "available", 1, 0, "", "" end
+    end
+    _G.GetTrainerServiceSkillReq = function(i)
+        local s = service(i)
+        if s and s.skill then return s.skill, s.rank, true end
+    end
+    _G.GetTrainerServiceSkillLine = function(i)
+        local s = service(i)
+        return s and s.line
+    end
+    _G.GetTrainerServiceItemLink = function(i)
+        local s = service(i)
+        return s and s.item and ("|cffffffff|Hitem:" .. s.item .. "::::::::|h[x]|h|r") or nil
+    end
+    _G.GetTrainerServiceTypeFilter = function(kind)
+        if kind == "unavailable" then return state.trainer == nil or state.trainer.unavailableShown ~= false end
+        return true
+    end
     -- Bags and bank: state.bags = { [bag] = { slots = n, [slot] = { id, count } } };
     -- state.containerApi "modern" (C_Container), "classic" (globals) or nil (none).
     state.bags = state.bags or {}
@@ -425,7 +459,7 @@ function wow.guildieRows(added, ns)
     assert(#added > 2, "a header with no rows")
     local rows = {}
     for i = 3, #added do
-        assert(added[i]:match("^   %S"), "rows are indented: " .. added[i])
+        assert(added[i]:match("^   +%S"), "rows are indented: " .. added[i])
         table.insert(rows, (added[i]:gsub("^%s+", "")))
     end
     return rows

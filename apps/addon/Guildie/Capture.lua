@@ -315,6 +315,61 @@ function ns.readRecipes(which)
     return readTradeSkill()
 end
 
+-- ---- Trainers (learn levels) -------------------------------------------------
+-- The skill a trainer asks for to learn each recipe isn't in the game's
+-- files, only in the trainer's window. Read it there, for everyone: it's the
+-- same for every player (docs/game-data.md, "Learn levels").
+
+local MAX_TRAINER_SERVICES = 1000
+
+--- Is the open trainer a profession trainer? nil when the client can't say.
+local function tradeskillTrainer()
+    if C_Trainer and C_Trainer.GetTrainerType and Enum and Enum.TrainerType then
+        local ok, kind = pcall(C_Trainer.GetTrainerType)
+        if ok and kind ~= nil then return kind == Enum.TrainerType.Tradeskills end
+    end
+    if IsTradeskillTrainer then
+        local ok, yes = pcall(IsTradeskillTrainer)
+        if ok then return yes and true or false end
+    end
+    return nil
+end
+
+--- The open profession trainer's list: { [profession] = { { name, item?, skill }, ... } }
+--- (skill 0: no requirement), and whether recipes the character can't learn
+--- yet are listed (the window's "Unavailable" filter). nil when no
+--- profession trainer is open or the client lacks the API.
+function ns.readTrainer()
+    if not (GetNumTrainerServices and GetTrainerServiceInfo and GetTrainerServiceSkillReq) then return nil end
+    if tradeskillTrainer() == false then return nil end
+    local byProfession, count = {}, 0
+    for i = 1, GetNumTrainerServices() or 0 do
+        local name, kind = GetTrainerServiceInfo(i)
+        if name and kind ~= "header" and count < MAX_TRAINER_SERVICES then
+            local skill, rank = GetTrainerServiceSkillReq(i)
+            local profession = skill
+            if not profession and GetTrainerServiceSkillLine then profession = GetTrainerServiceSkillLine(i) end
+            if type(profession) == "string" and profession ~= "" then
+                local list = byProfession[profession] or {}
+                byProfession[profession] = list
+                table.insert(list, {
+                    name = name,
+                    item = itemIdOf(GetTrainerServiceItemLink and GetTrainerServiceItemLink(i)),
+                    skill = (skill and tonumber(rank)) or 0,
+                })
+                count = count + 1
+            end
+        end
+    end
+    if not next(byProfession) then return nil end
+    local unavailableShown = nil
+    if GetTrainerServiceTypeFilter then
+        local ok, shown = pcall(GetTrainerServiceTypeFilter, "unavailable")
+        if ok then unavailableShown = shown and true or false end
+    end
+    return byProfession, unavailableShown
+end
+
 -- ---- Bags and bank (guild requests) ------------------------------------------
 -- What's in your bags, and in your bank as of the last time it was open, as
 -- item id -> count. guildie.club uses it only to tell you whether you have

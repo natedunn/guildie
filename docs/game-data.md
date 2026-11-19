@@ -1,15 +1,16 @@
-# Game data: who can wear and wield what
+# Game data: what the game's own files say
 
-Which armor and weapon types each class can use, and from which level, comes
-from WoW: Forever's own game data, not from a hand-written list. Blizzard's
-web API has none of it (`playable-class` has no proficiencies, item
-subclasses are just names, profiles have no skills), so Guildie reads the
+Which armor and weapon types each class can use, and from which level, and
+where each recipe stops giving skill-ups, come from WoW: Forever's own game
+data, not from a hand-written list. Blizzard's web API has none of it
+(`playable-class` has no proficiencies, item subclasses are just names,
+profiles have no skills, recipes have no levels), so Guildie reads the
 game's DB2 tables, which [wago.tools](https://wago.tools) publishes for every
 build (Forever is product `wowf`).
 
 Used by: gear-upgrade suggestions (site and addon tooltips, through
 `GuildieData.lua`), a character's "Can use" (Gear tab) and the guild's Gear
-page.
+page. Recipe levels: see "Recipe skill levels" below.
 
 ## Pieces
 
@@ -69,7 +70,7 @@ Actions → General). Without it the workflow opens (or updates) an issue
 labeled `game-data` with the summary and a link to open the pull request by
 hand, which then runs CI as usual.
 
-Requests to wago.tools are few (one build list and three tables a day) and
+Requests to wago.tools are few (two build lists and six tables a day) and
 name Guildie and this repository in the User-Agent.
 
 By hand:
@@ -100,6 +101,84 @@ say, and the override it contradicts if any) and, per override that removes
 something, `contradictedBy` (characters that have it: remove the override)
 and `consistentWith` (characters of that class at or above the data's level
 without it: weak support, since skills are trained).
+
+## Recipe skill levels
+
+Where each recipe turns yellow, green and grey in the profession window
+(when it stops giving skill-ups), also from Forever's own tables, since
+Blizzard's web API doesn't have it. For ranking who could use a reagent
+best (the addon's item tooltips).
+
+| File                                               | What                                                                                            |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apps/web/scripts/gen-recipe-skills.mjs`           | Reads `SkillLine`, `SkillLineAbility` and `SpellName` for a build and writes the generated file |
+| `apps/web/convex/shared/recipeSkills.generated.ts` | Generated: per profession, each recipe's id, name, and yellow and grey levels                   |
+| `apps/web/convex/shared/recipeSkills.ts`           | `recipeSkill(recipeId)` (levels, with green) and `recipeColor(levels, skill)`                   |
+| `apps/web/scripts/lib/wago.mjs`                    | What the generators share: build lookup, tables as CSV, Biome formatting                        |
+
+How the tables are read:
+
+- `SkillLineAbility.ID` is Blizzard's recipe id (`recipes.recipeId`), so the
+  two join exactly. `TrivialSkillLineRankLow` is yellow,
+  `TrivialSkillLineRankHigh` grey, and green starts halfway between
+  (rounded down), the game's own rule.
+- The professions are the skill lines with a tier under them (Tailoring 197
+  over Tailoring 2948); their names match Blizzard's.
+- Left out: rows with no grey level (Find Herbs and other abilities) and
+  rows whose spell isn't in the build's `SpellName` (leftovers: Forever
+  dropped Classic's Minor Healing Potion recipe but kept its row).
+- Not read: where orange starts, the skill needed to learn a recipe.
+  Trainers keep it on the server, so nearly every row says 1, and the few
+  that don't are Classic's numbers Forever didn't update. See "Learn levels".
+
+Forever changed many levels from Classic Era (Bolt of Silk Cloth is
+110/120 here, 135/145 in Era), so the numbers must come from `wowf` builds,
+never Era's.
+
+The daily check covers this file too: a pull request lists the recipes whose
+levels changed per profession (`~ Bolt of Silk Cloth: 110/120 → 115/125`).
+To confirm one, open the profession window on a character near that level
+and compare the recipe's color.
+
+```sh
+node apps/web/scripts/gen-recipe-skills.mjs                       # newest build
+node apps/web/scripts/gen-recipe-skills.mjs --build 1.60.1.70959  # a given build
+node apps/web/scripts/gen-recipe-skills.mjs --summary out.md      # also: what changed, as markdown
+node apps/web/scripts/gen-recipe-skills.mjs --check               # exit 1 if it would change
+```
+
+## Learn levels
+
+The skill a trainer asks for to learn a recipe (where orange starts) isn't
+in the game's files, and no other source has Forever's. So the addon (0.24.0)
+reads it from trainer windows: on `TRAINER_SHOW`/`TRAINER_UPDATE` it lists
+each recipe's name, the item it makes and `GetTrainerServiceSkillReq`, keeps
+one list per profession (later trainers add to it; a new game build starts
+over) and sends them with every upload as `trainers` (docs/addon.md, "API").
+It's the same for every player, so one visit covers everyone.
+
+- `convex/learnLevels.ts` matches each read to Blizzard's recipe ids by name
+  within the profession (and the crafted item when two recipes share a
+  name); anything ambiguous is skipped. One row per recipe in
+  `recipeLearnLevels`, the newest read winning, with the recipe's yellow and
+  grey levels at the time. If a game update changes those, the row stops
+  counting until someone reads a trainer again. A requirement above the
+  recipe's grey level is refused.
+- A player's read is matched again only when it's newer than their last one
+  for that profession (`trainerReads`).
+- Used by `convex/reagentProgress.ts`: a recipe someone hasn't learned counts
+  only if a trainer was seen teaching it, and only from that skill (a
+  pattern's recipe needs the pattern). Recipes they know need no learn level.
+- Patterns, plans and formulas carry theirs in their tooltips
+  (`recipeItems.skill`); those only move a reagent's "from".
+- Coverage (maintainers): `npx convex run learnLevels:coverage --deployment <name>`
+  per profession: recipes with colors, how many have a current learn level,
+  how many a stale one, and the newest read.
+
+Not known yet (docs/addon.md, "Not verified yet"): whether a trainer lists
+recipes above your skill (the window's "Unavailable" filter; each read
+records whether it was on), and what it shows someone without the
+profession.
 
 ## Dungeons
 

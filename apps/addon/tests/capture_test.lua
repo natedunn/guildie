@@ -706,5 +706,78 @@ test("quests: changes update the save; a collapsed header keeps its quests; logo
     eq(byId(payload(state.db).characters[1].quests.list)[214], nil, "logout writes it")
 end)
 
+test("trainers: each recipe's required skill, sent beside the characters", function()
+    local state = lich()
+    wow.load(state)
+    wow.fire("PLAYER_ENTERING_WORLD")
+    eq(payload(state.db).trainers, nil, "nothing read yet: no trainers")
+    state.trainer = {
+        kind = 2,
+        services = {
+            { name = "Journeyman Tailoring", line = "Tailoring" },
+            { name = "Bolt of Silk Cloth", skill = "Tailoring", rank = 100, item = 4305, type = "available" },
+            { name = "Mageweave Bag", skill = "Tailoring", rank = 175, item = 4245, type = "unavailable" },
+            { name = "Brown Linen Shirt", line = "Tailoring", item = 2568, type = "used" },
+        },
+    }
+    wow.fire("TRAINER_SHOW")
+    local trainers = payload(state.db).trainers
+    eq(#trainers, 1, "one profession")
+    local read = trainers[1]
+    eq(read.profession, "Tailoring")
+    eq(read.capturedAt, state.time)
+    eq(read.build, "1.60.1.70959")
+    eq(read.unavailableShown, true)
+    eq(#read.services, 4)
+    eq(read.services[2].name, "Bolt of Silk Cloth")
+    eq(read.services[2].skill, 100)
+    eq(read.services[2].item, 4305)
+    eq(read.services[3].skill, 175, "one you can't learn yet")
+    eq(read.services[4].skill, 0, "no requirement")
+    eq(#payload(state.db).characters, 1, "characters as before")
+end)
+
+test("trainers: a later trainer adds to the list; a new game build starts over", function()
+    local state = lich()
+    wow.load(state)
+    state.trainer = { kind = 2, services = { { name = "Bolt of Silk Cloth", skill = "Tailoring", rank = 100 } } }
+    wow.fire("TRAINER_SHOW")
+    state.time = state.time + 60
+    state.trainer = { kind = 2, unavailableShown = false, services = {
+        { name = "Mageweave Bag", skill = "Tailoring", rank = 175 },
+        { name = "Bolt of Silk Cloth", skill = "Tailoring", rank = 105 },
+    } }
+    wow.fire("TRAINER_UPDATE")
+    local read = payload(state.db).trainers[1]
+    eq(#read.services, 2, "merged by name")
+    eq(read.services[1].name, "Mageweave Bag")
+    eq(read.services[2].skill, 105, "the newer read wins")
+    eq(read.unavailableShown, false)
+    eq(read.capturedAt, state.time)
+    state.build = "71000"
+    state.trainer = { kind = 2, services = { { name = "Linen Cloak", skill = "Tailoring", rank = 1 } } }
+    wow.fire("TRAINER_SHOW")
+    read = payload(state.db).trainers[1]
+    eq(#read.services, 1, "a new build: only what this trainer listed")
+    eq(read.build, "1.60.1.71000")
+end)
+
+test("trainers: class trainers and closed windows are ignored, on both APIs", function()
+    for _, api in ipairs({ "modern", "classic" }) do
+        local state = lich({ trainerApi = api })
+        wow.load(state)
+        wow.fire("PLAYER_ENTERING_WORLD")
+        state.trainer = { kind = 0, services = { { name = "Power Word: Fortitude", line = "Discipline" } } }
+        wow.fire("TRAINER_SHOW")
+        eq(payload(state.db).trainers, nil, api .. ": class trainer")
+        state.trainer = nil
+        wow.fire("TRAINER_UPDATE")
+        eq(payload(state.db).trainers, nil, api .. ": closed")
+        state.trainer = { kind = 2, services = { { name = "Bolt of Silk Cloth", skill = "Tailoring", rank = 100 } } }
+        wow.fire("TRAINER_SHOW")
+        eq(payload(state.db).trainers[1].services[1].skill, 100, api .. ": profession trainer")
+    end
+end)
+
 print(string.format("%d passed, %d failed", passed, failures))
 os.exit(failures == 0 and 0 or 1)
