@@ -208,3 +208,21 @@ The Dungeons page (`/g/<region>/<guild>/dungeons`) reads three sources:
 Blizzard has no quest chains (prerequisites), boss loot or dungeon maps for
 Forever, and the game files don't either: "ready" counts a quest in the log
 as its chain done, and the page links to Wowhead for loot and maps.
+
+## After a hotfix
+
+Hotfixes change items (stats, binding) and quests (a quest stops being a
+Dungeon quest). What catches up by itself:
+
+- **Items** (`convex/items.ts`): the site saves each item's tooltip from
+  Blizzard and scores upgrades from it. A daily cron looks up again the 500
+  items saved longest ago, once they're over 30 days old, so a changed item
+  is right within a month or so. Items Blizzard 404s on keep what we have.
+  To fix particular items now (ids from the hotfix notes, on Wowhead):
+  `npx convex run items:syncBatch '{"itemIds":[1234,5678]}'` (add `--prod`).
+- **Dungeon quests**: the weekly sync replaces each dungeon's list from
+  Blizzard's quest types; `npx convex run dungeons:syncQuests` does it now.
+- **The addon** reads items from the game itself, so it needs nothing.
+
+Stat weights don't follow from hotfix notes; change them only on purpose
+([gear-upgrades.md](gear-upgrades.md)).

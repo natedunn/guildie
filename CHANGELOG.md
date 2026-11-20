@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** Item tooltips and upgrade suggestions catch up when a hotfix changes an item's stats or binding (like November's Soulforge armor and caster staves). Before, an item kept what it had when Guildie first saw it.
+
 ### Improvements
 
 - **Guildie:** An Admin page for maintainers, starting with how far trainer visits have filled in each profession's recipe learn levels.
