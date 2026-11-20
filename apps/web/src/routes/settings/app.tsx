@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { DownloadAppButton } from "@/components/download-app";
 import { HelperTokens } from "@/components/helper-tokens";
@@ -213,8 +213,12 @@ function GetTheApp() {
 			</p>
 			<DownloadAppButton className="mt-4" />
 			<p className="mt-3 text-muted-foreground">
-				For Windows, macOS and Linux, from the latest release on GitHub. The app isn't code-signed yet, so the first
-				time you open it your computer may warn you: the download explains what to do on yours.
+				From the latest release on GitHub. The app isn't code-signed yet, so Windows may warn you the first time: the
+				download explains what to do. Early alpha builds for macOS and Linux are on{" "}
+				<Link to="/download" className="text-foreground underline underline-offset-2">
+					the download page
+				</Link>
+				.
 			</p>
 		</section>
 	);
