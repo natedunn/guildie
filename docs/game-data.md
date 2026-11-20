@@ -178,10 +178,11 @@ It's the same for every player, so one visit covers everyone.
   how many a stale one, and the newest read. The page also counts trainer
   visits and the players they came from.
 
-Not known yet (docs/addon.md, "Not verified yet"): whether a trainer lists
-recipes above your skill (the window's "Unavailable" filter; each read
-records whether it was on), and what it shows someone without the
-profession.
+Checked in game (docs/addon.md, "Verified in game"): with the window's
+"Unavailable" filter on, a trainer lists recipes above your skill, also for
+a profession you don't have; each read records whether the filter was on.
+A trainer lists only up to the rank it teaches, so city trainers fill in
+the most.
 
 ## Dungeons
 

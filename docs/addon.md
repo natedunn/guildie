@@ -676,18 +676,15 @@ sees their own.
 
 - Talent reading (names and ranks) in WoW: Forever.
 - The GUID's number equals Blizzard's character id, so uploads match on id.
+- The 0.24.0 trainer read (2026-11-19, build 1.60.1.70959): `TRAINER_SHOW`
+  and the trainer functions work; with "Unavailable" ticked the list has
+  recipes above your skill, each with its requirement; a trainer for a
+  profession you don't have lists its recipes too. Each trainer lists only
+  up to the rank it teaches (a small town's stops near 50). Mining's lists
+  smelting by the bar ("Tin Bar" for Smelt Tin), matched by the item. The
+  reagent tooltip's arrows draw inline.
 
 ## Not verified yet
-
-- The 0.24.0 trainer read in Forever: `GetNumTrainerServices`,
-  `GetTrainerServiceInfo`, `GetTrainerServiceSkillReq` (from Forever's own
-  trainer window code), whether the list includes recipes the character
-  can't learn yet (the "Unavailable" filter, `GetTrainerServiceTypeFilter`;
-  each read says), what a trainer lists for someone without the profession,
-  and `TRAINER_SHOW`/`TRAINER_UPDATE`. Also that the arrows draw inline
-  (`|A:Professions-Icon-Skill-High:12:10|a`; without the atlas the skill
-  shows in its color alone). `learnLevels:coverage` shows how many recipes
-  have a learn level.
 
 - The addon list (payload 7): that `C_AddOns.GetAddOnInfo` and
   `IsAddOnLoaded` take an index in Forever, and that `GetNumAddOns` leaves
