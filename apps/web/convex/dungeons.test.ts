@@ -132,6 +132,19 @@ test("quests that start inside don't count toward picked up", () => {
 	assert.deepEqual([s.toPickUp, s.pickedUp, s.questReady, s.total], [1, 1, true, 2]);
 });
 
+test("breadcrumbs are optional", () => {
+	// 4133 only sends you to 4134's quest giver, who gives 4134 without it.
+	const bd = questGroups([
+		{ id: 4133, title: "Crumb", after: undefined },
+		{ id: 4134, title: "Real", after: 4133 },
+	]);
+	assert.equal(bd.find((g) => g.title === "Crumb")?.breadcrumb, true);
+	const none = memberStatus({ level: 50 }, bd, member({ level: 55 }));
+	assert.deepEqual([none.toPickUp, none.total, none.missing], [1, 1, ["Real"]]);
+	const skipped = memberStatus({ level: 50 }, bd, member({ level: 55, completed: new Set([4134]) }));
+	assert.deepEqual([skipped.questReady, skipped.questsCompleted, skipped.done], [true, true, 1]);
+});
+
 test("extra dungeon quests start inside and have a side", () => {
 	for (const ids of Object.values(EXTRA_DUNGEON_QUESTS)) {
 		for (const id of ids) {

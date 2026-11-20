@@ -298,6 +298,7 @@ export const detail = query({
 			level: g.ids.map((id) => byId.get(id)?.level).find((l) => l),
 			startsInside: g.startsInside,
 			endsInside: g.endsInside,
+			breadcrumb: g.breadcrumb,
 		});
 		// Whole chains: the steps outside the dungeon by title and side as Blizzard has them.
 		const outside = new Map<number, { title: string; faction?: "alliance" | "horde"; level?: number }>();
@@ -321,6 +322,8 @@ export const detail = query({
 						title: g?.title ?? outside.get(s.id)?.title ?? `Quest ${s.id}`,
 						level: g ? row(g).level : (outside.get(s.id)?.level ?? QUEST_LEVELS[s.id]),
 						here: g ? row(g) : undefined,
+						/** Optional: only leads to the next step. */
+						breadcrumb: g ? g.breadcrumb : DUNGEON_QUEST_FACTS[s.id]?.breadcrumb,
 					};
 				}),
 			})),
