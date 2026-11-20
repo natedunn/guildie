@@ -11,7 +11,6 @@ import {
 	SmartPhone01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
-import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ClassText } from "@/components/class-name";
 import { DownloadAppButton } from "@/components/download-app";
@@ -55,10 +54,7 @@ export function DesktopAppSection() {
 							<>
 								<DownloadAppButton size="lg" className="h-10 w-full" />
 								<p className="mt-3 text-center text-xs text-muted-foreground">
-									Free, for Windows, from GitHub Releases.{" "}
-									<Link to="/download" className="underline underline-offset-2 hover:text-foreground">
-										macOS and Linux alpha
-									</Link>
+									Free, for Windows. Early alphas for macOS and Linux.
 								</p>
 							</>
 						)}
@@ -82,7 +78,7 @@ function AppFact({ title, children }: { title: string; children: ReactNode }) {
  * A window with the app in it (scaled down), and the tray menu beside it: a
  * Mac window for Mac visitors, Windows' otherwise.
  */
-function WindowMock() {
+export function WindowMock() {
 	const os = useVisitorOS();
 	const mac = os === "mac";
 	const atLogin = mac || os === "linux" ? "Open at login" : "Start with Windows";

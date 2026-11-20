@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { DownloadAppButton } from "@/components/download-app";
 import { HelperTokens } from "@/components/helper-tokens";
@@ -212,14 +212,7 @@ function GetTheApp() {
 				date, and keeps your character current on Guildie as you play. It updates itself.
 			</p>
 			<DownloadAppButton className="mt-4" />
-			<p className="mt-3 text-muted-foreground">
-				From the latest release on GitHub. The app isn't code-signed yet, so Windows may warn you the first time: the
-				download explains what to do. Early alpha builds for macOS and Linux are on{" "}
-				<Link to="/download" className="text-foreground underline underline-offset-2">
-					the download page
-				</Link>
-				.
-			</p>
+			<p className="mt-3 text-muted-foreground">For Windows, with early alpha builds for macOS and Linux.</p>
 		</section>
 	);
 }

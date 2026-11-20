@@ -6,82 +6,33 @@ import { type ComponentProps, type ReactNode, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DOWNLOADS } from "@/lib/desktop";
 
-// Downloads of the Guildie app. Windows is the beta: every "get the app"
-// button downloads it, after a notice (the installer isn't code-signed yet,
-// so SmartScreen warns). macOS and Linux are alpha builds, offered only on
-// /download, each behind a dialog the visitor has to acknowledge
-// (AlphaDownloadButton).
+// Downloads of the Guildie app. They all live on /download (routes/download.tsx):
+// Windows (the beta) downloads straight away; macOS and Linux are alpha
+// builds behind AlphaDownloadButton's dialog, which the visitor has to
+// acknowledge. Elsewhere, DownloadAppButton just goes to that page.
 
 export const ISSUES = "https://github.com/natedunn/guildie/issues/new/choose";
 
-const popup =
-	"surface-card fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(460px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0";
-const backdrop =
-	"fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0";
-
-/** The Windows app (beta): a notice, then the download. */
+/** "Get the app" anywhere on the site: the download page. */
 export function DownloadAppButton({
 	children,
 	...props
 }: Omit<ComponentProps<typeof Button>, "render" | "nativeButton">) {
-	const [open, setOpen] = useState(false);
 	return (
-		<Dialog.Root open={open} onOpenChange={setOpen}>
-			<Dialog.Trigger
-				render={
-					<Button {...props}>
-						{children ?? (
-							<>
-								<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-								Download for Windows
-							</>
-						)}
-					</Button>
-				}
-			/>
-			<Dialog.Portal>
-				<Dialog.Backdrop className={backdrop} />
-				<Dialog.Popup className={popup}>
-					<Dialog.Title className="text-[15px] font-semibold">Guildie for Windows is in beta</Dialog.Title>
-					<Dialog.Description render={<div />} className="mt-2 space-y-2.5 text-pretty text-muted-foreground">
-						<p>
-							The app isn't code-signed yet, so when you run the installer Windows may show{" "}
-							<Em>"Windows protected your PC"</Em>. To install anyway, choose <Em>More info</Em>, then{" "}
-							<Em>Run anyway</Em>.
-						</p>
-						<p>We're working on signing the app so this warning goes away.</p>
-						<p>It's a beta, so you may also run into bugs or rough edges.</p>
-					</Dialog.Description>
-					<p className="mt-4 text-xs text-muted-foreground">
-						By downloading, you agree that you've read and acknowledge the notice above.
-					</p>
-					<div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-						<Link
-							to="/download"
-							onClick={() => setOpen(false)}
-							className="mr-auto text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-						>
-							macOS or Linux?
-						</Link>
-						<Dialog.Close render={<Button variant="outline" />}>Cancel</Dialog.Close>
-						<Button
-							nativeButton={false}
-							render={<a href={DOWNLOADS.win.href} target="_blank" rel="noreferrer" />}
-							onClick={() => setOpen(false)}
-						>
-							<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-							Download
-						</Button>
-					</div>
-				</Dialog.Popup>
-			</Dialog.Portal>
-		</Dialog.Root>
+		<Button nativeButton={false} render={<Link to="/download" />} {...props}>
+			{children ?? (
+				<>
+					<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
+					Download the app
+				</>
+			)}
+		</Button>
 	);
 }
 
 /**
- * The macOS or Linux alpha: a dialog listing what's likely to go wrong, and
- * the download only once the visitor ticks that they understand.
+ * The macOS or Linux alpha: a dialog with what's likely to go wrong, and the
+ * download only once the visitor ticks that they understand.
  */
 export function AlphaDownloadButton({
 	os,
@@ -102,13 +53,13 @@ export function AlphaDownloadButton({
 				render={
 					<Button variant="outline" {...props}>
 						<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-						Download the {name} alpha
+						Download alpha
 					</Button>
 				}
 			/>
 			<Dialog.Portal>
-				<Dialog.Backdrop className={backdrop} />
-				<Dialog.Popup className={popup}>
+				<Dialog.Backdrop className="fixed inset-0 z-40 bg-black/50 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0" />
+				<Dialog.Popup className="surface-card fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[min(460px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto bg-background p-5 text-[0.8125rem] shadow-[var(--popover-shadow)] transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
 					<Dialog.Title className="text-[15px] font-semibold">Guildie for {name} is an early alpha</Dialog.Title>
 					<Dialog.Description render={<div />} className="mt-2 space-y-2.5 text-pretty text-muted-foreground">
 						<p>
@@ -164,7 +115,7 @@ export function AlphaDownloadButton({
 }
 
 /** What's likely to go wrong on each alpha, and how to install it anyway. */
-export function AlphaRisks({ os }: { os: "mac" | "linux" }) {
+function AlphaRisks({ os }: { os: "mac" | "linux" }) {
 	if (os === "mac")
 		return (
 			<ul className="list-disc space-y-1.5 pl-4">
@@ -177,7 +128,7 @@ export function AlphaRisks({ os }: { os: "mac" | "linux" }) {
 					Because it's unsigned, macOS may ask again for your keychain (to keep you signed in) and for Screen Recording
 					(live sync) after every update, and may stop live sync until you allow it again.
 				</li>
-				<li>Updating itself only works from Applications, and is new: if an update fails, download it again here.</li>
+				<li>Updating itself only works from Applications, and is new: if an update fails, download it again.</li>
 				<li>Finding your WoW folder, uploading and the addon's install haven't been tried with the game on a Mac.</li>
 			</ul>
 		);

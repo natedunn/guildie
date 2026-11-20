@@ -54,7 +54,7 @@ export const RELEASES = "https://github.com/natedunn/guildie/releases/latest";
  * name, so it links the release page; macOS and Linux have stable names.
  */
 export const DOWNLOADS: Record<DesktopPlatform, { name: string; href: string; file: string }> = {
-	win: { name: "Windows", href: RELEASES, file: "Guildie-Setup.exe" },
+	win: { name: "Windows", href: `${RELEASES}/download/Guildie-Setup.exe`, file: "Guildie-Setup.exe" },
 	mac: {
 		name: "macOS",
 		href: `${RELEASES}/download/Guildie-mac-universal.dmg`,
