@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.49
+
 ### Improvements
 
 - **Addon:** Reagent tooltips also list your own characters who would level with it: "You" for the one you're playing, and your alts by name. Turn it off in the Guildie window under Display ("Show your characters on reagents").
