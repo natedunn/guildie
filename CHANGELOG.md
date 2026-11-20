@@ -17,6 +17,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Fixes
 
+- **Guildie, App:** Characters you deleted no longer bring back the "not claimed" notification every time the app starts. Guildie recognizes characters that have left your Battle.net account and stops asking about them. If one still shows up, Settings → Account lists it under "The addon also saw", where you can forget it (clicking the notification takes you there).
 - **Guildie:** Item tooltips and upgrade suggestions catch up when a hotfix changes an item's stats or binding (like November's Soulforge armor and caster staves). Before, an item kept what it had when Guildie first saw it.
 
 ### Improvements

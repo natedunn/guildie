@@ -270,6 +270,24 @@ export default defineSchema({
 		addedAt: v.number(),
 	}).index("by_user", ["userId", "recipeId"]),
 
+	/**
+	 * Characters the addon uploads that the player hasn't claimed, while
+	 * they're worth asking about (unclaimed.ts): Settings → Account lists them
+	 * to refresh or forget. `forgotten`: the player said it's gone (deleted, or
+	 * not theirs); uploads skip it quietly, and a claim still wins.
+	 */
+	unclaimedCharacters: defineTable({
+		userId: v.id("users"),
+		/** From the in-game GUID; the same id Battle.net's account list has. */
+		blizzardId: v.number(),
+		name: v.string(),
+		classId: v.optional(v.number()),
+		level: v.optional(v.number()),
+		/** ms: the addon's last capture of it, i.e. when it was last played. */
+		lastPlayedAt: v.number(),
+		forgotten: v.optional(v.boolean()),
+	}).index("by_user", ["userId", "blizzardId"]),
+
 	/** Characters a person proved they own, via Battle.net's account profile. */
 	ownedCharacters: defineTable({
 		userId: v.id("users"),

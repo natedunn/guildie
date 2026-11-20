@@ -10,6 +10,34 @@
 
 export const PAYLOAD_VERSIONS = [1, 2, 3, 4, 5, 6, 7] as const;
 
+/**
+ * Past this, an unclaimed character the addon still uploads isn't named back
+ * as "not claimed yet" (the fallback in noticeUnclaimed).
+ */
+export const UNCLAIMED_NOTICE_MS = 14 * 24 * 60 * 60_000;
+
+/**
+ * Whether an upload should tell the player an unclaimed character is "not
+ * claimed yet". The addon keeps every character it ever saw, so a deleted one
+ * rides along in every upload, its last capture frozen. Claiming reads the
+ * whole Battle.net account (claims.save), so a character last played before
+ * the latest claim yet missing from it has left the account: deleted, or on
+ * another account, and claiming again wouldn't help. Without a claim since,
+ * one not played for a while is most likely deleted too.
+ */
+export const noticeUnclaimed = (capturedAt: number, lastClaimAt: number | undefined, now: number) =>
+	(lastClaimAt === undefined || capturedAt > lastClaimAt) && now - capturedAt <= UNCLAIMED_NOTICE_MS;
+
+/** When the account's character list was last read: each claim rewrites every claimed row (claims.save). */
+export const lastClaimAt = (owned: { claimedAt: number }[]) =>
+	owned.length ? Math.max(...owned.map((o) => o.claimedAt)) : undefined;
+
+/** In-game GUID "Player-1234-0ABC" -> Blizzard's character id. */
+export function blizzardIdFromGuid(guid: string) {
+	const hex = guid.match(/^Player-\d+-([0-9A-Fa-f]+)$/)?.[1];
+	return hex ? Number.parseInt(hex, 16) : undefined;
+}
+
 export const LIMITS = {
 	characters: 50,
 	talents: 120,
