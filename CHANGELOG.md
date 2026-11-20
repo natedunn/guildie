@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.48
+
 ### Fixes
 
 - **Guildie, App:** Characters you deleted no longer bring back the "not claimed" notification every time the app starts. Guildie recognizes characters that have left your Battle.net account and stops asking about them. If one still shows up, Settings → Account lists it under "The addon also saw", where you can forget it (clicking the notification takes you there).
