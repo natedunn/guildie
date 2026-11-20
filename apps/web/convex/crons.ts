@@ -19,6 +19,9 @@ crons.daily("prune notifications", { hourUTC: 8, minuteUTC: 45 }, internal.notif
 
 crons.daily("backfill item names and icons", { hourUTC: 10, minuteUTC: 30 }, internal.items.backfill, {});
 
+// Items saved over a month ago, looked up again so hotfixes reach them (items.ts).
+crons.daily("refresh old items", { hourUTC: 10, minuteUTC: 45 }, internal.items.refreshStale, {});
+
 crons.daily("backfill quest titles", { hourUTC: 11, minuteUTC: 0 }, internal.quests.backfill, {});
 
 crons.weekly(

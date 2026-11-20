@@ -584,6 +584,8 @@ export default defineSchema({
 		syncedAt: v.number(),
 	})
 		.index("by_itemId", ["itemId"])
+		// The daily refresh, oldest first (items.refreshStale).
+		.index("by_syncedAt", ["syncedAt"])
 		// Requests → "what do you need?" search.
 		.searchIndex("search_name", { searchField: "name" })
 		// Omni search (search.ts).
