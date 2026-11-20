@@ -1,4 +1,4 @@
-import { ArrowRight01Icon, Download04Icon } from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { CSSProperties } from "react";
 import { DownloadAppButton } from "@/components/download-app";
@@ -40,19 +40,14 @@ export function Hero() {
 					className="landing-enter mt-6 max-w-[38rem] text-base leading-relaxed text-pretty text-muted-foreground sm:text-lg"
 				>
 					Guildie keeps your guild's roster, gear, talents and crafters current, then tells you who an item is for, who
-					can make it, and who's ready for which dungeon. On the web, in a Windows app, and on your tooltips in game.
+					can make it, and who's ready for which dungeon. On the web, in a desktop app, and on your tooltips in game.
 				</p>
 				<div
 					style={delay(240)}
 					className="landing-enter mt-9 flex flex-wrap items-start justify-center gap-3 [&>span]:items-center [&>span]:text-center"
 				>
 					<SignInButton className="h-10 px-5" />
-					{!inApp && (
-						<DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5">
-							<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-							Get the Windows app
-						</DownloadAppButton>
-					)}
+					{!inApp && <DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5" />}
 				</div>
 			</div>
 

@@ -1,7 +1,7 @@
 // Bundles the main process and the preload into dist/ (one file each, so the
-// packaged app ships no node_modules), and copies the icons from assets/
-// (drawn by scripts/make-icon.py).
-import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+// packaged app ships no node_modules), and copies assets/ (the app icons drawn
+// by scripts/make-icon.py, the tray icons) into dist/assets as a whole.
+import { cpSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -24,8 +24,7 @@ await build({ ...common, entryPoints: [join(root, "src/main.ts")], outfile: join
 // The preload runs sandboxed: it may only require("electron").
 await build({ ...common, entryPoints: [join(root, "src/preload.ts")], outfile: join(root, "dist/preload.cjs") });
 
-mkdirSync(join(root, "dist/assets"), { recursive: true });
-for (const icon of ["guildie.ico", "guildie-256.png"]) {
-	copyFileSync(join(root, "assets", icon), join(root, "dist/assets", icon));
-}
+// Whole, so an icon removed from assets/ doesn't linger in dist/.
+rmSync(join(root, "dist/assets"), { recursive: true, force: true });
+cpSync(join(root, "assets"), join(root, "dist/assets"), { recursive: true });
 console.log(`Built Guildie ${version} into dist/`);

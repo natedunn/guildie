@@ -9,9 +9,9 @@ import { REPO } from "./primitives";
 // The landing page's own nav and footer (it has no sidebar).
 
 const NAV = [
-	{ href: "#features", label: "Features" },
-	{ href: "#app", label: "Windows app" },
-	{ href: "#open-source", label: "Open source" },
+	{ href: "/#features", label: "Features" },
+	{ href: "/#app", label: "Desktop app" },
+	{ href: "/#open-source", label: "Open source" },
 ];
 
 export function LandingNav() {
@@ -62,10 +62,11 @@ export function LandingFooter() {
 					</p>
 				</div>
 				<FooterColumn title="Product">
-					<FooterLink href="#features">Features</FooterLink>
-					<FooterLink href="#addon">In-game addon</FooterLink>
-					{!inApp && <FooterLink href="#app">Windows app</FooterLink>}
-					<FooterLink href="#ai">AI apps</FooterLink>
+					<FooterLink href="/#features">Features</FooterLink>
+					<FooterLink href="/#addon">In-game addon</FooterLink>
+					{!inApp && <FooterLink href="/#app">Desktop app</FooterLink>}
+					{!inApp && <FooterLink href="/download">Download</FooterLink>}
+					<FooterLink href="/#ai">AI apps</FooterLink>
 				</FooterColumn>
 				<FooterColumn title="Open source">
 					<FooterLink href={REPO} external>

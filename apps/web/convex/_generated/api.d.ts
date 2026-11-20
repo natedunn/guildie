@@ -63,6 +63,7 @@ import type * as shared_questLevels from "../shared/questLevels.js";
 import type * as shared_quests from "../shared/quests.js";
 import type * as shared_reactions from "../shared/reactions.js";
 import type * as shared_recipeResearch from "../shared/recipeResearch.js";
+import type * as shared_recipeSkills from "../shared/recipeSkills.js";
 import type * as shared_recipeStatus from "../shared/recipeStatus.js";
 import type * as shared_requests from "../shared/requests.js";
 import type * as shared_search from "../shared/search.js";
@@ -142,6 +143,7 @@ declare const fullApi: ApiFromModules<{
   "shared/quests": typeof shared_quests;
   "shared/reactions": typeof shared_reactions;
   "shared/recipeResearch": typeof shared_recipeResearch;
+  "shared/recipeSkills": typeof shared_recipeSkills;
   "shared/recipeStatus": typeof shared_recipeStatus;
   "shared/requests": typeof shared_requests;
   "shared/search": typeof shared_search;

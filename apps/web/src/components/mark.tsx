@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 /**
  * Guildie's shield in its gold gradient: the sidebar's wordmark, the landing
  * page's app mock, and the same as the app icons (icons/mark.svg; favicon,
- * PWA icons and the Windows app's icon render it too).
+ * PWA icons and the desktop app's icon render it too).
  */
 export function GuildieMark({ className }: { className?: string }) {
 	// Each copy on the page needs its own gradient id.

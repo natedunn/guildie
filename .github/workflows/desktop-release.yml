@@ -1,12 +1,13 @@
 name: Desktop release
 
-# Builds the Windows installer and publishes it, with latest.yml (what the
-# installed app checks for updates, apps/desktop/src/updater.ts), as the
-# GitHub Release for the tag. Cut one by bumping apps/desktop/package.json
-# and pushing the tag desktop-v<that version> (apps/desktop/README.md).
+# Builds the app for Windows, macOS and Linux and publishes them, with the
+# update manifests installed apps check (latest.yml, latest-mac.yml,
+# latest-linux.yml; apps/desktop/src/updater.ts), as the GitHub Release for the
+# tag. Cut one by bumping apps/desktop/package.json and pushing the tag
+# desktop-v<that version> (apps/desktop/README.md).
 #
 # Run by hand on a tag, it publishes that tag; on a branch, it only builds and
-# keeps the installer as a workflow artifact (a test build, never published).
+# keeps the three builds as workflow artifacts (test builds, never published).
 on:
   push:
     tags:
@@ -17,7 +18,46 @@ concurrency:
   group: desktop-release-${{ github.ref }}
 
 jobs:
+  # Once, before any build: check the tag and make the release the three
+  # builds upload into. electron-builder's uploads each create a release when
+  # none exists, and parallel ones split 0.3.0 into two; with three platforms
+  # in parallel that would happen every time.
   release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag matches the app's version
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          echo "Guildie $version"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "desktop-v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match apps/desktop/package.json ($version): expected desktop-v$version"
+            exit 1
+          fi
+
+      # The release desktop-v<version>: a normal one, not a draft
+      # (electron-builder.yml publish.releaseType), and the repo's Latest,
+      # which is the only one installed apps look at.
+      - name: Create the release
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          # The notes are this version's section of CHANGELOG.md (also what the app shows).
+          awk -v v="## $version" '$0==v{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no '## $version' section"; exit 1; }
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$version" --notes-file notes.md --latest
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows:
+    needs: release
     runs-on: windows-latest
     permissions:
       contents: write
@@ -33,15 +73,6 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-
-      - name: Tag matches the app's version
-        run: |
-          version=$(node -p "require('./apps/desktop/package.json').version")
-          echo "Guildie $version"
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "desktop-v$version" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME doesn't match apps/desktop/package.json ($version): expected desktop-v$version"
-            exit 1
-          fi
 
       # Only the app and what it uses (packages/sync), not the website.
       - run: pnpm install --frozen-lockfile --filter "@guildie/desktop..."
@@ -60,29 +91,22 @@ jobs:
           apps/desktop/capture/dist/GuildieCapture/GuildieCapture.exe --help
           apps/desktop/capture/dist/GuildieCapture/GuildieCapture.exe --auto --parent-pid 4294967295
 
-      # Creates the release desktop-v<version> (a normal one, not a draft:
-      # electron-builder.yml publish.releaseType) and uploads the installer,
-      # its .blockmap and latest.yml.
-      # Make the release before electron-builder uploads: its parallel uploads
-      # each create one when none exists, which split 0.3.0 into two releases.
-      - name: Create the release
-        if: github.ref_type == 'tag'
-        run: |
-          version=$(node -p "require('./apps/desktop/package.json').version")
-          # The notes are this version's section of CHANGELOG.md (also what the app shows).
-          awk -v v="## $version" '$0==v{on=1;next} /^## /{on=0} on' CHANGELOG.md > notes.md
-          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no '## $version' section"; exit 1; }
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
-          else
-            gh release create "$GITHUB_REF_NAME" --title "$version" --notes-file notes.md --latest
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      # Uploads the installer, its .blockmap and latest.yml into the release.
       - name: Build and publish
         if: github.ref_type == 'tag'
         run: pnpm --filter @guildie/desktop release:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same installer as Guildie-Setup.exe, so the site can link
+      # releases/latest/download/Guildie-Setup.exe. Updates never use it
+      # (latest.yml names the versioned one).
+      - name: Publish the installer under a fixed name
+        if: github.ref_type == 'tag'
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          cp "apps/desktop/release/Guildie-Setup-$version.exe" apps/desktop/release/Guildie-Setup.exe
+          gh release upload "$GITHUB_REF_NAME" apps/desktop/release/Guildie-Setup.exe --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -97,4 +121,143 @@ jobs:
           path: |
             apps/desktop/release/*.exe
             apps/desktop/release/*.zip
+          if-no-files-found: error
+
+  # One universal app (Apple Silicon and Intel). Unsigned (ad-hoc) until the
+  # MAC_CSC_LINK, MAC_CSC_KEY_PASSWORD and APPLE_API_* secrets exist; then
+  # signed with the Developer ID and notarized, with no code change
+  # (apps/desktop/scripts/package.mjs, README.md "Signing the macOS app").
+  mac:
+    needs: release
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter "@guildie/desktop..."
+
+      - run: pnpm --filter @guildie/desktop check
+      - run: pnpm --filter @guildie/desktop test
+
+      # notarytool wants the App Store Connect key as a file.
+      - name: Notarization key (only when the secret exists)
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          if [ -n "$APPLE_API_KEY_P8" ]; then
+            printf '%s\n' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
+            echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
+          fi
+
+      # Built without publishing, checked, then uploaded: a build that fails
+      # its smoke test never reaches the release.
+      - name: Build
+        run: pnpm --filter @guildie/desktop build:mac
+        env:
+          # Empty (no secret) means ad-hoc signed.
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
+      - name: Check the app
+        run: |
+          app=apps/desktop/release/mac-universal/Guildie.app
+          test -f "$app/Contents/Resources/addon/Guildie/Guildie.toc"
+          lipo -archs "$app/Contents/MacOS/Guildie"
+          codesign --verify --deep --strict "$app"
+          codesign -dv "$app" 2>&1 | grep -E "Signature|Authority|TeamIdentifier" || true
+          for f in Guildie-mac-universal.dmg Guildie-mac-universal.zip latest-mac.yml; do test -f "apps/desktop/release/$f"; done
+
+      # The packaged app itself, against the live site.
+      - name: Smoke test
+        timeout-minutes: 5
+        run: apps/desktop/release/mac-universal/Guildie.app/Contents/MacOS/Guildie --smoke-test --url https://guildie.club
+
+      - name: Publish
+        if: github.ref_type == 'tag'
+        working-directory: apps/desktop/release
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber \
+            Guildie-mac-universal.dmg Guildie-mac-universal.zip Guildie-mac-universal.zip.blockmap latest-mac.yml
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
+        with:
+          name: guildie-desktop-mac
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+          if-no-files-found: error
+
+  # An x86_64 AppImage, which updates itself (latest-linux.yml).
+  linux:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile --filter "@guildie/desktop..."
+
+      - run: pnpm --filter @guildie/desktop check
+      - run: pnpm --filter @guildie/desktop test
+
+      - name: Build
+        run: pnpm --filter @guildie/desktop build:linux
+
+      - name: Check the AppImage
+        run: |
+          cd apps/desktop/release
+          test -f linux-unpacked/resources/addon/Guildie/Guildie.toc
+          test -f Guildie-linux-x86_64.AppImage
+          test -f latest-linux.yml
+          cat latest-linux.yml
+
+      # Ubuntu 24.04 keeps unprivileged apps from making user namespaces,
+      # which Chromium's sandbox needs; allow it on this runner rather than
+      # turning the sandbox off. The AppImage runs extracted (no FUSE here),
+      # in a virtual display.
+      - name: Smoke test
+        timeout-minutes: 5
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+          chmod +x apps/desktop/release/Guildie-linux-x86_64.AppImage
+          xvfb-run --auto-servernum apps/desktop/release/Guildie-linux-x86_64.AppImage --appimage-extract-and-run --smoke-test --url https://guildie.club
+
+      - name: Publish
+        if: github.ref_type == 'tag'
+        working-directory: apps/desktop/release
+        run: |
+          gh release upload "$GITHUB_REF_NAME" --clobber Guildie-linux-x86_64.AppImage latest-linux.yml
+          # electron-updater uses the blockmap for smaller downloads when there is one.
+          if [ -f Guildie-linux-x86_64.AppImage.blockmap ]; then
+            gh release upload "$GITHUB_REF_NAME" --clobber Guildie-linux-x86_64.AppImage.blockmap
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
+        with:
+          name: guildie-desktop-linux
+          path: apps/desktop/release/*.AppImage
           if-no-files-found: error

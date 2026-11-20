@@ -5,7 +5,16 @@ import { OpenSourceNote } from "@/components/open-source-note";
 import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { type AddonInfo, type DesktopStatus, desktop, RELEASES, useInDesktopApp } from "@/lib/desktop";
+import {
+	type AddonInfo,
+	type DesktopPlatform,
+	type DesktopStatus,
+	DOWNLOADS,
+	desktop,
+	RELEASES,
+	useDesktopPlatform,
+	useInDesktopApp,
+} from "@/lib/desktop";
 import { ago } from "@/lib/format";
 import { compareVersions } from "@/lib/versions";
 
@@ -36,8 +45,8 @@ function GetTheApp() {
 			<SectionTitle>The Guildie addon</SectionTitle>
 			<p className="mt-1 text-muted-foreground">
 				The Guildie addon shows who in your guild might want an item, right in its tooltip, and keeps your character
-				current on Guildie as you play. It works through the Guildie app for Windows, which installs the addon, keeps it
-				up to date and moves its data.
+				current on Guildie as you play. It works through the Guildie app for Windows, macOS or Linux, which installs the
+				addon, keeps it up to date and moves its data.
 			</p>
 			<Button className="mt-4" render={<Link to="/settings/app" />}>
 				Get the Guildie app
@@ -92,6 +101,7 @@ function ManageAddon() {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const app = desktop();
+	const platform = useDesktopPlatform() ?? "win";
 	const run = async (action: () => Promise<AddonInfo | void> | undefined) => {
 		setBusy(true);
 		setError(null);
@@ -151,7 +161,9 @@ function ManageAddon() {
 						</p>
 						<p className="mt-3" role="status">
 							{!status?.livePixelsAvailable
-								? "Requires a Windows build with live capture installed."
+								? platform === "win"
+									? "Requires a Windows build with live capture installed."
+									: `Not available on ${DOWNLOADS[platform].name} yet. Normal sync works.`
 								: !status.livePixelsEnabled
 									? "Capture off. Normal sync remains available."
 									: !status.connected
@@ -252,6 +264,9 @@ function ManageAddon() {
 				<Button className="mt-3" variant="outline" disabled={busy} onClick={() => run(() => app?.chooseWowFolder?.())}>
 					Choose folder…
 				</Button>
+				{(!info.wowFolder || !info.hasForever) && (
+					<p className="mt-3 text-[0.8125rem] text-pretty text-muted-foreground">{WOW_FOLDER_HINT[platform]}</p>
+				)}
 			</section>
 
 			<section id="sync" className="mt-10 scroll-mt-4">
@@ -341,6 +356,26 @@ function UninstallButton({
 		</Dialog.Root>
 	);
 }
+
+/** Where World of Warcraft usually is (the folder with _forever_ in it). */
+const WOW_FOLDER_HINT: Record<DesktopPlatform, ReactNode> = {
+	win: (
+		<>
+			Usually <span className="font-mono text-foreground">C:\Program Files (x86)\World of Warcraft</span>.
+		</>
+	),
+	mac: (
+		<>
+			Usually <span className="font-mono text-foreground">/Applications/World of Warcraft</span>.
+		</>
+	),
+	linux: (
+		<>
+			The World of Warcraft folder inside your Wine, Lutris, Bottles or Steam prefix, usually ending in{" "}
+			<span className="font-mono break-all text-foreground">drive_c/Program Files (x86)/World of Warcraft</span>.
+		</>
+	),
+};
 
 export function Rows({ children }: { children: ReactNode }) {
 	return <dl className="surface-card mt-2 divide-y divide-border text-[0.8125rem]">{children}</dl>;

@@ -1,6 +1,6 @@
 # Changelog
 
-What changed in each release of the Guildie app for Windows, at a glance. Most
+What changed in each release of the Guildie app (Windows, macOS and Linux), at a glance. Most
 of Guildie is the website, which the app shows, so a release also lists what
 changed on the site since the last one. The release workflow uses the section
 for its version as the GitHub release notes, and the app shows them under
@@ -9,11 +9,15 @@ Settings → App.
 Each pull request adds a line under `## Unreleased` (in `### New`,
 `### Improvements` or `### Fixes`), written for players and starting with
 where you'll see the change: `**Guildie:**` (the site, in a browser or in the
-app's window), `**App:**` (the Windows app itself: installing, updating, the
+app's window), `**App:**` (the desktop app itself: installing, updating, the
 tray, uploads) or `**Addon:**` (in game), or several, e.g. `**Guildie, App:**`.
 CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
+
+### New
+
+- **Guildie, App:** Early alpha builds of the Guildie app for macOS and Linux, on a new Download page with all three systems. They're unfinished and untested with WoW, so each one explains what's likely to go wrong and asks you to confirm before downloading. The Mac build isn't signed by Apple yet. Windows stays the one to use.
 
 ## 0.3.49
 

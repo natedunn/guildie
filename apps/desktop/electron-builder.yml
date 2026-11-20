@@ -1,6 +1,9 @@
 # electron-builder: pnpm --filter @guildie/desktop build:win (on Windows) or
-# build:win-cross (from macOS, no wine). Output in apps/desktop/release.
-# Releases: .github/workflows/desktop-release.yml (README.md, "Releasing").
+# build:win-cross (from macOS, no wine), build:mac (on a Mac), build:linux.
+# Output in apps/desktop/release. Releases:
+# .github/workflows/desktop-release.yml (README.md, "Releasing"). The asset
+# names are fixed: the site links them
+# (releases/latest/download/<name>), so don't rename them.
 appId: club.guildie.desktop
 productName: Guildie
 copyright: Guildie
@@ -10,6 +13,10 @@ directories:
 files:
   - dist/**/*
   - "!dist/**/*.map"
+  # The packages' own icons (electron-builder reads them from assets/), not
+  # needed at runtime.
+  - "!dist/assets/linux"
+  - "!dist/assets/*.icns"
   - package.json
 asar: true
 extraMetadata:
@@ -17,15 +24,15 @@ extraMetadata:
   # The installer's folder name (%LOCALAPPDATA%\Programs\guildie); the
   # workspace name, @guildie/desktop, would make it "@guildiedesktop".
   name: guildie
+  # Linux: the .desktop file's name, Electron's Wayland app_id and the
+  # entry's StartupWMClass (linux.syncDesktopName), so the dock groups the
+  # window with its launcher.
+  desktopName: guildie.desktop
 # The addon the app installs into WoW (src/addon.ts reads it from
-# resources/addon/Guildie). GuildieData.lua is the app's to write, per player.
+# resources/addon/Guildie: Guildie.app/Contents/Resources/addon/Guildie on
+# macOS, inside the AppImage on Linux), on every OS. GuildieData.lua is the
+# app's to write, per player. Each platform's own extraResources add to this.
 extraResources:
-  # koffi's Windows binary, for hiding Windows 11's accent-color window border
-  # (src/window-border.ts). koffi looks for it in resources/koffi/<platform>.
-  - from: node_modules/koffi/build/koffi/win32_x64
-    to: koffi/win32_x64
-    filter:
-      - koffi.node
   - from: ../addon/Guildie
     to: addon/Guildie
     filter:
@@ -43,6 +50,12 @@ publish:
   releaseType: release
 win:
   extraResources:
+    # koffi's Windows binary, for hiding Windows 11's accent-color window border
+    # (src/window-border.ts). koffi looks for it in resources/koffi/<platform>.
+    - from: node_modules/koffi/build/koffi/win32_x64
+      to: koffi/win32_x64
+      filter:
+        - koffi.node
     # Explorer cannot load a taskbar group icon from inside app.asar.
     - from: assets/guildie.ico
       to: guildie.ico
@@ -70,6 +83,36 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: Guildie
   artifactName: Guildie-Setup-${version}.${ext}
+# macOS: one universal app (Apple Silicon and Intel). The dmg is the
+# download; the zip is what installed apps update from (src/mac-updater.ts,
+# via latest-mac.yml). Signing is decided by scripts/package.mjs: ad-hoc
+# without a certificate (today), Developer ID + notarized once the CSC_LINK and
+# APPLE_API_* secrets exist. The settings here are the signed ones.
 mac:
-  target: dir
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+  icon: assets/guildie.icns
   category: public.app-category.games
+  artifactName: Guildie-mac-${arch}.${ext}
+  hardenedRuntime: true
+  # Electron 45's floor.
+  minimumSystemVersion: "12.0"
+dmg:
+  artifactName: Guildie-mac-${arch}.${ext}
+  # A disk image only to drag the app out of: the app updates itself after.
+  writeUpdateInfo: false
+# Linux: an AppImage, which updates itself (electron-updater's
+# AppImageUpdater, via latest-linux.yml). One file, no install.
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  icon: assets/linux
+  category: Game
+  synopsis: Your WoW Forever guild, and the Guildie addon kept up to date
+  description: Guildie in its own window. Installs and updates the Guildie addon, uploads what it saves in game and downloads your guild's data for its tooltips.
+  syncDesktopName: true
+  artifactName: Guildie-linux-x86_64.${ext}

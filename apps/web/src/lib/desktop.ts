@@ -1,6 +1,7 @@
 import { useRouteContext } from "@tanstack/react-router";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
+import { type DesktopPlatform, parseDesktopUserAgent, type VisitorOS, visitorOS } from "./platform";
 
 // The Guildie desktop app loads this site in its window and exposes this
 // bridge (Electron contextBridge) on our own origins only. The site gives it
@@ -102,18 +103,8 @@ declare global {
 	}
 }
 
-/**
- * What the desktop app says about itself in its user agent: the window appends
- * " GuildieDesktop/<version>", plus " (Mica)" when the window has Windows 11's
- * Mica behind it (apps/desktop/src/window.ts). Read on the server too, so the
- * first paint already has the app's layout (html[data-desktop]).
- */
-export type DesktopInfo = { version: string; mica: boolean };
-
-export function parseDesktopUserAgent(ua: string | null | undefined): DesktopInfo | null {
-	const match = /\bGuildieDesktop\/([\w.+-]+)( \(Mica\))?/.exec(ua ?? "");
-	return match ? { version: match[1], mica: !!match[2] } : null;
-}
+export type { DesktopInfo, DesktopPlatform, VisitorOS } from "./platform";
+export { DOWNLOADS, parseDesktopUserAgent, RELEASES } from "./platform";
 
 /** The current request's (server) or the window's (client) desktop app, if any. */
 export const readDesktopInfo = createIsomorphicFn()
@@ -153,5 +144,27 @@ export function useDesktopStatus() {
 	return status;
 }
 
-/** Where the Guildie app's installer is (GitHub Releases; the app updates itself from there too). */
-export const RELEASES = "https://github.com/natedunn/guildie/releases/latest";
+/**
+ * The system the desktop app runs on, or null outside it. From the user
+ * agent, so the server render knows it too; app builds before 0.2 (no user
+ * agent, bridge only) were Windows-only.
+ */
+export function useDesktopPlatform(): DesktopPlatform | null {
+	const fromAgent = useRouteContext({ from: "__root__", select: (c) => c.desktop?.platform ?? null });
+	const inApp = useInDesktopApp();
+	return fromAgent ?? (inApp ? "win" : null);
+}
+
+/**
+ * The visitor's system, to offer the right download: null until mounted (the
+ * server can't tell), then the browser's answer. Inside the app, its own.
+ */
+export function useVisitorOS(): VisitorOS | null {
+	const app = useDesktopPlatform();
+	const [os, setOs] = useState<VisitorOS | null>(null);
+	useEffect(
+		() => setOs(visitorOS(navigator as Navigator & { userAgentData?: { platform?: string; mobile?: boolean } })),
+		[],
+	);
+	return app ?? os;
+}

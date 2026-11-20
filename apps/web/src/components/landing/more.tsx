@@ -2,7 +2,6 @@ import { CLASSES } from "@convex/shared/wow";
 import {
 	Activity01Icon,
 	AiChat02Icon,
-	Download04Icon,
 	GithubIcon,
 	MoneyBag01Icon,
 	ScrollTextIcon,
@@ -18,21 +17,21 @@ import { DownloadAppButton } from "@/components/download-app";
 import { ItemIcon } from "@/components/item";
 import { SignInButton } from "@/components/sign-in-button";
 import { Button } from "@/components/ui/button";
-import { useInDesktopApp } from "@/lib/desktop";
+import { useInDesktopApp, useVisitorOS } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 import { AppMock } from "./app-mock";
 import { Card, Eyebrow, icon, Name, REPO, Section, SectionHead } from "./primitives";
 
-// The rest of the landing page: the Windows app, AI apps, a grid of smaller
+// The rest of the landing page: the desktop app, AI apps, a grid of smaller
 // features, open source, and a last call to sign in.
 
-// ---- 6. The Windows app ----------------------------------------------------------------
+// ---- 6. The desktop app -----------------------------------------------------------------
 
-export function WindowsAppSection() {
+export function DesktopAppSection() {
 	const inApp = useInDesktopApp();
 	return (
 		<Section id="app" className="pt-28 sm:pt-36">
-			<SectionHead eyebrow="Guildie for Windows" color="#3fc7eb" title="The companion app">
+			<SectionHead eyebrow="Guildie app" color="#3fc7eb" title="The companion app">
 				Blizzard updates a character only when they log out, and never sees bags or banks. The app fills that in: it
 				uploads what the addon saves in game, so your guild sees your changes after a /reload. And it's Guildie in its
 				own window.
@@ -53,11 +52,10 @@ export function WindowsAppSection() {
 							<p className="text-[0.8125rem] text-muted-foreground">You're in it. Sign in to connect it.</p>
 						) : (
 							<>
-								<DownloadAppButton size="lg" className="h-10 w-full">
-									<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-									Guildie for Windows
-								</DownloadAppButton>
-								<p className="mt-3 text-center text-xs text-muted-foreground">Free, from GitHub Releases</p>
+								<DownloadAppButton size="lg" className="h-10 w-full" />
+								<p className="mt-3 text-center text-xs text-muted-foreground">
+									Free, for Windows. Early alphas for macOS and Linux.
+								</p>
 							</>
 						)}
 					</Card>
@@ -76,21 +74,36 @@ function AppFact({ title, children }: { title: string; children: ReactNode }) {
 	);
 }
 
-/** A Windows window with the app in it (scaled down), and the tray menu beside it. */
-function WindowMock() {
+/**
+ * A window with the app in it (scaled down), and the tray menu beside it: a
+ * Mac window for Mac visitors, Windows' otherwise.
+ */
+export function WindowMock() {
+	const os = useVisitorOS();
+	const mac = os === "mac";
+	const atLogin = mac || os === "linux" ? "Open at login" : "Start with Windows";
 	return (
 		<div className="relative pb-10 sm:pb-0" aria-hidden>
 			<div className="landing-frame hairline overflow-hidden">
-				<div className="flex h-8 items-center justify-end border-b border-border bg-chrome text-muted-foreground">
-					{/* minimize / maximize / close, as Windows draws them */}
-					<span className="grid h-full w-11 place-items-center">
-						<span className="h-px w-2.5 bg-current" />
-					</span>
-					<span className="grid h-full w-11 place-items-center">
-						<span className="size-2.5 border border-current" />
-					</span>
-					<span className="grid h-full w-11 place-items-center text-sm leading-none">✕</span>
-				</div>
+				{mac ? (
+					<div className="flex h-8 items-center gap-2 border-b border-border bg-chrome px-3">
+						{/* the traffic lights, in grey like an inactive window's */}
+						<span className="size-3 rounded-full bg-white/15" />
+						<span className="size-3 rounded-full bg-white/15" />
+						<span className="size-3 rounded-full bg-white/15" />
+					</div>
+				) : (
+					<div className="flex h-8 items-center justify-end border-b border-border bg-chrome text-muted-foreground">
+						{/* minimize / maximize / close, as Windows draws them */}
+						<span className="grid h-full w-11 place-items-center">
+							<span className="h-px w-2.5 bg-current" />
+						</span>
+						<span className="grid h-full w-11 place-items-center">
+							<span className="size-2.5 border border-current" />
+						</span>
+						<span className="grid h-full w-11 place-items-center text-sm leading-none">✕</span>
+					</div>
+				)}
 				<div className="h-[16rem] overflow-hidden sm:h-[22.2rem]">
 					<div className="w-[166%] origin-top-left scale-[0.6]">
 						<AppMock className="rounded-none" />
@@ -104,7 +117,7 @@ function WindowMock() {
 				<p className="max-sm:hidden px-2.5 pb-1.5 text-muted-foreground">Last upload: 2 min ago</p>
 				<p className="max-sm:hidden px-2.5 pb-1.5 text-muted-foreground">Addon 0.13.0</p>
 				<div className="max-sm:hidden my-1 h-px bg-border" />
-				{["Open Guildie", "Upload now", "Choose World of Warcraft folder…", "Start with Windows"].map((t, i) => (
+				{["Open Guildie", "Upload now", "Choose World of Warcraft folder…", atLogin].map((t, i) => (
 					<p key={t} className={cn("rounded-sm px-2.5 py-1.5", i === 1 && "bg-selected")}>
 						{t}
 					</p>
@@ -354,7 +367,7 @@ function BagRow({ file, name, count, where }: { file: number; name: string; coun
 
 const REPO_TREE = [
 	["apps/web", "The site: TanStack Start and Convex"],
-	["apps/desktop", "The Windows app (Electron)"],
+	["apps/desktop", "The desktop app (Electron)"],
 	["apps/addon", "The in-game addon (Lua)"],
 	["apps/mcp", "The MCP server for AI apps"],
 	["packages/sync", "Reads and writes the addon's files"],
@@ -435,12 +448,7 @@ export function ClosingSection() {
 			</p>
 			<div className="landing-reveal mt-9 flex flex-wrap items-start justify-center gap-3 [&>span]:items-center [&>span]:text-center">
 				<SignInButton className="h-10 px-5" />
-				{!inApp && (
-					<DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5">
-						<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
-						Get the Windows app
-					</DownloadAppButton>
-				)}
+				{!inApp && <DownloadAppButton size="lg" variant="outline" className="h-10 bg-white/[0.02] px-5" />}
 			</div>
 		</section>
 	);

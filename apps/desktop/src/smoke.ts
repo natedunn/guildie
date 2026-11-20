@@ -10,6 +10,7 @@ import type { Log } from "@guildie/sync";
 import { app, type BrowserWindow } from "electron";
 import { readAddonVersion } from "./addon.ts";
 import type { Connection } from "./connection.ts";
+import { platformToken } from "./window.ts";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -95,6 +96,11 @@ export async function runSmokeTest(
 			pageScrolls: getComputedStyle(document.body).overflow !== "hidden",
 		}))()`);
 		check("user agent says GuildieDesktop", String(shell.userAgent).includes(" GuildieDesktop/"), shell.userAgent);
+		check(
+			"user agent names the platform",
+			String(shell.userAgent).endsWith(` Platform/${platformToken()}`),
+			shell.userAgent,
+		);
 		check("server renders the app layout", shell.serverRendered === true);
 		check(
 			"title bar shown, page doesn't scroll",
@@ -202,9 +208,13 @@ export async function runSmokeTest(
 			const connected = await page<{ connected: boolean; account?: string }>("window.guildieDesktop.getState()");
 			check("setToken connects (checked with /api/helper/me)", connected.connected, connected);
 			const stored = readFileSync(join(app.getPath("userData"), "settings.json"), "utf8");
+			// Linux without a keyring (the smoke test forces that): kept unencrypted, marked so.
+			const plain = process.platform === "linux" && /"plain": true/.test(stored);
 			check(
-				"token saved encrypted, under the site's origin",
-				!stored.includes(token) && stored.includes(connection.origin),
+				plain
+					? "token saved (no keyring: marked plain), under the site's origin"
+					: "token saved encrypted, under the site's origin",
+				(plain || !stored.includes(token)) && stored.includes(connection.origin),
 			);
 			connection.uploadNow();
 			const synced = await until(() => {

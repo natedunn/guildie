@@ -79,6 +79,7 @@ function RootDocument({ children }: { children: ReactNode }) {
 			lang="en"
 			data-desktop={desktop ? "true" : undefined}
 			data-material={desktop?.mica ? "mica" : undefined}
+			data-platform={desktop?.platform}
 			suppressHydrationWarning
 		>
 			<head>
@@ -133,7 +134,8 @@ function RootComponent() {
 /**
  * The sign-in flow's routes: just the page (the onboarding card), filling the
  * window. In the desktop app a strip along the top still drags the window and
- * leaves room for Windows' minimize / maximize / close.
+ * leaves room for the window's own buttons (minimize / maximize / close, or
+ * the traffic lights on macOS).
  */
 function OnboardingShell() {
 	return (

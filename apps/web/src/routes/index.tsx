@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 // switches between guilds). It shows a page only to signed-out visitors (what
 // Guildie is, and sign in), and to players whose guild Guildie hasn't found
 // yet (characters under level 10, or not logged out since joining). The
-// Windows app has no landing page: signed out, it opens the sign-in card.
+// desktop app has no landing page: signed out, it opens the sign-in card.
 export const Route = createFileRoute("/")({
 	loader: async ({ context }) => {
 		const viewer = await context.queryClient.ensureQueryData(convexQuery(api.users.viewer, {}));

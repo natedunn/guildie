@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AddonRouteImport } from './routes/addon'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DataRouteImport } from './routes/data'
+import { Route as DownloadRouteImport } from './routes/download'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MeRouteImport } from './routes/me'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -74,6 +75,11 @@ const AdminRoute = AdminRouteImport.update({
 const DataRoute = DataRouteImport.update({
   id: '/data',
   path: '/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -294,6 +300,7 @@ export interface FileRoutesByFullPath {
   '/addon': typeof AddonRoute
   '/admin': typeof AdminRouteWithChildren
   '/data': typeof DataRoute
+  '/download': typeof DownloadRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
   '/notifications': typeof NotificationsRoute
@@ -341,6 +348,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
   '/data': typeof DataRoute
+  '/download': typeof DownloadRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
   '/notifications': typeof NotificationsRoute
@@ -387,6 +395,7 @@ export interface FileRoutesById {
   '/addon': typeof AddonRoute
   '/admin': typeof AdminRouteWithChildren
   '/data': typeof DataRoute
+  '/download': typeof DownloadRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
   '/notifications': typeof NotificationsRoute
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
     | '/addon'
     | '/admin'
     | '/data'
+    | '/download'
     | '/inventory'
     | '/me'
     | '/notifications'
@@ -484,6 +494,7 @@ export interface FileRouteTypes {
     | '/'
     | '/addon'
     | '/data'
+    | '/download'
     | '/inventory'
     | '/me'
     | '/notifications'
@@ -529,6 +540,7 @@ export interface FileRouteTypes {
     | '/addon'
     | '/admin'
     | '/data'
+    | '/download'
     | '/inventory'
     | '/me'
     | '/notifications'
@@ -578,6 +590,7 @@ export interface RootRouteChildren {
   AddonRoute: typeof AddonRoute
   AdminRoute: typeof AdminRouteWithChildren
   DataRoute: typeof DataRoute
+  DownloadRoute: typeof DownloadRoute
   InventoryRoute: typeof InventoryRoute
   MeRoute: typeof MeRoute
   NotificationsRoute: typeof NotificationsRoute
@@ -629,6 +642,13 @@ declare module '@tanstack/react-router' {
       path: '/data'
       fullPath: '/data'
       preLoaderRoute: typeof DataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -1023,6 +1043,7 @@ const rootRouteChildren: RootRouteChildren = {
   AddonRoute: AddonRoute,
   AdminRoute: AdminRouteWithChildren,
   DataRoute: DataRoute,
+  DownloadRoute: DownloadRoute,
   InventoryRoute: InventoryRoute,
   MeRoute: MeRoute,
   NotificationsRoute: NotificationsRoute,

@@ -3,7 +3,8 @@
 // push it). Turns CHANGELOG.md's "## Unreleased" into "## 0.3.6", bumps
 // apps/desktop/package.json, commits "Release 0.3.6" and tags desktop-v0.3.6.
 // Pushing the tag runs .github/workflows/desktop-release.yml, which builds the
-// installer and publishes it as the GitHub release installed apps update from.
+// app for Windows, macOS and Linux and publishes them as the GitHub release
+// installed apps update from.
 //
 // Run it on an up-to-date main with a clean tree. Maintainers only (main is
 // protected; admins can push the release commit).
@@ -63,7 +64,7 @@ console.log(`Committed "Release ${version}" and tagged desktop-v${version}.`);
 if (push) {
 	git("push", "origin", "main");
 	git("push", "origin", `desktop-v${version}`);
-	console.log("Pushed. The Desktop release workflow builds and publishes it:");
+	console.log("Pushed. The Desktop release workflow builds and publishes it (Windows, macOS, Linux):");
 	console.log(
 		"  gh run watch $(gh run list --workflow desktop-release.yml --limit 1 --json databaseId -q '.[0].databaseId')",
 	);

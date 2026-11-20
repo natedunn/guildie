@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 // Personal → Notifications: what happened to your requests, newest first
 // (convex/notifications.ts). Opening it reads them all; the ones that were
-// new keep their mark until you leave. The Windows app shows some as system
+// new keep their mark until you leave. The desktop app shows some as system
 // notifications, and the addon prints some in game at login.
 
 export const Route = createFileRoute("/notifications")({
