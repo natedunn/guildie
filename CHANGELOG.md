@@ -18,6 +18,12 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### Fixes
 
 - **Guildie, App:** Characters you deleted no longer bring back the "not claimed" notification every time the app starts. Guildie recognizes characters that have left your Battle.net account and stops asking about them. If one still shows up, Settings → Account lists it under "The addon also saw", where you can forget it (clicking the notification takes you there).
+- **Guildie:** Item tooltips and upgrade suggestions catch up when a hotfix changes an item's stats or binding (like November's Soulforge armor and caster staves). Before, an item kept what it had when Guildie first saw it.
+
+### Improvements
+
+- **Guildie:** An Admin page for maintainers, starting with how far trainer visits have filled in each profession's recipe learn levels.
+- **Addon:** Reagent tooltips now show who would level their profession most with it. Each profession that uses the reagent gets its own line, then the best three guildmates, with their skill in the color and with the arrow their profession window shows (orange always gives a skill-up, yellow and green less often). Anyone the reagent can't help level isn't listed. When nobody is listed, it says what's missing: a recipe (and who's high enough for one), more skill (and who's closest), or anyone with the profession. Visiting a profession trainer, smelting included, now records which skill each recipe needs, for everyone in Guildie.
 
 ## 0.3.47
 

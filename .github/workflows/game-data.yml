@@ -2,11 +2,14 @@ name: Game data
 
 # Daily: reads WoW: Forever's newest build from wago.tools and regenerates
 # apps/web/convex/shared/proficiencies.generated.ts (who can wear and wield
-# what; apps/web/scripts/gen-proficiencies.mjs). If the data changed, it
-# commits to the fixed branch bot/game-data and opens (or updates) a pull
-# request labeled game-data with what changed per class. A maintainer reviews
-# it: a change can need an override in shared/proficiencies.ts, and a CHANGELOG
-# line if players will notice. Nothing changed: it does nothing.
+# what; apps/web/scripts/gen-proficiencies.mjs) and
+# apps/web/convex/shared/recipeSkills.generated.ts (the skill levels where
+# each recipe turns yellow and grey; apps/web/scripts/gen-recipe-skills.mjs).
+# If the data changed, it commits to the fixed branch bot/game-data and opens
+# (or updates) a pull request labeled game-data with what changed. A
+# maintainer reviews it: a change can need an override in
+# shared/proficiencies.ts, and a CHANGELOG line if players will notice.
+# Nothing changed: it does nothing.
 #
 # GITHUB_TOKEN caveats (docs/game-data.md):
 # - Pull requests and pushes made with GITHUB_TOKEN don't trigger other
@@ -38,11 +41,11 @@ concurrency:
 
 env:
   BRANCH: bot/game-data
-  FILE: apps/web/convex/shared/proficiencies.generated.ts
+  FILES: apps/web/convex/shared/proficiencies.generated.ts apps/web/convex/shared/recipeSkills.generated.ts
 
 jobs:
   proficiencies:
-    name: Armor and weapon rules
+    name: Armor, weapons and recipe levels
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -76,13 +79,23 @@ jobs:
         env:
           BUILD: ${{ inputs.build }}
         run: |
-          node apps/web/scripts/gen-proficiencies.mjs ${BUILD:+--build "$BUILD"} --summary "$RUNNER_TEMP/summary.md"
-          cat "$RUNNER_TEMP/summary.md" >> "$GITHUB_STEP_SUMMARY"
-          if git diff --quiet -- "$FILE"; then
+          summary="$RUNNER_TEMP/summary.md"
+          : > "$summary"
+          # Each part only when its file changed.
+          node apps/web/scripts/gen-proficiencies.mjs ${BUILD:+--build "$BUILD"} --summary "$RUNNER_TEMP/proficiencies.md"
+          if ! git diff --quiet -- apps/web/convex/shared/proficiencies.generated.ts; then
+            { echo "## Armor and weapons"; echo; cat "$RUNNER_TEMP/proficiencies.md"; echo; } >> "$summary"
+          fi
+          node apps/web/scripts/gen-recipe-skills.mjs ${BUILD:+--build "$BUILD"} --summary "$RUNNER_TEMP/recipes.md"
+          if ! git diff --quiet -- apps/web/convex/shared/recipeSkills.generated.ts; then
+            { echo "## Recipe skill levels"; echo; cat "$RUNNER_TEMP/recipes.md"; echo; } >> "$summary"
+          fi
+          cat "$summary" >> "$GITHUB_STEP_SUMMARY"
+          if git diff --quiet -- $FILES; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "build=$(sed -n 's/.*version: "\([^"]*\)".*/\1/p' "$FILE" | head -1)" >> "$GITHUB_OUTPUT"
+            echo "build=$(git diff -- $FILES | sed -n 's/^+.*version: "\([^"]*\)".*/\1/p' | head -1)" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push
@@ -90,8 +103,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "$FILE"
-          git commit -m "Game data: armor and weapon rules from Forever build ${{ steps.gen.outputs.build }}"
+          git add $FILES
+          git commit -m "Game data from Forever build ${{ steps.gen.outputs.build }}"
           if [ -n "${{ steps.base.outputs.pr }}" ]; then
             git push origin "$BRANCH"
           else
@@ -105,15 +118,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           build="${{ steps.gen.outputs.build }}"
-          title="Game data: armor and weapon rules from Forever build $build"
+          title="Game data from Forever build $build"
           {
-            echo "WoW: Forever's game data changed who can wear or wield what (apps/web/scripts/gen-proficiencies.mjs, run by .github/workflows/game-data.yml)."
+            echo "WoW: Forever's game data changed (apps/web/scripts/gen-proficiencies.mjs and gen-recipe-skills.mjs, run by .github/workflows/game-data.yml)."
             echo
             cat "$RUNNER_TEMP/summary.md"
             echo
             echo "### Review"
             echo
-            echo "- [ ] Does each change look like the real game? Data that's wrong for Forever (Season of Discovery leftovers, say) gets an override in \`apps/web/convex/shared/proficiencies.ts\` with a reason and how it'll be confirmed."
+            echo "- [ ] Does each change look like the real game? Armor or weapon data that's wrong for Forever (Season of Discovery leftovers, say) gets an override in \`apps/web/convex/shared/proficiencies.ts\` with a reason and how it'll be confirmed."
+            echo "- [ ] Recipe levels: spot-check a changed recipe's color in a profession window (docs/game-data.md)."
             echo "- [ ] \`proficiencies:audit\` on production shows what players' games say (docs/game-data.md)."
             echo "- [ ] A CHANGELOG line under \`## Unreleased\` if players will notice, else the skip-changelog label."
             echo

@@ -199,6 +199,7 @@ export const syncBatch = internalAction({
 	args: { itemIds: v.array(v.number()), hints: v.optional(v.array(vHint)) },
 	handler: async (ctx, { itemIds, hints }) => {
 		const hintOf = new Map((hints ?? []).map((h) => [h.itemId, h]));
+		const unavailable: number[] = [];
 		const token = await appToken(ctx, "us");
 		const common = { flavor: "forever" as const, region: "us" as const, namespace: "static" as const, token };
 		const fetched = await Promise.all(
@@ -213,6 +214,9 @@ export const syncBatch = internalAction({
 			}),
 		);
 		await ctx.runMutation(internal.items.save, { items: fetched.filter((x) => x !== null) });
+		// Blizzard has no record (a 404) and nothing else told us about it: keep
+		// what we have, but count it as looked at, so the refresh moves on.
+		if (unavailable.length) await ctx.runMutation(internal.items.touch, { itemIds: unavailable });
 
 		async function fetchItem(itemId: number) {
 			const [item, media] = await Promise.all([
@@ -222,7 +226,10 @@ export const syncBatch = internalAction({
 			if (!item.ok) {
 				const hint = hintOf.get(itemId);
 				const icon = media.ok ? media.data.assets?.find((a) => a.key === "icon")?.value : undefined;
-				if (!hint?.name || !icon) return null;
+				if (!hint?.name || !icon) {
+					unavailable.push(itemId);
+					return null;
+				}
 				return { itemId, name: hint.name, quality: hint.quality ?? "COMMON", icon, tooltip: hint.tooltip ?? [] };
 			}
 			return {
@@ -261,6 +268,58 @@ export const backfill = internalAction({
 	handler: async (ctx): Promise<{ queued: number }> => {
 		const itemIds: number[] = await ctx.runQuery(internal.items.referencedItemIds, {});
 		return await ctx.runAction(internal.items.ensure, { itemIds });
+	},
+});
+
+/** Items stay current after hotfixes change their stats or binding: look each up again a month on. */
+const REFRESH_AFTER_MS = 30 * 24 * 3600_000;
+/** A day's share (two Blizzard requests each), oldest first. */
+const REFRESH_PER_DAY = 500;
+
+/** The items looked up longest ago, before `before`. */
+export const stale = internalQuery({
+	args: { before: v.number(), limit: v.number() },
+	handler: async (ctx, { before, limit }) => {
+		const rows = await ctx.db
+			.query("items")
+			.withIndex("by_syncedAt", (q) => q.lt("syncedAt", before))
+			.take(limit);
+		return rows.map((r) => r.itemId);
+	},
+});
+
+/**
+ * Daily: look up again the items we saved over a month ago, so a hotfix that
+ * changes an item's stats or binding reaches tooltips and upgrade scores.
+ */
+export const refreshStale = internalAction({
+	args: {},
+	handler: async (ctx): Promise<{ queued: number }> => {
+		const due: number[] = await ctx.runQuery(internal.items.stale, {
+			before: Date.now() - REFRESH_AFTER_MS,
+			limit: REFRESH_PER_DAY,
+		});
+		for (let i = 0; i < due.length; i += BATCH) {
+			await ctx.scheduler.runAfter((i / BATCH) * BATCH_STAGGER_MS, internal.items.syncBatch, {
+				itemIds: due.slice(i, i + BATCH),
+			});
+		}
+		return { queued: due.length };
+	},
+});
+
+/** Count these items as just looked up, keeping what we have. */
+export const touch = internalMutation({
+	args: { itemIds: v.array(v.number()) },
+	handler: async (ctx, { itemIds }) => {
+		const now = Date.now();
+		for (const itemId of itemIds) {
+			const row = await ctx.db
+				.query("items")
+				.withIndex("by_itemId", (q) => q.eq("itemId", itemId))
+				.unique();
+			if (row) await ctx.db.patch(row._id, { syncedAt: now });
+		}
 	},
 });
 

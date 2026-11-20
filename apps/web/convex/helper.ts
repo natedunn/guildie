@@ -10,12 +10,16 @@ import {
 	lastClaimAt,
 	matchRecipes,
 	parseCharacter,
+	parseTrainers,
+	type TrainerRead,
 } from "./addonPayload";
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
+import { storeTrainers } from "./learnLevels";
 import { forGame, takeToasts as takeToastsFor } from "./notifications";
 import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
+import { type ReagentUse, reagentProgress } from "./reagentProgress";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonCraft, type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -152,8 +156,13 @@ const baseName = (item: { name: string; suffixId?: number }) =>
  * (another computer, say) never replaces newer data.
  */
 export const ingest = mutation({
-	args: { token: v.string(), version: v.optional(v.number()), characters: v.array(v.any()) },
-	handler: async (ctx, { token, version, characters }) => {
+	args: {
+		token: v.string(),
+		version: v.optional(v.number()),
+		characters: v.array(v.any()),
+		trainers: v.optional(v.array(v.any())),
+	},
+	handler: async (ctx, { token, version, characters, trainers }) => {
 		const row = await tokenOwner(ctx, token);
 		if (!row) throw new ConvexError("Unknown or revoked token");
 		const now = Date.now();
@@ -372,6 +381,17 @@ export const ingest = mutation({
 		// A newer bag or bank read: re-check the player's open craft requests.
 		if (inventoryChanged) await refreshMats(ctx, row.userId);
 		if (addons) await storeAddons(ctx, row.userId, addons, now);
+		// Trainer windows the addon read: game facts, not a character's, so they
+		// count from any signed-in player, and a bad one only drops the trainers.
+		if (trainers?.length) {
+			let reads: TrainerRead[] | undefined;
+			try {
+				reads = parseTrainers(trainers, now);
+			} catch (error) {
+				console.warn(`helper.ingest: trainers dropped: ${(error as Error).message}`);
+			}
+			if (reads?.length) await storeTrainers(ctx, row.userId, reads, now);
+		}
 		return { accepted, unmatched, rejected };
 	},
 });
@@ -645,6 +665,14 @@ export type GuildData = {
 	recipesInCatalog: number;
 	reagents: Record<string, { name: string; users: ReagentUser[] }>;
 	/**
+	 * Who'd get the most profession progress out of each reagent (addon
+	 * 0.24.0+; older addons read `reagents`): per profession whose recipes
+	 * use it, the guildmates for whom one still gives skill-ups, best first,
+	 * with the color their profession window shows it in (reagentProgress.ts).
+	 * Pairs inside Convex; the HTTP route makes it an object by item id.
+	 */
+	reagentUse: ReagentUse;
+	/**
 	 * Gear-upgrade suggestions (addon 0.5.0+; older addons ignore it): the
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
 	 * active guildmate with the scores of what they wear.
@@ -855,6 +883,17 @@ export const guildData = action({
 			]),
 		);
 		const reagents = reagentSuggestions(base.guilds, recipes, quality);
+		const mine = new Set(base.mine);
+		// A character in two of the player's guilds counts once.
+		const members = new Map(
+			base.guilds.flatMap((g) => g.members.filter((m) => !mine.has(m.name)).map((m) => [`${g.region}:${m.slug}`, m])),
+		);
+		const reagentUse = reagentProgress(
+			[...members.values()],
+			await ctx.runQuery(internal.recipes.forProgress, {}),
+			new Map(await ctx.runQuery(internal.learnLevels.all, {})),
+			new Map(await ctx.runQuery(internal.learnLevels.patternSkills, {})),
+		);
 		const rules = upgradeRules();
 		return {
 			version: 1,
@@ -864,6 +903,7 @@ export const guildData = action({
 			recipesKnown: ids.length,
 			recipesInCatalog: recipes.size,
 			reagents,
+			reagentUse,
 			upgrades: {
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },

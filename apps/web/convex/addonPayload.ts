@@ -636,3 +636,95 @@ export function matchRecipes(
 	}
 	return { recipeIds: [...ids], unmatched };
 }
+
+// ---- Trainer reads ----------------------------------------------------------
+
+/**
+ * What a profession trainer's window listed (`trainers`, top level, addon
+ * 0.x with payload 7): each recipe with the skill the trainer asks for to
+ * learn it (0: none). Account-wide game facts, not a character's, so they sit
+ * beside `characters`. docs/game-data.md, "Learn levels".
+ */
+export type TrainerRead = {
+	profession: string;
+	professionId: number;
+	capturedAt: number;
+	/** The game build it was read on ("1.60.1.70959"). */
+	build?: string;
+	/** Whether the window listed recipes the character can't learn yet (the "Unavailable" filter). */
+	unavailableShown?: boolean;
+	services: { name: string; itemId?: number; skill: number }[];
+};
+
+export const TRAINER_LIMITS = { professions: 15, services: 1000 } as const;
+
+/** The upload's `trainers`, checked; a bad one throws (the caller drops trainers, not characters). */
+export function parseTrainers(x: unknown, now: number): TrainerRead[] {
+	const out: TrainerRead[] = [];
+	for (const [i, raw] of arr(x, "trainers", TRAINER_LIMITS.professions).entries()) {
+		const p = `trainers[${i}]`;
+		const t = obj(raw, p);
+		const profession = professionOf(str(t.profession, `${p}.profession`, 48, 1));
+		const capturedAt = time(t.capturedAt, `${p}.capturedAt`, now);
+		const build = opt(t.build, (b) => str(b, `${p}.build`, 32));
+		const unavailableShown = opt(t.unavailableShown, (b) => bool(b, `${p}.unavailableShown`));
+		const services = arr(t.services, `${p}.services`, TRAINER_LIMITS.services).map((s, j) => {
+			const o = obj(s, `${p}.services[${j}]`);
+			const itemId = opt(o.item, (n) => int(n, `${p}.services[${j}].item`, 1, 100_000_000));
+			return {
+				name: str(o.name, `${p}.services[${j}].name`, LIMITS.name, 1),
+				...(itemId ? { itemId } : {}),
+				skill: int(o.skill ?? 0, `${p}.services[${j}].skill`, 0, 1000),
+			};
+		});
+		// Another language, or not a profession we know: nothing to match against.
+		if (!profession || out.some((o) => o.professionId === profession.id)) continue;
+		out.push({
+			profession: profession.name,
+			professionId: profession.id,
+			capturedAt,
+			...(build ? { build } : {}),
+			...(unavailableShown !== undefined ? { unavailableShown } : {}),
+			services,
+		});
+	}
+	return out;
+}
+
+/**
+ * A trainer's recipes matched to the catalog's recipe ids, within one
+ * profession, with the skill each needs (at least 1). A recipe is matched
+ * only when it's certain: its name (and the item it makes, when the game
+ * said) fits exactly one catalog recipe. Services that aren't recipes (the
+ * profession's ranks) find no match. Returns the levels and how many were
+ * left out as ambiguous or unmatched.
+ */
+export function matchTrainer(
+	services: TrainerRead["services"],
+	catalog: { recipeId: number; name: string; craftedItemId?: number }[],
+) {
+	const byName = new Map<string, { recipeId: number; craftedItemId?: number }[]>();
+	const byItem = new Map<number, { recipeId: number; craftedItemId?: number }[]>();
+	for (const r of catalog) {
+		const key = r.name.toLowerCase();
+		byName.set(key, [...(byName.get(key) ?? []), r]);
+		if (r.craftedItemId !== undefined) byItem.set(r.craftedItemId, [...(byItem.get(r.craftedItemId) ?? []), r]);
+	}
+	const levels: { recipeId: number; skill: number }[] = [];
+	let ambiguous = 0;
+	let unmatched = 0;
+	const seen = new Set<number>();
+	for (const s of services) {
+		let fits = byName.get(s.name.toLowerCase()) ?? [];
+		if (s.itemId !== undefined && fits.length > 1) fits = fits.filter((r) => r.craftedItemId === s.itemId);
+		// Smelting's trainer lists the bar ("Tin Bar"), the recipe is "Smelt Tin": the item it makes.
+		else if (s.itemId !== undefined && fits.length === 0) fits = byItem.get(s.itemId) ?? [];
+		if (fits.length === 0) unmatched++;
+		else if (fits.length > 1) ambiguous++;
+		else if (!seen.has(fits[0].recipeId)) {
+			seen.add(fits[0].recipeId);
+			levels.push({ recipeId: fits[0].recipeId, skill: Math.max(1, s.skill) });
+		}
+	}
+	return { levels, ambiguous, unmatched };
+}
