@@ -43,14 +43,23 @@ export function AiConnections() {
 			</div>
 			<ul className="mt-3 space-y-1 text-[0.8125rem] text-muted-foreground">
 				<li>
-					<span className="text-foreground">Claude:</span> add a custom connector (in Settings → Connectors) with this
-					address.
+					<span className="text-foreground">Claude (web or desktop):</span> open claude.ai/plugins → Add → Add custom
+					connector. Name it Guildie, paste this address and click Continue. Choose Sign in now and finish adding the
+					connector. After connecting, enable Guildie in your chat's + → Connectors menu.
 				</li>
 				<li>
-					<span className="text-foreground">ChatGPT:</span> turn on developer mode (in Settings → Apps), then add an app
-					with this address.
+					<span className="text-foreground">ChatGPT:</span> in your browser, open chatgpt.com/plugins → Add → Add a
+					custom MCP server. Name it Guildie, paste this address and choose OAuth. Create and install the plugin, then
+					type @Guildie in a new chat.
 				</li>
-				<li>Then sign in with Guildie when it asks, and confirm on guildie.club.</li>
+				<li>
+					Sign in with Guildie when asked and confirm on guildie.club. Character changes are optional; leave them off
+					for read-only access. You can disconnect below at any time.
+				</li>
+				<li>
+					Missing the add option? Availability depends on your AI app's plan and workspace permissions; a workspace
+					admin may need to add Guildie for you.
+				</li>
 			</ul>
 			{connections && connections.length > 0 && (
 				<ul className="surface-card mt-4 divide-y divide-border text-[0.8125rem]">
