@@ -82,17 +82,12 @@ function Downloads() {
 						<HugeiconsIcon icon={Download04Icon} strokeWidth={1.75} />
 						Download
 					</Button>
-					<p className="mt-3 text-xs text-pretty text-muted-foreground">
-						Not code-signed yet: if Windows warns you, choose More info, then Run anyway.
-					</p>
 				</Platform>
 				<Platform os="mac" icon={AppleIcon} stage="Alpha" spec="macOS 12 or later, Apple Silicon and Intel">
 					<AlphaDownloadButton os="mac" size="lg" className="h-10 w-full" />
-					<p className="mt-3 text-xs text-pretty text-muted-foreground">Early and unsigned. Read before installing.</p>
 				</Platform>
 				<Platform os="linux" icon={PenguinIcon} stage="Alpha" spec="64-bit AppImage">
 					<AlphaDownloadButton os="linux" size="lg" className="h-10 w-full" />
-					<p className="mt-3 text-xs text-pretty text-muted-foreground">Early, for WoW under Wine or Proton.</p>
 				</Platform>
 			</div>
 
