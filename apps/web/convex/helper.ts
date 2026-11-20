@@ -19,7 +19,7 @@ import { noteLevel } from "./feed";
 import { storeTrainers } from "./learnLevels";
 import { forGame, takeToasts as takeToastsFor } from "./notifications";
 import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
-import { type ReagentUse, reagentProgress } from "./reagentProgress";
+import { type ProgressMember, type ProgressUser, type ReagentUse, reagentProgress } from "./reagentProgress";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonCraft, type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -631,6 +631,8 @@ export const signOut = mutation({
 
 type GuildDataBase = {
 	mine: string[];
+	/** The token owner's claimed characters, in a guild or not, with their professions (reagentUseMine). */
+	myProfessions: ProgressMember[];
 	guilds: {
 		name: string;
 		region: string;
@@ -672,6 +674,13 @@ export type GuildData = {
 	 * Pairs inside Convex; the HTTP route makes it an object by item id.
 	 */
 	reagentUse: ReagentUse;
+	/**
+	 * The same for the player's own claimed characters, guild or not (addon
+	 * 0.25.0+; older addons ignore it): per reagent and profession, theirs
+	 * that'd get skill-ups from it, best first. Only `users`: why nobody is
+	 * listed is about guildmates. Pairs, like `reagentUse`.
+	 */
+	reagentUseMine: [number, { name: string; users: ProgressUser[] }[]][];
 	/**
 	 * Gear-upgrade suggestions (addon 0.5.0+; older addons ignore it): the
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
@@ -752,6 +761,7 @@ export const guildDataBase = internalQuery({
 			.collect();
 		const guildIds = new Set<Id<"guilds">>();
 		const characters: GuildData["characters"] = {};
+		const myProfessions = new Map<string, ProgressMember>();
 		for (const c of owned) {
 			const member = await ctx.db
 				.query("characters")
@@ -759,6 +769,16 @@ export const guildDataBase = internalQuery({
 				.first();
 			if (member?.inRoster) guildIds.add(member.guildId);
 			if (!member) continue;
+			const profile = await pickProfile(ctx, member);
+			myProfessions.set(`${member.region}:${member.slug}`, {
+				name: member.name,
+				classId: member.classId,
+				professions: profile.professions.map((p) => ({
+					name: p.name,
+					skill: p.skill,
+					knownRecipes: p.knownRecipes ?? [],
+				})),
+			});
 			const inventory = await ctx.db
 				.query("inventories")
 				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
@@ -841,6 +861,7 @@ export const guildDataBase = internalQuery({
 		}
 		return {
 			mine: owned.map((c) => c.name),
+			myProfessions: [...myProfessions.values()],
 			guilds,
 			upgradeMembers,
 			upgradeMine,
@@ -888,12 +909,16 @@ export const guildData = action({
 		const members = new Map(
 			base.guilds.flatMap((g) => g.members.filter((m) => !mine.has(m.name)).map((m) => [`${g.region}:${m.slug}`, m])),
 		);
-		const reagentUse = reagentProgress(
-			[...members.values()],
-			await ctx.runQuery(internal.recipes.forProgress, {}),
-			new Map(await ctx.runQuery(internal.learnLevels.all, {})),
-			new Map(await ctx.runQuery(internal.learnLevels.patternSkills, {})),
-		);
+		const progressRecipes = await ctx.runQuery(internal.recipes.forProgress, {});
+		const learnLevels = new Map(await ctx.runQuery(internal.learnLevels.all, {}));
+		const patternSkills = new Map(await ctx.runQuery(internal.learnLevels.patternSkills, {}));
+		const reagentUse = reagentProgress([...members.values()], progressRecipes, learnLevels, patternSkills);
+		// The player's own characters, ranked the same way; only who'd level.
+		const reagentUseMine: GuildData["reagentUseMine"] = [];
+		for (const [itemId, use] of reagentProgress(base.myProfessions, progressRecipes, learnLevels, patternSkills)) {
+			const professions = use.professions.filter((p) => p.users.length).map(({ name, users }) => ({ name, users }));
+			if (professions.length) reagentUseMine.push([itemId, professions]);
+		}
 		const rules = upgradeRules();
 		return {
 			version: 1,
@@ -904,6 +929,7 @@ export const guildData = action({
 			recipesInCatalog: recipes.size,
 			reagents,
 			reagentUse,
+			reagentUseMine,
 			upgrades: {
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },

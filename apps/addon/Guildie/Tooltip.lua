@@ -102,23 +102,56 @@ local function skillText(user)
 end
 ns.skillText = skillText
 
+--- Your own characters' rows for a reagent (GuildieData.reagentUseMine,
+--- addon 0.25.0), by profession, unless "Show your characters on reagents"
+--- is off: "You | ^^ 131" for the one you're on, "Ivar (alt) | ^ 112".
+local function mineUse(itemID)
+    local s = GuildieDB and GuildieDB.settings
+    if s and s.showMineReagents == false then return {} end
+    local data = GuildieData and type(GuildieData.reagentUseMine) == "table" and GuildieData.reagentUseMine
+    local entry = data and data[itemID]
+    local out = {}
+    if type(entry) ~= "table" then return out end
+    local me = UnitName("player")
+    for _, p in ipairs(entry) do
+        if type(p) == "table" and p.name and type(p.users) == "table" then
+            local rows = {}
+            for _, user in ipairs(p.users) do
+                if user.name then
+                    local left = user.name == me and classColored("You", user.classId)
+                        or (classColored(user.name, user.classId) .. " |cffa8a8a8(alt)|r")
+                    table.insert(rows, { left = SUB .. left, right = skillText(user) })
+                end
+            end
+            if #rows > 0 then out[p.name] = rows end
+        end
+    end
+    return out
+end
+
 --- Who'd get the most profession progress out of this reagent
 --- (GuildieData.reagentUse, addon 0.24.0; reagentProgress.ts): per profession
---- whose recipes use it, "Tailoring", then the best few guildmates with
---- their skill ("Todd | ^^ 131", in the window's colors), "+2 more", or
---- what's missing: "Needs a recipe: Todd, Brenna" (in range, none has one),
+--- whose recipes use it, "Tailoring", then your own characters (mineUse),
+--- then the best few guildmates with their skill ("Todd | ^^ 131", in the
+--- window's colors), "+2 more", or, with none of yours listed either, what's
+--- missing: "Needs a recipe: Todd, Brenna" (in range, none has one),
 --- "Needs 140 skill: Miller 110" (the closest), "No one in the guild".
 --- `skip`: names already on a request row.
 local function useRows(itemID, skip)
     local data = GuildieData and type(GuildieData.reagentUse) == "table" and GuildieData.reagentUse
     local entry = data and data[itemID]
-    if type(entry) ~= "table" or type(entry.professions) ~= "table" then return {} end
+    local mine = mineUse(itemID)
+    local professions = type(entry) == "table" and type(entry.professions) == "table" and entry.professions or {}
     local rows = {}
-    for _, p in ipairs(entry.professions) do
+    local done = {}
+    for _, p in ipairs(professions) do
         if type(p) == "table" and p.name then
+            done[p.name] = true
             local header = { left = p.name }
             table.insert(rows, header)
-            local shown, hidden = 0, 0
+            local own = mine[p.name] or {}
+            for _, row in ipairs(own) do table.insert(rows, row) end
+            local shown, hidden = #own, 0
             for _, user in ipairs(type(p.users) == "table" and p.users or {}) do
                 if isMine(user.name) or (skip and skip[user.name]) then
                     hidden = hidden + 1
@@ -127,7 +160,7 @@ local function useRows(itemID, skip)
                     table.insert(rows, { left = SUB .. classColored(user.name, user.classId), right = skillText(user) })
                 end
             end
-            local more = (tonumber(p.count) or 0) - shown - hidden
+            local more = (tonumber(p.count) or 0) - (shown - #own) - hidden
             if more > 0 then
                 table.insert(rows, { left = SUB .. string.format("+%d more", more) })
             elseif shown == 0 then
@@ -154,6 +187,16 @@ local function useRows(itemID, skip)
                 end
             end
         end
+    end
+    -- Professions only yours would level with it (guildmates are past it, or don't have it).
+    local rest = {}
+    for name in pairs(mine) do
+        if not done[name] then table.insert(rest, name) end
+    end
+    table.sort(rest)
+    for _, name in ipairs(rest) do
+        table.insert(rows, { left = name })
+        for _, row in ipairs(mine[name]) do table.insert(rows, row) end
     end
     return rows
 end

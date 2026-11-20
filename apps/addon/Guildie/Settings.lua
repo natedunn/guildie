@@ -8,6 +8,7 @@ function ns.settings()
     if s.sayWhyEmpty == nil then s.sayWhyEmpty = true end
     if s.showForYou == nil then s.showForYou = true end
     if s.showTracked == nil then s.showTracked = true end
+    if s.showMineReagents == nil then s.showMineReagents = true end
     if s.dialogueUI == nil then s.dialogueUI = true end
     return s
 end
@@ -134,6 +135,7 @@ function ns.buildSettingsRows(parent, width, changed)
     preference("Explain empty item tooltips", "sayWhyEmpty")
     preference("Say whether items are an upgrade for you", "showForYou")
     preference("Say how many you need for tracked crafts", "showTracked")
+    preference("Show your characters on reagents", "showMineReagents")
     preference("Guildie in Dialogue UI tooltips", "dialogueUI")
     note("Experimental. Adds Guildie to the quest window's item tooltips when the Dialogue UI addon is installed.", nil, 24)
     return rows, function() for _, update in ipairs(updates) do update() end end, controls

@@ -159,5 +159,56 @@ test("not a reagent anyone uses: the usual empty line", function()
     eq(table.concat(hover(ns, 1234)), "No guildmates need this")
 end)
 
+local MINE = {
+    { name = "Tailoring", users = {
+        { name = "Lich", classId = 5, skill = 108, color = "orange" },
+        { name = "Ivar", classId = 1, skill = 113, color = "yellow" },
+    } },
+    { name = "Cooking", users = { { name = "Ivar", classId = 1, skill = 40, color = "green" } } },
+}
+
+test("your characters: first under the profession, You and (alt); professions only yours have after", function()
+    local d = data({ TAILORING })
+    d.reagentUseMine = { [SILK] = MINE }
+    local lines = hover(load(d), SILK)
+    eq(#lines, 9)
+    eq(lines[1], "Tailoring")
+    eq(plain(lines[2]), "   You | 108")
+    eq(plain(lines[3]), "   Ivar (alt) | 113")
+    eq(plain(lines[4]), "   Todd | 105")
+    eq(plain(lines[7]), "   +2 more", "guildmates only")
+    eq(lines[8], "Cooking")
+    eq(plain(lines[9]), "   Ivar (alt) | 40")
+end)
+
+test("yours listed: no \"Needs\" line about guildmates", function()
+    local d = data({ { name = "Tailoring", from = 175, count = 0, users = {}, closest = { name = "Miller", classId = 11, skill = 160 } } })
+    d.reagentUseMine = { [SILK] = { MINE[1] } }
+    local lines = hover(load(d), SILK)
+    eq(#lines, 3)
+    eq(plain(lines[2]), "   You | 108")
+    eq(plain(lines[3]), "   Ivar (alt) | 113")
+end)
+
+test("only yours: the reagent shows even with nothing about guildmates", function()
+    local d = data({})
+    d.reagentUse = {}
+    d.reagentUseMine = { [SILK] = { MINE[2] } }
+    local lines = hover(load(d), SILK)
+    eq(#lines, 2)
+    eq(lines[1], "Cooking")
+end)
+
+test("the setting off: no rows of yours", function()
+    local d = data({ TAILORING })
+    d.reagentUseMine = { [SILK] = MINE }
+    local ns, state = load(d)
+    GuildieDB.settings = GuildieDB.settings or {}
+    GuildieDB.settings.showMineReagents = false
+    local lines = hover(ns, SILK)
+    eq(#lines, 5)
+    eq(plain(lines[2]), "   Todd | 105")
+end)
+
 print(string.format("%d passed, %d failed", passed, failures))
 os.exit(failures == 0 and 0 or 1)
