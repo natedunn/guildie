@@ -104,7 +104,7 @@ ns.skillText = skillText
 
 --- Your own characters' rows for a reagent (GuildieData.reagentUseMine,
 --- addon 0.25.0), by profession, unless "Show your characters on reagents"
---- is off: "You | ^^ 131" for the one you're on, "Ivar (alt) | ^ 112".
+--- is off: "You | ^^ 131" for the one you're on, "Ivar | ^ 112".
 local function mineUse(itemID)
     local s = GuildieDB and GuildieDB.settings
     if s and s.showMineReagents == false then return {} end
@@ -118,8 +118,7 @@ local function mineUse(itemID)
             local rows = {}
             for _, user in ipairs(p.users) do
                 if user.name then
-                    local left = user.name == me and classColored("You", user.classId)
-                        or (classColored(user.name, user.classId) .. " |cffa8a8a8(alt)|r")
+                    local left = classColored(user.name == me and "You" or user.name, user.classId)
                     table.insert(rows, { left = SUB .. left, right = skillText(user) })
                 end
             end

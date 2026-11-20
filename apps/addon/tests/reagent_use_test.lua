@@ -167,18 +167,18 @@ local MINE = {
     { name = "Cooking", users = { { name = "Ivar", classId = 1, skill = 40, color = "green" } } },
 }
 
-test("your characters: first under the profession, You and (alt); professions only yours have after", function()
+test("your characters: first under the profession, You and alts by name; professions only yours have after", function()
     local d = data({ TAILORING })
     d.reagentUseMine = { [SILK] = MINE }
     local lines = hover(load(d), SILK)
     eq(#lines, 9)
     eq(lines[1], "Tailoring")
     eq(plain(lines[2]), "   You | 108")
-    eq(plain(lines[3]), "   Ivar (alt) | 113")
+    eq(plain(lines[3]), "   Ivar | 113")
     eq(plain(lines[4]), "   Todd | 105")
     eq(plain(lines[7]), "   +2 more", "guildmates only")
     eq(lines[8], "Cooking")
-    eq(plain(lines[9]), "   Ivar (alt) | 40")
+    eq(plain(lines[9]), "   Ivar | 40")
 end)
 
 test("yours listed: no \"Needs\" line about guildmates", function()
@@ -187,7 +187,7 @@ test("yours listed: no \"Needs\" line about guildmates", function()
     local lines = hover(load(d), SILK)
     eq(#lines, 3)
     eq(plain(lines[2]), "   You | 108")
-    eq(plain(lines[3]), "   Ivar (alt) | 113")
+    eq(plain(lines[3]), "   Ivar | 113")
 end)
 
 test("only yours: the reagent shows even with nothing about guildmates", function()

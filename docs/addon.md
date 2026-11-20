@@ -281,7 +281,7 @@ your last login or reload.
   more". With nobody listed, the next row says what's missing: "Needs a
   recipe: Todd, Brenna", "Needs 140 skill: Miller 110" or "No one in the
   guild". Your own characters come first under their profession (0.25.0):
-  "You" for the one you're on, others as "Ivar (alt)"; with one of yours
+  "You" for the one you're on, others by name; with one of yours
   listed there's no "Needs" line, and a profession only yours would level
   with comes after the rest. Setting: "Show your characters on reagents"
   (`showMineReagents`, on by default). Someone on a request row above isn't
