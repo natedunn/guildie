@@ -147,6 +147,29 @@ jobs:
       - run: pnpm --filter @guildie/desktop check
       - run: pnpm --filter @guildie/desktop test
 
+      # The live-pixels helper, universal2 like the app: python.org's
+      # universal2 Python (setup-python's is one architecture only).
+      - name: Universal2 Python
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/python.pkg" https://www.python.org/ftp/python/3.12.10/python-3.12.10-macos11.pkg
+          sudo installer -pkg "$RUNNER_TEMP/python.pkg" -target /
+          echo "/Library/Frameworks/Python.framework/Versions/3.12/bin" >> "$GITHUB_PATH"
+      - run: |
+          python3 -m venv "$RUNNER_TEMP/capture-venv"
+          echo "$RUNNER_TEMP/capture-venv/bin" >> "$GITHUB_PATH"
+      - run: python -m pip install -r apps/desktop/capture/requirements.txt
+      - run: python -m unittest discover -s apps/desktop/capture -p "test_*.py"
+      - run: pnpm --filter @guildie/desktop capture:build
+        env:
+          GUILDIE_CAPTURE_ARCH: universal2
+      - name: Check bundled capture runtime and parent-exit guard
+        run: |
+          helper=apps/desktop/capture/dist/GuildieCapture/GuildieCapture
+          "$helper" --help
+          "$helper" --auto --parent-pid 4294967295
+          codesign --verify --strict "$helper"
+          lipo -archs "$helper" | grep -q "x86_64 arm64"
+
       # notarytool wants the App Store Connect key as a file.
       - name: Notarization key (only when the secret exists)
         env:
@@ -172,6 +195,7 @@ jobs:
         run: |
           app=apps/desktop/release/mac-universal/Guildie.app
           test -f "$app/Contents/Resources/addon/Guildie/Guildie.toc"
+          test -x "$app/Contents/Resources/capture/GuildieCapture"
           lipo -archs "$app/Contents/MacOS/Guildie"
           codesign --verify --deep --strict "$app"
           codesign -dv "$app" 2>&1 | grep -E "Signature|Authority|TeamIdentifier" || true
@@ -203,7 +227,9 @@ jobs:
   # An x86_64 AppImage, which updates itself (latest-linux.yml).
   linux:
     needs: release
-    runs-on: ubuntu-latest
+    # 22.04, not latest: the capture helper (PyInstaller) needs the build
+    # machine's glibc or newer on players' machines (2.35 here).
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
@@ -221,6 +247,17 @@ jobs:
       - run: pnpm --filter @guildie/desktop check
       - run: pnpm --filter @guildie/desktop test
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r apps/desktop/capture/requirements.txt
+      - run: python -m unittest discover -s apps/desktop/capture -p "test_*.py"
+      - run: pnpm --filter @guildie/desktop capture:build
+      - name: Check bundled capture runtime and parent-exit guard
+        run: |
+          apps/desktop/capture/dist/GuildieCapture/GuildieCapture --help
+          apps/desktop/capture/dist/GuildieCapture/GuildieCapture --auto --parent-pid 4294967295
+
       - name: Build
         run: pnpm --filter @guildie/desktop build:linux
 
@@ -228,6 +265,7 @@ jobs:
         run: |
           cd apps/desktop/release
           test -f linux-unpacked/resources/addon/Guildie/Guildie.toc
+          test -x linux-unpacked/resources/capture/GuildieCapture
           test -f Guildie-linux-x86_64.AppImage
           test -f latest-linux.yml
           cat latest-linux.yml

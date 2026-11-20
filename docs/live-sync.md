@@ -1,7 +1,7 @@
 # Experimental sync without reloading
 
 The main Guildie addon exports complete character snapshots through a small amber
-square. The Windows app captures and uploads those snapshots through the existing
+square. The desktop app (Windows, macOS and Linux) captures and uploads those snapshots through the existing
 authenticated endpoint. Normal SavedVariables sync remains active. This feature
 is opt-in on both sides and does not provide server-side live health or location.
 
@@ -26,8 +26,9 @@ Signing out stops the helper, and signing in resumes it if the setting is enable
 Turning the app setting off or quitting stops capture. Turning export off in WoW
 hides the square immediately; `/reload` then tells the app to stop capture too. The app setting can stop capture immediately.
 
-The bundled helper monitors the original desktop process handle and exits if the
-app crashes or is force-closed, even when there are no new capture records.
+The bundled helper monitors the original desktop process handle (Windows) or its
+parent process (macOS, Linux: an orphan is reparented, so a reused PID never matches)
+and exits if the app crashes or is force-closed, even when there are no new capture records.
 
 The app scans the foreground WoW client rectangle to locate the protocol header,
 validates eight distinct packets, then captures only the square. It searches again
@@ -37,34 +38,96 @@ The helper has no network calls and never receives the account token. Only compl
 snapshots upload; live records are discarded after updating capture status.
 
 Status distinguishes waiting for WoW, searching, checking alignment, receiving,
-stale and failed. Receiving does not mean a snapshot has uploaded: check Last upload
+stale and failed, plus `permission` (macOS: Screen Recording not allowed) and
+`unsupported` (Linux: no X11 display to read). Receiving does not mean a snapshot has uploaded: check Last upload
 and the log for `Uploaded live pixel snapshot`. Bulk throughput is unchanged from
 the pilot (~1.2 KB/sec); large snapshots can take minutes. Bank/recipe data still
 requires opening those windows. Returned GuildieData.lua still loads on reload.
 
-## Building on Windows
+## Per OS
 
-The helper is a PyInstaller **one-directory** application with its Python runtime
-and MSS included. Players do not install Python. Windows release CI builds the
-helper before packaging it as `resources/capture/GuildieCapture.exe` and its files.
-The addon is included through the existing `resources/addon/Guildie` installation.
+The helper (`apps/desktop/capture`) is the same program everywhere; only finding
+the WoW window and the capture backend differ (`discovery.py`).
 
-For a development or test installer, use Python 3.12 and the repository's pinned pnpm:
+- **Windows:** the foreground window (`GetForegroundWindow`) whose title contains
+  "World of Warcraft"; its client rectangle, captured with GDI (MSS).
+- **macOS:** the frontmost normal window in Quartz's front-to-back window list
+  (`CGWindowListCopyWindowInfo`, layer 0, invisible or tiny windows skipped). It is
+  WoW when the owning app's name starts with "World of Warcraft" (the native client;
+  needs no permission to read), or, for Wine/CrossOver (`*.exe`, `wine*`), when the
+  window title passes the app's `isWowTitle` rule. A browser showing a WoW page is
+  never matched. The whole window is searched, title bar included.
+  - Capture needs **Screen Recording** permission. macOS gives it to the Guildie app
+    (the helper is its child), not the helper. The helper checks
+    `CGPreflightScreenCaptureAccess` before looking for WoW, asks once
+    (`CGRequestScreenCaptureAccess`, which shows the system dialog only the first
+    time) and otherwise reports `permission` without capturing anything. The player
+    turns Guildie on in System Settings → Privacy & Security → Screen Recording and
+    reopens it. While the app is ad-hoc signed, every update has a new signature,
+    so macOS may stop honoring the grant after an update (toggle Guildie off and on
+    there); a Developer ID signature fixes that.
+  - **Retina:** screen coordinates are points, images are pixels. MSS normally asks
+    Quartz for point-sized (downscaled) images, which blends the cells; the helper
+    asks for full-resolution images instead and converts the square's pixel position
+    back to a point region (rounded outward, with the pixel offset inside it), so
+    cells keep their exact colors at 2×.
+  - MSS uses `CGWindowListCreateImage`, which Apple deprecates in favor of
+    ScreenCaptureKit; it still works at runtime (checked on macOS 27).
+- **Linux:** the EWMH active window (`_NET_ACTIVE_WINDOW`) over X11 (python-xlib),
+  matched with `isWowTitle` on `_NET_WM_NAME` (or `WM_NAME`); its client area in root
+  coordinates, captured from the X root window (MSS). Wine draws WoW as an X11
+  window, also on a Wayland desktop through XWayland, so the lookup usually works
+  there. Capturing an XWayland window from the root can give black images under
+  some compositors: after three all-black searches in a Wayland session the helper
+  reports `unsupported` (and keeps checking slowly). With no `DISPLAY` at all (pure
+  Wayland), it reports `unsupported` at once and captures nothing.
+
+Every OS keeps the same rules: only while WoW is foreground, images stay in memory
+and are dropped right after reading, the same JSON lines on stdout.
+
+## Building the helper
+
+The helper is a PyInstaller **one-directory** application with its Python runtime,
+MSS and the OS's window library (pyobjc Quartz on macOS, python-xlib on Linux)
+included; `requirements.txt` pins them with platform markers. Players do not
+install Python. Release CI builds it on each OS before packaging it as
+`resources/capture/` (`GuildieCapture.exe` on Windows, `GuildieCapture` on macOS
+and Linux) with its files and `licenses/`. The addon is included through the
+existing `resources/addon/Guildie` installation.
+
+For a development or test build, use Python 3.12 and the repository's pinned pnpm:
 
 ```sh
 pnpm install --frozen-lockfile
 python -m pip install -r apps/desktop/capture/requirements.txt
+python -m unittest discover -s apps/desktop/capture -p "test_*.py"
 pnpm --filter @guildie/desktop capture:build
-pnpm --filter @guildie/desktop build:win --publish never
+pnpm --filter @guildie/desktop build:win --publish never   # or build:mac, build:linux
 ```
 
-The helper must be built on Windows. Cross-packaging on a Mac requires the helper
-directory from a Windows build. macOS does not offer the automatic-capture setting.
+Build the helper on the OS it is for (PyInstaller does not cross-compile).
+On macOS the build ad-hoc signs every Mach-O file in it (Apple Silicon runs only
+signed code); `GUILDIE_CAPTURE_ARCH=universal2` builds a universal helper, which
+needs a universal2 Python. The tests need no dependencies and run on any OS.
 The old `--live-pixels-config` flag remains for manual diagnostic captures only.
 
 The additive `setLivePixels(boolean)` desktop bridge method requires the same
 main-frame/site-origin checks as other addon actions. Older apps simply omit it.
 The website shows the new controls only when the method exists. Use a site build with these controls when testing the updated desktop app.
+
+## macOS and Linux acceptance (not yet run)
+
+Run the Windows checklist below on each, plus:
+
+1. macOS: first start with capture enabled shows the Screen Recording dialog once,
+   naming Guildie; status says `permission` until it is allowed and Guildie reopened.
+   Capture on a Retina display (2×) and a non-Retina one, windowed and fullscreen,
+   small and large squares. Native client and, if possible, CrossOver. Update the
+   app and check whether Screen Recording still works.
+2. Linux on X11: Wine/Proton WoW, windowed and fullscreen, two monitors.
+3. Linux on Wayland (GNOME and KDE) with WoW under XWayland: either it receives, or
+   status turns `unsupported` within seconds instead of searching forever.
+4. Quit or kill the app: no `GuildieCapture` process remains.
 
 ## Windows acceptance checklist before release
 

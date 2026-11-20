@@ -222,10 +222,12 @@ app.whenReady().then(async () => {
 	}
 
 	let pixelConfig: CaptureConfig | undefined;
+	// The live-pixels helper (apps/desktop/capture), built per OS by capture:build.
+	const captureName = process.platform === "win32" ? "GuildieCapture.exe" : "GuildieCapture";
 	const captureExecutable = app.isPackaged
-		? join(process.resourcesPath, "capture", "GuildieCapture.exe")
-		: join(__dirname, "..", "capture", "dist", "GuildieCapture", "GuildieCapture.exe");
-	if (!smokeTest && process.platform === "win32" && existsSync(captureExecutable)) {
+		? join(process.resourcesPath, "capture", captureName)
+		: join(__dirname, "..", "capture", "dist", "GuildieCapture", captureName);
+	if (!smokeTest && existsSync(captureExecutable)) {
 		pixelConfig = { executable: captureExecutable, auto: true };
 	}
 	const pixelConfigPath = flag("--live-pixels-config");
