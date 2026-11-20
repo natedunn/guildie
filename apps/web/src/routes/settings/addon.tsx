@@ -9,7 +9,6 @@ import {
 	type AddonInfo,
 	type DesktopPlatform,
 	type DesktopStatus,
-	DOWNLOADS,
 	desktop,
 	RELEASES,
 	useDesktopPlatform,
@@ -161,9 +160,7 @@ function ManageAddon() {
 						</p>
 						<p className="mt-3" role="status">
 							{!status?.livePixelsAvailable
-								? platform === "win"
-									? "Requires a Windows build with live capture installed."
-									: `Not available on ${DOWNLOADS[platform].name} yet. Normal sync works.`
+								? "Requires a build of the app with live capture installed."
 								: !status.livePixelsEnabled
 									? "Capture off. Normal sync remains available."
 									: !status.connected
@@ -177,6 +174,10 @@ function ManageAddon() {
 												stale: "No recent data. Keep the square visible.",
 												stopped: "Capture stopped. Enable experimental sync in WoW and /reload to start.",
 												failed: "Capture failed. Turn it off and on to retry.",
+												permission:
+													"Allow Guildie in System Settings → Privacy & Security → Screen Recording, then reopen Guildie. After an app update you may need to turn it off and on there.",
+												unsupported:
+													"This desktop doesn't let apps capture WoW's window (Wayland). Run WoW under X11 or XWayland to use live capture. Normal sync works.",
 											}[status.livePixels ?? "waiting"]}
 						</p>
 					</div>

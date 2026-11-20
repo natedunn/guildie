@@ -19,9 +19,23 @@ export type PixelStatus =
 	| "searching"
 	| "calibrating"
 	| "receiving"
+	// macOS: the app lacks Screen Recording permission (System Settings › Privacy & Security).
+	| "permission"
+	// Linux: no X11 display to capture (pure Wayland), or XWayland only returns black images.
+	| "unsupported"
 	| "stale"
 	| "stopped"
 	| "failed";
+
+/** States the capture helper itself reports. */
+const helperStates: readonly PixelStatus[] = [
+	"waiting-game",
+	"searching",
+	"calibrating",
+	"receiving",
+	"permission",
+	"unsupported",
+];
 
 export function parsePixelConfig(value: unknown): PixelConfig {
 	if (!value || typeof value !== "object") throw new Error("Invalid pixel config");
@@ -113,8 +127,7 @@ export class LivePixels {
 		};
 		const lines = new PixelLines((channel, data) => {
 			if (channel === "status") {
-				if (!["waiting-game", "searching", "calibrating", "receiving"].includes(String(data.state)))
-					throw new Error("Invalid capture state");
+				if (!helperStates.includes(data.state as PixelStatus)) throw new Error("Invalid capture state");
 				this.setStatus(data.state as PixelStatus);
 				return;
 			}

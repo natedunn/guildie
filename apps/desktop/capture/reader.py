@@ -3,7 +3,8 @@ import argparse
 import json
 import time
 import zlib
-from discovery import candidates, RegionShot, foreground_wow, parent_watch
+from discovery import (candidates, RegionShot, foreground_wow, parent_watch, capture_problem,
+                       configure_capture, square_region, is_blank, wayland_session)
 
 
 def decode(values):
@@ -80,9 +81,19 @@ def main():
     if not 2 <= args.cell <= 64:
         parser.error("cell must be between 2 and 64")
     import mss
+    configure_capture(mss)
     if args.auto:
         parent_alive = parent_watch(args.parent_pid)
         if not parent_alive():
+            return
+        if capture_problem() == "unsupported":
+            # No X11 display to capture (pure Wayland): say so and stay quiet until the app exits.
+            emit("status", {"state": "unsupported"})
+            try:
+                while parent_alive():
+                    time.sleep(2)
+            except KeyboardInterrupt:
+                pass
             return
         with mss.mss() as capture:
             try:
@@ -123,6 +134,8 @@ def automatic(capture, parent_alive=lambda: True):
     region = None
     window = None
     pending = None
+    offset = [0, 0]
+    blank = 0
     confirmations = set()
     last_valid = 0
     assembler = Assembler()
@@ -135,6 +148,13 @@ def automatic(capture, parent_alive=lambda: True):
             last_state = value
 
     while parent_alive():
+        if region is None and pending is None:
+            problem = capture_problem()
+            if problem:
+                # macOS Screen Recording not granted (the app asks for it), or no X11 display.
+                status(problem)
+                time.sleep(2)
+                continue
         current = foreground_wow()
         if current != window:
             region, pending, window = None, None, current
@@ -145,15 +165,22 @@ def automatic(capture, parent_alive=lambda: True):
             time.sleep(0.5)
             continue
         if region is None and pending is None:
-            status("searching")
             shot = capture.grab(current)
+            if wayland_session() and is_blank(shot):
+                # XWayland under some compositors gives black images of other windows.
+                blank += 1
+                del shot
+                status("unsupported" if blank >= 3 else "searching")
+                time.sleep(2)
+                continue
+            blank = 0
+            status("searching")
             for x, y, cell, theme in candidates(shot):
                 try:
                     decode(sample_values(RegionShot(shot, x, y), cell, theme=theme))
                 except (ValueError, IndexError):
                     continue
-                pending = {"left": current["left"] + x, "top": current["top"] + y,
-                           "width": 16 * cell, "height": 16 * cell}
+                pending, *offset = square_region(current, shot, x, y, cell)
                 confirmations.clear()
                 last_valid = time.monotonic()
                 status("calibrating")
@@ -165,7 +192,11 @@ def automatic(capture, parent_alive=lambda: True):
             del shot
         target = region or pending
         try:
-            packet = decode(sample_values(capture.grab(target), cell, theme=theme))
+            shot = capture.grab(target)
+            if offset != [0, 0]:
+                shot = RegionShot(shot, *offset)
+            packet = decode(sample_values(shot, cell, theme=theme))
+            del shot
             last_valid = time.monotonic()
             if region is None:
                 confirmations.add(packet)

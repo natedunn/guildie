@@ -97,6 +97,13 @@ mac:
   icon: assets/guildie.icns
   category: public.app-category.games
   artifactName: Guildie-mac-${arch}.${ext}
+  extraResources:
+    # The live-pixels helper (capture:build). On macOS it's built universal2,
+    # so the universal merge keeps it as is.
+    - from: capture/dist/GuildieCapture
+      to: capture
+      filter:
+        - "**/*"
   hardenedRuntime: true
   # Electron 45's floor.
   minimumSystemVersion: "12.0"
@@ -116,3 +123,10 @@ linux:
   description: Guildie in its own window. Installs and updates the Guildie addon, uploads what it saves in game and downloads your guild's data for its tooltips.
   syncDesktopName: true
   artifactName: Guildie-linux-x86_64.${ext}
+  extraResources:
+    # The live-pixels helper (capture:build).
+    - from: capture/dist/GuildieCapture
+      to: capture
+      filter:
+        - "**/*"
+

@@ -18,6 +18,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 ### New
 
 - **Guildie, App:** Early alpha builds of the Guildie app for macOS and Linux, on a new Download page with all three systems. They're unfinished and untested with WoW, so each one explains what's likely to go wrong and asks you to confirm before downloading. The Mac build isn't signed by Apple yet. Windows stays the one to use.
+- **Guildie, App:** Experimental live sync (the in-game sync square) also works in the macOS and Linux alpha. On macOS, allow Guildie under Privacy & Security → Screen Recording. On Linux it needs WoW in an X11 or XWayland window.
 
 ## 0.3.49
 

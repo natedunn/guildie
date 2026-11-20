@@ -62,3 +62,39 @@ setInterval(() => {}, 1000);
 		rmSync(directory, { recursive: true, force: true });
 	}
 });
+
+test("helper statuses include permission and unsupported; unknown states fail", async () => {
+	const directory = mkdtempSync(join(tmpdir(), "guildie-pixel-test-"));
+	const reader = join(directory, "reader.cjs");
+	writeFileSync(
+		reader,
+		`
+for (const state of ["permission", "unsupported", "searching", "permission", "not-a-state"])
+	console.log(JSON.stringify({channel:"status",data:{state}}));
+setInterval(() => {}, 1000);
+`,
+	);
+	const states: PixelStatus[] = [];
+	let capture: LivePixels;
+	try {
+		await new Promise<void>((resolve, reject) => {
+			const timeout = setTimeout(() => reject(new Error("reader timeout")), 5_000);
+			capture = new LivePixels(
+				{ python: process.execPath, reader, left: 0, top: 0, cell: 2, theme: "amber" },
+				() => reject(new Error("no snapshot expected")),
+				(state) => {
+					states.push(state);
+					if (state === "failed") {
+						clearTimeout(timeout);
+						resolve();
+					}
+				},
+			);
+			capture.start();
+		});
+		assert.deepEqual(states, ["waiting", "permission", "unsupported", "searching", "permission", "stopped", "failed"]);
+	} finally {
+		capture!.stop();
+		rmSync(directory, { recursive: true, force: true });
+	}
+});

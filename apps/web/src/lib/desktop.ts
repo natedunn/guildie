@@ -73,7 +73,7 @@ export type DesktopStatus = {
 	notify?: Record<NotifyOption, boolean> & { reloadRemindersAvailable: boolean };
 	livePixelsEnabled?: boolean;
 	livePixelsAvailable?: boolean;
-	livePixels?: "waiting" | "waiting-game" | "searching" | "calibrating" | "receiving" | "stale" | "stopped" | "failed";
+	livePixels?: "waiting" | "waiting-game" | "searching" | "calibrating" | "receiving" | "stale" | "stopped" | "failed" | "permission" | "unsupported";
 	connected: boolean;
 	account?: string;
 	wowFolder?: string;
