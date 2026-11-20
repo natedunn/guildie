@@ -42,8 +42,8 @@ export type ProfessionUse = {
 	users: ProgressUser[];
 	/** Nobody can use it yet: the guildmate closest to `from`. */
 	closest?: { name: string; classId: number; skill: number };
-	/** Nobody can use it, though some are in range: none of them has learned a recipe for it (and no trainer was seen teaching one). */
-	unlearned?: true;
+	/** Nobody can use it, though some are in range: none of them has a recipe for it (and no trainer was seen teaching one). The first few, lower skill first. */
+	needRecipe?: { name: string; classId: number }[];
 	/** Nobody in the guild has the profession. */
 	nobody?: true;
 };
@@ -121,7 +121,7 @@ export function reagentProgress(
 			const candidates: Candidate[] = [];
 			let has = 0;
 			let closest: ProfessionUse["closest"];
-			let unlearned = false;
+			const inRange: { name: string; classId: number; skill: number }[] = [];
 			const top = Math.max(...list.map((x) => x.levels.grey));
 			for (const [i, m] of members.entries()) {
 				const p = known[i].get(profession);
@@ -148,7 +148,7 @@ export function reagentProgress(
 				if (best) candidates.push(best);
 				else if (skill < from) {
 					if (!closest || skill > closest.skill) closest = { name: m.name, classId: m.classId, skill };
-				} else if (skill < top) unlearned = true;
+				} else if (skill < top) inRange.push({ name: m.name, classId: m.classId, skill });
 			}
 			candidates.sort(better);
 			const users = candidates
@@ -156,14 +156,17 @@ export function reagentProgress(
 				.map(({ name, classId, skill, color }) => ({ name, classId, skill, color }));
 			if (users.length)
 				professions.push({ name: profession, from, count: candidates.length, users, best: candidates[0] });
-			else if (unlearned) professions.push({ name: profession, from, count: 0, users, unlearned: true });
-			else if (closest) professions.push({ name: profession, from, count: 0, users, closest });
+			else if (inRange.length) {
+				inRange.sort((a, b) => a.skill - b.skill || a.name.localeCompare(b.name));
+				const needRecipe = inRange.slice(0, SHOWN_PER_PROFESSION).map(({ name, classId }) => ({ name, classId }));
+				professions.push({ name: profession, from, count: 0, users, needRecipe });
+			} else if (closest) professions.push({ name: profession, from, count: 0, users, closest });
 			else if (!has) professions.push({ name: profession, from, count: 0, users, nobody: true });
 			// Everyone with it is past it: nothing to say.
 		}
 		if (!professions.length) continue;
-		// Professions with people first (best person first), then not learned, nobody yet, nobody has it.
-		const order = (p: (typeof professions)[number]) => (p.best ? 0 : p.unlearned ? 1 : p.closest ? 2 : 3);
+		// Professions with people first (best person first), then needs a recipe, needs skill, nobody has it.
+		const order = (p: (typeof professions)[number]) => (p.best ? 0 : p.needRecipe ? 1 : p.closest ? 2 : 3);
 		professions.sort(
 			(a, b) =>
 				order(a) - order(b) ||

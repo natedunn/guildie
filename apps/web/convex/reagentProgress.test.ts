@@ -96,7 +96,7 @@ test("unlearned recipes count only from a trainer's requirement, never from a pa
 	const pattern = run(members, [], [[1, 95]])[SILK].professions.find((p) => p.name === "Tailoring");
 	assert.equal(pattern?.users.length, 0);
 	assert.equal(pattern?.from, 95);
-	assert.equal(pattern?.unlearned, true);
+	assert.deepEqual(pattern?.needRecipe, [{ name: "Todd", classId: 8 }]);
 	assert.equal(pattern?.closest, undefined);
 });
 
@@ -129,6 +129,15 @@ test("professions with people first, best person first; vendor reagents and unkn
 		["First Aid", "Tailoring"],
 	);
 	assert.equal(out[2320], undefined);
+});
+
+test("needs a recipe: who's in range, lower skill first", () => {
+	const members = [130, 100, 115, 105, 50].map((skill, i) => member(`M${i}`, "Tailoring", skill));
+	const tailoring = run(members)[SILK].professions.find((p) => p.name === "Tailoring");
+	assert.deepEqual(
+		tailoring?.needRecipe?.map((m) => m.name),
+		["M2", "M0"],
+	);
 });
 
 test("caps at three, counting the rest", () => {

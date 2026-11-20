@@ -475,6 +475,9 @@ test("matchTrainer: only certain matches, at least skill 1", () => {
 		{ recipeId: 20, name: "Brown Linen Shirt", craftedItemId: 2 },
 		{ recipeId: 21, name: "Brown Linen Shirt", craftedItemId: 3 },
 		{ recipeId: 30, name: "Linen Cloak", craftedItemId: 4 },
+		{ recipeId: 1848, name: "Smelt Tin", craftedItemId: 3576 },
+		{ recipeId: 40, name: "Wool Bandage", craftedItemId: 5 },
+		{ recipeId: 41, name: "Wool Bandage (old)", craftedItemId: 5 },
 	];
 	const out = matchTrainer(
 		[
@@ -484,6 +487,8 @@ test("matchTrainer: only certain matches, at least skill 1", () => {
 			{ name: "Brown Linen Shirt", skill: 10 }, // no item: can't tell
 			{ name: "Linen Cloak", skill: 0 },
 			{ name: "Journeyman Tailoring", skill: 50 }, // a rank, not a recipe
+			{ name: "Tin Bar", itemId: 3576, skill: 65 }, // smelting: named for the bar, matched by it
+			{ name: "Heavy Wool Bandage", itemId: 5, skill: 80 }, // the item fits two recipes: skipped
 		],
 		catalog,
 	);
@@ -491,7 +496,8 @@ test("matchTrainer: only certain matches, at least skill 1", () => {
 		{ recipeId: 2376, skill: 100 },
 		{ recipeId: 21, skill: 10 },
 		{ recipeId: 30, skill: 1 },
+		{ recipeId: 1848, skill: 65 },
 	]);
-	assert.equal(out.ambiguous, 2);
+	assert.equal(out.ambiguous, 3);
 	assert.equal(out.unmatched, 1);
 });

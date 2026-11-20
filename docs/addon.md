@@ -250,10 +250,11 @@ your last login or reload.
   skill it asks for. Ranked by the color their best one shows in the
   profession window (orange, yellow, green), then fewer of the reagent per
   craft, then how far into the color, then lower skill; grey is left out.
-  The best 3 per profession and how many in all. When nobody counts: the
-  guildmate closest to the lowest skill it's used from ("Nobody yet"), that
-  those in range haven't learned a recipe for it, or that nobody has the
-  profession; a profession everyone is past is left out. Every profession,
+  The best 3 per profession and how many in all. When nobody counts, what's
+  missing: those in range who have no recipe for it (`needRecipe`, 3, lower
+  skill first), else the lowest skill it's used from (`from`) and the
+  guildmate closest to it, else that nobody has the profession; a
+  profession everyone is past is left out. Every profession,
   gathering ones' camping recipes, Cooking and First Aid included; reagents
   vendors sell left out. Your own characters left out.
 - The older `reagents` (until 0.23.0 addons are gone): guild members whose known recipes use it, most recipes
@@ -274,9 +275,9 @@ your last login or reload.
   rows (0.24.0): a row per profession, then its people indented once more,
   each with their skill in the color and with the arrow their profession
   window shows (`Professions-Icon-Skill-High`, `-Medium`, `-Low`), then "+2
-  more". With nobody listed, the profession row says "from 125" and the next
-  says why: "Nobody yet (Brenna 98)", "No one has learned it yet" or "Nobody
-  has it". Someone on a request row above isn't listed again. With a
+  more". With nobody listed, the next row says what's missing: "Needs a
+  recipe: Todd, Brenna", "Needs 140 skill: Miller 110" or "No one in the
+  guild". Someone on a request row above isn't listed again. With a
   GuildieData.lua from before `reagentUse`: "Brenna | might want (Tailoring,
   Alchemy)", up to 8, then "+2 more". With "Say
   why tooltips have nothing" ticked in the `/guildie` window

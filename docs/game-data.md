@@ -159,7 +159,8 @@ It's the same for every player, so one visit covers everyone.
 
 - `convex/learnLevels.ts` matches each read to Blizzard's recipe ids by name
   within the profession (and the crafted item when two recipes share a
-  name); anything ambiguous is skipped. One row per recipe in
+  name, or when the name matches none: smelting's trainer lists "Tin Bar"
+  for "Smelt Tin"); anything ambiguous is skipped. One row per recipe in
   `recipeLearnLevels`, the newest read winning, with the recipe's yellow and
   grey levels at the time. If a game update changes those, the row stops
   counting until someone reads a trainer again. A requirement above the
