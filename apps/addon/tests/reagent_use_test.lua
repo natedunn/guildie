@@ -98,20 +98,28 @@ test("the profession window's arrows, when the client has them", function()
     eq(plain(lines[4]), "   Sela | [Low] 116")
 end)
 
-test("nobody: closest, not learned, nobody has it", function()
+test("nobody listed: what's missing, and who", function()
     local ns = load(data({
-        { name = "Tailoring", from = 175, count = 0, users = {}, unlearned = true },
+        { name = "Tailoring", from = 175, count = 0, users = {},
+          needRecipe = { { name = "Todd", classId = 1 }, { name = "Lich", classId = 5 }, { name = "Brenna", classId = 8 } } },
         { name = "First Aid", from = 210, count = 0, users = {}, closest = { name = "Miller", classId = 11, skill = 160 } },
         { name = "Engineering", from = 150, count = 0, users = {}, nobody = true },
     }))
     local lines = hover(ns, SILK)
     eq(#lines, 6)
-    eq(plain(lines[1]), "Tailoring | from 175")
-    eq(plain(lines[2]), "   No one has a recipe that uses it")
-    eq(plain(lines[3]), "First Aid | from 210")
-    eq(plain(lines[4]), "   Nobody yet (Miller 160)")
-    eq(plain(lines[5]), "Engineering | from 150")
-    eq(plain(lines[6]), "   Nobody has it")
+    eq(lines[1], "Tailoring", "no \"from\"")
+    eq(plain(lines[2]), "   Needs a recipe: Todd, Brenna", "not my own characters")
+    eq(lines[3], "First Aid")
+    eq(plain(lines[4]), "   Needs 210 skill: Miller 160")
+    eq(lines[5], "Engineering")
+    eq(plain(lines[6]), "   No one in the guild")
+end)
+
+test("needs a recipe, but they're all on a request row: no block", function()
+    local d = data({ { name = "Tailoring", from = 175, count = 0, users = {}, needRecipe = { { name = "Todd", classId = 1 } } } })
+    d.requests = { [SILK] = { { kind = "item", ongoing = true, name = "Todd", classId = 1 } } }
+    local lines = hover(load(d), SILK)
+    eq(#lines, 1, "the request only")
 end)
 
 test("someone with a request for it is on the request row, not listed again", function()

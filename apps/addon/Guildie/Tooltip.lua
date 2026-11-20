@@ -104,10 +104,11 @@ ns.skillText = skillText
 
 --- Who'd get the most profession progress out of this reagent
 --- (GuildieData.reagentUse, addon 0.24.0; reagentProgress.ts): per profession
---- whose recipes use it, "Tailoring | from 125", then the best few
---- guildmates with their skill ("Todd | ^^ 131", in the window's colors),
---- "+2 more", or why nobody: "Nobody yet (Brenna 152)", "No one has learned
---- it yet", "Nobody has it". `skip`: names already on a request row.
+--- whose recipes use it, "Tailoring", then the best few guildmates with
+--- their skill ("Todd | ^^ 131", in the window's colors), "+2 more", or
+--- what's missing: "Needs a recipe: Todd, Brenna" (in range, none has one),
+--- "Needs 140 skill: Miller 110" (the closest), "No one in the guild".
+--- `skip`: names already on a request row.
 local function useRows(itemID, skip)
     local data = GuildieData and type(GuildieData.reagentUse) == "table" and GuildieData.reagentUse
     local entry = data and data[itemID]
@@ -115,8 +116,6 @@ local function useRows(itemID, skip)
     local rows = {}
     for _, p in ipairs(entry.professions) do
         if type(p) == "table" and p.name then
-            -- "from" only when nobody's listed: someone who knows a recipe gets
-            -- skill-ups below it (its learn level isn't always known).
             local header = { left = p.name }
             table.insert(rows, header)
             local shown, hidden = 0, 0
@@ -132,20 +131,25 @@ local function useRows(itemID, skip)
             if more > 0 then
                 table.insert(rows, { left = SUB .. string.format("+%d more", more) })
             elseif shown == 0 then
-                header.right = p.from and ("from " .. p.from) or nil
                 local why
-                if p.unlearned then
-                    why = "No one has a recipe that uses it"
-                elseif type(p.closest) == "table" and p.closest.name then
-                    why = string.format("Nobody yet (%s %s)", classColored(p.closest.name, p.closest.classId),
-                        tostring(p.closest.skill))
+                if type(p.needRecipe) == "table" then
+                    local names = {}
+                    for _, m in ipairs(p.needRecipe) do
+                        if m.name and not isMine(m.name) and not (skip and skip[m.name]) then
+                            table.insert(names, classColored(m.name, m.classId))
+                        end
+                    end
+                    if #names > 0 then why = "Needs a recipe: " .. table.concat(names, ", ") end
+                elseif type(p.closest) == "table" and p.closest.name and p.from then
+                    why = string.format("Needs %s skill: %s %s", tostring(p.from),
+                        classColored(p.closest.name, p.closest.classId), tostring(p.closest.skill))
                 elseif p.nobody then
-                    why = "Nobody has it"
+                    why = "No one in the guild"
                 end
                 if why then
                     table.insert(rows, { left = SUB .. why })
                 else
-                    -- Everyone listed is already on a request row above.
+                    -- Everyone it'd name is already on a request row above.
                     table.remove(rows)
                 end
             end
