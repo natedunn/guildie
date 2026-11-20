@@ -3,12 +3,23 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalQuery, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { anyUnknown, foldersFor } from "./addonCatalog";
-import { type AddonCharacter, LIMITS, matchRecipes, parseCharacter } from "./addonPayload";
+import {
+	type AddonCharacter,
+	blizzardIdFromGuid,
+	LIMITS,
+	lastClaimAt,
+	matchRecipes,
+	parseCharacter,
+	parseTrainers,
+	type TrainerRead,
+} from "./addonPayload";
 import { type AddonView, addonView } from "./addonView";
 import { sha256 } from "./claims";
 import { noteLevel } from "./feed";
+import { storeTrainers } from "./learnLevels";
 import { forGame, takeToasts as takeToastsFor } from "./notifications";
 import { addRecipes, dropGoneRecipes, mergeProfile, type Profession } from "./profile";
+import { type ReagentUse, reagentProgress } from "./reagentProgress";
 import { type ReagentRecipe, type ReagentUser, reagentSuggestions, reagentsNeedingQuality } from "./reagentSuggestions";
 import { heldUnlearned, recipeItemsFor } from "./recipeItems";
 import { type AddonCraft, type AddonRequest, addonRequests, refreshMats } from "./requests";
@@ -20,6 +31,7 @@ import { mergeCompletedQuestIds } from "./shared/quests";
 import { addonRecipes, type PackedAddonRecipes, packAddonRecipes } from "./shared/recipeStatus";
 import { type Rules, type UpgradeMember, upgradeRules } from "./shared/upgrades";
 import { trackedReagents } from "./tracking";
+import { noteUnclaimed } from "./unclaimed";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
 
@@ -104,11 +116,6 @@ export const whoami = query({
 });
 
 /** The number in Player-<server>-<hex>: Blizzard's character id. */
-function blizzardIdFromGuid(guid: string) {
-	const hex = guid.match(/^Player-\d+-([0-9A-Fa-f]+)$/)?.[1];
-	return hex ? Number.parseInt(hex, 16) : undefined;
-}
-
 async function treesFromRanks(ctx: MutationCtx, talents: AddonCharacter["talents"]) {
 	const trees = new Map<string, Infer<typeof vTalentTree>>();
 	for (const t of talents) {
@@ -149,8 +156,13 @@ const baseName = (item: { name: string; suffixId?: number }) =>
  * (another computer, say) never replaces newer data.
  */
 export const ingest = mutation({
-	args: { token: v.string(), version: v.optional(v.number()), characters: v.array(v.any()) },
-	handler: async (ctx, { token, version, characters }) => {
+	args: {
+		token: v.string(),
+		version: v.optional(v.number()),
+		characters: v.array(v.any()),
+		trainers: v.optional(v.array(v.any())),
+	},
+	handler: async (ctx, { token, version, characters, trainers }) => {
 		const row = await tokenOwner(ctx, token);
 		if (!row) throw new ConvexError("Unknown or revoked token");
 		const now = Date.now();
@@ -163,6 +175,7 @@ export const ingest = mutation({
 			.query("ownedCharacters")
 			.withIndex("by_user", (q) => q.eq("userId", row.userId))
 			.collect();
+		const claimedAt = lastClaimAt(owned);
 		const accepted: string[] = [];
 		let inventoryChanged = false;
 		// The addons running: account-wide, so the newest read in this upload.
@@ -194,7 +207,8 @@ export const ingest = mutation({
 			const c = parsed.character;
 			const match = matchOwned(owned, c);
 			if (!match) {
-				unmatched.push(c.name);
+				// Skipped quietly when it's gone from the account or the player forgot it (unclaimed.ts).
+				if (await noteUnclaimed(ctx, row.userId, c, claimedAt, now)) unmatched.push(c.name);
 				continue;
 			}
 			const key = { flavor: match.flavor, region: match.region, slug: match.slug };
@@ -367,6 +381,17 @@ export const ingest = mutation({
 		// A newer bag or bank read: re-check the player's open craft requests.
 		if (inventoryChanged) await refreshMats(ctx, row.userId);
 		if (addons) await storeAddons(ctx, row.userId, addons, now);
+		// Trainer windows the addon read: game facts, not a character's, so they
+		// count from any signed-in player, and a bad one only drops the trainers.
+		if (trainers?.length) {
+			let reads: TrainerRead[] | undefined;
+			try {
+				reads = parseTrainers(trainers, now);
+			} catch (error) {
+				console.warn(`helper.ingest: trainers dropped: ${(error as Error).message}`);
+			}
+			if (reads?.length) await storeTrainers(ctx, row.userId, reads, now);
+		}
 		return { accepted, unmatched, rejected };
 	},
 });
@@ -640,6 +665,14 @@ export type GuildData = {
 	recipesInCatalog: number;
 	reagents: Record<string, { name: string; users: ReagentUser[] }>;
 	/**
+	 * Who'd get the most profession progress out of each reagent (addon
+	 * 0.24.0+; older addons read `reagents`): per profession whose recipes
+	 * use it, the guildmates for whom one still gives skill-ups, best first,
+	 * with the color their profession window shows it in (reagentProgress.ts).
+	 * Pairs inside Convex; the HTTP route makes it an object by item id.
+	 */
+	reagentUse: ReagentUse;
+	/**
 	 * Gear-upgrade suggestions (addon 0.5.0+; older addons ignore it): the
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
 	 * active guildmate with the scores of what they wear.
@@ -850,6 +883,17 @@ export const guildData = action({
 			]),
 		);
 		const reagents = reagentSuggestions(base.guilds, recipes, quality);
+		const mine = new Set(base.mine);
+		// A character in two of the player's guilds counts once.
+		const members = new Map(
+			base.guilds.flatMap((g) => g.members.filter((m) => !mine.has(m.name)).map((m) => [`${g.region}:${m.slug}`, m])),
+		);
+		const reagentUse = reagentProgress(
+			[...members.values()],
+			await ctx.runQuery(internal.recipes.forProgress, {}),
+			new Map(await ctx.runQuery(internal.learnLevels.all, {})),
+			new Map(await ctx.runQuery(internal.learnLevels.patternSkills, {})),
+		);
 		const rules = upgradeRules();
 		return {
 			version: 1,
@@ -859,6 +903,7 @@ export const guildData = action({
 			recipesKnown: ids.length,
 			recipesInCatalog: recipes.size,
 			reagents,
+			reagentUse,
 			upgrades: {
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },

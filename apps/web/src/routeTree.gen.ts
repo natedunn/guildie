@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AddonRouteImport } from './routes/addon'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DataRouteImport } from './routes/data'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as MeRouteImport } from './routes/me'
@@ -18,6 +19,7 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as QuestsRouteImport } from './routes/quests'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AuthRefreshRouteImport } from './routes/auth/refresh'
 import { Route as AuthSigninRouteImport } from './routes/auth/signin'
 import { Route as AuthSignoutRouteImport } from './routes/auth/signout'
@@ -64,6 +66,11 @@ const AddonRoute = AddonRouteImport.update({
   path: '/addon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DataRoute = DataRouteImport.update({
   id: '/data',
   path: '/data',
@@ -98,6 +105,11 @@ const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AuthRefreshRoute = AuthRefreshRouteImport.update({
   id: '/auth/refresh',
@@ -280,6 +292,7 @@ const GRegionSlugDungeonsDungeonRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
+  '/admin': typeof AdminRouteWithChildren
   '/data': typeof DataRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
@@ -297,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/settings/addon': typeof SettingsAddonRoute
   '/settings/app': typeof SettingsAppRoute
   '/settings/guilds': typeof SettingsGuildsRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
@@ -342,6 +356,7 @@ export interface FileRoutesByTo {
   '/settings/addon': typeof SettingsAddonRoute
   '/settings/app': typeof SettingsAppRoute
   '/settings/guilds': typeof SettingsGuildsRoute
+  '/admin': typeof AdminIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
@@ -370,6 +385,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/addon': typeof AddonRoute
+  '/admin': typeof AdminRouteWithChildren
   '/data': typeof DataRoute
   '/inventory': typeof InventoryRoute
   '/me': typeof MeRoute
@@ -387,6 +403,7 @@ export interface FileRoutesById {
   '/settings/addon': typeof SettingsAddonRoute
   '/settings/app': typeof SettingsAppRoute
   '/settings/guilds': typeof SettingsGuildsRoute
+  '/admin/': typeof AdminIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/api/helper/guild-data': typeof ApiHelperGuildDataRoute
   '/api/helper/me': typeof ApiHelperMeRoute
@@ -418,6 +435,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/addon'
+    | '/admin'
     | '/data'
     | '/inventory'
     | '/me'
@@ -435,6 +453,7 @@ export interface FileRouteTypes {
     | '/settings/addon'
     | '/settings/app'
     | '/settings/guilds'
+    | '/admin/'
     | '/settings/'
     | '/api/helper/guild-data'
     | '/api/helper/me'
@@ -480,6 +499,7 @@ export interface FileRouteTypes {
     | '/settings/addon'
     | '/settings/app'
     | '/settings/guilds'
+    | '/admin'
     | '/settings'
     | '/api/helper/guild-data'
     | '/api/helper/me'
@@ -507,6 +527,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/addon'
+    | '/admin'
     | '/data'
     | '/inventory'
     | '/me'
@@ -524,6 +545,7 @@ export interface FileRouteTypes {
     | '/settings/addon'
     | '/settings/app'
     | '/settings/guilds'
+    | '/admin/'
     | '/settings/'
     | '/api/helper/guild-data'
     | '/api/helper/me'
@@ -554,6 +576,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AddonRoute: typeof AddonRoute
+  AdminRoute: typeof AdminRouteWithChildren
   DataRoute: typeof DataRoute
   InventoryRoute: typeof InventoryRoute
   MeRoute: typeof MeRoute
@@ -592,6 +615,13 @@ declare module '@tanstack/react-router' {
       path: '/addon'
       fullPath: '/addon'
       preLoaderRoute: typeof AddonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/data': {
@@ -642,6 +672,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/auth/refresh': {
       id: '/auth/refresh'
@@ -891,6 +928,16 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminRouteChildren {
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsAddonRoute: typeof SettingsAddonRoute
   SettingsAppRoute: typeof SettingsAppRoute
@@ -974,6 +1021,7 @@ const GRegionSlugRouteWithChildren = GRegionSlugRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AddonRoute: AddonRoute,
+  AdminRoute: AdminRouteWithChildren,
   DataRoute: DataRoute,
   InventoryRoute: InventoryRoute,
   MeRoute: MeRoute,

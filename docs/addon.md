@@ -97,7 +97,13 @@ used); the account page lists them with Disconnect.
 - `POST /api/helper/snapshot`, body (≤ 2 MB): the addon's payload as saved,
   `{ "version": 7, "characters": [ ... ] }` (versions 1, talents and level
   only, 2, without `inventory`, 3, without `quests`, 4, without `completedQuestIds`, 5, without `deliveries`, and 6, without `addons`, are still accepted) → `{ accepted: [slug], unmatched: [name], rejected: [name] }`.
-  One upload per 5 s per token, at most 50 characters. A character, version 2:
+  One upload per 5 s per token, at most 50 characters. Beside `characters`,
+  optional `trainers` (0.24.0, still version 7): what profession trainers'
+  windows listed, `[{ profession, capturedAt, build, unavailableShown,
+  services: [{ name, item?, skill }] }]` (`skill` is what the trainer asks
+  for to learn it, 0 for nothing). They're game facts, not a character's, so
+  any signed-in player's count; a bad list is dropped without touching the
+  characters. See docs/game-data.md, "Learn levels". A character, version 2:
 
   ```jsonc
   {
@@ -236,7 +242,22 @@ your last login or reload.
 
 - Only guilds the token's claimed characters are in (so members-only guilds
   work, and nobody else's guild is downloaded).
-- For each reagent: guild members whose known recipes use it, most recipes
+- For each reagent (`reagentUse`, 0.24.0): per profession whose recipes use
+  it, the guildmates who'd get the most profession progress out of it
+  (`convex/reagentProgress.ts`). Someone counts when one of those recipes
+  still gives them skill-ups: one they know, at their skill, or one a trainer
+  was seen teaching (docs/game-data.md, "Learn levels"), once they have the
+  skill it asks for. Ranked by the color their best one shows in the
+  profession window (orange, yellow, green), then fewer of the reagent per
+  craft, then how far into the color, then lower skill; grey is left out.
+  The best 3 per profession and how many in all. When nobody counts, what's
+  missing: those in range who have no recipe for it (`needRecipe`, 3, lower
+  skill first), else the lowest skill it's used from (`from`) and the
+  guildmate closest to it, else that nobody has the profession; a
+  profession everyone is past is left out. Every profession,
+  gathering ones' camping recipes, Cooking and First Aid included; reagents
+  vendors sell left out. Your own characters left out.
+- The older `reagents` (until 0.23.0 addons are gone): guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
   weekly) and each member's known recipes (with their profile, hourly), in
   `convex/reagentSuggestions.ts`. Left out: Cooking, Fishing and First Aid
@@ -251,8 +272,14 @@ your last login or reload.
   the class-colored name, and what Guildie knows in muted grey. Requests
   first, then recipe items, then reagents, then upgrades. The hook goes on at `PLAYER_LOGIN`,
   so other addons' lines (added at load) come before the block. Reagent
-  rows, skipping your own characters, up to 8 (all the site sends):
-  "Brenna | might want (Tailoring, Alchemy)", then "+2 more". With "Say
+  rows (0.24.0): a row per profession, then its people indented once more,
+  each with their skill in the color and with the arrow their profession
+  window shows (`Professions-Icon-Skill-High`, `-Medium`, `-Low`), then "+2
+  more". With nobody listed, the next row says what's missing: "Needs a
+  recipe: Todd, Brenna", "Needs 140 skill: Miller 110" or "No one in the
+  guild". Someone on a request row above isn't listed again. With a
+  GuildieData.lua from before `reagentUse`: "Brenna | might want (Tailoring,
+  Alchemy)", up to 8, then "+2 more". With "Say
   why tooltips have nothing" ticked in the `/guildie` window
   (`GuildieDB.settings.sayWhyEmpty`, on by default), an item with nothing
   to show gets one row instead: "Soulbound, can't be traded" (or Binds when
@@ -651,6 +678,16 @@ sees their own.
 - The GUID's number equals Blizzard's character id, so uploads match on id.
 
 ## Not verified yet
+
+- The 0.24.0 trainer read in Forever: `GetNumTrainerServices`,
+  `GetTrainerServiceInfo`, `GetTrainerServiceSkillReq` (from Forever's own
+  trainer window code), whether the list includes recipes the character
+  can't learn yet (the "Unavailable" filter, `GetTrainerServiceTypeFilter`;
+  each read says), what a trainer lists for someone without the profession,
+  and `TRAINER_SHOW`/`TRAINER_UPDATE`. Also that the arrows draw inline
+  (`|A:Professions-Icon-Skill-High:12:10|a`; without the atlas the skill
+  shows in its color alone). `learnLevels:coverage` shows how many recipes
+  have a learn level.
 
 - The addon list (payload 7): that `C_AddOns.GetAddOnInfo` and
   `IsAddOnLoaded` take an index in Forever, and that `GetNumAddOns` leaves

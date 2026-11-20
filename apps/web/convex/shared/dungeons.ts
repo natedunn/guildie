@@ -162,6 +162,8 @@ export type QuestGroup = {
 	startsInside?: true;
 	/** Turned in inside the dungeon (ENDS_INSIDE). */
 	endsInside?: true;
+	/** Optional: only leads to the next step, which can be had without it. */
+	breadcrumb?: true;
 };
 
 /** The dungeon's quests as rows, each chain's later steps under the one before, in display order. */
@@ -178,6 +180,7 @@ export function questGroups(quests: DungeonQuest[]): QuestGroup[] {
 		g.ids.push(q.id);
 		if (STARTS_INSIDE.has(q.id)) g.startsInside = true;
 		if (ENDS_INSIDE.has(q.id)) g.endsInside = true;
+		if (DUNGEON_QUEST_FACTS[q.id]?.breadcrumb) g.breadcrumb = true;
 		groupOf.set(q.id, g);
 	}
 	for (const q of quests) {
@@ -331,12 +334,14 @@ export type MemberQuests = {
  *   in their log or done;
  * - questsCompleted: every quest of theirs is turned in (undefined when their
  *   turned-in quests aren't known).
+ * Breadcrumbs are optional: they count for neither.
  * A dungeon with no quests for them is never quest ready or completed.
  */
 export function memberStatus(d: Pick<Dungeon, "level">, groups: QuestGroup[], m: MemberQuests) {
-	const theirs = groups.filter((g) => !g.classes || g.classes.includes(m.classId));
+	const theirs = groups.filter((g) => (!g.classes || g.classes.includes(m.classId)) && !g.breadcrumb);
 	const keys = new Set(theirs.map((g) => g.key));
-	// What they can have before going in: not a chain's later steps, not quests that start inside.
+	// What they can have before going in: not a chain's later steps (a breadcrumb's next step is
+	// to be had without it), not quests that start inside.
 	const toPickUp = theirs.filter((g) => (!g.parent || !keys.has(g.parent)) && !g.startsInside);
 	const isDone = (g: QuestGroup) => g.ids.some((id) => m.completed?.has(id));
 	const inLog = (g: QuestGroup) => !isDone(g) && g.ids.some((id) => m.inProgress.has(id));

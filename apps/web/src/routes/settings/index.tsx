@@ -10,7 +10,7 @@ import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-r
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { ConvexError } from "convex/values";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { AddonShareControl } from "@/components/addon-list";
 import { AiConnections } from "@/components/ai-connections";
 import { ClassText } from "@/components/class-name";
@@ -100,6 +100,7 @@ function Account() {
 					</p>
 				)}
 				<ClaimCharacters />
+				<UnclaimedCharacters />
 			</section>
 
 			<section id="privacy" className="mt-10 scroll-mt-4">
@@ -293,6 +294,68 @@ function ClaimCharacters() {
 				{pending ? "Heading to Battle.net…" : "Refresh my characters"}
 			</Button>
 			{error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+		</div>
+	);
+}
+
+/**
+ * Characters the addon uploads that aren't claimed (convex/unclaimed.ts): a
+ * new one to add by refreshing, or a deleted one to forget so the app stops
+ * asking. Shown only while there are any; the app's "not claimed" notice opens it.
+ */
+function UnclaimedCharacters() {
+	const { data } = useQuery(convexQuery(api.unclaimed.mine, {}));
+	const forget = useMutation(api.unclaimed.forget);
+	const shown = !!data?.length;
+	// The app's notice links here; the list loads after the page, so scroll once it's in.
+	useEffect(() => {
+		if (shown && window.location.hash === "#unclaimed") document.getElementById("unclaimed")?.scrollIntoView();
+	}, [shown]);
+	if (!data?.length) return null;
+	return (
+		<div id="unclaimed" className="mt-8 scroll-mt-4">
+			<SectionTitle>The addon also saw</SectionTitle>
+			<p className="mt-1 text-[0.8125rem] text-muted-foreground">
+				Characters you played in game that aren't on your list above. If one is new, refresh your characters to add it.
+				If you deleted it, forget it, and Guildie stops asking about it.
+			</p>
+			<div className="surface-card mt-3 overflow-hidden">
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead>Name</TableHead>
+							<TableHead>Class</TableHead>
+							<TableHead className="text-right">Level</TableHead>
+							<TableHead>Last played</TableHead>
+							<TableHead className="w-0">
+								<span className="sr-only">Forget</span>
+							</TableHead>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
+						{data.map((c) => (
+							<TableRow key={c.blizzardId}>
+								<TableCell className="font-medium">
+									<ClassText classId={c.classId}>{c.name}</ClassText>
+								</TableCell>
+								<TableCell className="text-muted-foreground">{c.classId ? className(c.classId) : ""}</TableCell>
+								<TableCell className="num text-right">{c.level ?? ""}</TableCell>
+								<TableCell className="text-muted-foreground">{ago(c.lastPlayedAt)}</TableCell>
+								<TableCell className="py-1">
+									<Button
+										variant="ghost"
+										size="sm"
+										className="text-muted-foreground"
+										onClick={() => void forget({ blizzardId: c.blizzardId })}
+									>
+										Forget
+									</Button>
+								</TableCell>
+							</TableRow>
+						))}
+					</TableBody>
+				</Table>
+			</div>
 		</div>
 	);
 }

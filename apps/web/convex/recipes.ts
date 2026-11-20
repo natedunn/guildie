@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { appToken, blizzardGet } from "./blizzard";
+import { recipeSkill } from "./shared/recipeSkills";
 
 // Forever's recipe catalog: every profession's recipes and their reagents,
 // from Blizzard's static data (the same in every region, so read from US).
@@ -163,5 +164,16 @@ export const byIds = internalQuery({
 		return rows
 			.filter((r) => r !== null)
 			.map(({ recipeId, profession, name, reagents }) => ({ recipeId, profession, name, reagents }));
+	},
+});
+
+/** Every recipe whose colors the game data gives, with its reagents (reagentProgress.ts, for guildData). */
+export const forProgress = internalQuery({
+	args: {},
+	handler: async (ctx) => {
+		const all = await ctx.db.query("recipes").collect();
+		return all
+			.filter((r) => recipeSkill(r.recipeId))
+			.map(({ recipeId, profession, reagents }) => ({ recipeId, profession, reagents }));
 	},
 });

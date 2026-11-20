@@ -243,7 +243,15 @@ function QuestList({ items, viewer }: { items: Item[]; viewer?: Person }) {
 			{items.map((item) =>
 				item.kind === "quest" ? (
 					<li key={item.key} className="px-3 py-2">
-						<QuestLine ids={item.ids} id={item.id} title={item.title} level={item.level} here={item} viewer={viewer} />
+						<QuestLine
+							ids={item.ids}
+							id={item.id}
+							title={item.title}
+							level={item.level}
+							here={item}
+							viewer={viewer}
+							breadcrumb={item.breadcrumb}
+						/>
 					</li>
 				) : (
 					<li key={item.steps[0].id} className="px-3 py-2">
@@ -263,6 +271,13 @@ function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
 	const near = (i: number) =>
 		i === 0 || i === steps.length - 1 || steps.slice(Math.max(0, i - 1), i + 2).some((s) => s.here);
 	const shown = all || steps.length <= SHOW_ALL_UP_TO ? steps.map(() => true) : steps.map((_, i) => near(i));
+	// A step the viewer went past: one after it (on its branch) is in their log or turned in.
+	const taken = (s: Step) =>
+		viewer?.questsDone?.some((q) => s.ids.includes(q)) || viewer?.questsInLog.some((q) => s.ids.includes(q));
+	const passed = (i: number) => {
+		for (let j = i + 1; j < steps.length && steps[j].step > steps[i].step; j++) if (taken(steps[j])) return true;
+		return false;
+	};
 	return (
 		<div>
 			<p className="text-xs font-medium text-muted-foreground">Chain</p>
@@ -283,6 +298,8 @@ function Chain({ steps, viewer }: { steps: Step[]; viewer?: Person }) {
 										here={s.here}
 										viewer={viewer}
 										inChain
+										breadcrumb={s.breadcrumb}
+										passed={passed(i)}
 									/>
 								</div>
 							</li>
@@ -323,6 +340,8 @@ function QuestLine({
 	here,
 	viewer,
 	inChain,
+	breadcrumb,
+	passed,
 }: {
 	ids: number[];
 	id: number;
@@ -332,19 +351,27 @@ function QuestLine({
 	viewer?: Person;
 	/** A chain's step: its steps elsewhere get no line, its steps here always one. */
 	inChain?: boolean;
+	/** Optional: it only leads to the next step, which can be had without it. */
+	breadcrumb?: boolean;
+	/** The viewer has a later step of its chain, so they're past this one. */
+	passed?: boolean;
 }) {
 	const done = viewer?.questsDone?.some((q) => ids.includes(q));
 	const inLog = !done && viewer?.questsInLog.some((q) => ids.includes(q));
 	// Another class's quest isn't theirs to pick up; "not picked up" only when their turned-in quests are known.
 	const otherClass = !!viewer && !!here?.classes && !here.classes.includes(viewer.classId);
+	// A breadcrumb they went past was skipped; one they haven't isn't needed.
+	const skipped = !done && !inLog && !!breadcrumb && !!passed;
 	// One that starts inside can't be had yet; the line under its title says so.
-	const notPickedUp = !done && !inLog && !otherClass && !here?.startsInside && !!viewer?.questsDone;
+	const notPickedUp =
+		!done && !inLog && !otherClass && !breadcrumb && !passed && !here?.startsInside && !!viewer?.questsDone;
 	// Under the title: where it starts and ends, and the class it's for.
 	const facts: ReactNode[] = [];
 	const where = (label: string) => <span className="text-[10px] font-medium tracking-wider uppercase">{label}</span>;
 	if (here?.startsInside) facts.push(where("Starts inside"));
 	if (here?.endsInside) facts.push(where("Ends inside"));
 	if (here && inChain && !facts.length) facts.push(where("Done inside"));
+	if (breadcrumb) facts.unshift(inChain ? <>{where("Optional")} · Leads to the next step</> : where("Optional"));
 	if (here?.classes?.length) {
 		facts.push(
 			<>
@@ -370,7 +397,10 @@ function QuestLine({
 					target="_blank"
 					rel="noreferrer"
 					title="Open on Wowhead"
-					className="min-w-0 flex-1 truncate text-[0.8125rem] underline-offset-4 hover:underline"
+					className={cn(
+						"min-w-0 flex-1 truncate text-[0.8125rem] underline-offset-4 hover:underline",
+						skipped && "text-muted-foreground",
+					)}
 				>
 					{title}
 				</a>
@@ -378,6 +408,8 @@ function QuestLine({
 					<DoneMark label={`${viewer?.name} turned it in`} />
 				) : inLog ? (
 					<span className="flex-none text-xs text-muted-foreground">In log</span>
+				) : skipped ? (
+					<span className="flex-none text-xs text-muted-foreground/70">Skipped</span>
 				) : notPickedUp ? (
 					<span className="flex-none text-xs text-muted-foreground/70">Not picked up</span>
 				) : otherClass ? (
