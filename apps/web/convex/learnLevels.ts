@@ -1,7 +1,9 @@
 import type { Id } from "./_generated/dataModel";
-import { internalQuery, type MutationCtx } from "./_generated/server";
+import { internalQuery, type MutationCtx, type QueryCtx, query } from "./_generated/server";
 import { matchTrainer, type TrainerRead } from "./addonPayload";
+import { isMaintainer } from "./maintainers";
 import { recipeSkill } from "./shared/recipeSkills";
+import { RECIPE_SKILLS_BUILD } from "./shared/recipeSkills.generated";
 
 // The skill a trainer asks for to learn each recipe (orange starts there).
 // Forever's game files don't have it, so the addon reads it in trainer
@@ -83,34 +85,68 @@ export const all = internalQuery({
 	},
 });
 
+type Coverage = Record<string, { recipes: number; learnLevels: number; stale: number; lastReadAt?: number }>;
+
+async function coverageOf(ctx: QueryCtx): Promise<Coverage> {
+	const rows = await ctx.db.query("recipeLearnLevels").collect();
+	const current = currentLevels(rows);
+	const recipes = await ctx.db.query("recipes").collect();
+	const out: Coverage = {};
+	for (const r of recipes) {
+		if (!recipeSkill(r.recipeId)) continue;
+		const p = (out[r.profession] ??= { recipes: 0, learnLevels: 0, stale: 0 });
+		p.recipes++;
+	}
+	const professionOf = new Map(recipes.map((r) => [r.recipeId, r.profession]));
+	for (const row of rows) {
+		const p = out[professionOf.get(row.recipeId) ?? ""];
+		if (!p) continue;
+		if (current.has(row.recipeId)) p.learnLevels++;
+		else p.stale++;
+		if (!p.lastReadAt || row.seenAt > p.lastReadAt) p.lastReadAt = row.seenAt;
+	}
+	return out;
+}
+
 /**
  * How far the readings have come, per profession: recipes with known colors,
  * how many have a current learn level, how many a stale one (the recipe's
- * levels changed since), and the newest read. For maintainers:
+ * levels changed since), and the newest read. For maintainers (also the Admin page):
  * `npx convex run learnLevels:coverage --deployment <name>`.
  */
 export const coverage = internalQuery({
 	args: {},
+	handler: async (ctx) =>
+		Object.fromEntries(
+			Object.entries(await coverageOf(ctx)).map(([name, { lastReadAt, ...p }]) => [
+				name,
+				{ ...p, newest: lastReadAt && new Date(lastReadAt).toISOString().slice(0, 10) },
+			]),
+		),
+});
+
+/**
+ * The Admin page's Learn levels tab: coverage per profession, the trainer
+ * reads behind it (how many, from how many players, the latest), and the
+ * game build the recipe colors are from. Null unless a maintainer asks.
+ */
+export const report = query({
+	args: {},
 	handler: async (ctx) => {
-		const rows = await ctx.db.query("recipeLearnLevels").collect();
-		const current = currentLevels(rows);
-		const recipes = await ctx.db.query("recipes").collect();
-		const out: Record<string, { recipes: number; learnLevels: number; stale: number; newest?: string }> = {};
-		for (const r of recipes) {
-			if (!recipeSkill(r.recipeId)) continue;
-			const p = (out[r.profession] ??= { recipes: 0, learnLevels: 0, stale: 0 });
-			p.recipes++;
-		}
-		const professionOf = new Map(recipes.map((r) => [r.recipeId, r.profession]));
-		for (const row of rows) {
-			const p = out[professionOf.get(row.recipeId) ?? ""];
-			if (!p) continue;
-			if (current.has(row.recipeId)) p.learnLevels++;
-			else p.stale++;
-			const seen = new Date(row.seenAt).toISOString().slice(0, 10);
-			if (!p.newest || seen > p.newest) p.newest = seen;
-		}
-		return out;
+		if (!(await isMaintainer(ctx))) return null;
+		const reads = await ctx.db.query("trainerReads").collect();
+		return {
+			professions: Object.entries(await coverageOf(ctx))
+				.map(([name, p]) => ({ name, ...p }))
+				.sort((a, b) => a.name.localeCompare(b.name)),
+			reads: reads.length,
+			players: new Set(reads.map((r) => r.userId)).size,
+			lastReadAt: reads.reduce<number | undefined>(
+				(max, r) => (max && max > r.capturedAt ? max : r.capturedAt),
+				undefined,
+			),
+			colors: RECIPE_SKILLS_BUILD,
+		};
 	},
 });
 

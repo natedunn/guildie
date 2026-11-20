@@ -172,9 +172,11 @@ It's the same for every player, so one visit covers everyone.
   pattern's recipe needs the pattern). Recipes they know need no learn level.
 - Patterns, plans and formulas carry theirs in their tooltips
   (`recipeItems.skill`); those only move a reagent's "from".
-- Coverage (maintainers): `npx convex run learnLevels:coverage --deployment <name>`
-  per profession: recipes with colors, how many have a current learn level,
-  how many a stale one, and the newest read.
+- Coverage (maintainers): the site's Admin page (sidebar, Personal; Learn
+  levels tab), or `npx convex run learnLevels:coverage --deployment <name>`:
+  per profession, recipes with colors, how many have a current learn level,
+  how many a stale one, and the newest read. The page also counts trainer
+  visits and the players they came from.
 
 Not known yet (docs/addon.md, "Not verified yet"): whether a trainer lists
 recipes above your skill (the window's "Unavailable" filter; each read

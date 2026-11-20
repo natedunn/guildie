@@ -1,9 +1,8 @@
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { internalQuery, type QueryCtx, query } from "./_generated/server";
 import { snapshotOf } from "./helper";
-import { isLocalBackend } from "./origins";
+import { isMaintainer } from "./maintainers";
 import { auditCharacter, type Finding, mergeProfile } from "./profile.ts";
 import { vRegion } from "./schema";
 
@@ -13,20 +12,7 @@ import { vRegion } from "./schema";
 //
 //   npx convex run sources:audit --deployment <name>
 //
-// Maintainers are the Battle.net account ids in MAINTAINER_BATTLENET_IDS
-// (comma-separated, set per deployment), and anyone on a local backend.
-
-async function isMaintainer(ctx: QueryCtx) {
-	if (isLocalBackend()) return true;
-	const userId = await getAuthUserId(ctx);
-	if (!userId) return false;
-	const user = await ctx.db.get(userId);
-	const ids = (process.env.MAINTAINER_BATTLENET_IDS ?? "")
-		.split(",")
-		.map((s) => s.trim())
-		.filter(Boolean);
-	return Boolean(user?.battlenetId && ids.includes(user.battlenetId));
-}
+// Maintainers: convex/maintainers.ts.
 
 /** Per section: what each source has, which one is shown, and why. Null unless a maintainer asks. */
 export const character = query({
