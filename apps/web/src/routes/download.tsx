@@ -9,7 +9,7 @@ import { AlphaDownloadButton } from "@/components/download-app";
 import { LandingFooter, LandingNav } from "@/components/landing/chrome";
 import { WindowMock } from "@/components/landing/more";
 import { Button } from "@/components/ui/button";
-import { type DesktopPlatform, DOWNLOADS, RELEASES, useVisitorOS } from "@/lib/desktop";
+import { type DesktopPlatform, DOWNLOADS, RELEASES } from "@/lib/desktop";
 import { cn } from "@/lib/utils";
 
 // Every download of the Guildie app, side by side. Windows (the beta)
@@ -42,7 +42,6 @@ function DownloadPage() {
 }
 
 function Downloads() {
-	const os = useVisitorOS();
 	return (
 		<section className="relative isolate pb-24">
 			<div
@@ -73,7 +72,7 @@ function Downloads() {
 			</div>
 
 			<div style={delay(240)} className="landing-enter mx-auto mt-14 grid max-w-5xl gap-4 px-4 sm:px-6 md:grid-cols-3">
-				<Platform os="win" icon={WindowsNewIcon} stage="Beta" spec="Windows 10 and 11" current={os === "win"}>
+				<Platform os="win" icon={WindowsNewIcon} stage="Beta" spec="Windows 10 and 11">
 					<Button
 						size="lg"
 						className="h-10 w-full"
@@ -87,17 +86,11 @@ function Downloads() {
 						Not code-signed yet: if Windows warns you, choose More info, then Run anyway.
 					</p>
 				</Platform>
-				<Platform
-					os="mac"
-					icon={AppleIcon}
-					stage="Alpha"
-					spec="macOS 12 or later, Apple Silicon and Intel"
-					current={os === "mac"}
-				>
+				<Platform os="mac" icon={AppleIcon} stage="Alpha" spec="macOS 12 or later, Apple Silicon and Intel">
 					<AlphaDownloadButton os="mac" size="lg" className="h-10 w-full" />
 					<p className="mt-3 text-xs text-pretty text-muted-foreground">Early and unsigned. Read before installing.</p>
 				</Platform>
-				<Platform os="linux" icon={PenguinIcon} stage="Alpha" spec="64-bit AppImage" current={os === "linux"}>
+				<Platform os="linux" icon={PenguinIcon} stage="Alpha" spec="64-bit AppImage">
 					<AlphaDownloadButton os="linux" size="lg" className="h-10 w-full" />
 					<p className="mt-3 text-xs text-pretty text-muted-foreground">Early, for WoW under Wine or Proton.</p>
 				</Platform>
@@ -129,30 +122,22 @@ function Platform({
 	icon,
 	stage,
 	spec,
-	current,
 	children,
 }: {
 	os: DesktopPlatform;
 	icon: IconSvgElement;
 	stage: "Beta" | "Alpha";
 	spec: string;
-	current: boolean;
 	children: ReactNode;
 }) {
 	return (
-		<section
-			className={cn(
-				"surface-card flex flex-col p-6 text-left",
-				current && "ring-1 ring-[color-mix(in_oklab,var(--highlight)_35%,transparent)]",
-			)}
-		>
+		<section className="surface-card flex flex-col p-6 text-left">
 			<span aria-hidden className="streak" />
 			<div className="flex items-center justify-between">
 				<span className="grid size-11 place-items-center rounded-lg border border-white/[0.08] bg-white/[0.03] text-foreground">
 					<HugeiconsIcon icon={icon} size={22} strokeWidth={1.5} />
 				</span>
 				<span className="flex items-center gap-2 text-xs text-muted-foreground">
-					{current && <span>Your computer</span>}
 					<span
 						className={cn(
 							"rounded-[4px] border px-1.5 text-[11px] font-medium",
