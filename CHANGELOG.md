@@ -7,8 +7,7 @@ for its version as the GitHub release notes, and the app shows them under
 Settings → App.
 
 Each pull request adds a line under `## Unreleased` (in `### New`,
-`### Improvements` - **Guildie:** AI apps settings explain where to connect ChatGPT and Claude, how to enable Guildie in a chat, and how optional character changes and workspace permissions work.
-or `### Fixes`), written for players and starting with
+`### Improvements` or `### Fixes`), written for players and starting with
 where you'll see the change: `**Guildie:**` (the site, in a browser or in the
 app's window), `**App:**` (the Windows app itself: installing, updating, the
 tray, uploads) or `**Addon:**` (in game), or several, e.g. `**Guildie, App:**`.
@@ -25,6 +24,7 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ### Improvements
 
+- **Guildie:** AI apps settings explain where to connect ChatGPT and Claude, how to enable Guildie in a chat, and how optional character changes and workspace permissions work.
 - **Guildie:** An Admin page for maintainers, starting with how far trainer visits have filled in each profession's recipe learn levels.
 - **Addon:** Reagent tooltips now show who would level their profession most with it. Each profession that uses the reagent gets its own line, then the best three guildmates, with their skill in the color and with the arrow their profession window shows (orange always gives a skill-up, yellow and green less often). Anyone the reagent can't help level isn't listed. When nobody is listed, it says what's missing: a recipe (and who's high enough for one), more skill (and who's closest), or anyone with the profession. Visiting a profession trainer, smelting included, now records which skill each recipe needs, for everyone in Guildie.
 
