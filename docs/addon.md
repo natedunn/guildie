@@ -257,6 +257,9 @@ your last login or reload.
   profession everyone is past is left out. Every profession,
   gathering ones' camping recipes, Cooking and First Aid included; reagents
   vendors sell left out. Your own characters left out.
+- `reagentUseMine` (0.25.0): the same ranking for the player's own claimed
+  characters, in a guild or not; per reagent, the professions where one of
+  theirs would level, with only `users` (no "what's missing").
 - The older `reagents` (until 0.23.0 addons are gone): guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
   weekly) and each member's known recipes (with their profile, hourly), in
@@ -277,7 +280,12 @@ your last login or reload.
   window shows (`Professions-Icon-Skill-High`, `-Medium`, `-Low`), then "+2
   more". With nobody listed, the next row says what's missing: "Needs a
   recipe: Todd, Brenna", "Needs 140 skill: Miller 110" or "No one in the
-  guild". Someone on a request row above isn't listed again. With a
+  guild". Your own characters come first under their profession (0.25.0):
+  "You" for the one you're on, others by name; with one of yours
+  listed there's no "Needs" line, and a profession only yours would level
+  with comes after the rest. Setting: "Show your characters on reagents"
+  (`showMineReagents`, on by default). Someone on a request row above isn't
+  listed again. With a
   GuildieData.lua from before `reagentUse`: "Brenna | might want (Tailoring,
   Alchemy)", up to 8, then "+2 more". With "Say
   why tooltips have nothing" ticked in the `/guildie` window
