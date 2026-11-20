@@ -271,6 +271,12 @@ select:not([multiple]) {
 		padding-inline: var(--pane-gutter);
 		scrollbar-width: none;
 	}
+	/* Inside that scroller the head would stick to the scroller, not the
+	   pane, and the phone top bar's offset (below) would push it down into
+	   the rows. Let it sit in place instead. */
+	[data-slot="table-container"]:has(> .roster-table) > .table-sticky thead th {
+		position: static;
+	}
 }
 
 /* Class colors are the game's; a touch of white keeps Shaman blue legible. */
