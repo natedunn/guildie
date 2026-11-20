@@ -270,6 +270,24 @@ export default defineSchema({
 		addedAt: v.number(),
 	}).index("by_user", ["userId", "recipeId"]),
 
+	/**
+	 * Characters the addon uploads that the player hasn't claimed, while
+	 * they're worth asking about (unclaimed.ts): Settings → Account lists them
+	 * to refresh or forget. `forgotten`: the player said it's gone (deleted, or
+	 * not theirs); uploads skip it quietly, and a claim still wins.
+	 */
+	unclaimedCharacters: defineTable({
+		userId: v.id("users"),
+		/** From the in-game GUID; the same id Battle.net's account list has. */
+		blizzardId: v.number(),
+		name: v.string(),
+		classId: v.optional(v.number()),
+		level: v.optional(v.number()),
+		/** ms: the addon's last capture of it, i.e. when it was last played. */
+		lastPlayedAt: v.number(),
+		forgotten: v.optional(v.boolean()),
+	}).index("by_user", ["userId", "blizzardId"]),
+
 	/** Characters a person proved they own, via Battle.net's account profile. */
 	ownedCharacters: defineTable({
 		userId: v.id("users"),
@@ -504,6 +522,39 @@ export default defineSchema({
 		.searchIndex("search_name", { searchField: "name" }),
 
 	/**
+	 * The skill a trainer asks for to learn a recipe, as the addon read it in
+	 * trainer windows (learnLevels.ts; docs/game-data.md, "Learn levels").
+	 * The game's files don't have it. One row per recipe, the newest read
+	 * wins. `yellow`/`grey`: the recipe's levels (shared/recipeSkills.ts) when
+	 * it was read; if a game update changes them, the row is ignored until a
+	 * trainer is read again. `seenAt`: game time of the read.
+	 */
+	recipeLearnLevels: defineTable({
+		recipeId: v.number(),
+		professionId: v.number(),
+		skill: v.number(),
+		yellow: v.number(),
+		grey: v.number(),
+		seenAt: v.number(),
+		build: v.optional(v.string()),
+		receivedAt: v.number(),
+	})
+		.index("by_recipeId", ["recipeId"])
+		.index("by_professionId", ["professionId"]),
+
+	/** The last trainer read each player's addon sent per profession, so an unchanged one isn't matched again (learnLevels.ts). */
+	trainerReads: defineTable({
+		userId: v.id("users"),
+		professionId: v.number(),
+		capturedAt: v.number(),
+		build: v.optional(v.string()),
+		unavailableShown: v.optional(v.boolean()),
+		services: v.number(),
+		matched: v.number(),
+		receivedAt: v.number(),
+	}).index("by_user_profession", ["userId", "professionId"]),
+
+	/**
 	 * Recipe items (patterns, plans, formulas...) and what they teach, from
 	 * Blizzard's static data (recipeItems.ts, weekly after the recipes).
 	 * `recipeId`: the recipe in `recipes` it teaches, unset when we couldn't
@@ -551,6 +602,8 @@ export default defineSchema({
 		syncedAt: v.number(),
 	})
 		.index("by_itemId", ["itemId"])
+		// The daily refresh, oldest first (items.refreshStale).
+		.index("by_syncedAt", ["syncedAt"])
 		// Requests → "what do you need?" search.
 		.searchIndex("search_name", { searchField: "name" })
 		// Omni search (search.ts).

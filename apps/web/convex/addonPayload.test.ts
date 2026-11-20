@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addonText, curseProjectId, matchRecipes, parseCharacter } from "./addonPayload.ts";
+import {
+	addonText,
+	blizzardIdFromGuid,
+	curseProjectId,
+	lastClaimAt,
+	matchRecipes,
+	matchTrainer,
+	noticeUnclaimed,
+	parseCharacter,
+	parseTrainers,
+	UNCLAIMED_NOTICE_MS,
+} from "./addonPayload.ts";
 
 const NOW = 1_794_300_000_000;
 const T = NOW / 1000 - 60;
@@ -425,4 +436,93 @@ test("payload 7 from addon 0.20: descriptions and CurseForge project IDs", () =>
 	assert.equal(curseProjectId(" 42 "), 42);
 	assert.equal(curseProjectId(-1), undefined);
 	assert.equal(curseProjectId("1".repeat(12)), undefined);
+});
+
+test("unclaimed characters are named only while claiming could still help", () => {
+	const day = 24 * 60 * 60_000;
+	// Never claimed: a recent character is named, a long-unplayed one isn't.
+	assert.equal(noticeUnclaimed(NOW - day, undefined, NOW), true);
+	assert.equal(noticeUnclaimed(NOW - UNCLAIMED_NOTICE_MS - 1, undefined, NOW), false);
+	// Played after the last claim: new to the account, so named.
+	assert.equal(noticeUnclaimed(NOW - day, NOW - 2 * day, NOW), true);
+	// Played before the last claim yet not on it: deleted (or another account).
+	assert.equal(noticeUnclaimed(NOW - 3 * day, NOW - 2 * day, NOW), false);
+});
+
+test("the Blizzard id is the GUID's trailing hex number", () => {
+	assert.equal(blizzardIdFromGuid("Player-4395-0AB12C3D"), 0x0ab12c3d);
+	assert.equal(blizzardIdFromGuid("Creature-0-1"), undefined);
+});
+
+test("the last claim is the newest claimed row", () => {
+	assert.equal(lastClaimAt([]), undefined);
+	assert.equal(lastClaimAt([{ claimedAt: 5 }, { claimedAt: 9 }, { claimedAt: 7 }]), 9);
+});
+
+test("trainers: checked, known professions only, one read each", () => {
+	const at = Math.floor(NOW / 1000) - 60;
+	const reads = parseTrainers(
+		[
+			{
+				profession: "Tailoring",
+				capturedAt: at,
+				build: "1.60.1.70959",
+				unavailableShown: true,
+				services: [
+					{ name: "Bolt of Silk Cloth", item: 4305, skill: 100 },
+					{ name: "Journeyman Tailoring", skill: 50 },
+					{ name: "Linen Cloak" },
+				],
+			},
+			{ profession: "Tailoring", capturedAt: at, services: [] },
+			{ profession: "Schneiderei", capturedAt: at, services: [] },
+		],
+		NOW,
+	);
+	assert.equal(reads.length, 1);
+	assert.equal(reads[0].professionId, 197);
+	assert.equal(reads[0].capturedAt, at * 1000);
+	assert.equal(reads[0].build, "1.60.1.70959");
+	assert.deepEqual(reads[0].services, [
+		{ name: "Bolt of Silk Cloth", itemId: 4305, skill: 100 },
+		{ name: "Journeyman Tailoring", skill: 50 },
+		{ name: "Linen Cloak", skill: 0 },
+	]);
+	assert.throws(() => parseTrainers([{ profession: "Tailoring", capturedAt: at, services: [{ skill: 5 }] }], NOW));
+	assert.throws(() => parseTrainers([{ profession: "Tailoring", capturedAt: at + 3600, services: [] }], NOW));
+});
+
+test("matchTrainer: only certain matches, at least skill 1", () => {
+	const catalog = [
+		{ recipeId: 2376, name: "Bolt of Silk Cloth", craftedItemId: 4305 },
+		{ recipeId: 10, name: "Basic Campfire", craftedItemId: 1 },
+		{ recipeId: 11, name: "Basic Campfire", craftedItemId: 1 },
+		{ recipeId: 20, name: "Brown Linen Shirt", craftedItemId: 2 },
+		{ recipeId: 21, name: "Brown Linen Shirt", craftedItemId: 3 },
+		{ recipeId: 30, name: "Linen Cloak", craftedItemId: 4 },
+		{ recipeId: 1848, name: "Smelt Tin", craftedItemId: 3576 },
+		{ recipeId: 40, name: "Wool Bandage", craftedItemId: 5 },
+		{ recipeId: 41, name: "Wool Bandage (old)", craftedItemId: 5 },
+	];
+	const out = matchTrainer(
+		[
+			{ name: "Bolt of Silk Cloth", skill: 100 },
+			{ name: "Basic Campfire", itemId: 1, skill: 1 }, // two recipes make the same thing: skipped
+			{ name: "Brown Linen Shirt", itemId: 3, skill: 10 }, // the item tells them apart
+			{ name: "Brown Linen Shirt", skill: 10 }, // no item: can't tell
+			{ name: "Linen Cloak", skill: 0 },
+			{ name: "Journeyman Tailoring", skill: 50 }, // a rank, not a recipe
+			{ name: "Tin Bar", itemId: 3576, skill: 65 }, // smelting: named for the bar, matched by it
+			{ name: "Heavy Wool Bandage", itemId: 5, skill: 80 }, // the item fits two recipes: skipped
+		],
+		catalog,
+	);
+	assert.deepEqual(out.levels, [
+		{ recipeId: 2376, skill: 100 },
+		{ recipeId: 21, skill: 10 },
+		{ recipeId: 30, skill: 1 },
+		{ recipeId: 1848, skill: 65 },
+	]);
+	assert.equal(out.ambiguous, 3);
+	assert.equal(out.unmatched, 1);
 });

@@ -100,8 +100,8 @@ export class Connection {
 	private pixelsEnabled = false;
 	private readonly automaticPixels: boolean;
 	private readonly listeners = new Set<(status: Status) => void>();
-	/** Notices for the user (shown as notifications by main). */
-	onNotice: (title: string, body: string) => void = () => {};
+	/** Notices for the user (shown as notifications by main; clicking opens `url` if given). */
+	onNotice: (title: string, body: string, url?: string) => void = () => {};
 	/** A notification from the site to show (main shows it; clicking opens `url`). */
 	onSiteNotification: (text: string, url: string) => void = () => {};
 	/** Enough changed in the guild since WoW loaded GuildieData.lua: suggest a /reload. */
@@ -133,8 +133,13 @@ export class Connection {
 					this.reloadReminder.guildData(data);
 					this.emit();
 				},
+				// Settings → Account lists them to add (a new character) or forget (a deleted one).
 				onUnmatched: (names) =>
-					this.onNotice("Guildie", `Not claimed on Guildie yet: ${names.join(", ")}. Claim them on your account page.`),
+					this.onNotice(
+						"Guildie",
+						`Not on your Guildie characters yet: ${names.join(", ")}. Click to manage them.`,
+						`${this.origin}/settings#unclaimed`,
+					),
 			},
 			join(app.getPath("userData"), "sync-outbox"),
 		);
