@@ -7,12 +7,21 @@ import { SectionTitle } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AllReleasesLink, WhatsNew } from "@/components/whats-new";
-import { desktop, type NotifyOption, type UpdateState, useDesktopStatus, useInDesktopApp } from "@/lib/desktop";
+import {
+	type DesktopPlatform,
+	DOWNLOADS,
+	desktop,
+	type NotifyOption,
+	type UpdateState,
+	useDesktopPlatform,
+	useDesktopStatus,
+	useInDesktopApp,
+} from "@/lib/desktop";
 import { ago } from "@/lib/format";
 import { markSeen } from "@/lib/release-notes";
 import { Row, Rows } from "./addon";
 
-// Settings → App: the Guildie app for Windows. In the app, its version and
+// Settings → App: the Guildie app (Windows, macOS, Linux). In the app, its version and
 // updates; on the web, where to get it. Either way, the computers connected
 // to your account (each is a token that can upload your addon's data).
 export const Route = createFileRoute("/settings/app")({
@@ -50,18 +59,19 @@ function AppSettings() {
 function ThisApp() {
 	const status = useDesktopStatus();
 	const app = desktop();
+	const platform = useDesktopPlatform() ?? "win";
 	const [checking, setChecking] = useState(false);
 	const update = status?.update;
 	const ready = update?.state === "ready" ? update.version : status?.updateReady;
 	return (
 		<section>
-			<SectionTitle>Guildie for Windows</SectionTitle>
+			<SectionTitle>Guildie for {DOWNLOADS[platform].name}</SectionTitle>
 			<Rows>
 				<Row label="Version">
 					<span className="num">{app?.version ?? "Unknown"}</span>
 				</Row>
 				<Row label="Updates">
-					<UpdateLine update={update} ready={ready} />
+					<UpdateLine update={update} ready={ready} platform={platform} />
 				</Row>
 			</Rows>
 			<div className="mt-3 flex gap-2">
@@ -85,10 +95,11 @@ function ThisApp() {
 	);
 }
 
-/** Experimental Windows notifications while you play (apps/desktop/README.md). */
+/** Experimental system notifications while you play (apps/desktop/README.md). */
 function NotifyWhilePlaying() {
 	const status = useDesktopStatus();
 	const app = desktop();
+	const platform = useDesktopPlatform() ?? "win";
 	const [error, setError] = useState<string | null>(null);
 	const notify = status?.notify;
 	if (!app?.setNotifyOption || !notify) return null;
@@ -113,8 +124,8 @@ function NotifyWhilePlaying() {
 					<span>
 						Items mailed for your requests
 						<span className="mt-1 block text-muted-foreground">
-							When a guildmate mails you something you asked for, a Windows notification tells you to check your
-							mailbox. It comes once their Guildie app uploads the mail they sent.
+							When a guildmate mails you something you asked for, a notification tells you to check your mailbox. It
+							comes once their Guildie app uploads the mail they sent.
 						</span>
 					</span>
 				</label>
@@ -129,16 +140,14 @@ function NotifyWhilePlaying() {
 						Reload reminders
 						<span className="mt-1 block text-muted-foreground">
 							The addon only gets new guild data at login or /reload. When a lot has changed since then (guildmates'
-							gear and levels, requests, recipes) while WoW is open, a Windows notification suggests a /reload so
-							tooltips catch up. At most once an hour.
-							{!notify.reloadRemindersAvailable && " Windows only."}
+							gear and levels, requests, recipes) while WoW is open, a notification suggests a /reload so tooltips catch
+							up. At most once an hour.
+							{!notify.reloadRemindersAvailable &&
+								(platform === "win" ? " Windows only." : ` Not available on ${DOWNLOADS[platform].name} yet.`)}
 						</span>
 					</span>
 				</label>
-				<p className="text-muted-foreground">
-					Windows may hold notifications while a game is fullscreen: check Settings → System → Notifications → Do not
-					disturb, or play in windowed fullscreen.
-				</p>
+				<p className="text-muted-foreground">{NOTIFY_HINT[platform]}</p>
 				{error && (
 					<p className="text-destructive" role="alert">
 						{error}
@@ -149,7 +158,22 @@ function NotifyWhilePlaying() {
 	);
 }
 
-function UpdateLine({ update, ready }: { update?: UpdateState; ready?: string }) {
+/** Where each system holds notifications back. */
+const NOTIFY_HINT: Record<DesktopPlatform, string> = {
+	win: "Windows may hold notifications while a game is fullscreen: check Settings → System → Notifications → Do not disturb, or play in windowed fullscreen.",
+	mac: "macOS asks once whether Guildie may show notifications, and may hold them while a game is fullscreen or a Focus is on: check System Settings → Notifications → Guildie, and Focus.",
+	linux: "Your desktop may hold notifications while a game is fullscreen or Do not disturb is on.",
+};
+
+/** Why a copy of the app can't update itself, and what to do about it. */
+const UPDATES_OFF: Record<DesktopPlatform, string> = {
+	win: "Off: this copy can't update itself. Install Guildie from the App tab on guildie.club.",
+	mac: "Off: this copy can't update itself. Quit Guildie, move it to your Applications folder, and open it from there.",
+	linux:
+		"Off: this copy can't update itself. Run the Guildie AppImage from the App tab on guildie.club (not an unpacked copy).",
+};
+
+function UpdateLine({ update, ready, platform }: { update?: UpdateState; ready?: string; platform: DesktopPlatform }) {
 	if (ready) return <span>Version {ready} is downloaded and ready</span>;
 	switch (update?.state) {
 		case "checking":
@@ -168,11 +192,7 @@ function UpdateLine({ update, ready }: { update?: UpdateState; ready?: string })
 				<span className="text-muted-foreground">Couldn't check {ago(update.checkedAt)}. It tries again by itself.</span>
 			);
 		case "off":
-			return (
-				<span className="text-muted-foreground">
-					Off: this copy can't update itself. Install Guildie from the App tab on guildie.club.
-				</span>
-			);
+			return <span className="text-muted-foreground">{UPDATES_OFF[platform]}</span>;
 		default:
 			return (
 				<span className="text-muted-foreground">
@@ -186,15 +206,15 @@ function GetTheApp() {
 	return (
 		<section className="surface-card max-w-xl p-5 text-[0.8125rem]">
 			<span aria-hidden className="streak" />
-			<SectionTitle>Guildie for Windows</SectionTitle>
+			<SectionTitle>The Guildie app</SectionTitle>
 			<p className="mt-1 text-muted-foreground">
 				Guildie in its own window, plus the Guildie addon: it installs the addon in World of Warcraft, keeps it up to
 				date, and keeps your character current on Guildie as you play. It updates itself.
 			</p>
-			<DownloadAppButton className="mt-4">Get Guildie for Windows</DownloadAppButton>
+			<DownloadAppButton className="mt-4" />
 			<p className="mt-3 text-muted-foreground">
-				Download <span className="text-foreground">Guildie-Setup.exe</span> from the latest release and run it. Windows
-				may warn that it's from an unknown publisher: choose More info, then Run anyway.
+				For Windows, macOS and Linux, from the latest release on GitHub. The app isn't code-signed yet, so the first
+				time you open it your computer may warn you: the download explains what to do on yours.
 			</p>
 		</section>
 	);

@@ -1,15 +1,15 @@
-// Guildie for Windows: the site in its own window, plus the uploader
+// Guildie for Windows, macOS and Linux: the site in its own window, plus the uploader
 // (packages/sync): uploads what the Guildie addon saves in game, and
 // downloads your guild's data into the addon. Signing in in the window
 // connects it; nothing else to set up.
 //
 //   --url <url>        another Guildie (a preview, or https://<name>.guildie.localhost:1355);
 //                      also GUILDIE_URL
-//   --hidden           start in the tray (how "Start with Windows" launches it)
+//   --hidden           start in the tray (how "Start with Windows" / "Open at login" launches it)
 //   --smoke-test       start hidden, check the window, bridge and sync engine, print, exit
 //   --user-data <dir>  keep settings somewhere else (tests)
 
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { configDir, DEFAULT_API, loadConfig, makeLogger } from "@guildie/sync";
@@ -19,12 +19,16 @@ import {
 	dialog,
 	type IpcMainInvokeEvent,
 	ipcMain,
+	Menu,
+	type MenuItemConstructorOptions,
 	Notification,
+	nativeImage,
 	session,
 	shell,
 } from "electron";
 import {
 	type AddonResult,
+	addOnsFolder,
 	addonInstalls,
 	ensureAddon,
 	foreverFlavors,
@@ -34,10 +38,11 @@ import {
 import { Connection, type Status } from "./connection.ts";
 import { type CaptureConfig, LivePixels } from "./live-pixels.ts";
 import { allowsSelfSigned, isGuildieUrl, originOf } from "./origins.ts";
+import { integrateLinuxDesktop, linuxTrayHost, loginItem, type StartWithSystem } from "./platform.ts";
 import { settings } from "./settings.ts";
 import { runSmokeTest } from "./smoke.ts";
 import { createTray } from "./tray.ts";
-import { canSelfUpdate, startUpdater, type Updater, type UpdateState } from "./updater.ts";
+import { canSelfUpdate, selfUpdateBlocker, startUpdater, type Updater, type UpdateState } from "./updater.ts";
 import { createWindow } from "./window.ts";
 import { hideWindowBorder } from "./window-border.ts";
 
@@ -66,14 +71,24 @@ app.setPath(
 	flag("--user-data") ?? (smokeTest ? mkdtempSync(join(tmpdir(), "guildie-smoke-")) : join(configDir(), "desktop")),
 );
 if (smokeTest && process.platform === "darwin") app.commandLine.appendSwitch("use-mock-keychain");
+// Linux: no keyring prompt in a smoke test (CI has none): tokens take the no-keyring path (settings.ts).
+if (smokeTest && process.platform === "linux") app.commandLine.appendSwitch("password-store", "basic");
 const log = makeLogger(!app.isPackaged || smokeTest, join(app.getPath("userData"), "guildie.log"));
 
 // A second launch focuses the running app instead.
 if (!app.requestSingleInstanceLock()) app.exit(0);
 if (process.platform === "win32") app.setAppUserModelId("club.guildie.desktop");
 
+const mac = process.platform === "darwin";
+
 let win: BrowserWindow | undefined;
 let quitting = false;
+/**
+ * Closing the window leaves Guildie running (tray, menu bar), except on a
+ * Linux desktop that shows no tray icons: there nothing would be left to
+ * open or quit it from, so closing the window quits.
+ */
+let keepRunningWhenClosed = true;
 /** Where the window was when it closed, so reopening comes back there. */
 let lastUrl = siteUrl;
 /** Set once the app is ready: makes the window (it exists only while open). */
@@ -88,6 +103,9 @@ function showWindow(url?: string) {
 	if (!win || win.isDestroyed()) {
 		if (!openWindow) return;
 		win = openWindow(url);
+		updateDock();
+		// macOS: coming back from the menu bar only (no Dock icon), bring Guildie to the front.
+		if (mac) app.focus({ steal: true });
 		return;
 	}
 	if (url) void win.loadURL(url);
@@ -99,10 +117,22 @@ function showWindow(url?: string) {
 /** Shown notifications, held until clicked or closed: one that's garbage-collected loses its click. */
 const shown = new Set<Notification>();
 
+/**
+ * The notification's icon. Windows: the file. Linux: the image (the
+ * notification daemon can't read a file inside app.asar). macOS shows the
+ * app's own icon; an icon here would be a second picture on the right.
+ */
+const notificationIcon = () => {
+	const file = join(__dirname, "assets", "guildie-256.png");
+	if (process.platform === "win32") return file;
+	return mac ? undefined : nativeImage.createFromPath(file);
+};
+
 function notify(title: string, body: string, onClick?: () => void) {
 	log(`${title}: ${body}`);
 	if (smokeTest || !Notification.isSupported()) return;
-	const n = new Notification({ title, body, icon: join(__dirname, "assets", "guildie-256.png") });
+	const icon = notificationIcon();
+	const n = new Notification({ title, body, ...(icon ? { icon } : {}) });
 	shown.add(n);
 	n.on("close", () => shown.delete(n));
 	n.on("click", () => {
@@ -112,22 +142,30 @@ function notify(title: string, body: string, onClick?: () => void) {
 	n.show();
 }
 
+const loginArgs = ["--hidden", ...(siteUrl === DEFAULT_API ? [] : ["--url", siteUrl])];
 /**
- * "Start with Windows". The installer puts Guildie.exe in one place per user
- * (%LOCALAPPDATA%\Programs\guildie) and updates replace it there, so the
- * running .exe's path stays valid across updates.
+ * "Start with Windows" / "Open at login". Windows: the installer puts
+ * Guildie.exe in one place per user (%LOCALAPPDATA%\Programs\guildie) and
+ * updates replace it there, so the running .exe's path stays valid across
+ * updates. macOS (a LaunchAgent) and Linux (an autostart entry, AppImage
+ * only): platform.ts, which keeps them pointed at the app's current path.
  */
-const loginItem = {
-	path: process.execPath,
-	args: ["--hidden", ...(siteUrl === DEFAULT_API ? [] : ["--url", siteUrl])],
-};
-const startWithSystem =
-	app.isPackaged && (process.platform === "win32" || process.platform === "darwin")
-		? {
-				get: () => app.getLoginItemSettings(loginItem).openAtLogin,
-				set: (openAtLogin: boolean) => app.setLoginItemSettings({ ...loginItem, openAtLogin }),
-			}
-		: undefined;
+function startWithSystem(): StartWithSystem | undefined {
+	if (process.platform !== "win32") return loginItem(loginArgs, app.isPackaged, log);
+	if (!app.isPackaged) return undefined;
+	const item = { path: process.execPath, args: loginArgs };
+	return {
+		get: () => app.getLoginItemSettings(item).openAtLogin,
+		set: (openAtLogin: boolean) => app.setLoginItemSettings({ ...item, openAtLogin }),
+	};
+}
+
+/** macOS: a Dock icon only while the window is open (in the menu bar otherwise, like Windows' tray). */
+function updateDock() {
+	if (!mac || !app.dock || smokeTest) return;
+	if (win && !win.isDestroyed()) void app.dock.show();
+	else app.dock.hide();
+}
 
 /** The sync status as the page sees it. */
 const publicStatus = ({
@@ -171,6 +209,7 @@ const addonSource = app.isPackaged
 
 app.whenReady().then(async () => {
 	if (!origin) return;
+	if (mac) Menu.setApplicationMenu(macMenu());
 	// Local dev sites use a self-signed certificate: accept it there only.
 	session.defaultSession.setCertificateVerifyProc((request, callback) =>
 		callback(allowsSelfSigned(request.hostname) ? 0 : -3),
@@ -298,16 +337,26 @@ app.whenReady().then(async () => {
 			if (quitting || smokeTest) return;
 			const current = created.webContents.getURL();
 			if (isGuildieUrl(current) && originOf(current) === origin) lastUrl = current;
-			if (!settings.trayNoticeShown) {
+			if (!settings.trayNoticeShown && keepRunningWhenClosed) {
 				settings.trayNoticeShown = true;
-				notify("Guildie is still running", "It keeps uploading your addon data. Quit from the tray icon.");
+				notify(
+					"Guildie is still running",
+					mac
+						? "It keeps uploading your addon data. Quit from its menu bar icon."
+						: "It keeps uploading your addon data. Quit from the tray icon.",
+				);
 			}
+		});
+		created.on("closed", () => {
+			if (win === created) win = undefined;
+			updateDock();
 		});
 		return created;
 	};
 	// Started from "Start with Windows" (--hidden): no window until it's opened.
 	if (smokeTest) win = createWindow(siteUrl, { show: false, preload: join(__dirname, "preload.cjs") });
 	else if (!startHidden) win = openWindow(siteUrl);
+	updateDock();
 	connection.onStatus((status) => {
 		const contents = win && !win.isDestroyed() ? win.webContents : undefined;
 		if (contents && isGuildieUrl(contents.getURL()) && originOf(contents.getURL()) === origin) {
@@ -318,9 +367,13 @@ app.whenReady().then(async () => {
 	const chooseWow = async () => {
 		const result = await dialog.showOpenDialog({
 			title: "Choose your World of Warcraft folder",
-			message: "The folder with _classic_ or _forever_ inside",
+			message:
+				process.platform === "linux"
+					? "The folder with _classic_ or _forever_ inside, or the Wine prefix WoW is in"
+					: "The folder with _classic_ or _forever_ inside",
 			defaultPath: connection.status.wowFolder,
-			properties: ["openDirectory"],
+			// Linux: Wine prefixes are hidden folders (~/.wine, ~/.local/share/...).
+			properties: process.platform === "linux" ? ["openDirectory", "showHiddenFiles"] : ["openDirectory"],
 		});
 		const folder = result.filePaths[0];
 		if (result.canceled || !folder) return;
@@ -392,7 +445,7 @@ app.whenReady().then(async () => {
 			const target = install
 				? install.version
 					? install.folder
-					: join(install.flavor, "Interface", "AddOns")
+					: addOnsFolder(install.flavor)
 				: connection.status.wowFolder;
 			if (target) void shell.openPath(target);
 		}),
@@ -429,6 +482,9 @@ app.whenReady().then(async () => {
 		return;
 	}
 
+	// Linux, in an AppImage: Guildie in the app launcher, pointed at this AppImage.
+	integrateLinuxDesktop(() => readFileSync(join(__dirname, "assets", "guildie-256.png")), log);
+
 	// ---- The tray ----
 	// Sign in through the player's own browser (Battle.net's login, Google
 	// included, can't run inside the app), then sign the window in with the
@@ -444,6 +500,18 @@ app.whenReady().then(async () => {
 		if (!fromSite(event)) throw new Error("Not allowed from this page.");
 		signIn();
 	});
+	const about = () =>
+		void dialog
+			.showMessageBox({
+				type: "info",
+				title: "About Guildie",
+				message: `Guildie ${__VERSION__}`,
+				detail: `Site: ${origin}\nElectron ${process.versions.electron}\n${usageLine()}\nSettings and log: ${app.getPath("userData")}`,
+				buttons: ["OK", "Open log"],
+			})
+			.then(({ response }) => {
+				if (response === 1) void shell.openPath(join(app.getPath("userData"), "guildie.log"));
+			});
 	const { update } = createTray({
 		open: () => showWindow(),
 		manageAddon: () => showWindow(`${origin}/addon`),
@@ -472,24 +540,23 @@ app.whenReady().then(async () => {
 		connect: signIn,
 		uploadNow: () => connection.uploadNow(),
 		chooseWow: () => void chooseWow(),
-		startWithSystem,
-		about: () =>
-			void dialog
-				.showMessageBox({
-					type: "info",
-					title: "About Guildie",
-					message: `Guildie ${__VERSION__}`,
-					detail: `Site: ${origin}\nElectron ${process.versions.electron}\n${usageLine()}\nSettings and log: ${app.getPath("userData")}`,
-					buttons: ["OK", "Open log"],
-				})
-				.then(({ response }) => {
-					if (response === 1) void shell.openPath(join(app.getPath("userData"), "guildie.log"));
-				}),
+		startWithSystem: startWithSystem(),
+		about,
 		signOut: () => void connection.disconnect(),
 		quit: () => app.quit(),
 	});
 	connection.onStatus(update);
 	update(connection.status);
+	if (mac) Menu.setApplicationMenu(macMenu(about));
+	// Linux: no tray icons on this desktop (GNOME without the AppIndicator
+	// extension): closing the window quits, rather than leave Guildie unreachable.
+	if (process.platform === "linux") {
+		void linuxTrayHost().then((host) => {
+			if (host !== false) return;
+			keepRunningWhenClosed = false;
+			log("No tray on this desktop: closing the window quits Guildie.");
+		});
+	}
 
 	// Before syncing starts, so guild data lands in an installed addon.
 	manageAddon();
@@ -498,7 +565,7 @@ app.whenReady().then(async () => {
 			connection.setExtras({ updateReady: state.state === "ready" ? state.version : undefined, update: state }),
 		);
 	} else {
-		log("Updates: off (not the installed app)");
+		log(`Updates: off (${selfUpdateBlocker()})`);
 		connection.setExtras({ update: { state: "off" } });
 	}
 
@@ -513,8 +580,63 @@ app.on("before-quit", () => {
 });
 // Closing the window leaves Guildie in the tray; "Quit" in the tray menu quits.
 app.on("window-all-closed", () => {
-	if (quitting) app.quit();
+	if (quitting || !keepRunningWhenClosed) app.quit();
 });
+
+/**
+ * macOS: the menu bar's menus, so the usual shortcuts work (Cmd+C/V/X/A/Z in
+ * the page, Cmd+W, Cmd+M, Cmd+H, Cmd+Q). Back, Forward and Reload are
+ * handled in window.ts; their shortcuts are shown here, not registered twice.
+ */
+function macMenu(about?: () => void) {
+	const page = () => (win && !win.isDestroyed() ? win.webContents : undefined);
+	const template: MenuItemConstructorOptions[] = [
+		{
+			label: "Guildie",
+			submenu: [
+				about ? { label: "About Guildie", click: about } : { role: "about" },
+				{ type: "separator" },
+				{ label: "Open Guildie", click: () => showWindow() },
+				{ type: "separator" },
+				{ role: "services" },
+				{ type: "separator" },
+				{ role: "hide" },
+				{ role: "hideOthers" },
+				{ role: "unhide" },
+				{ type: "separator" },
+				{ role: "quit" },
+			],
+		},
+		{ role: "editMenu" },
+		{
+			label: "View",
+			submenu: [
+				{
+					label: "Back",
+					accelerator: "Cmd+[",
+					registerAccelerator: false,
+					click: () => page()?.navigationHistory.canGoBack() && page()?.navigationHistory.goBack(),
+				},
+				{
+					label: "Forward",
+					accelerator: "Cmd+]",
+					registerAccelerator: false,
+					click: () => page()?.navigationHistory.canGoForward() && page()?.navigationHistory.goForward(),
+				},
+				{ label: "Reload", accelerator: "Cmd+R", registerAccelerator: false, click: () => page()?.reload() },
+				{ type: "separator" },
+				{ role: "resetZoom" },
+				{ role: "zoomIn" },
+				{ role: "zoomOut" },
+				{ type: "separator" },
+				{ role: "togglefullscreen" },
+				...(app.isPackaged ? [] : [{ role: "toggleDevTools" } as const]),
+			],
+		},
+		{ role: "windowMenu" },
+	];
+	return Menu.buildFromTemplate(template);
+}
 
 /** Memory and CPU across all of Guildie's processes, e.g. "92 MB in 1 process, CPU 0.1%". */
 function usageLine() {

@@ -4,6 +4,9 @@
 // into the installed copy, so the two must stay in step.
 //
 // No Electron imports here, so the tests run under plain Node.
+//
+// Paths inside WoW go through wowPath: on Linux (case-sensitive) a hand-made
+// "Interface/Addons" is used as it is, not doubled by a new "AddOns".
 
 import {
 	copyFileSync,
@@ -17,6 +20,7 @@ import {
 	writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { wowPath } from "@guildie/sync";
 
 export const ADDON = "Guildie";
 /** The app's own file in the addon folder: kept across updates, never shipped. */
@@ -79,12 +83,15 @@ export function decideAddonAction(installed: string | null | undefined, bundled:
 export function foreverFlavors(wow: string): string[] {
 	try {
 		return readdirSync(wow)
-			.filter((d) => /^_forever\w*_$/.test(d))
+			.filter((d) => /^_forever\w*_$/i.test(d))
 			.map((d) => join(wow, d));
 	} catch {
 		return [];
 	}
 }
+
+/** <flavor>/Interface/AddOns, spelled as it is on disk. */
+export const addOnsFolder = (flavor: string) => wowPath(flavor, "Interface", "AddOns");
 
 /** The addon's files, as shipped: everything but GuildieData.lua. */
 function shippedFiles(source: string) {
@@ -191,14 +198,14 @@ export function ensureAddon(source: string, wow: string, log: Log, force = false
 	const bundled = readAddonVersion(source);
 	if (!bundled) throw new Error(`No addon to install at ${source}`);
 	return foreverFlavors(wow).map((flavor) => {
-		const folder = join(flavor, "Interface", "AddOns", ADDON);
+		const folder = join(addOnsFolder(flavor), ADDON);
 		const present = existsSync(folder) && statSync(folder).isDirectory();
 		const installed = present ? (readAddonVersion(folder) ?? null) : undefined;
 		let action = decideAddonAction(installed, bundled);
 		if (force && action === "none") action = "update";
 		if (action === "none") return { folder, action, version: installed ?? undefined };
 		try {
-			replaceAddon(source, join(flavor, "Interface", "AddOns"), log);
+			replaceAddon(source, addOnsFolder(flavor), log);
 			log(
 				`Addon: ${action === "install" ? "installed" : `updated ${installed ?? "(unknown)"} ->`} ${bundled} in ${folder}`,
 			);
@@ -224,7 +231,7 @@ export type AddonInstall = {
 
 export function addonInstalls(wow: string): AddonInstall[] {
 	return foreverFlavors(wow).map((flavor) => {
-		const folder = join(flavor, "Interface", "AddOns", ADDON);
+		const folder = join(addOnsFolder(flavor), ADDON);
 		const present = existsSync(folder) && statSync(folder).isDirectory();
 		const version = present ? readAddonVersion(folder) : undefined;
 		return { flavor, folder, version, broken: present && !version ? true : undefined };
@@ -247,17 +254,17 @@ export function uninstallAddon(wow: string, options: { savedData: boolean }, log
 		log(`Addon: removed ${path}`);
 	};
 	for (const flavor of foreverFlavors(wow)) {
-		const addOns = join(flavor, "Interface", "AddOns");
+		const addOns = addOnsFolder(flavor);
 		for (const name of [ADDON, STAGING, OLD]) remove(join(addOns, name));
 		if (!options.savedData) continue;
-		const accounts = join(flavor, "WTF", "Account");
+		const accounts = wowPath(flavor, "WTF", "Account");
 		for (const account of safeList(accounts)) {
 			const accountDir = join(accounts, account);
-			removeSaved(join(accountDir, "SavedVariables"), remove);
+			removeSaved(wowPath(accountDir, "SavedVariables"), remove);
 			// Per character: Account/<account>/<realm>/<character>/SavedVariables.
 			for (const realm of safeList(accountDir)) {
 				for (const character of safeList(join(accountDir, realm))) {
-					removeSaved(join(accountDir, realm, character, "SavedVariables"), remove);
+					removeSaved(wowPath(accountDir, realm, character, "SavedVariables"), remove);
 				}
 			}
 		}

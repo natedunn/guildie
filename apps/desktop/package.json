@@ -14,7 +14,11 @@
 		"build:win": "node scripts/build.mjs && electron-builder --win --x64",
 		"build:win-cross": "node scripts/build.mjs && electron-builder --win zip --x64",
 		"release:win": "node scripts/build.mjs && electron-builder --win nsis --x64 --publish always",
-		"build:mac": "node scripts/build.mjs && electron-builder --mac dir",
+		"build:mac": "node scripts/build.mjs && node scripts/package.mjs --mac --universal --publish never",
+		"build:mac-dir": "node scripts/build.mjs && node scripts/package.mjs --mac dir",
+		"release:mac": "node scripts/build.mjs && node scripts/package.mjs --mac --universal --publish always",
+		"build:linux": "node scripts/build.mjs && electron-builder --linux AppImage --x64 --publish never",
+		"release:linux": "node scripts/build.mjs && electron-builder --linux AppImage --x64 --publish always",
 		"check": "tsc --noEmit",
 		"test": "node --test src/*.test.ts"
 	},

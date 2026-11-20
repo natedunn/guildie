@@ -7,7 +7,7 @@ import { useInDesktopApp } from "@/lib/desktop";
  * Asks before leaving a page with changes that aren't saved: our own dialog
  * for moves inside Guildie (links, the sidebar, back and forward), and the
  * browser's own prompt for closing or reloading the tab. Not that one in the
- * Windows app: there it would quietly keep the window from closing.
+ * desktop app: there it would quietly keep the window from closing.
  */
 export function UnsavedChangesGuard({ dirty }: { dirty: boolean }) {
 	const inApp = useInDesktopApp();

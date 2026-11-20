@@ -51,7 +51,7 @@ export function AppSidebar() {
 /** The wordmark row. In the desktop app it's part of the title bar: drag it to move the window. */
 function SidebarHead() {
 	return (
-		<div className="app-sidebar-drag flex h-12 flex-none items-center px-3 desktop:h-10 desktop:pl-[max(0.75rem,env(titlebar-area-x,0px))]">
+		<div className="app-sidebar-drag flex h-12 flex-none items-center px-3 desktop:h-10 desktop:pl-[max(0.75rem,var(--titlebar-left))]">
 			<Wordmark />
 		</div>
 	);
@@ -355,7 +355,7 @@ export function NavSheet({ className }: { className?: string }) {
 					initialFocus={false}
 					className="app-sidebar fixed inset-y-0 left-0 z-50 w-[min(280px,85vw)] pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] border-r border-border bg-chrome! shadow-2xl transition-transform data-ending-style:-translate-x-full data-starting-style:-translate-x-full"
 				>
-					<div className="flex h-12 flex-none items-center justify-between px-3 desktop:h-10">
+					<div className="flex h-12 flex-none items-center justify-between px-3 desktop:h-10 desktop:pl-[max(0.75rem,var(--titlebar-left))]">
 						<Wordmark />
 						<Dialog.Close
 							className="grid size-9 place-items-center rounded-md text-muted-foreground hover:bg-hover hover:text-foreground desktop:size-8"

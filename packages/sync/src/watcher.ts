@@ -1,33 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
 import type { Log } from "./config.ts";
 import { extractPayload } from "./savedVariables.ts";
-
-/** Default World of Warcraft folders, most likely first. */
-export function wowCandidates(wow?: string) {
-	if (wow) return [wow];
-	if (process.platform === "win32") {
-		return [
-			"C:\\Program Files (x86)\\World of Warcraft",
-			"C:\\Program Files\\World of Warcraft",
-			"D:\\World of Warcraft",
-			"D:\\Games\\World of Warcraft",
-		];
-	}
-	return ["/Applications/World of Warcraft"];
-}
+import { isFlavorName, isWowFolder, wowCandidates, wowPath } from "./wowPaths.ts";
 
 /** A game install's flavor folders: _classic_, _retail_, _forever_... */
-const flavorFolders = (root: string) => readdirSync(root).filter((d) => /^_.+_$/.test(d));
-
-/** Whether a folder looks like a World of Warcraft install (has a _flavor_ folder). */
-export function isWowFolder(folder: string) {
-	try {
-		return flavorFolders(folder).length > 0;
-	} catch {
-		return false;
-	}
-}
+const flavorFolders = (root: string) => readdirSync(root).filter(isFlavorName);
 
 /** The WoW folder in use: the chosen one, or the first default that looks like an install. */
 export function findWowFolder(wow?: string): string | undefined {
@@ -41,10 +18,10 @@ export function findSavedVariables(wow?: string): string[] {
 		if (!existsSync(root)) continue;
 		const flavors = flavorFolders(root).sort((a, b) => Number(b.includes("forever")) - Number(a.includes("forever")));
 		for (const flavor of flavors) {
-			const accounts = join(root, flavor, "WTF", "Account");
+			const accounts = wowPath(root, flavor, "WTF", "Account");
 			if (!existsSync(accounts)) continue;
 			for (const account of readdirSync(accounts)) {
-				const file = join(accounts, account, "SavedVariables", "Guildie.lua");
+				const file = wowPath(accounts, account, "SavedVariables", "Guildie.lua");
 				if (existsSync(file)) found.push(file);
 			}
 		}
@@ -96,8 +73,8 @@ export function findAddonFolders(wow?: string): string[] {
 	for (const root of wowCandidates(wow)) {
 		if (!existsSync(root)) continue;
 		for (const flavor of flavorFolders(root)) {
-			const folder = join(root, flavor, "Interface", "AddOns", "Guildie");
-			if (existsSync(join(folder, "Guildie.toc"))) found.push(folder);
+			const folder = wowPath(root, flavor, "Interface", "AddOns", "Guildie");
+			if (existsSync(wowPath(folder, "Guildie.toc"))) found.push(folder);
 		}
 	}
 	return found;

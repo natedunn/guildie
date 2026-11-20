@@ -9,7 +9,7 @@ const SITE = (import.meta.env.VITE_SITE_URL as string | undefined) || "https://g
 
 export const DEFAULT_TITLE = "Guildie";
 export const DEFAULT_DESCRIPTION =
-	"Your whole guild, in sync: roster, gear, talents and crafters for WoW: Forever, on the web, in a Windows app and on your tooltips in game.";
+	"Your whole guild, in sync: roster, gear, talents and crafters for WoW: Forever, on the web, in a desktop app and on your tooltips in game.";
 
 /** The default tags, on every page (root route). */
 export const defaultShareMeta = [

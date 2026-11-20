@@ -1,6 +1,9 @@
 // What the app remembers, in <userData>/settings.json. Tokens are encrypted
-// with Electron's safeStorage (DPAPI on Windows, the Keychain on macOS) and
-// kept per site origin, so a preview's token never applies to guildie.club.
+// with Electron's safeStorage (DPAPI on Windows, the Keychain on macOS, the
+// Secret Service or KWallet on Linux) and kept per site origin, so a
+// preview's token never applies to guildie.club. A Linux desktop without a
+// keyring keeps the token unencrypted, marked as such, in a file only the
+// user can read: uploading keeps working, and the log says so once.
 
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -10,8 +13,11 @@ export type Bounds = { x: number; y: number; width: number; height: number; maxi
 
 type Stored = {
 	livePixelsOrigins?: string[];
-	/** origin -> encrypted token (base64) and the account it belongs to. */
-	tokens: Record<string, { token: string; account?: string }>;
+	/**
+	 * origin -> encrypted token (base64) and the account it belongs to.
+	 * `plain`: Linux without a keyring, the token as it is.
+	 */
+	tokens: Record<string, { token: string; account?: string; plain?: true }>;
 	wow?: string;
 	bounds?: Bounds;
 	/** The "still running in the tray" notice was shown once. */
@@ -61,7 +67,8 @@ function save() {
 	const path = file();
 	mkdirSync(dirname(path), { recursive: true });
 	// Write then rename, so a crash never leaves half a file.
-	writeFileSync(`${path}.tmp`, JSON.stringify(cache, null, 2));
+	// Only the user can read it (it holds tokens). Windows: the profile folder's own rights.
+	writeFileSync(`${path}.tmp`, JSON.stringify(cache, null, 2), { mode: 0o600 });
 	renameSync(`${path}.tmp`, path);
 }
 
@@ -114,10 +121,22 @@ export const settings = {
 	},
 };
 
+/**
+ * Whether the OS can encrypt tokens here. On Linux it's also false when
+ * Chromium found no keyring ("basic_text": its key is the same on every
+ * computer, so that would only look encrypted).
+ */
+function canEncrypt() {
+	if (!safeStorage.isEncryptionAvailable()) return false;
+	return process.platform !== "linux" || safeStorage.getSelectedStorageBackend() !== "basic_text";
+}
+
 /** The token saved for a site, decrypted; undefined if none (or it can't be decrypted here). */
 export function loadToken(origin: string): { token: string; account?: string } | undefined {
 	const saved = load().tokens[origin];
-	if (!saved || !safeStorage.isEncryptionAvailable()) return undefined;
+	if (!saved) return undefined;
+	if (saved.plain) return process.platform === "linux" ? { token: saved.token, account: saved.account } : undefined;
+	if (!safeStorage.isEncryptionAvailable()) return undefined;
 	try {
 		return { token: safeStorage.decryptString(Buffer.from(saved.token, "base64")), account: saved.account };
 	} catch {
@@ -125,12 +144,21 @@ export function loadToken(origin: string): { token: string; account?: string } |
 	}
 }
 
-/** Saves a site's token encrypted. Returns false when the OS can't encrypt (then it's kept for this run only). */
-export function saveToken(origin: string, token: string, account?: string) {
-	if (!safeStorage.isEncryptionAvailable()) return false;
-	load().tokens[origin] = { token: safeStorage.encryptString(token).toString("base64"), account };
+/**
+ * Saves a site's token: "encrypted", or "plain" (Linux without a keyring:
+ * unencrypted, marked, readable only by the user). False when it can't be
+ * kept at all (then it's kept for this run only).
+ */
+export function saveToken(origin: string, token: string, account?: string): "encrypted" | "plain" | false {
+	if (canEncrypt()) {
+		load().tokens[origin] = { token: safeStorage.encryptString(token).toString("base64"), account };
+		save();
+		return "encrypted";
+	}
+	if (process.platform !== "linux") return false;
+	load().tokens[origin] = { token, account, plain: true };
 	save();
-	return true;
+	return "plain";
 }
 
 export function forgetToken(origin: string) {

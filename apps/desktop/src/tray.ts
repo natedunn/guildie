@@ -1,4 +1,8 @@
-// The notification-area icon and its menu. Left-click opens the window.
+// The notification-area icon (macOS: menu bar extra) and its menu. On
+// Windows and Linux a left-click opens the window; on macOS a click shows the
+// menu, as menu bar icons do (it has "Open Guildie"). Linux trays need a
+// StatusNotifierItem host (GNOME: the AppIndicator extension), so nothing
+// depends on the tray there: starting Guildie opens its window.
 
 import { join } from "node:path";
 import { displayName } from "@guildie/sync";
@@ -26,14 +30,29 @@ export type TrayActions = {
 
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
+/** The tray icon for this system (assets/, drawn by scripts/make-tray-icon.py). */
+function trayIcon() {
+	const asset = (name: string) => nativeImage.createFromPath(join(__dirname, "assets", name));
+	if (process.platform === "win32") return asset("guildie.ico");
+	const app = () => asset("guildie-256.png").resize({ width: 22, height: 22, quality: "best" });
+	if (process.platform === "darwin") {
+		// A template image: black with alpha, which macOS tints for light and dark menu bars.
+		const icon = asset("tray-mac-Template.png");
+		if (icon.isEmpty()) return app();
+		icon.setTemplateImage(true);
+		return icon;
+	}
+	const icon = asset("tray-linux.png");
+	return icon.isEmpty() ? app() : icon;
+}
+
+/** Whether the menu shows on a click (macOS) rather than the click opening the window. */
+export const trayClickShowsMenu = process.platform === "darwin";
+
 export function createTray(actions: TrayActions) {
-	const icon =
-		process.platform === "win32"
-			? nativeImage.createFromPath(join(__dirname, "assets", "guildie.ico"))
-			: nativeImage.createFromPath(join(__dirname, "assets", "guildie-256.png")).resize({ width: 18, height: 18 });
-	const tray = new Tray(icon);
+	const tray = new Tray(trayIcon());
 	tray.setToolTip("Guildie");
-	tray.on("click", actions.open);
+	if (!trayClickShowsMenu) tray.on("click", actions.open);
 
 	const update = (status: Status) => {
 		const statusLine = status.pairingCode
@@ -69,7 +88,7 @@ export function createTray(actions: TrayActions) {
 				...(actions.startWithSystem
 					? [
 							{
-								label: process.platform === "win32" ? "Start with Windows" : "Start at login",
+								label: process.platform === "win32" ? "Start with Windows" : "Open at login",
 								type: "checkbox" as const,
 								checked: actions.startWithSystem.get(),
 								click: (item: Electron.MenuItem) => actions.startWithSystem?.set(item.checked),

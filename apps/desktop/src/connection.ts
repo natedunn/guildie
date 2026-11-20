@@ -9,11 +9,11 @@ import { join } from "node:path";
 import {
 	Api,
 	isTokenShaped,
-	isWowFolder,
 	type LastUpload,
 	type Log,
 	loadedAddonVersion,
 	ReloadReminder,
+	resolveWowFolder,
 	SyncEngine,
 	savedLivePixelsEnabled,
 	savedVariablesAt,
@@ -237,7 +237,8 @@ export class Connection {
 	setNotify(option: unknown, enabled: unknown) {
 		if (!NOTIFY_OPTIONS.includes(option as NotifyOption)) throw new Error("Unknown notification option");
 		if (typeof enabled !== "boolean") throw new Error("Expected a boolean");
-		if (option === "reloadReminders" && enabled && !canTellWowRunning) throw new Error("Reload reminders need Windows");
+		if (option === "reloadReminders" && enabled && !canTellWowRunning)
+			throw new Error("Reload reminders aren't available on this computer");
 		settings.setNotify(option as NotifyOption, enabled);
 		// Off: forget WoW was open, so turning it back on starts from what's loaded then.
 		if (option === "reloadReminders" && !enabled) this.reloadReminder.gameRunning(false);
@@ -326,12 +327,25 @@ export class Connection {
 		}
 		this.account = me.battletag ?? this.account ?? "you";
 		this.updatePixelCapture();
-		if (this.api.token) saveToken(this.origin, this.api.token, this.account);
+		if (this.api.token) this.keepToken(this.api.token);
 		this.log(`Connected to ${this.origin} as ${this.account}`);
 		if (!me.characters.length)
 			this.onNotice("Guildie", "No claimed characters yet. Claim them on your Guildie account page.");
 		this.emit();
 		return true;
+	}
+
+	private warnedPlainToken = false;
+	/** Saves the token (never logged), saying once when it can't be encrypted here. */
+	private keepToken(token: string) {
+		const kept = saveToken(this.origin, token, this.account);
+		if (!kept) this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
+		else if (kept === "plain" && !this.warnedPlainToken) {
+			this.warnedPlainToken = true;
+			this.log(
+				"No keyring (Secret Service or KWallet) found: the token is saved unencrypted in settings.json, readable only by you.",
+			);
+		}
 	}
 
 	/** The site hands over a token after the user signs in. Checked with the site before it's kept. */
@@ -345,8 +359,7 @@ export class Connection {
 		this.sync.reset();
 		this.api.token = token;
 		this.account = me.battletag ?? account ?? "you";
-		if (!saveToken(this.origin, token, this.account))
-			this.log("Can't encrypt the token on this computer; it's kept until the app quits.");
+		this.keepToken(token);
 		this.sync.reset();
 		this.pixels?.stop();
 		this.updatePixelCapture();
@@ -373,8 +386,10 @@ export class Connection {
 		void this.tick();
 	}
 
-	setWowFolder(folder: string) {
-		if (!isWowFolder(folder))
+	/** The chosen WoW folder; _forever_ inside it or (Linux) a Wine prefix with WoW in it count too. */
+	setWowFolder(chosen: string) {
+		const folder = resolveWowFolder(chosen);
+		if (!folder)
 			throw new Error("That folder doesn't look like World of Warcraft (no _classic_ or _forever_ folder inside).");
 		settings.wow = folder;
 		this.sync.setWow(folder);

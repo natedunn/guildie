@@ -564,7 +564,7 @@ export function AddonSection() {
 		<Section id="addon" className="pt-28 sm:pt-36">
 			<SectionHead eyebrow="In-game addon" color="#d9b559" title="Your guild, on your tooltips">
 				The Guildie addon adds a few lines to item tooltips in game: who it's an upgrade for, who's requesting it, and
-				who needs it as a reagent. It comes with the Windows app, which keeps its guild data current.
+				who needs it as a reagent. It comes with the Guildie app, which keeps its guild data current.
 			</SectionHead>
 			<Card className="landing-reveal mt-14">
 				<div className="relative overflow-hidden">

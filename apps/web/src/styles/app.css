@@ -5,7 +5,8 @@
 
 /* One theme, dark. `dark:` variants always apply. */
 @custom-variant dark (&:where(:root, :root *));
-/* The Windows app (html[data-desktop]). SSR sets it from the user agent. */
+/* The desktop app (html[data-desktop]; html[data-platform] says win, mac or
+   linux). SSR sets both from the user agent. */
 @custom-variant desktop (&:where(html[data-desktop="true"], html[data-desktop="true"] *));
 
 @theme inline {
@@ -158,15 +159,29 @@ html:not([data-desktop="true"]) {
 }
 
 /* Browser chrome and exposed safe areas should continue the page's fill.
-   The Windows shell keeps its own chrome / Mica background. */
+   The desktop app keeps its own chrome / Mica background. */
 html:not([data-desktop="true"]):not(:has(.landing-shell)),
 html:not([data-desktop="true"]):not(:has(.landing-shell)) body {
 	background-color: var(--background);
 }
 
-/* Windows draws the app in Segoe; the site keeps Inter elsewhere. */
-html[data-desktop="true"] {
+/* Windows draws the app in Segoe; the site (and the app on macOS and Linux)
+   keeps Inter. */
+html[data-desktop="true"][data-platform="win"] {
 	--font-sans: "Segoe UI Variable Text", "Segoe UI", "Inter Variable", system-ui, sans-serif;
+}
+
+/* The window's own buttons sit over the title bar (titleBarOverlay, Window
+   Controls Overlay): minimize / maximize / close at the right on Windows and
+   Linux, the traffic lights at the left on macOS. The window reports where
+   the free strip is (env(titlebar-area-*)); the fallbacks fit when it doesn't. */
+html[data-desktop="true"] {
+	--titlebar-left: env(titlebar-area-x, 0px);
+	--titlebar-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+}
+html[data-desktop="true"][data-platform="mac"] {
+	--titlebar-left: env(titlebar-area-x, 78px);
+	--titlebar-right: 0px;
 }
 
 @layer base {
@@ -343,7 +358,7 @@ select:not([multiple]) {
 	   home indicator (viewport-fit=cover, and a home screen app draws under a
 	   translucent status bar): keep the shell inside the safe area. The strips
 	   outside it show the chrome color, the same as the phone's top bar. All
-	   zero in browsers without those, and in the Windows app. */
+	   zero in browsers without those, and in the desktop app. */
 	.app-shell {
 		display: flex;
 		height: 100dvh;
@@ -508,11 +523,11 @@ select:not([multiple]) {
 	}
 	/* Segoe UI (the app's font) sits its letters high in the line box, so a
 	   box-centered icon reads low next to them there: lift it to the letters. */
-	html[data-desktop="true"] .nav-item > svg {
+	html[data-desktop="true"][data-platform="win"] .nav-item > svg {
 		translate: 0 -1px;
 	}
 
-	/* ---- The Windows app ---- */
+	/* ---- The desktop app ---- */
 
 	html[data-desktop="true"] .app-titlebar {
 		display: flex;
@@ -521,11 +536,18 @@ select:not([multiple]) {
 		align-items: center;
 		gap: 0.25rem;
 		padding-left: 0.5rem;
-		/* Room for minimize / maximize / close (titleBarOverlay). */
-		padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+		/* Room for the window's buttons (see --titlebar-right). */
+		padding-right: var(--titlebar-right);
 		background-color: var(--chrome);
 		-webkit-app-region: drag;
 		app-region: drag;
+	}
+	/* No sidebar (narrow windows): the title bar starts at the window's left
+	   edge, where macOS has its traffic lights. */
+	@media (width < 48rem) {
+		html[data-desktop="true"] .app-titlebar {
+			padding-left: max(0.5rem, var(--titlebar-left));
+		}
 	}
 	html[data-desktop="true"] :is(.app-titlebar, .app-sidebar-drag) :is(a, button, input, select, [role="button"]) {
 		-webkit-app-region: no-drag;
@@ -1006,14 +1028,15 @@ select:not([multiple]) {
 	}
 
 	/* The sticky nav (.frosted). In the desktop app it's also the title bar:
-	   it drags the window and leaves room for minimize / maximize / close. */
+	   it drags the window and leaves room for the window's buttons. */
 	.landing-nav {
 		padding-top: env(safe-area-inset-top);
 	}
 	html[data-desktop="true"] .landing-nav {
 		-webkit-app-region: drag;
 		app-region: drag;
-		padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 138px)));
+		padding-left: var(--titlebar-left);
+		padding-right: var(--titlebar-right);
 	}
 	html[data-desktop="true"] .landing-nav :is(a, button) {
 		-webkit-app-region: no-drag;

@@ -7,7 +7,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "tsc --noEmit && tsc --noEmit -p convex",
-		"test": "node --test convex/*.test.ts",
+		"test": "node --test convex/*.test.ts src/lib/*.test.ts",
 		"seed": "CONVEX_AGENT_MODE=anonymous convex run dev:seed",
 		"blizzard-keys": "sh scripts/blizzard-keys.sh",
 		"push:cloud-dev": "sh scripts/push-cloud-dev.sh",

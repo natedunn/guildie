@@ -145,3 +145,14 @@ test("uninstall removes the addon (and, if asked, only its saved files)", () => 
 	assert.ok(existsSync(sv("SavedVariables", "Other.lua")));
 	assert.ok(existsSync(join(forever, "Interface", "AddOns", "OtherAddon")));
 });
+
+test("Linux: installs into the Interface/Addons that's there instead of making a second AddOns", () => {
+	const root = wow("_forever_");
+	const interfaceDir = join(root, "_forever_", "Interface");
+	mkdirSync(join(interfaceDir, "Addons", "OtherAddon"), { recursive: true });
+	const [result] = ensureAddon(source("0.3.1"), root, quiet);
+	assert.equal(result?.version, "0.3.1");
+	assert.deepEqual(readdirSync(interfaceDir), ["Addons"]);
+	assert.deepEqual(readdirSync(join(interfaceDir, "Addons")).sort(), ["Guildie", "OtherAddon"]);
+	assert.equal(addonInstalls(root)[0]?.version, "0.3.1");
+});

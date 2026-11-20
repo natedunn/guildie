@@ -4,21 +4,37 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { Fragment, useEffect, useState } from "react";
 import { NavSheet } from "@/components/app-sidebar";
 import { useBreadcrumbs } from "@/lib/breadcrumbs";
+import { useDesktopPlatform } from "@/lib/desktop";
 
 // The title bar over the content pane: where you are (breadcrumbs), and in the
 // desktop app back / forward too. There the whole row drags the window
-// (app.css .app-titlebar) and Windows draws minimize / maximize / close at its
-// right end. On the web it's a plain row (the browser has back and forward).
+// (app.css .app-titlebar) and the window draws its own buttons over it:
+// minimize / maximize / close at the right end on Windows and Linux, the
+// traffic lights at the window's left on macOS (over the sidebar, or this
+// row's start when the sidebar is hidden; app.css leaves room for both). On
+// the web it's a plain row (the browser has back and forward).
 
 export function AppTitleBar() {
 	const crumbs = useBreadcrumbs();
 	const { canBack, canForward, back, forward } = useHistoryButtons();
+	// The keys the app's window listens for (apps/desktop/src/window.ts): Cmd+[ and Cmd+] on a Mac.
+	const mac = useDesktopPlatform() === "mac";
 	return (
 		<div className="app-titlebar">
 			<NavSheet className="md:hidden" />
 			<span className="hidden gap-0.5 desktop:flex">
-				<TitleButton label="Back (Alt+Left)" disabled={!canBack} onClick={back} icon={ArrowLeft01Icon} />
-				<TitleButton label="Forward (Alt+Right)" disabled={!canForward} onClick={forward} icon={ArrowRight01Icon} />
+				<TitleButton
+					label={mac ? "Back (⌘[)" : "Back (Alt+Left)"}
+					disabled={!canBack}
+					onClick={back}
+					icon={ArrowLeft01Icon}
+				/>
+				<TitleButton
+					label={mac ? "Forward (⌘])" : "Forward (Alt+Right)"}
+					disabled={!canForward}
+					onClick={forward}
+					icon={ArrowRight01Icon}
+				/>
 			</span>
 			<nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-xs desktop:ml-2">
 				{crumbs.map((c, i) => {

@@ -10,7 +10,7 @@ import { REPO } from "./primitives";
 
 const NAV = [
 	{ href: "#features", label: "Features" },
-	{ href: "#app", label: "Windows app" },
+	{ href: "#app", label: "Desktop app" },
 	{ href: "#open-source", label: "Open source" },
 ];
 
@@ -64,7 +64,7 @@ export function LandingFooter() {
 				<FooterColumn title="Product">
 					<FooterLink href="#features">Features</FooterLink>
 					<FooterLink href="#addon">In-game addon</FooterLink>
-					{!inApp && <FooterLink href="#app">Windows app</FooterLink>}
+					{!inApp && <FooterLink href="#app">Desktop app</FooterLink>}
 					<FooterLink href="#ai">AI apps</FooterLink>
 				</FooterColumn>
 				<FooterColumn title="Open source">

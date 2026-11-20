@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import { createFileRoute } from "@tanstack/react-router";
 import { bearerToken, convex, errorResponse, json } from "@/lib/helper-api";
 
-// POST /api/helper/notifications (Bearer token): the Windows app, every
+// POST /api/helper/notifications (Bearer token): the desktop app, every
 // minute. Notifications to show as system notifications, each handed out
 // once. Body (optional): { optIn: ["itemsMailed"] }, the opt-in kinds the app
 // shows (shared/notifications.ts CHANNELS). -> { notifications: [{ id, text,

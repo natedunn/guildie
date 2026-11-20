@@ -1,6 +1,6 @@
 # Guildie
 
-WoW: Forever guild site (guildie.club), its Windows app and its in-game
+WoW: Forever guild site (guildie.club), its desktop app (Windows, macOS, Linux) and its in-game
 addon. See README.md, CONTRIBUTING.md and docs/.
 
 Monorepo (pnpm workspaces):
@@ -9,7 +9,7 @@ Monorepo (pnpm workspaces):
 - `apps/gateway`: the OAuth callback gateway Worker.
 - `apps/mcp`: the MCP server Worker (mcp.guildie.club) that lets AI apps read
   a player's guild data; tools run in `apps/web/convex/mcp.ts` (docs/mcp.md).
-- `apps/addon`: the in-game addon (Lua 5.1). `apps/desktop`: the Windows app
+- `apps/addon`: the in-game addon (Lua 5.1). `apps/desktop`: the desktop app
   (Electron: the site in a window plus the uploader; apps/desktop/README.md).
 - `packages/sync`: the desktop app's SavedVariables reader, uploader and
   GuildieData.lua writer. (`apps/helper`, the old tray uploader, is retired;
@@ -29,11 +29,11 @@ Monorepo (pnpm workspaces):
   with `useSuspenseQuery`. Writes: `useMutation` from `convex/react`.
 - Each PR adds a line under `## Unreleased` in CHANGELOG.md (player-facing
   wording), labeled with where it shows: `- **Guildie:** …` (the site, browser or app
-  window), `**App:**` (the Windows app itself), `**Addon:**`, or several
+  window), `**App:**` (the desktop app itself), `**Addon:**`, or several
   (`**Guildie, App:**`); CI checks it. Maintainers cut
   releases.
 - Design: minimal, dark only, an app rather than a website (the same React
-  app runs on the web and in the Windows app). Tokens live in
+  app runs on the web and in the desktop app). Tokens live in
   `apps/web/src/styles/app.css`; restyle shadcn primitives there.
   - App shell: a left sidebar for navigation and one content pane that
     scrolls by itself; the page never scrolls as a whole. Phones get a top

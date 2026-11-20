@@ -973,12 +973,17 @@ function useLocalResults(typed: string) {
 					"Settings · Addon",
 				);
 			}
-			s("app", "Windows app", "/settings/app", "computer", [
+			s("app", "Desktop app", "/settings/app", "computer", [
 				"desktop",
+				"windows",
+				"mac",
+				"macos",
+				"linux",
 				"download",
 				"update",
 				"version",
 				"guildie for windows",
+				"guildie for mac",
 			]);
 			s(
 				"whats-new",
