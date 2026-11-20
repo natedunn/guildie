@@ -31,6 +31,7 @@ import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
 import type * as items from "../items.js";
 import type * as learnLevels from "../learnLevels.js";
+import type * as maintainers from "../maintainers.js";
 import type * as mcp from "../mcp.js";
 import type * as notifications from "../notifications.js";
 import type * as origins from "../origins.js";
@@ -108,6 +109,7 @@ declare const fullApi: ApiFromModules<{
   inventory: typeof inventory;
   items: typeof items;
   learnLevels: typeof learnLevels;
+  maintainers: typeof maintainers;
   mcp: typeof mcp;
   notifications: typeof notifications;
   origins: typeof origins;

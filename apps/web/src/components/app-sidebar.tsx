@@ -7,6 +7,7 @@ import {
 	AnvilIcon,
 	Cancel01Icon,
 	Castle01Icon,
+	DashboardSquare01Icon,
 	InboxIcon,
 	Login03Icon,
 	Menu01Icon,
@@ -70,6 +71,7 @@ function SidebarNav() {
 	// Requests you could fill, per guild, and yours that went quiet (members only).
 	const { data: requests } = useQuery({ ...convexQuery(api.requests.sidebar, {}), enabled: !!viewer });
 	const { data: unread } = useQuery({ ...convexQuery(api.notifications.unread, {}), enabled: !!viewer });
+	const { data: maintainer } = useQuery({ ...convexQuery(api.maintainers.me, {}), enabled: !!viewer });
 	const requestsIn = (g: { region: string; slug: string }) =>
 		requests?.guilds.find((r) => r.region === g.region && r.slug === g.slug);
 	const stale = (requests?.guilds ?? []).filter((g) => g.stale > 0);
@@ -187,6 +189,12 @@ function SidebarNav() {
 							<HugeiconsIcon icon={ScrollTextIcon} size={15} strokeWidth={1.75} />
 							Quests
 						</NavLink>
+						{maintainer && (
+							<NavLink to="/admin">
+								<HugeiconsIcon icon={DashboardSquare01Icon} size={15} strokeWidth={1.75} />
+								Admin
+							</NavLink>
+						)}
 					</NavSection>
 				)}
 
