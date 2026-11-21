@@ -147,6 +147,39 @@ node apps/web/scripts/gen-recipe-skills.mjs --summary out.md      # also: what c
 node apps/web/scripts/gen-recipe-skills.mjs --check               # exit 1 if it would change
 ```
 
+## Waylaid Crates and Supplies
+
+What each Waylaid Crate and Waylaid Supplies item takes to fill, for the
+addon's item tooltips (who in the guild makes or gathers it). Neither
+Blizzard's web API nor the item's name says it, so it comes from Forever's
+own tables.
+
+| File                                          | What                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| `apps/web/scripts/gen-waylaid.mjs`            | Reads the items, their "Use:" spells and what those take; writes the file |
+| `apps/web/convex/shared/waylaid.generated.ts` | Generated: each crate or Supplies item, its level and what it takes       |
+
+- **Supplies** take one item: the spell's `SpellReagents` row ("Add 12
+  Bronze Bars to complete the shipment" is reagent 2841, count 12). Five of
+  them (Dusky Belts, Gnomish Rocket Boots, Goblin Mortars, Lesser
+  Stoneshield Potions, Shadowskin Gloves) take 20 Copper Bars whatever their
+  names say, in the game and in its tooltip, so the file keeps that.
+- **Crates** take any one bundle of several. The spell's description lists
+  them by name (`- $M3 Stranglekelp`, where `$M3` is effect 2's base
+  points, the count). Names become item ids through `ItemSparse`; a name
+  shared by several items needs an entry in `SAME_NAME` in the script
+  (Dark Iron Ore), else it fails.
+
+The daily check covers this file too (`~ Waylaid Crate: …: 10 Silver Bar or
+20 Iron Bar → …`). To confirm a change, read the crate's tooltip in game.
+
+```sh
+node apps/web/scripts/gen-waylaid.mjs                       # newest build
+node apps/web/scripts/gen-waylaid.mjs --build 1.60.1.71037  # a given build
+node apps/web/scripts/gen-waylaid.mjs --summary out.md      # also: what changed, as markdown
+node apps/web/scripts/gen-waylaid.mjs --check               # exit 1 if it would change
+```
+
 ## Learn levels
 
 The skill a trainer asks for to learn a recipe (where orange starts) isn't

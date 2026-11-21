@@ -177,3 +177,19 @@ export const forProgress = internalQuery({
 			.map(({ recipeId, profession, reagents }) => ({ recipeId, profession, reagents }));
 	},
 });
+
+/** Recipes that craft any of these items (waylaidUse.ts, for guildData). */
+export const makers = internalQuery({
+	args: { itemIds: v.array(v.number()) },
+	handler: async (ctx, { itemIds }) => {
+		const out: { recipeId: number; profession: string; craftedItemId: number }[] = [];
+		for (const itemId of itemIds) {
+			const rows = await ctx.db
+				.query("recipes")
+				.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", itemId))
+				.collect();
+			for (const r of rows) out.push({ recipeId: r.recipeId, profession: r.profession, craftedItemId: itemId });
+		}
+		return out;
+	},
+});

@@ -201,6 +201,86 @@ local function useRows(itemID, skip)
 end
 ns.useRows = useRows
 
+--- Who can fill a Waylaid Crate or Waylaid Supplies item (GuildieData.waylaid
+--- and waylaidMine, addon 0.26.0; apps/web/convex/waylaidUse.ts): per
+--- profession that makes or gathers what it takes, "Herbalism", then your
+--- own characters, then the best few guildmates with their skill ("Todd |
+--- 183"; makers' in their profession window's colors). Who can supply all
+--- of a crate's bundles for that profession comes first (the site sorts). With
+--- nobody listed: "Needs 85 skill: Miller 60" or "No one in the guild".
+--- The item is soulbound: these are who to ask for what it takes.
+local function waylaidRows(itemID)
+    local data = GuildieData and type(GuildieData.waylaid) == "table" and GuildieData.waylaid
+    local entry = data and data[itemID]
+    local s = GuildieDB and GuildieDB.settings
+    local mineData = not (s and s.showMineReagents == false)
+        and GuildieData and type(GuildieData.waylaidMine) == "table" and GuildieData.waylaidMine
+    local mineEntry = mineData and mineData[itemID]
+    if type(entry) ~= "table" and type(mineEntry) ~= "table" then return {} end
+    local me = UnitName("player")
+    local function right(p, user)
+        return p.how == "makes" and skillText(user) or tostring(user.skill or "?")
+    end
+    local key = function(p) return tostring(p.how) .. ":" .. tostring(p.name) end
+    local mine = {}
+    for _, p in ipairs(type(mineEntry) == "table" and mineEntry or {}) do
+        if type(p) == "table" and p.name and type(p.users) == "table" then
+            local rows = {}
+            for _, user in ipairs(p.users) do
+                if user.name then
+                    local left = classColored(user.name == me and "You" or user.name, user.classId)
+                    table.insert(rows, { left = SUB .. left, right = right(p, user) })
+                end
+            end
+            if #rows > 0 then mine[key(p)] = { p = p, rows = rows } end
+        end
+    end
+    local rows, done = {}, {}
+    local professions = type(entry) == "table" and type(entry.professions) == "table" and entry.professions or {}
+    for _, p in ipairs(professions) do
+        if type(p) == "table" and p.name then
+            done[key(p)] = true
+            table.insert(rows, { left = p.name })
+            local own = mine[key(p)] and mine[key(p)].rows or {}
+            for _, row in ipairs(own) do table.insert(rows, row) end
+            local shown, hidden = #own, 0
+            for _, user in ipairs(type(p.users) == "table" and p.users or {}) do
+                if isMine(user.name) then
+                    hidden = hidden + 1
+                else
+                    shown = shown + 1
+                    table.insert(rows, { left = SUB .. classColored(user.name, user.classId), right = right(p, user) })
+                end
+            end
+            local more = (tonumber(p.count) or 0) - (shown - #own) - hidden
+            if more > 0 then
+                table.insert(rows, { left = SUB .. string.format("+%d more", more) })
+            elseif shown == 0 then
+                local why
+                if type(p.closest) == "table" and p.closest.name and p.closest.need then
+                    why = string.format("Needs %s skill: %s %s", tostring(p.closest.need),
+                        classColored(p.closest.name, p.closest.classId), tostring(p.closest.skill))
+                elseif p.nobody then
+                    why = "No one in the guild"
+                end
+                if why then table.insert(rows, { left = SUB .. why }) else table.remove(rows) end
+            end
+        end
+    end
+    -- Professions only yours can supply.
+    local rest = {}
+    for k in pairs(mine) do
+        if not done[k] then table.insert(rest, k) end
+    end
+    table.sort(rest)
+    for _, k in ipairs(rest) do
+        table.insert(rows, { left = mine[k].p.name })
+        for _, row in ipairs(mine[k].rows) do table.insert(rows, row) end
+    end
+    return rows
+end
+ns.waylaidRows = waylaidRows
+
 --- A list as a set, cached per list (GuildieData is replaced only on /reload).
 local sets = setmetatable({}, { __mode = "k" })
 local function asSet(list)
@@ -418,6 +498,11 @@ local function rowsFor(tooltip, itemID, data, link)
     if okMine and mine then table.insert(rows, mine) end
     local requests, ongoing = requestRows(itemID)
     for _, row in ipairs(requests) do table.insert(rows, row) end
+    -- Waylaid Crates and Supplies: who can supply what they take (bound or not).
+    local okWaylaid, waylaid = pcall(waylaidRows, itemID)
+    if okWaylaid then
+        for _, row in ipairs(waylaid) do table.insert(rows, row) end
+    end
     -- Guildmates' recipes use it, but nobody can hand over a bound one.
     local binding = ns.upgrades and ns.upgrades.binding(lines)
     local bound = binding ~= nil

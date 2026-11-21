@@ -2,9 +2,11 @@ name: Game data
 
 # Daily: reads WoW: Forever's newest build from wago.tools and regenerates
 # apps/web/convex/shared/proficiencies.generated.ts (who can wear and wield
-# what; apps/web/scripts/gen-proficiencies.mjs) and
+# what; apps/web/scripts/gen-proficiencies.mjs),
 # apps/web/convex/shared/recipeSkills.generated.ts (the skill levels where
-# each recipe turns yellow and grey; apps/web/scripts/gen-recipe-skills.mjs).
+# each recipe turns yellow and grey; apps/web/scripts/gen-recipe-skills.mjs)
+# and apps/web/convex/shared/waylaid.generated.ts (what each Waylaid Crate
+# and Waylaid Supplies item takes; apps/web/scripts/gen-waylaid.mjs).
 # If the data changed, it commits to the fixed branch bot/game-data and opens
 # (or updates) a pull request labeled game-data with what changed. A
 # maintainer reviews it: a change can need an override in
@@ -41,7 +43,7 @@ concurrency:
 
 env:
   BRANCH: bot/game-data
-  FILES: apps/web/convex/shared/proficiencies.generated.ts apps/web/convex/shared/recipeSkills.generated.ts
+  FILES: apps/web/convex/shared/proficiencies.generated.ts apps/web/convex/shared/recipeSkills.generated.ts apps/web/convex/shared/waylaid.generated.ts
 
 jobs:
   proficiencies:
@@ -90,6 +92,10 @@ jobs:
           if ! git diff --quiet -- apps/web/convex/shared/recipeSkills.generated.ts; then
             { echo "## Recipe skill levels"; echo; cat "$RUNNER_TEMP/recipes.md"; echo; } >> "$summary"
           fi
+          node apps/web/scripts/gen-waylaid.mjs ${BUILD:+--build "$BUILD"} --summary "$RUNNER_TEMP/waylaid.md"
+          if ! git diff --quiet -- apps/web/convex/shared/waylaid.generated.ts; then
+            { echo "## Waylaid Crates and Supplies"; echo; cat "$RUNNER_TEMP/waylaid.md"; echo; } >> "$summary"
+          fi
           cat "$summary" >> "$GITHUB_STEP_SUMMARY"
           if git diff --quiet -- $FILES; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
@@ -120,7 +126,7 @@ jobs:
           build="${{ steps.gen.outputs.build }}"
           title="Game data from Forever build $build"
           {
-            echo "WoW: Forever's game data changed (apps/web/scripts/gen-proficiencies.mjs and gen-recipe-skills.mjs, run by .github/workflows/game-data.yml)."
+            echo "WoW: Forever's game data changed (apps/web/scripts/gen-proficiencies.mjs, gen-recipe-skills.mjs and gen-waylaid.mjs, run by .github/workflows/game-data.yml)."
             echo
             cat "$RUNNER_TEMP/summary.md"
             echo

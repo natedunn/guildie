@@ -34,6 +34,7 @@ import { trackedReagents } from "./tracking";
 import { noteUnclaimed } from "./unclaimed";
 import { memberForUpgrades } from "./upgradeProfiles";
 import { requireUserId } from "./users";
+import { type WaylaidPerson, type WaylaidUse, waylaidItems, waylaidUse } from "./waylaidUse";
 
 // The desktop helper (apps/helper) uploads what the Guildie addon
 // (apps/addon) saved in game. It authenticates with a token the player makes
@@ -684,6 +685,15 @@ export type GuildData = {
 	 */
 	reagentUseMine: [number, { name: string; users: ProgressUser[] }[]][];
 	/**
+	 * Who can fill each Waylaid Crate and Waylaid Supplies item (addon
+	 * 0.26.0+; older addons ignore it): per profession that makes or
+	 * gathers what it takes, the guildmates who can, best first
+	 * (waylaidUse.ts). Pairs, like `reagentUse`.
+	 */
+	waylaid: WaylaidUse;
+	/** The same for the player's own claimed characters: only `users`. Pairs. */
+	waylaidMine: [number, { name: string; how: "makes" | "gathers"; of: number; users: WaylaidPerson[] }[]][];
+	/**
 	 * Gear-upgrade suggestions (addon 0.5.0+; older addons ignore it): the
 	 * rules and weights once (shared/upgrades.ts, shared/weights.ts), and each
 	 * active guildmate with the scores of what they wear.
@@ -921,6 +931,16 @@ export const guildData = action({
 			const professions = use.professions.filter((p) => p.users.length).map(({ name, users }) => ({ name, users }));
 			if (professions.length) reagentUseMine.push([itemId, professions]);
 		}
+		// Waylaid Crates and Supplies: who makes or gathers what they take.
+		const makers = await ctx.runQuery(internal.recipes.makers, { itemIds: waylaidItems() });
+		const waylaid = waylaidUse([...members.values()], makers);
+		const waylaidMine: GuildData["waylaidMine"] = [];
+		for (const [itemId, use] of waylaidUse(base.myProfessions, makers)) {
+			const professions = use.professions
+				.filter((p) => p.users.length)
+				.map(({ name, how, of, users }) => ({ name, how, of, users }));
+			if (professions.length) waylaidMine.push([itemId, professions]);
+		}
 		const rules = upgradeRules();
 		return {
 			version: 1,
@@ -932,6 +952,8 @@ export const guildData = action({
 			reagents,
 			reagentUse,
 			reagentUseMine,
+			waylaid,
+			waylaidMine,
 			upgrades: {
 				version: 1,
 				rules: { ...rules, specs: { ...rules.specs, ...base.customSpecs } },

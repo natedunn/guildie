@@ -6,7 +6,7 @@ import { bearerToken, convex, errorResponse, json } from "@/lib/helper-api";
 // GET /api/helper/guild-data (Bearer token): what the addon's tooltips show,
 // for the guilds the token's claimed characters are in.
 // -> { version, generatedAt, guilds, mine, reagents: { [itemId]: { name, users: [{ name, profession, recipes }] } }, recipes, ... }
-// `recipes.items`, `reagentUse` and `reagentUseMine` come out of Convex as pairs (objects there
+// `recipes.items`, `reagentUse`, `reagentUseMine`, `waylaid` and `waylaidMine` come out of Convex as pairs (objects there
 // are capped at 1,024 fields); the app and addon get them keyed by item id.
 export const Route = createFileRoute("/api/helper/guild-data")({
 	server: {
@@ -22,6 +22,8 @@ export const Route = createFileRoute("/api/helper/guild-data")({
 								recipes: unpackAddonRecipes(data.recipes),
 								reagentUse: Object.fromEntries(data.reagentUse),
 								reagentUseMine: Object.fromEntries(data.reagentUseMine),
+								waylaid: Object.fromEntries(data.waylaid),
+								waylaidMine: Object.fromEntries(data.waylaidMine),
 							})
 						: json(401, { error: "Unknown or revoked token" });
 				} catch (error) {
