@@ -7,6 +7,7 @@ import {
 	GAME_WINDOW_MS,
 	KEEP_MS,
 	type NotificationKind,
+	notificationSince,
 	notificationText,
 	TOAST_WINDOW_MS,
 } from "./shared/notifications";
@@ -92,7 +93,7 @@ const recent = (ctx: QueryCtx, userId: Id<"users">) =>
 		.withIndex("by_user", (q) => q.eq("userId", userId))
 		.order("desc");
 
-/** The inbox: the latest 50, newest first, with the guild's name. */
+/** The inbox: the latest 50, newest first, with the guild's name, the item and where the request stands now. */
 export const list = query({
 	args: {},
 	handler: async (ctx) => {
@@ -101,9 +102,18 @@ export const list = query({
 		const rows = await recent(ctx, userId).take(50);
 		const guilds = new Map<Id<"guilds">, Doc<"guilds"> | null>();
 		for (const n of rows) if (!guilds.has(n.guildId)) guilds.set(n.guildId, await ctx.db.get(n.guildId));
+		const requests = new Map<Id<"requests">, Doc<"requests"> | null>();
+		const things = new Map<Id<"requests">, InboxItem | null>();
+		for (const n of rows) {
+			if (!n.requestId || requests.has(n.requestId)) continue;
+			const r = await ctx.db.get(n.requestId);
+			requests.set(n.requestId, r);
+			things.set(n.requestId, r ? await inboxItem(ctx, r) : null);
+		}
 		return rows.flatMap((n) => {
 			const guild = guilds.get(n.guildId);
 			if (!guild) return [];
+			const r = n.requestId ? requests.get(n.requestId) : null;
 			return [
 				{
 					_id: n._id,
@@ -114,11 +124,46 @@ export const list = query({
 					view: n.link.includes("view=help") ? ("help" as const) : ("mine" as const),
 					at: n.at,
 					read: n.readAt !== undefined,
+					item: (n.requestId && things.get(n.requestId)) || null,
+					since: r ? notificationSince(n.kind, n.at, userId, r) : undefined,
+					// Written into the text only ("Brenna mailed you 7 Silk Cloth").
+					mailed: n.kind === "itemsMailed" ? Number(/ mailed you (\d+) /.exec(n.text)?.[1]) || undefined : undefined,
 				},
 			];
 		});
 	},
 });
+
+type InboxItem = {
+	name: string;
+	quality?: string;
+	icon?: string;
+	quantity?: number;
+	/** The amount goes first ("20 Silk Cloth"), not after ("Silk Bandage ×2"). */
+	prefix: boolean;
+	/** No item: an enchant, shown with the Enchanting icon. */
+	enchant?: boolean;
+};
+
+/** What the request is for, as the inbox shows it: the item (or the enchant's recipe), its icon and the amount. */
+async function inboxItem(ctx: QueryCtx, r: Doc<"requests">): Promise<InboxItem | null> {
+	const quantity = r.ongoing || r.quantity <= 1 ? undefined : r.quantity;
+	// "20 Silk Cloth" for items, "Silk Bandage ×2" for crafts.
+	const prefix = r.kind === "item";
+	if (r.itemId !== undefined) {
+		const item = await ctx.db
+			.query("items")
+			.withIndex("by_itemId", (q) => q.eq("itemId", r.itemId as number))
+			.first();
+		if (item) return { name: item.name, quality: item.quality, icon: item.icon, quantity, prefix };
+	}
+	if (r.recipeId === undefined) return null;
+	const recipe = await ctx.db
+		.query("recipes")
+		.withIndex("by_recipeId", (q) => q.eq("recipeId", r.recipeId as number))
+		.first();
+	return recipe ? { name: recipe.name, quantity, prefix, enchant: true } : null;
+}
 
 /** The sidebar's count. */
 export const unread = query({

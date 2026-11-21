@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Improvements
+
+- **Guildie:** Notifications are easier to read: each shows the item's icon with a small mark for what happened (asked, accepted, mailed, complete, cancelled), and asks that were since cancelled, answered or completed say so, so you don't go looking for a request that's closed.
+
 ## 0.3.49
 
 ### Improvements
