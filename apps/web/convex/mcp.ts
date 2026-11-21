@@ -8,9 +8,9 @@ import { pickProfile } from "./helper";
 import { preferencesOf } from "./preferences";
 import { activeIn } from "./requests";
 import { DUNGEON_BY_KEY } from "./shared/dungeons";
-import { ago, capped, gearType, matches, quality, slotName, statKey } from "./shared/mcpText";
+import { ago, capped, fold, gearType, gold, matches, paged, quality, slotName, statKey } from "./shared/mcpText";
 import { CLASS_RULES, PROFICIENCY_TYPES } from "./shared/proficiencies";
-import { remainingQuantity } from "./shared/requests";
+import { isStale, remainingQuantity } from "./shared/requests";
 import { PRIORITY_STATS, statPriority, TIER_PRESETS } from "./shared/statPriority";
 import { canPrefer, type GearChoice, typesOf } from "./shared/upgrades";
 import { CLASS_TOKENS, SPECS } from "./shared/weights";
@@ -86,10 +86,10 @@ export const startConnect = mutation({
 
 /** The Worker swaps the code, with the state it came back with, for a connection. Null if it's no good. */
 export const exchange = internalMutation({
-	args: { code: v.string(), state: v.string(), write: v.optional(v.boolean()) },
+	args: { code: v.string(), state: v.string(), write: v.optional(v.boolean()), act: v.optional(v.boolean()) },
 	handler: async (
 		ctx,
-		{ code, state, write },
+		{ code, state, write, act },
 	): Promise<{ userId: Id<"users">; connectionId: Id<"aiConnections"> } | null> => {
 		const codeHash = await sha256(code);
 		const row = await ctx.db
@@ -113,6 +113,7 @@ export const exchange = internalMutation({
 			redirectHost: row.redirectHost,
 			createdAt: Date.now(),
 			...(write ? { canWrite: true } : {}),
+			...(act ? { canAct: true } : {}),
 		});
 		return { userId: row.userId, connectionId };
 	},
@@ -129,13 +130,14 @@ export const connections = query({
 			.collect();
 		return rows
 			.sort((a, b) => b.createdAt - a.createdAt)
-			.map(({ _id, client, redirectHost, createdAt, lastUsedAt, canWrite }) => ({
+			.map(({ _id, client, redirectHost, createdAt, lastUsedAt, canWrite, canAct }) => ({
 				_id,
 				client,
 				redirectHost,
 				createdAt,
 				lastUsedAt,
 				canWrite: canWrite === true,
+				canAct: canAct === true,
 			}));
 	},
 });
@@ -169,7 +171,7 @@ async function connectionOf(ctx: QueryCtx, connectionId: string) {
 	return row;
 }
 
-async function viewerOf(ctx: QueryCtx, connectionId: string) {
+export async function viewerOf(ctx: QueryCtx, connectionId: string) {
 	return (await connectionOf(ctx, connectionId)).userId;
 }
 
@@ -184,9 +186,52 @@ async function writerOf(ctx: QueryCtx, connectionId: string) {
 	return row.userId;
 }
 
-/** The guild a tool means: the one named, or the player's only guild. */
-async function pickGuild(ctx: QueryCtx, userId: Id<"users">, name: string | undefined) {
+/** The player behind a connection that may act for them in their guilds (requests, tracked crafts). */
+export async function actorOf(ctx: QueryCtx, connectionId: string) {
+	const row = await connectionOf(ctx, connectionId);
+	if (!row.canAct) {
+		throw new ConvexError(
+			"This app can't act for you in your guilds. To let it make and answer requests and track crafts, disconnect it in Guildie's Settings and connect it again, allowing that.",
+		);
+	}
+	return row.userId;
+}
+
+/** A public guild on Guildie by name, for the tools that show what anyone can see on the site. */
+async function publicGuild(ctx: QueryCtx, name: string) {
+	const slug = name.trim().toLowerCase().replace(/\s+/g, "-");
+	const hits = await ctx.db
+		.query("guilds")
+		.withSearchIndex("search_name", (q) => q.search("name", name).eq("visibility", "public"))
+		.take(10);
+	return hits.find((g) => g.slug === slug) ?? hits.find((g) => matches(name, g.name)) ?? null;
+}
+
+/**
+ * The guild a tool means: the one named, or the player's only guild.
+ * `anyPublic`: a public guild the player isn't in will do too (what anyone
+ * sees on the site); `member` says whether they're in it.
+ */
+export async function pickGuild(
+	ctx: QueryCtx,
+	userId: Id<"users">,
+	name: string | undefined,
+	anyPublic = false,
+): Promise<Doc<"guilds"> & { member: boolean }> {
 	const guilds = await guildsOf(ctx, userId);
+	if (anyPublic && name?.trim()) {
+		const own = guilds.find((g) => matches(name, g.name) || g.slug === name.trim().toLowerCase());
+		if (own) return { ...own, member: true };
+		const other = await publicGuild(ctx, name);
+		if (other) return { ...other, member: false };
+		throw new ConvexError(
+			`No public guild called "${name}" on Guildie${guilds.length ? `, and you're not in one by that name (yours: ${guilds.map((g) => g.name).join(", ")})` : ""}.`,
+		);
+	}
+	return { ...ownGuild(guilds, name), member: true };
+}
+
+function ownGuild(guilds: Doc<"guilds">[], name: string | undefined) {
 	if (!guilds.length) {
 		throw new ConvexError(
 			"None of your characters is in a guild on Guildie. Sign in on guildie.club and refresh your characters.",
@@ -203,16 +248,101 @@ async function pickGuild(ctx: QueryCtx, userId: Id<"users">, name: string | unde
 	throw new ConvexError(`You're in several guilds; say which: ${guilds.map((g) => g.name).join(", ")}.`);
 }
 
-async function roster(ctx: QueryCtx, guild: Doc<"guilds">) {
+export async function roster(ctx: QueryCtx, guild: Doc<"guilds">) {
 	return await ctx.db
 		.query("characters")
 		.withIndex("by_guild", (q) => q.eq("guildId", guild._id).eq("inRoster", true))
 		.collect();
 }
 
-const fullName = (c: { name: string; surname?: string }) => (c.surname ? `${c.name} ${c.surname}` : c.name);
+export const fullName = (c: { name: string; surname?: string }) => (c.surname ? `${c.name} ${c.surname}` : c.name);
 
-const vConnection = { connectionId: v.string() };
+export const vConnection = { connectionId: v.string() };
+
+/** The player's claimed characters, once each, with their roster rows; hidden ones left out. */
+export async function ownCharacters(ctx: QueryCtx, userId: Id<"users">) {
+	const owned = await ctx.db
+		.query("ownedCharacters")
+		.withIndex("by_user", (q) => q.eq("userId", userId))
+		.collect();
+	const seen = new Set<string>();
+	const out = [];
+	for (const claim of owned) {
+		const key = `${claim.region}/${claim.slug}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		const row = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) => q.eq("flavor", claim.flavor).eq("region", claim.region).eq("slug", claim.slug))
+			.first();
+		if (row?.hidden) continue;
+		out.push({ claim, row, name: row ? fullName(row) : claim.name });
+	}
+	return out;
+}
+
+/** Copper on one of the player's characters, as the addon last read it (only their own uploads count). */
+export async function moneyOf(ctx: QueryCtx, userId: Id<"users">, region: Doc<"characters">["region"], slug: string) {
+	const snap = await ctx.db
+		.query("addonSnapshots")
+		.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+		.unique();
+	return snap?.userId === userId && snap.money !== undefined ? { copper: snap.money, at: snap.capturedAt } : undefined;
+}
+
+/** What a request is for: the item, the recipe, and the name to call it. */
+export async function requestWhat(ctx: QueryCtx, r: Doc<"requests">) {
+	const item = r.itemId !== undefined ? await itemRow(ctx, r.itemId) : null;
+	const recipe =
+		r.recipeId !== undefined
+			? await ctx.db
+					.query("recipes")
+					.withIndex("by_recipeId", (q) => q.eq("recipeId", r.recipeId as number))
+					.unique()
+			: null;
+	return {
+		item,
+		recipe,
+		name: item?.name ?? recipe?.name ?? (r.itemId !== undefined ? `item ${r.itemId}` : "something"),
+	};
+}
+
+/**
+ * One request as a line, from `userId`'s side, ending with its id (the
+ * request tools take it): who wants what, how far along, who's on it.
+ */
+export async function requestLine(ctx: QueryCtx, r: Doc<"requests">, userId: Id<"users">, now: number) {
+	const { recipe, name: what } = await requestWhat(ctx, r);
+	const delivered = r.quantity - remainingQuantity(r);
+	const active = r.status === "open" || r.status === "claimed";
+	const who = (c: { userId: Id<"users">; character: { name: string } }) =>
+		c.userId === userId ? "you" : c.character.name;
+	let state = "";
+	if (!active) state = `; ${r.status}${r.closedAt ? ` ${ago(r.closedAt, now)}` : ""}`;
+	else if (r.ask) state = `; asked ${who(r.ask)} to craft it ${ago(r.ask.askedAt, now)}, no answer yet`;
+	else if (r.claim) state = `; ${who(r.claim)} accepted${r.claim.sentAt ? ", says it's sent" : ""}`;
+	else if (r.kind === "craft")
+		state = `; nobody asked to craft it${
+			r.lastAsk
+				? ` (${r.lastAsk.character.name} ${r.lastAsk.outcome === "backedOut" ? "backed out" : r.lastAsk.outcome})`
+				: ""
+		}`;
+	else if (!r.ongoing) state = "; open";
+	return [
+		`- ${r.character.name}${r.userId === userId ? " (you)" : ""} wants `,
+		r.ongoing
+			? `any ${what} anyone has (ongoing, until ${new Date(r.until ?? now).toISOString().slice(0, 10)}; just send it)`
+			: `${r.quantity}× ${what}`,
+		r.kind === "craft" ? ` crafted${recipe ? ` (${recipe.profession})` : ""}` : "",
+		!r.ongoing && delivered > 0 && active ? `; ${delivered} delivered` : "",
+		state,
+		r.kind === "craft" && r.mats && active ? (r.mats.state === "missing" ? "; needs mats" : "; has mats") : "",
+		active && isStale(r, now) ? "; quiet for a week or more" : "",
+		`; made ${ago(r.createdAt, now)}`,
+		r.note ? `; note: "${r.note}"` : "",
+		` [id ${r._id}]`,
+	].join("");
+}
 
 // ---- Tools (apps/mcp/src/tools.ts describes them to the app) -------------------------
 
@@ -226,35 +356,66 @@ export const me = internalQuery({
 			.query("ownedCharacters")
 			.withIndex("by_user", (q) => q.eq("userId", userId))
 			.collect();
+		const connection = await connectionOf(ctx, connectionId);
+		const now = Date.now();
 		const lines = [`Player: ${user?.battletag ?? user?.name ?? "unknown"}`];
 		if (!owned.length) lines.push("No claimed characters yet (claim them on guildie.club → Settings).");
-		else lines.push("Characters:");
-		for (const c of owned) {
-			const row = await ctx.db
-				.query("characters")
-				.withIndex("by_slug", (q) => q.eq("flavor", c.flavor).eq("region", c.region).eq("slug", c.slug))
-				.first();
+		else lines.push("Characters (highest level first):");
+		let total = 0;
+		let counted = 0;
+		const rows = [];
+		for (const { claim: c, row, name } of await ownCharacters(ctx, userId)) {
 			const guild = row?.inRoster ? await ctx.db.get(row.guildId) : null;
-			const level = row ? (await pickProfile(ctx, row)).level : c.level;
+			const p = row ? await pickProfile(ctx, row) : null;
+			const level = p?.level ?? c.level;
 			const classId = row?.classId ?? c.classId;
-			lines.push(
-				`- ${row ? fullName(row) : c.name}: level ${level ?? "?"} ${classId ? className(classId) : ""}, ${
-					guild ? `<${guild.name}>` : "no guild"
-				} (${c.region.toUpperCase()})`,
-			);
+			const money = await moneyOf(ctx, userId, c.region, c.slug);
+			if (money) {
+				total += money.copper;
+				counted++;
+			}
+			const main = user?.mainCharacter?.region === c.region && user.mainCharacter.slug === c.slug;
+			const professions = p?.professions
+				.map((x) => `${x.name}${x.skill !== undefined ? ` ${x.skill}` : ""}`)
+				.join(", ");
+			const who = [`level ${level ?? "?"}`, row ? raceName(row.raceId) : "", classId ? className(classId) : ""];
+			rows.push({
+				level: level ?? 0,
+				text: [
+					`- ${name}${main ? " (main)" : ""}: ${who.filter(Boolean).join(" ")}`,
+					guild ? `<${guild.name}>` : "no guild",
+					professions ? `professions ${professions}` : "",
+					money ? `gold ${gold(money.copper)} (${ago(money.at, now)})` : "",
+					p?.synced ? `data ${ago(p.synced.at, now)}` : "",
+				]
+					.filter(Boolean)
+					.join("; "),
+			});
 		}
+		rows.sort((a, b) => b.level - a.level || a.text.localeCompare(b.text));
+		lines.push(...rows.map((r) => r.text));
+		if (counted)
+			lines.push(
+				`Gold in all: ${gold(total)} (on ${counted} ${counted === 1 ? "character" : "characters"} the Guildie addon has read).`,
+			);
 		const guilds = await guildsOf(ctx, userId);
 		if (guilds.length) lines.push(`Guilds: ${guilds.map((g) => `${g.name} (${g.memberCount} members)`).join(", ")}`);
+		const can = [
+			"read",
+			connection.canWrite ? "change your characters' stat priority and gear preferences" : "",
+			connection.canAct ? "make and answer guild requests, track crafts, mark notifications read" : "",
+		];
+		lines.push(`This app may: ${can.filter(Boolean).join("; ")}.`);
 		return lines.join("\n");
 	},
 });
 
 /** Everyone in the guild: level, class, item level, professions, last logout. */
 export const guildRoster = internalQuery({
-	args: { ...vConnection, guild: v.optional(v.string()), search: v.optional(v.string()) },
-	handler: async (ctx, { connectionId, guild: name, search }): Promise<string> => {
+	args: { ...vConnection, guild: v.optional(v.string()), search: v.optional(v.string()), page: v.optional(v.number()) },
+	handler: async (ctx, { connectionId, guild: name, search, page }): Promise<string> => {
 		const userId = await viewerOf(ctx, connectionId);
-		const guild = await pickGuild(ctx, userId, name);
+		const guild = await pickGuild(ctx, userId, name, true);
 		const now = Date.now();
 		const members = await roster(ctx, guild);
 		const rows = [];
@@ -278,13 +439,15 @@ export const guildRoster = internalQuery({
 			if (!search || matches(search, text)) rows.push({ level: p.level, text });
 		}
 		rows.sort((a, b) => b.level - a.level || a.text.localeCompare(b.text));
-		const head = `${guild.name}: ${members.length} members${search ? `, ${rows.length} matching "${search}"` : ""}.`;
+		const head = `${guild.name}${guild.member ? "" : " (a public guild)"}: ${members.length} members${
+			search ? `, ${rows.length} matching "${search}"` : ""
+		}.`;
 		return [
 			head,
-			...capped(
+			...paged(
 				rows.map((r) => `- ${r.text}`),
-				150,
-				"Add a search (a class, a profession, a name).",
+				page,
+				200,
 			),
 		].join("\n");
 	},
@@ -299,8 +462,10 @@ export const character = internalQuery({
 		const candidates = (await Promise.all((await guildsOf(ctx, userId)).map((g) => roster(ctx, g)))).flat();
 		const exact = candidates.filter((c) => c.slug === name.trim().toLowerCase() || matches(name, c.name, c.surname));
 		const firstName = exact.filter((c) => matches(name, c.name));
-		const hits = firstName.length ? firstName : exact;
-		if (!hits.length) return `No character called "${name}" in your guilds.`;
+		let hits = firstName.length ? firstName : exact;
+		if (!hits.length) hits = await publicCharacter(ctx, name);
+		if (!hits.length)
+			return `No character called "${name}" in your guilds (or, by full name, in a public guild on Guildie).`;
 		if (hits.length > 1 && !hits.some((c) => c.slug === name.trim().toLowerCase())) {
 			return `Several match "${name}": ${hits.map(fullName).join(", ")}. Use the full name.`;
 		}
@@ -370,6 +535,10 @@ export const character = internalQuery({
 		} else if (c.profileMissing) {
 			lines.push("Gear: unknown (Blizzard has no profile until level 10 and a logout).");
 		}
+		if (mine) {
+			const money = await moneyOf(ctx, userId, c.region, c.slug);
+			if (money) lines.push(`Gold: ${gold(money.copper)} (${ago(money.at, now)})`);
+		}
 		if (c.clearedDungeons?.length) {
 			lines.push(`Dungeons cleared: ${c.clearedDungeons.map((k) => DUNGEON_BY_KEY.get(k)?.name ?? k).join(", ")}`);
 		}
@@ -382,12 +551,28 @@ export const character = internalQuery({
 	},
 });
 
+/** A character in a public guild, by full name ("Brisket Smith"): what anyone sees on the site. */
+async function publicCharacter(ctx: QueryCtx, name: string) {
+	const slug = fold(name).replace(/ /g, "-");
+	if (!slug.includes("-")) return [];
+	const out = [];
+	for (const region of ["us", "eu", "kr", "tw"] as const) {
+		const row = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", region).eq("slug", slug))
+			.first();
+		if (!row?.inRoster) continue;
+		if ((await ctx.db.get(row.guildId))?.visibility === "public") out.push(row);
+	}
+	return out;
+}
+
 /** Who in the guild can craft something: recipes known in the guild matching the search, with crafters and reagents. */
 export const whoCanCraft = internalQuery({
 	args: { ...vConnection, search: v.string(), guild: v.optional(v.string()) },
 	handler: async (ctx, { connectionId, search, guild: name }): Promise<string> => {
 		const userId = await viewerOf(ctx, connectionId);
-		const guild = await pickGuild(ctx, userId, name);
+		const guild = await pickGuild(ctx, userId, name, true);
 		const crafters = await guildCrafters(ctx, guild);
 		const hits = [];
 		for (const [recipeId, who] of crafters) {
@@ -425,31 +610,11 @@ export const requests = internalQuery({
 		const rows = (await activeIn(ctx, guild._id)).sort((a, b) => b.lastActivityAt - a.lastActivityAt);
 		if (!rows.length) return `${guild.name} has no open requests.`;
 		const lines = [];
-		for (const r of rows) {
-			const item = r.itemId !== undefined ? await itemRow(ctx, r.itemId) : null;
-			const recipe =
-				r.recipeId !== undefined
-					? await ctx.db
-							.query("recipes")
-							.withIndex("by_recipeId", (q) => q.eq("recipeId", r.recipeId as number))
-							.unique()
-					: null;
-			const what = item?.name ?? recipe?.name ?? (r.itemId !== undefined ? `item ${r.itemId}` : "something");
-			lines.push(
-				[
-					`- ${r.character.name}${r.userId === userId ? " (you)" : ""} wants `,
-					r.ongoing
-						? `any ${what} anyone has (ongoing, until ${new Date(r.until ?? now).toISOString().slice(0, 10)}; no claim, just send it)`
-						: `${remainingQuantity(r)}× ${what}`,
-					r.kind === "craft" ? ` crafted${recipe ? ` (${recipe.profession})` : ""}` : "",
-					r.ongoing ? "" : r.claim ? `; ${r.claim.character.name} is on it${r.claim.sentAt ? ", sent" : ""}` : "; open",
-					r.kind === "craft" && r.mats ? (r.mats.state === "missing" ? "; needs mats" : "; has mats") : "",
-					`; ${ago(r.createdAt, now)}`,
-					r.note ? `; note: "${r.note}"` : "",
-				].join(""),
-			);
-		}
-		return [`${guild.name}: ${rows.length} open requests.`, ...capped(lines, 60, "")].join("\n");
+		for (const r of rows) lines.push(await requestLine(ctx, r, userId, now));
+		return [
+			`${guild.name}: ${rows.length} open requests, most recently active first.`,
+			...capped(lines, 80, "my_requests lists your own."),
+		].join("\n");
 	},
 });
 
@@ -515,8 +680,11 @@ export const inventory = internalQuery({
 				.withIndex("by_slug", (q) => q.eq("flavor", inv.flavor).eq("region", inv.region).eq("slug", inv.slug))
 				.first();
 			const who = row?.name ?? inv.slug.split("-")[0];
+			const money = await moneyOf(ctx, userId, inv.region, inv.slug);
 			seen.push(
-				`${who} (bags ${inv.bags ? ago(inv.bags.capturedAt, now) : "never"}, bank ${inv.bank ? ago(inv.bank.capturedAt, now) : "never"})`,
+				`${who} (bags ${inv.bags ? ago(inv.bags.capturedAt, now) : "never"}, bank ${
+					inv.bank ? ago(inv.bank.capturedAt, now) : "never"
+				}${money ? `, gold ${gold(money.copper)}` : ""})`,
 			);
 			for (const part of ["bags", "bank"] as const) {
 				for (const { id, count, name } of inv[part]?.items ?? []) {

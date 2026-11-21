@@ -89,6 +89,17 @@ test("when the level was reached (levelAt), optional", () => {
 	assert.equal(parseCharacter({ ...v1, levelAt: NOW / 1000 + 3600 }, NOW).ok, false);
 });
 
+test("gold on hand (addon 0.26.0), optional, whole copper", () => {
+	const r = parseCharacter({ ...v1, money: 123456 }, NOW);
+	assert.ok(r.ok);
+	assert.equal(r.character.money, 123456);
+	const none = parseCharacter(v1, NOW);
+	assert.ok(none.ok);
+	assert.equal(none.character.money, undefined);
+	assert.equal(parseCharacter({ ...v1, money: -1 }, NOW).ok, false);
+	assert.equal(parseCharacter({ ...v1, money: 1.5 }, NOW).ok, false);
+});
+
 test("version 2: gear, professions, recipes", () => {
 	const r = parseCharacter(v2, NOW);
 	assert.ok(r.ok, !r.ok ? r.error : "");

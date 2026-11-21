@@ -9,7 +9,8 @@ requests are open?". The app connects to Guildie's MCP server at
 `https://mcp.guildie.club/connect`, the player signs in with their Guildie
 account, and the app reads what that player can see on the site, nothing more.
 If the player allows it, it can also set their own characters' stat priority
-and gear preferences, and nothing else.
+and gear preferences, and (asked separately) act for them in their guilds:
+make, answer and close requests, track crafts, mark notifications read.
 
 ## The pieces
 
@@ -17,7 +18,9 @@ and gear preferences, and nothing else.
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `apps/mcp` (Worker `guildie-mcp`, `mcp.guildie.club`)    | OAuth 2.1 (`@cloudflare/workers-oauth-provider`, KV `OAUTH_KV`) and the MCP endpoint (stateless, `/connect`) |
 | `apps/mcp/src/tools.ts`                                  | The tools the app sees: names, descriptions, argument schemas                                                |
-| `apps/web/convex/mcp.ts`                                 | What each tool answers (short plain text), connecting, the connection list                                   |
+| `apps/web/convex/mcp.ts`                                 | Connecting, the connection list, shared helpers, the first tools (roster, character, requests…)              |
+| `apps/web/convex/mcpPlayer.ts`, `mcpGuild.ts`            | More read tools: the player's own things; the guild's, recipes and items                                     |
+| `apps/web/convex/mcpActions.ts`                          | The tools that act in the player's guilds (requests, tracked crafts, notifications)                          |
 | `apps/web/convex/http.ts` (`/mcp/exchange`, `/mcp/tool`) | The Worker's way in, guarded by `MCP_SECRET`                                                                 |
 | `apps/web/src/routes/connect/ai.tsx`                     | Where the player confirms which account the app gets                                                         |
 | Settings → Account → AI apps                             | The address to copy, how to add it in Claude and ChatGPT, connected apps with Disconnect                     |
@@ -49,37 +52,68 @@ as `{ userId, connectionId }`, encrypted in the OAuth grant.
 
 ## The tools
 
-Reading, limited to the player's own guilds (whatever their visibility) and,
-for bags and banks, their own characters:
+Reading, limited to what the player sees on the site: their own guilds
+(whatever their visibility), public guilds where the site shows them to
+anyone, and their own bags, banks, gold, quest progress, requests and inbox.
 
-`me`, `guild_roster`, `character`, `who_can_craft`, `guild_requests`,
-`guild_activity`, `my_inventory`.
+- The player's own: `me` (characters with level, class, guild, professions
+  and gold; what this app may do), `my_inventory` (with gold), `my_quests`
+  (quest logs with objectives, and guildmates on the same quests),
+  `my_crafting` (per profession: skill-ups from known recipes with reagents
+  on hand, what the bags can make now, trainer recipes to learn),
+  `tracked_crafts`, `my_requests` (their own, crafts asked of them, crafts
+  they accepted), `my_notifications`.
+- A guild's: `guild_roster` (any public guild too; 200 per page), `character`
+  (a public guild's too, by full name), `who_can_craft` (a public guild's
+  too), `guild_requests`, `guild_activity`, `guild_quests` (dungeon and raid
+  quests by dungeon; members only, like the Dungeons page), `guild_addons`
+  (only what each player shares: with guildmates, or publicly).
+- The game's: `recipes` (any recipe: reagents, skill-up levels, trainer or
+  pattern, who in the player's guilds knows it), `item` (tooltip, recipe and
+  crafters, how many the player has, open requests).
 
-Changing, only if the player allowed it when connecting, only on characters
-they claimed, and only these two settings (never anything about the account,
-the guild or requests):
+Gold is the addon's `money` (copper, addon 0.26+), kept on the character's
+`addonSnapshots` row and only ever shown to that character's own player.
+Request lines end with `[id …]`: the request tools take that id.
 
-- `set_stat_priority`: 3 to 5 stats with a steepness, a talent tree's, or
-  reset to their talents.
-- `set_gear_preference`: preferred (or only) armor and weapon types.
+Changing, only if the player allowed it when connecting, and only through
+the same functions and checks as the site. Two permissions, each its own
+OAuth scope, connection field and tool list:
 
-They go through the same checks as the site (`setStatPriority` and
-`setGearPreference` in `convex/statPriority.ts`), and the `character` tool
-lists the choices for the player's own characters.
+- `guildie:write` (`canWrite`, `writerOf`), "change your characters' stat
+  priority and gear preferences", ticked by default:
+  - `set_stat_priority`: 3 to 10 stats with a steepness, a talent tree's, or
+    reset to their talents.
+  - `set_gear_preference`: preferred (or only) armor and weapon types.
 
-**Permission:** the consent page has "Also let it change your characters'
-stat priority and gear preferences", ticked by default. Ticked, the grant gets
-scope `guildie:write` as well as `guildie:read`, and the connection
-`canWrite`. The Worker only offers the two tools to tokens with that scope, and
-Convex checks `canWrite` (`writerOf`) on every change. Connections from before
-this, or with the box unticked, stay read-only; reconnecting is the way to
-allow changes.
+  Through `setStatPriority` and `setGearPreference` in
+  `convex/statPriority.ts`; the `character` tool lists the choices for the
+  player's own characters.
 
-To add a read tool: a handler in `convex/mcp.ts` (an `internalQuery` that
+- `guildie:act` (`canAct`, `actorOf`), "act for you in your guilds", not
+  ticked by default (guildmates see what it does and get notified):
+  - `create_request`: an item (fixed, or ongoing for 14, 30 or 90 days) or a
+    craft asked of one guildmate (`requests.ts` `createRequest`).
+  - `update_request`: cancel, done, still needed, ask, has or no mats,
+    change an ongoing one, accept, decline, back out (`actOnRequest`,
+    `setMatsDeclared`, `updateOngoing`).
+  - `track_craft`, `untrack_craft` (`tracking.ts` `trackCraft`,
+    `untrackCraft`).
+  - `mark_notifications_read` (`notifications.ts` `markRead`).
+
+Nothing touches the account, the guild's settings, claims or addon sharing.
+The Worker offers each list only to tokens with its scope, and Convex checks
+the connection's field on every call. Connections from before a permission
+existed, or with its box unticked, don't have it; reconnecting allows it.
+
+To add a read tool: a handler in `convex/mcp.ts` (or `mcpPlayer.ts`, `mcpGuild.ts`) (an `internalQuery` that
 starts with `viewerOf` and returns a string), its name in `MCP_TOOLS` in
 `convex/http.ts`, and its description and arguments in `apps/mcp/src/tools.ts`.
 A tool that changes something is an `internalMutation` starting with
-`writerOf`, in `MCP_WRITE_TOOLS`, registered after `canWrite` in `tools.ts`.
+`writerOf` (character settings) or `actorOf` (acting in guilds), in
+`MCP_WRITE_TOOLS`, registered in `registerWrites` or `registerActs` in
+`tools.ts`. It calls the same function the site's mutation does (split the
+handler out as `doThing(ctx, userId, ...)` when it reads `getAuthUserId`).
 Keep answers short: names, not ids; one line per thing; cap long lists with
 `capped`. Descriptions go to the model on every turn, so keep them to a
 sentence.
@@ -131,6 +165,7 @@ variables before or after, it stays off until both are there.
    ```
 
    The site port is `VITE_CONVEX_SITE_URL` in `apps/web/.env.local`.
+
 4. `pnpm --filter @guildie/mcp dev` serves `http://localhost:8788/connect`. Point
    an MCP client at it (MCP Inspector: `npx @modelcontextprotocol/inspector`),
    or Claude Code: `claude mcp add --transport http guildie http://localhost:8788/connect`.

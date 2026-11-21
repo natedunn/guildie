@@ -42,6 +42,8 @@ const ENDPOINT = "/connect";
 const READ = "guildie:read";
 /** Change the player's own characters' stat priority and gear preferences. Asked for on the consent page. */
 const WRITE = "guildie:write";
+/** Act for the player in their guilds: make and answer requests, track crafts, mark notifications read. Asked for on the consent page. */
+const ACT = "guildie:act";
 const DAY_S = 86_400;
 
 const trimSlash = (url: string) => url.replace(/\/+$/, "");
@@ -78,7 +80,9 @@ const defaultHandler = {
 					return new Response(null, { status: 302, headers: denied.headers });
 				}
 				const write = form.get("write") === "1";
-				const approved = await oauth.approveConsent(request, handle, { scope: write ? [READ, WRITE] : [READ] });
+				const act = form.get("act") === "1";
+				const scope = [READ, ...(write ? [WRITE] : []), ...(act ? [ACT] : [])];
+				const approved = await oauth.approveConsent(request, handle, { scope });
 				const facts = await oauth.describeConsent(approved.request);
 				const { state, headers } = await oauth.beginUpstream(approved.request, { headers: approved.headers });
 				const next = new URL("/connect/ai", env.SITE_URL);
@@ -86,6 +90,7 @@ const defaultHandler = {
 				next.searchParams.set("client", facts.clientName.slice(0, 60));
 				next.searchParams.set("host", facts.redirectHost);
 				next.searchParams.set("access", write ? "write" : "read");
+				next.searchParams.set("act", act ? "1" : "0");
 				headers.set("Location", next.toString());
 				return new Response(null, { status: 302, headers });
 			}
@@ -100,7 +105,12 @@ const defaultHandler = {
 				const res = await fetch(`${trimSlash(env.CONVEX_SITE_URL)}/mcp/exchange`, {
 					method: "POST",
 					headers: { Authorization: `Bearer ${env.MCP_SECRET}`, "Content-Type": "application/json" },
-					body: JSON.stringify({ code, state: url.searchParams.get("state"), write: original.scope.includes(WRITE) }),
+					body: JSON.stringify({
+						code,
+						state: url.searchParams.get("state"),
+						write: original.scope.includes(WRITE),
+						act: original.scope.includes(ACT),
+					}),
 				});
 				const body = (await res.json().catch(() => null)) as {
 					userId?: string;
@@ -135,11 +145,10 @@ const mcpHandler = {
 		if (env.LIMITER && !(await env.LIMITER.limit({ key: props.connectionId })).success) {
 			return new Response("Too many requests. Slow down a little.", { status: 429 });
 		}
-		const server = buildServer(
-			{ siteUrl: trimSlash(env.CONVEX_SITE_URL), secret: env.MCP_SECRET },
-			props,
-			auth?.scope.includes(WRITE) ?? false,
-		);
+		const server = buildServer({ siteUrl: trimSlash(env.CONVEX_SITE_URL), secret: env.MCP_SECRET }, props, {
+			canWrite: auth?.scope.includes(WRITE) ?? false,
+			canAct: auth?.scope.includes(ACT) ?? false,
+		});
 		// Stateless: no sessions to keep, so any isolate can answer any request.
 		const transport = new WebStandardStreamableHTTPServerTransport({
 			sessionIdGenerator: undefined,
@@ -166,11 +175,11 @@ function providerFor(env: Env) {
 			tokenEndpoint: "/oauth/token",
 			clientRegistrationEndpoint: "/oauth/register",
 			clientIdMetadataDocumentEnabled: true,
-			scopesSupported: [READ, WRITE],
+			scopesSupported: [READ, WRITE, ACT],
 			resourceMetadata: {
 				resource: `${origin}${ENDPOINT}`,
 				authorization_servers: [origin],
-				scopes_supported: [READ, WRITE],
+				scopes_supported: [READ, WRITE, ACT],
 				resource_name: "Guildie",
 			},
 			accessTokenTTL: 3600,

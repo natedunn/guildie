@@ -163,6 +163,7 @@ function wow.reset(state)
     _G.UnitLevel = function() return state.level end
     _G.UnitXP = function() return state.xp or 0 end
     _G.UnitXPMax = function() return state.xpMax or 0 end
+    _G.GetMoney = function() return state.money or 0 end
     _G.UnitClass = function() return "Priest", "PRIEST", 5 end
     _G.UnitRace = function() return "Night Elf", "NightElf", 4 end
     _G.IsInGuild = function() return state.guild ~= nil end

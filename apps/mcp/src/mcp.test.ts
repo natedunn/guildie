@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { consentPage, escapeHtml } from "./pages.ts";
-import { callTool } from "./tools.ts";
+import { buildServer, callTool } from "./tools.ts";
 
 const convex = { siteUrl: "https://example.convex.site", secret: "s".repeat(40) };
 const props = { userId: "u1", connectionId: "c1" };
@@ -55,4 +55,25 @@ test("callTool turns Convex's errors and outages into tool errors", async () => 
 	assert.equal((await callTool(convex, props, "me", {}, down)).isError, true);
 	const broken = (async () => new Response("oops", { status: 500 })) as unknown as typeof fetch;
 	assert.equal((await callTool(convex, props, "me", {}, broken)).isError, true);
+});
+
+test("the consent page asks separately for changing settings and acting in guilds", () => {
+	const html = consentPage({ clientName: "Claude", redirectHost: "claude.ai", redirectIsLoopback: false }, "h");
+	assert.ok(html.includes(`name="write" value="1" checked`));
+	assert.ok(html.includes(`name="act" value="1">`), "acting is off unless ticked");
+});
+
+test("the tools offered follow what the player allowed", async () => {
+	const listed = async (allowed: { canWrite?: boolean; canAct?: boolean }) => {
+		const server = buildServer(convex, props, allowed);
+		const tools = (server as unknown as { _registeredTools: Record<string, unknown> })._registeredTools;
+		return Object.keys(tools);
+	};
+	const read = await listed({});
+	assert.ok(read.includes("my_quests") && read.includes("recipes") && read.includes("guild_addons"));
+	assert.ok(!read.includes("set_stat_priority") && !read.includes("create_request"));
+	const write = await listed({ canWrite: true });
+	assert.ok(write.includes("set_stat_priority") && !write.includes("create_request"));
+	const act = await listed({ canAct: true });
+	assert.ok(act.includes("create_request") && act.includes("track_craft") && !act.includes("set_gear_preference"));
 });

@@ -112,6 +112,7 @@ used); the account page lists them with Disconnect.
     "capturedAt": 1794336950,                 // game server time, seconds
     "levelAt": 1794330000,                    // optional: when `level` was reached (seen in game)
     "talentsAt": 1794330000,                  // optional (0.19+): when `talents` were last read; a failed read keeps both
+    "money": 123456,                          // optional (0.26+): copper on hand; only its player sees it
     "guild": { "name": "Unbound", "rank": "Member", "rankIndex": 5 },
     "talents": [ { "id": 134214, "rank": 5, "name": "Wand Specialization" } ],
     "equipment": {

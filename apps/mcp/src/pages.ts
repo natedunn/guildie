@@ -17,6 +17,7 @@ strong { color: #e7e7e9; font-weight: 500; }
 form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .check { flex-basis: 100%; display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; color: #e7e7e9; }
 .check input { margin-top: 4px; }
+form p { flex-basis: 100%; margin-bottom: 8px; }
 button { font: inherit; height: 32px; padding: 0 14px; border-radius: 6px; border: 1px solid rgb(255 255 255 / 8%);
   background: transparent; color: #e7e7e9; cursor: pointer; }
 button.primary { background: #e7e7e9; color: #0f0f10; border-color: transparent; }
@@ -46,7 +47,7 @@ export function consentPage(facts: ConsentFacts, handle: string) {
 	return page(
 		`Connect ${facts.clientName}`,
 		`<h1>Let ${name} read your Guildie data?</h1>
-<p>It will see what you see on Guildie: your guilds' rosters, characters, gear, crafters, requests and activity, and your own bags and banks.</p>
+<p>It will see what you see on Guildie: your guilds' rosters, characters, gear, crafters, quests, addons, requests and activity, public guilds' rosters, and your own bags, banks, gold, quests and notifications.</p>
 <p>${origin} Access goes to <strong>${escapeHtml(facts.redirectHost)}</strong>.</p>
 ${
 	facts.redirectIsLoopback
@@ -56,7 +57,9 @@ ${
 <p>Next, you'll confirm your account on Guildie. Disconnect it any time in Settings.</p>
 <form method="post" action="/authorize">
 <input type="hidden" name="handle" value="${escapeHtml(handle)}">
-<label class="check"><input type="checkbox" name="write" value="1" checked> Also let it change your characters' stat priority and gear preferences. Nothing else about your account.</label>
+<label class="check"><input type="checkbox" name="write" value="1" checked> Let it change your characters' stat priority and gear preferences.</label>
+<label class="check"><input type="checkbox" name="act" value="1"> Let it act for you in your guilds: make, answer and close requests (your guildmates see them and get notified), track crafts, and mark your notifications read.</label>
+<p>Nothing else about your account, guild or characters.</p>
 <button class="primary" name="decision" value="approve">Continue</button>
 <button name="decision" value="deny">Cancel</button>
 </form>`,
@@ -82,7 +85,7 @@ export function homePage(mcpUrl: string) {
 			"MCP server",
 			`<h1>Guildie for AI apps</h1>
 <p>Add <strong>${escapeHtml(mcpUrl)}</strong> as a custom connector (Claude) or app (ChatGPT), then sign in with your Guildie account.</p>
-<p>It reads your guilds' data. If you allow it, it can also change your own characters' stat priority and gear preferences, and nothing else.</p>`,
+<p>It reads your guilds' data. If you allow it, it can also change your own characters' stat priority and gear preferences, and make and answer guild requests and track crafts for you, and nothing else.</p>`,
 		),
 		{ headers: { "Content-Type": "text/html; charset=utf-8" } },
 	);

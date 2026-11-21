@@ -46,6 +46,34 @@ export function capped(lines: string[], max: number, narrow: string) {
 	return [...lines.slice(0, max), `…and ${lines.length - max} more. ${narrow}`];
 }
 
+/** Names in a sentence, at most `max`: "Miller, Brisket and 4 more". */
+export function listed(names: string[], max: number) {
+	if (names.length <= max) return names.join(", ");
+	return `${names.slice(0, max).join(", ")} and ${names.length - max} more`;
+}
+
+/**
+ * One page of a long list (`page` from 1), then where it stands: "Page 1 of 3;
+ * ask for page 2 for more." A page past the end gets the last one.
+ */
+export function paged(lines: string[], page: number | undefined, size: number) {
+	const pages = Math.max(1, Math.ceil(lines.length / size));
+	const at = Math.min(Math.max(1, Math.floor(page ?? 1)), pages);
+	const out = lines.slice((at - 1) * size, at * size);
+	if (pages > 1) out.push(`Page ${at} of ${pages}${at < pages ? `; ask for page ${at + 1} for more` : ""}.`);
+	return out;
+}
+
+/** Copper as the game shows money: "12g 3s 40c", "0c". */
+export function gold(copper: number | undefined) {
+	if (copper === undefined) return "";
+	const g = Math.floor(copper / 10_000);
+	const s = Math.floor((copper % 10_000) / 100);
+	const c = copper % 100;
+	const parts = [g ? `${g}g` : "", s ? `${s}s` : "", c || (!g && !s) ? `${c}c` : ""];
+	return parts.filter(Boolean).join(" ");
+}
+
 /** Item quality as players say it ("RARE" → "Rare"). */
 export function quality(q: string | undefined) {
 	if (!q) return "";

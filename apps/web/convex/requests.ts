@@ -1,5 +1,5 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { ConvexError, v } from "convex/values";
+import { ConvexError, type Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
@@ -64,7 +64,7 @@ async function recipeRow(ctx: Ctx, recipeId: number) {
 }
 
 /** The user's claimed characters that are in this guild's roster now. */
-async function charactersIn(ctx: Ctx, userId: Id<"users">, guildId: Id<"guilds">) {
+export async function charactersIn(ctx: Ctx, userId: Id<"users">, guildId: Id<"guilds">) {
 	const owned = await ctx.db
 		.query("ownedCharacters")
 		.withIndex("by_user", (q) => q.eq("userId", userId))
@@ -88,10 +88,12 @@ export async function membership(ctx: Ctx, guild: Doc<"guilds">) {
 	return characters.length ? { userId, characters } : null;
 }
 
-async function requireMember(ctx: Ctx, guild: Doc<"guilds">) {
-	const member = await membership(ctx, guild);
-	if (!member) throw new ConvexError("Only this guild's members can do that. Claim your character first.");
-	return member;
+/** `userId` as a member of this guild (a claimed character in its roster), or the player-facing reason not. */
+async function requireMember(ctx: Ctx, guild: Doc<"guilds">, userId: Id<"users"> | null) {
+	const characters = userId ? await charactersIn(ctx, userId, guild._id) : [];
+	if (!userId || !characters.length)
+		throw new ConvexError("Only this guild's members can do that. Claim your character first.");
+	return { userId, characters };
 }
 
 /** Requests are for things a guildmate can hand over: not "Binds when picked up", "Soulbound" or "Quest Item". */
@@ -144,7 +146,7 @@ async function crafterFor(ctx: Ctx, guildId: Id<"guilds">, slug: string, recipeI
 }
 
 /** Guildmates (not `except`'s characters) who know a recipe, highest level first. */
-async function craftersOf(ctx: Ctx, guildId: Id<"guilds">, recipeId: number, except: Id<"users">) {
+export async function craftersOf(ctx: Ctx, guildId: Id<"guilds">, recipeId: number, except: Id<"users">) {
 	const roster = await ctx.db
 		.query("characters")
 		.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
@@ -204,7 +206,7 @@ export async function activeIn(ctx: Ctx, guildId: Id<"guilds">) {
 	return lists.flat().filter((r) => live(r, now));
 }
 
-async function activeOf(ctx: Ctx, userId: Id<"users">) {
+export async function activeOf(ctx: Ctx, userId: Id<"users">) {
 	const now = Date.now();
 	const lists = await Promise.all(
 		ACTIVE.map((status) =>
@@ -499,97 +501,110 @@ function pickCharacter(
 	return characters.find(fits);
 }
 
+const vNewRequest = {
+	kind: v.union(v.literal("item"), v.literal("craft")),
+	itemId: v.optional(v.number()),
+	recipeId: v.optional(v.number()),
+	quantity: v.number(),
+	note: v.optional(v.string()),
+	/** The character asking (one of theirs in the guild); default: their highest level. */
+	character: v.optional(v.string()),
+	/** Crafts: "I have the mats". */
+	declared: v.optional(v.boolean()),
+	/** Crafts: the guildmate asked to craft it (a character slug in the guild who knows the recipe). */
+	crafter: v.optional(v.string()),
+	/** Items: "send me any you have", for `days` (14, 30 or 90). `quantity` is ignored. */
+	ongoing: v.optional(v.boolean()),
+	days: v.optional(v.number()),
+};
+
+const vNewRequestObject = v.object(vNewRequest);
+export type NewRequest = Infer<typeof vNewRequestObject>;
+
 export const create = mutation({
-	args: {
-		region: vRegion,
-		slug: v.string(),
-		kind: v.union(v.literal("item"), v.literal("craft")),
-		itemId: v.optional(v.number()),
-		recipeId: v.optional(v.number()),
-		quantity: v.number(),
-		note: v.optional(v.string()),
-		/** The character asking (one of theirs in the guild); default: their highest level. */
-		character: v.optional(v.string()),
-		/** Crafts: "I have the mats". */
-		declared: v.optional(v.boolean()),
-		/** Crafts: the guildmate asked to craft it (a character slug in the guild who knows the recipe). */
-		crafter: v.optional(v.string()),
-		/** Items: "send me any you have", for `days` (14, 30 or 90). `quantity` is ignored. */
-		ongoing: v.optional(v.boolean()),
-		days: v.optional(v.number()),
-	},
-	handler: async (ctx, args) => {
-		const guild = await guildByKey(ctx, args.region, args.slug);
+	args: { region: vRegion, slug: v.string(), ...vNewRequest },
+	handler: async (ctx, { region, slug, ...args }) => {
+		const guild = await guildByKey(ctx, region, slug);
 		if (!guild) throw new ConvexError("No such guild");
-		const member = await requireMember(ctx, guild);
-		const character = pickCharacter(member.characters, args.character)!;
-		const ongoing = !!args.ongoing;
-		if (ongoing && args.kind !== "item") throw new ConvexError("Only items can be ongoing requests.");
-		const now = Date.now();
-		const active = (await activeOf(ctx, member.userId)).filter((r) => r.guildId === guild._id);
-		let fields: { quantity: number; note?: string; until?: number };
-		try {
-			fields = validateNew({
-				ongoing,
-				quantity: args.quantity,
-				note: args.note,
-				openCount: active.filter((r) => !!r.ongoing === ongoing).length,
-			});
-			if (ongoing) fields.until = ongoingUntil(args.days ?? 0, now);
-		} catch (error) {
-			throw new ConvexError((error as Error).message);
-		}
-
-		let itemId = args.itemId;
-		let recipeId: number | undefined;
-		let mats: Doc<"requests">["mats"];
-		let ask: Doc<"requests">["ask"];
-		if (args.kind === "item") {
-			if (itemId === undefined || !Number.isInteger(itemId) || itemId < 1) throw new ConvexError("Which item?");
-			await requireTradeable(ctx, itemId, "nobody can send it to you");
-		} else {
-			if (args.recipeId === undefined) throw new ConvexError("Which recipe?");
-			const recipe = await recipeRow(ctx, args.recipeId);
-			if (!recipe) throw new ConvexError("Guildie doesn't know that recipe.");
-			recipeId = recipe.recipeId;
-			itemId = recipe.craftedItemId;
-			if (itemId !== undefined) await requireTradeable(ctx, itemId, "only whoever crafts it can have it");
-			if (!args.crafter) throw new ConvexError("Who should craft it?");
-			ask = { ...(await crafterFor(ctx, guild._id, args.crafter, recipe.recipeId, member.userId)), askedAt: now };
-			const checked = matsCheck(recipe.reagents, fields.quantity, await scansOf(ctx, member.userId));
-			const declared = !!args.declared;
-			mats = { state: matsState(checked.covered, declared), declared, checkedAt: checked.checkedAt };
-		}
-		// One item request per item, fixed or ongoing (change that one instead).
-		if (args.kind === "item" && active.some((r) => r.kind === "item" && r.itemId === itemId))
-			throw new ConvexError("You already have a request for this item. Change that one instead.");
-		if (active.some((r) => r.kind === args.kind && r.itemId === itemId && r.recipeId === recipeId))
-			throw new ConvexError("You already have an open request for this.");
-
-		const request = {
-			guildId: guild._id,
-			userId: member.userId,
-			character: brief(character),
-			kind: args.kind,
-			itemId,
-			recipeId,
-			...fields,
-			...(ongoing ? { ongoing: true } : {}),
-			status: "open" as const,
-			mats,
-			...(ask ? { ask } : {}),
-			createdAt: now,
-			lastActivityAt: now,
-		};
-		const id = await ctx.db.insert("requests", request);
-		await noteRequest(ctx, "request", { ...request, _id: id });
-		if (ask) {
-			const created = await ctx.db.get(id);
-			if (created) await notify(ctx, ask.userId, created, "craftAsked", request.character);
-		}
-		return id;
+		return await createRequest(ctx, (await getAuthUserId(ctx)) as Id<"users"> | null, guild, args);
 	},
 });
+
+/** A new request in `guild`, as `userId` (the site, and AI apps: mcpWrite.ts). Returns its id. */
+export async function createRequest(
+	ctx: MutationCtx,
+	userId: Id<"users"> | null,
+	guild: Doc<"guilds">,
+	args: NewRequest,
+) {
+	const member = await requireMember(ctx, guild, userId);
+	const character = pickCharacter(member.characters, args.character)!;
+	const ongoing = !!args.ongoing;
+	if (ongoing && args.kind !== "item") throw new ConvexError("Only items can be ongoing requests.");
+	const now = Date.now();
+	const active = (await activeOf(ctx, member.userId)).filter((r) => r.guildId === guild._id);
+	let fields: { quantity: number; note?: string; until?: number };
+	try {
+		fields = validateNew({
+			ongoing,
+			quantity: args.quantity,
+			note: args.note,
+			openCount: active.filter((r) => !!r.ongoing === ongoing).length,
+		});
+		if (ongoing) fields.until = ongoingUntil(args.days ?? 0, now);
+	} catch (error) {
+		throw new ConvexError((error as Error).message);
+	}
+
+	let itemId = args.itemId;
+	let recipeId: number | undefined;
+	let mats: Doc<"requests">["mats"];
+	let ask: Doc<"requests">["ask"];
+	if (args.kind === "item") {
+		if (itemId === undefined || !Number.isInteger(itemId) || itemId < 1) throw new ConvexError("Which item?");
+		await requireTradeable(ctx, itemId, "nobody can send it to you");
+	} else {
+		if (args.recipeId === undefined) throw new ConvexError("Which recipe?");
+		const recipe = await recipeRow(ctx, args.recipeId);
+		if (!recipe) throw new ConvexError("Guildie doesn't know that recipe.");
+		recipeId = recipe.recipeId;
+		itemId = recipe.craftedItemId;
+		if (itemId !== undefined) await requireTradeable(ctx, itemId, "only whoever crafts it can have it");
+		if (!args.crafter) throw new ConvexError("Who should craft it?");
+		ask = { ...(await crafterFor(ctx, guild._id, args.crafter, recipe.recipeId, member.userId)), askedAt: now };
+		const checked = matsCheck(recipe.reagents, fields.quantity, await scansOf(ctx, member.userId));
+		const declared = !!args.declared;
+		mats = { state: matsState(checked.covered, declared), declared, checkedAt: checked.checkedAt };
+	}
+	// One item request per item, fixed or ongoing (change that one instead).
+	if (args.kind === "item" && active.some((r) => r.kind === "item" && r.itemId === itemId))
+		throw new ConvexError("You already have a request for this item. Change that one instead.");
+	if (active.some((r) => r.kind === args.kind && r.itemId === itemId && r.recipeId === recipeId))
+		throw new ConvexError("You already have an open request for this.");
+
+	const request = {
+		guildId: guild._id,
+		userId: member.userId,
+		character: brief(character),
+		kind: args.kind,
+		itemId,
+		recipeId,
+		...fields,
+		...(ongoing ? { ongoing: true } : {}),
+		status: "open" as const,
+		mats,
+		...(ask ? { ask } : {}),
+		createdAt: now,
+		lastActivityAt: now,
+	};
+	const id = await ctx.db.insert("requests", request);
+	await noteRequest(ctx, "request", { ...request, _id: id });
+	if (ask) {
+		const created = await ctx.db.get(id);
+		if (created) await notify(ctx, ask.userId, created, "craftAsked", request.character);
+	}
+	return id;
+}
 
 /**
  * Everything else that happens to a request. Crafts: ask a crafter (again,
@@ -615,67 +630,79 @@ export const act = mutation({
 		/** Asks: the crafter's character slug. */
 		character: v.optional(v.string()),
 	},
-	handler: async (ctx, { requestId, action, character: characterSlug }) => {
+	handler: async (ctx, { requestId, action, character }) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 		if (!userId) throw new ConvexError("Not signed in");
-		const r = await ctx.db.get(requestId);
-		if (!r) throw new ConvexError("That request is gone.");
-		const guild = await ctx.db.get(r.guildId);
-		if (!guild) throw new ConvexError("That request is gone.");
-		// The requester can always close their own; everyone else must be in the guild now.
-		const characters = await charactersIn(ctx, userId, guild._id);
-		if (r.userId !== userId && characters.length === 0) throw new ConvexError("Only this guild's members can do that.");
-		const verdict = check(action as Action, ruleView(r), { userId });
-		if (!verdict.ok) throw new ConvexError(verdict.error);
-
-		const now = Date.now();
-		const status = nextStatus(action as Action, r.status);
-		const patch: Partial<Doc<"requests">> = { status, lastActivityAt: now };
-		let asked: Doc<"requests">["ask"];
-		if (action === "ask") {
-			if (!characterSlug || r.recipeId === undefined) throw new ConvexError("Who should craft it?");
-			asked = { ...(await crafterFor(ctx, guild._id, characterSlug, r.recipeId, userId)), askedAt: now };
-			patch.ask = asked;
-		}
-		if (action === "accept" && r.ask) {
-			patch.claim = { userId, character: r.ask.character, claimedAt: now };
-			patch.ask = undefined;
-		}
-		if (action === "decline" && r.ask) {
-			patch.ask = undefined;
-			patch.lastAsk = { character: r.ask.character, outcome: "declined", at: now };
-		}
-		if (action === "unclaim") {
-			patch.claim = undefined;
-			if (r.kind === "craft" && r.claim)
-				patch.lastAsk = { character: r.claim.character, outcome: "backedOut", at: now };
-		}
-		if (action === "markSent" && r.claim) patch.claim = { ...r.claim, sentAt: now };
-		if (status === "done" || status === "cancelled") {
-			patch.closedAt = now;
-			patch.ask = undefined;
-		}
-		await ctx.db.patch(requestId, patch);
-
-		// The guild's feed: a crafter taking it on, and fulfilled (done).
-		if (action === "accept" && r.ask) await noteRequest(ctx, "claim", r, r.ask.character);
-		if (status === "done" && r.status !== "done")
-			await noteRequest(ctx, "fulfilled", r, patch.claim?.character ?? r.claim?.character);
-		// The other side hears about it.
-		if (asked) await notify(ctx, asked.userId, r, "craftAsked", r.character);
-		if (action === "accept" && r.ask) await notifyRequester(ctx, r, "craftAccepted", r.ask.character);
-		if (action === "decline" && r.ask) await notifyRequester(ctx, r, "craftDeclined", r.ask.character);
-		if (action === "markSent" && r.claim) await notifyRequester(ctx, r, "craftSent", r.claim.character);
-		if (action === "unclaim" && r.kind === "craft" && r.claim) {
-			if (r.claim.userId === userId) await notifyRequester(ctx, r, "craftBackedOut", r.claim.character);
-			else await notify(ctx, r.claim.userId, r, "craftWithdrawn", r.character);
-		}
-		if (action === "cancel" && r.kind === "craft") {
-			const crafter = r.claim?.userId ?? r.ask?.userId;
-			if (crafter) await notify(ctx, crafter, r, "craftWithdrawn", r.character);
-		}
+		await actOnRequest(ctx, userId, requestId, action, character);
 	},
 });
+
+export type RequestAction = Exclude<Action, "setMats">;
+
+/** One of `act`'s actions on a request, as `userId` (the site, and AI apps: mcpWrite.ts). */
+export async function actOnRequest(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	requestId: Id<"requests">,
+	action: RequestAction,
+	characterSlug?: string,
+) {
+	const r = await ctx.db.get(requestId);
+	if (!r) throw new ConvexError("That request is gone.");
+	const guild = await ctx.db.get(r.guildId);
+	if (!guild) throw new ConvexError("That request is gone.");
+	// The requester can always close their own; everyone else must be in the guild now.
+	const characters = await charactersIn(ctx, userId, guild._id);
+	if (r.userId !== userId && characters.length === 0) throw new ConvexError("Only this guild's members can do that.");
+	const verdict = check(action as Action, ruleView(r), { userId });
+	if (!verdict.ok) throw new ConvexError(verdict.error);
+
+	const now = Date.now();
+	const status = nextStatus(action as Action, r.status);
+	const patch: Partial<Doc<"requests">> = { status, lastActivityAt: now };
+	let asked: Doc<"requests">["ask"];
+	if (action === "ask") {
+		if (!characterSlug || r.recipeId === undefined) throw new ConvexError("Who should craft it?");
+		asked = { ...(await crafterFor(ctx, guild._id, characterSlug, r.recipeId, userId)), askedAt: now };
+		patch.ask = asked;
+	}
+	if (action === "accept" && r.ask) {
+		patch.claim = { userId, character: r.ask.character, claimedAt: now };
+		patch.ask = undefined;
+	}
+	if (action === "decline" && r.ask) {
+		patch.ask = undefined;
+		patch.lastAsk = { character: r.ask.character, outcome: "declined", at: now };
+	}
+	if (action === "unclaim") {
+		patch.claim = undefined;
+		if (r.kind === "craft" && r.claim) patch.lastAsk = { character: r.claim.character, outcome: "backedOut", at: now };
+	}
+	if (action === "markSent" && r.claim) patch.claim = { ...r.claim, sentAt: now };
+	if (status === "done" || status === "cancelled") {
+		patch.closedAt = now;
+		patch.ask = undefined;
+	}
+	await ctx.db.patch(requestId, patch);
+
+	// The guild's feed: a crafter taking it on, and fulfilled (done).
+	if (action === "accept" && r.ask) await noteRequest(ctx, "claim", r, r.ask.character);
+	if (status === "done" && r.status !== "done")
+		await noteRequest(ctx, "fulfilled", r, patch.claim?.character ?? r.claim?.character);
+	// The other side hears about it.
+	if (asked) await notify(ctx, asked.userId, r, "craftAsked", r.character);
+	if (action === "accept" && r.ask) await notifyRequester(ctx, r, "craftAccepted", r.ask.character);
+	if (action === "decline" && r.ask) await notifyRequester(ctx, r, "craftDeclined", r.ask.character);
+	if (action === "markSent" && r.claim) await notifyRequester(ctx, r, "craftSent", r.claim.character);
+	if (action === "unclaim" && r.kind === "craft" && r.claim) {
+		if (r.claim.userId === userId) await notifyRequester(ctx, r, "craftBackedOut", r.claim.character);
+		else await notify(ctx, r.claim.userId, r, "craftWithdrawn", r.character);
+	}
+	if (action === "cancel" && r.kind === "craft") {
+		const crafter = r.claim?.userId ?? r.ask?.userId;
+		if (crafter) await notify(ctx, crafter, r, "craftWithdrawn", r.character);
+	}
+}
 
 /** Crafts, while open: tick or untick "I have the mats". */
 export const setDeclared = mutation({
@@ -683,17 +710,26 @@ export const setDeclared = mutation({
 	handler: async (ctx, { requestId, declared }) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 		if (!userId) throw new ConvexError("Not signed in");
-		const r = await ctx.db.get(requestId);
-		if (!r) throw new ConvexError("That request is gone.");
-		const verdict = check("setMats", ruleView(r), { userId });
-		if (!verdict.ok) throw new ConvexError(verdict.error);
-		const covered = r.mats?.state === "inventory";
-		await ctx.db.patch(requestId, {
-			mats: { state: matsState(covered, declared), declared, checkedAt: r.mats?.checkedAt },
-			lastActivityAt: Date.now(),
-		});
+		await setMatsDeclared(ctx, userId, requestId, declared);
 	},
 });
+
+export async function setMatsDeclared(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	requestId: Id<"requests">,
+	declared: boolean,
+) {
+	const r = await ctx.db.get(requestId);
+	if (!r) throw new ConvexError("That request is gone.");
+	const verdict = check("setMats", ruleView(r), { userId });
+	if (!verdict.ok) throw new ConvexError(verdict.error);
+	const covered = r.mats?.state === "inventory";
+	await ctx.db.patch(requestId, {
+		mats: { state: matsState(covered, declared), declared, checkedAt: r.mats?.checkedAt },
+		lastActivityAt: Date.now(),
+	});
+}
 
 /**
  * The requester changes their own ongoing request: how long (from now), the
@@ -706,26 +742,36 @@ export const update = mutation({
 		days: v.optional(v.number()),
 		note: v.optional(v.string()),
 	},
-	handler: async (ctx, args) => {
+	handler: async (ctx, { requestId, ...change }) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 		if (!userId) throw new ConvexError("Not signed in");
-		const r = await ctx.db.get(args.requestId);
-		if (!r || !live(r, Date.now())) throw new ConvexError("That request is gone.");
-		const verdict = canChange(ruleView(r), userId);
-		if (!verdict.ok) throw new ConvexError(verdict.error);
-		const now = Date.now();
-		let note: string | undefined;
-		let until = r.until;
-		try {
-			// openCount 0: it's already one of theirs, so the cap doesn't apply.
-			({ note } = validateNew({ ongoing: true, quantity: 0, note: args.note, openCount: 0 }));
-			if (args.days !== undefined || until === undefined) until = ongoingUntil(args.days ?? 0, now);
-		} catch (error) {
-			throw new ConvexError((error as Error).message);
-		}
-		await ctx.db.patch(r._id, { note, until, lastActivityAt: now });
+		await updateOngoing(ctx, userId, requestId, change);
 	},
 });
+
+/** `update`, as `userId`: an ongoing request's end date (days from now) and note. */
+export async function updateOngoing(
+	ctx: MutationCtx,
+	userId: Id<"users">,
+	requestId: Id<"requests">,
+	args: { days?: number; note?: string },
+) {
+	const r = await ctx.db.get(requestId);
+	if (!r || !live(r, Date.now())) throw new ConvexError("That request is gone.");
+	const verdict = canChange(ruleView(r), userId);
+	if (!verdict.ok) throw new ConvexError(verdict.error);
+	const now = Date.now();
+	let note: string | undefined;
+	let until = r.until;
+	try {
+		// openCount 0: it's already one of theirs, so the cap doesn't apply.
+		({ note } = validateNew({ ongoing: true, quantity: 0, note: args.note, openCount: 0 }));
+		if (args.days !== undefined || until === undefined) until = ongoingUntil(args.days ?? 0, now);
+	} catch (error) {
+		throw new ConvexError((error as Error).message);
+	}
+	await ctx.db.patch(r._id, { note, until, lastActivityAt: now });
+}
 
 const ruleView = (r: Doc<"requests">) => ({
 	kind: r.kind,

@@ -35,6 +35,7 @@ local function lich(overrides)
         level = 23,
         xp = 1200,
         xpMax = 15000,
+        money = 123456,
         guild = { name = "Unbound", rank = "Member", rankIndex = 5 },
         average = 21.47,
         gear = {
@@ -88,6 +89,7 @@ test("captures level, XP, guild, gear and professions on login", function()
     eq(c.level, 23, "level")
     eq(c.xp, 1200, "xp")
     eq(c.xpMax, 15000, "xpMax")
+    eq(c.money, 123456, "money")
     eq(c.classToken, "PRIEST")
     eq(c.raceToken, "NightElf")
     eq(c.capturedAt, state.time, "capturedAt")
