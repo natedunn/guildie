@@ -42,12 +42,27 @@ const MCP_TOOLS = {
 	guild_requests: internal.mcp.requests,
 	guild_activity: internal.mcp.activity,
 	my_inventory: internal.mcp.inventory,
+	my_quests: internal.mcpPlayer.myQuests,
+	my_requests: internal.mcpPlayer.myRequests,
+	my_notifications: internal.mcpPlayer.notifications,
+	tracked_crafts: internal.mcpPlayer.trackedCrafts,
+	my_crafting: internal.mcpPlayer.myCrafting,
+	guild_quests: internal.mcpGuild.guildQuests,
+	guild_addons: internal.mcpGuild.guildAddons,
+	recipes: internal.mcpGuild.recipes,
+	item: internal.mcpGuild.item,
 } as const;
 
-/** Tools that change things: only for connections the player let do that (convex/mcp.ts writerOf). */
+/** Tools that change things: only for connections the player let do that (convex/mcp.ts writerOf, actorOf). */
 const MCP_WRITE_TOOLS = {
 	set_stat_priority: internal.mcp.setStatPriorityTool,
 	set_gear_preference: internal.mcp.setGearPreferenceTool,
+	// Acting in the player's guilds: only for connections allowed to (convex/mcp.ts actorOf).
+	create_request: internal.mcpActions.createRequestTool,
+	update_request: internal.mcpActions.updateRequestTool,
+	track_craft: internal.mcpActions.trackCraftTool,
+	untrack_craft: internal.mcpActions.untrackCraftTool,
+	mark_notifications_read: internal.mcpActions.markNotificationsReadTool,
 } as const;
 
 /** The Worker's secret, compared in constant time; false when this deployment has none set. */
@@ -80,12 +95,14 @@ http.route({
 			code?: unknown;
 			state?: unknown;
 			write?: unknown;
+			act?: unknown;
 		} | null;
 		if (typeof body?.code !== "string" || typeof body.state !== "string") return json({ error: "bad request" }, 400);
 		const result = await ctx.runMutation(internal.mcp.exchange, {
 			code: body.code,
 			state: body.state,
 			write: body.write === true,
+			act: body.act === true,
 		});
 		return result ? json(result) : json({ error: "This sign-in expired or was already used. Start again." }, 400);
 	}),

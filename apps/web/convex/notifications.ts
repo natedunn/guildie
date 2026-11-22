@@ -184,15 +184,20 @@ export const markAllRead = mutation({
 	args: {},
 	handler: async (ctx) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
-		if (!userId) return;
-		const now = Date.now();
-		const rows = await ctx.db
-			.query("notifications")
-			.withIndex("by_user_read", (q) => q.eq("userId", userId).eq("readAt", undefined))
-			.take(500);
-		for (const n of rows) await ctx.db.patch(n._id, { readAt: now });
+		if (userId) await markRead(ctx, userId);
 	},
 });
+
+/** Every unread notification of `userId`'s, read now. How many there were. */
+export async function markRead(ctx: MutationCtx, userId: Id<"users">) {
+	const now = Date.now();
+	const rows = await ctx.db
+		.query("notifications")
+		.withIndex("by_user_read", (q) => q.eq("userId", userId).eq("readAt", undefined))
+		.take(500);
+	for (const n of rows) await ctx.db.patch(n._id, { readAt: now });
+	return rows.length;
+}
 
 /**
  * For the Windows app (helper.takeToasts): recent ones meant for the

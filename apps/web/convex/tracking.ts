@@ -1,7 +1,7 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mutation, type QueryCtx, query } from "./_generated/server";
+import { type MutationCtx, mutation, type QueryCtx, query } from "./_generated/server";
 import { itemRow } from "./guilds";
 import { pickProfile } from "./helper";
 import { VENDOR_REAGENTS } from "./shared/wow";
@@ -18,7 +18,7 @@ import { requireUserId } from "./users";
 const MAX_TRACKED = 40;
 const MAX_QUANTITY = 999;
 
-async function trackedOf(ctx: QueryCtx, userId: Id<"users">) {
+export async function trackedOf(ctx: QueryCtx, userId: Id<"users">) {
 	return await ctx.db
 		.query("trackedCrafts")
 		.withIndex("by_user", (q) => q.eq("userId", userId))
@@ -39,39 +39,49 @@ export const ids = query({
 export const track = mutation({
 	args: { recipeId: v.number(), quantity: v.optional(v.number()) },
 	handler: async (ctx, { recipeId, quantity }) => {
-		const userId = await requireUserId(ctx);
-		const recipe = await ctx.db
-			.query("recipes")
-			.withIndex("by_recipeId", (q) => q.eq("recipeId", recipeId))
-			.unique();
-		if (!recipe) throw new ConvexError("That recipe isn't in Guildie's catalog.");
-		const n = Math.min(MAX_QUANTITY, Math.max(1, Math.round(quantity ?? 1)));
-		const existing = await ctx.db
-			.query("trackedCrafts")
-			.withIndex("by_user", (q) => q.eq("userId", userId).eq("recipeId", recipeId))
-			.unique();
-		if (existing) {
-			await ctx.db.patch(existing._id, { quantity: n });
-			return;
-		}
-		if ((await trackedOf(ctx, userId)).length >= MAX_TRACKED) {
-			throw new ConvexError(`You're tracking ${MAX_TRACKED} crafts already. Untrack one first.`);
-		}
-		await ctx.db.insert("trackedCrafts", { userId, recipeId, quantity: n, addedAt: Date.now() });
+		await trackCraft(ctx, await requireUserId(ctx), recipeId, quantity);
 	},
 });
+
+/** Track `recipeId` for `userId` (the site, and AI apps: mcpWrite.ts). Returns how many it's tracked for now. */
+export async function trackCraft(ctx: MutationCtx, userId: Id<"users">, recipeId: number, quantity?: number) {
+	const recipe = await ctx.db
+		.query("recipes")
+		.withIndex("by_recipeId", (q) => q.eq("recipeId", recipeId))
+		.unique();
+	if (!recipe) throw new ConvexError("That recipe isn't in Guildie's catalog.");
+	const n = Math.min(MAX_QUANTITY, Math.max(1, Math.round(quantity ?? 1)));
+	const existing = await ctx.db
+		.query("trackedCrafts")
+		.withIndex("by_user", (q) => q.eq("userId", userId).eq("recipeId", recipeId))
+		.unique();
+	if (existing) {
+		await ctx.db.patch(existing._id, { quantity: n });
+		return n;
+	}
+	if ((await trackedOf(ctx, userId)).length >= MAX_TRACKED) {
+		throw new ConvexError(`You're tracking ${MAX_TRACKED} crafts already. Untrack one first.`);
+	}
+	await ctx.db.insert("trackedCrafts", { userId, recipeId, quantity: n, addedAt: Date.now() });
+	return n;
+}
 
 export const untrack = mutation({
 	args: { recipeId: v.number() },
 	handler: async (ctx, { recipeId }) => {
-		const userId = await requireUserId(ctx);
-		const existing = await ctx.db
-			.query("trackedCrafts")
-			.withIndex("by_user", (q) => q.eq("userId", userId).eq("recipeId", recipeId))
-			.unique();
-		if (existing) await ctx.db.delete(existing._id);
+		await untrackCraft(ctx, await requireUserId(ctx), recipeId);
 	},
 });
+
+/** Stop tracking `recipeId` for `userId`. False when it wasn't tracked. */
+export async function untrackCraft(ctx: MutationCtx, userId: Id<"users">, recipeId: number) {
+	const existing = await ctx.db
+		.query("trackedCrafts")
+		.withIndex("by_user", (q) => q.eq("userId", userId).eq("recipeId", recipeId))
+		.unique();
+	if (existing) await ctx.db.delete(existing._id);
+	return !!existing;
+}
 
 type Owned = { name: string; region: Doc<"characters">["region"]; slug: string; classId: number };
 
@@ -161,101 +171,106 @@ export const list = query({
 	handler: async (ctx) => {
 		const userId = (await getAuthUserId(ctx)) as Id<"users"> | null;
 		if (!userId) return null;
-		const { crafts, reagents } = await trackedReagents(ctx, userId);
-		if (crafts.length === 0) return { crafts: [], reagents: [] };
-
-		// Who in the player's guilds knows what: for the crafts and for reagents someone can make.
-		const owned = await ownedCharacters(ctx, userId);
-		const mine = new Set(owned.map((c) => `${c.region}/${c.slug}`));
-		const guildIds = new Set<Id<"guilds">>();
-		for (const c of owned) {
-			const roster = await ctx.db
-				.query("characters")
-				.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", c.region).eq("slug", c.slug))
-				.first();
-			if (roster?.inRoster) guildIds.add(roster.guildId);
-		}
-		const members: Doc<"characters">[] = [];
-		for (const guildId of guildIds) {
-			members.push(
-				...(await ctx.db
-					.query("characters")
-					.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
-					.collect()),
-			);
-		}
-		const known = await Promise.all(
-			members.map(async (m) => new Set((await pickProfile(ctx, m)).professions.flatMap((p) => p.knownRecipes ?? []))),
-		);
-		const crafters = (recipeId: number) =>
-			members
-				.filter((_, i) => known[i].has(recipeId))
-				.map((m) => ({
-					name: m.name,
-					slug: m.slug,
-					region: m.region,
-					classId: m.classId,
-					mine: mine.has(`${m.region}/${m.slug}`),
-				}))
-				.sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name));
-
-		const byId = new Map(reagents.map((r) => [r.itemId, r]));
-		return {
-			crafts: crafts
-				.sort((a, b) => b.tracked.addedAt - a.tracked.addedAt)
-				.map(({ tracked, recipe, made }) => {
-					const short = recipe.reagents.filter((r) => {
-						const pool = byId.get(r.itemId);
-						return !pool || pool.have < r.quantity * tracked.quantity;
-					}).length;
-					return {
-						recipeId: recipe.recipeId,
-						quantity: tracked.quantity,
-						name: recipe.name,
-						profession: recipe.profession,
-						item: made ? { itemId: made.itemId, name: made.name, quality: made.quality, icon: made.icon } : null,
-						/** Reagents with fewer than it needs (counting all tracked crafts' share as available to it). */
-						short,
-						crafters: crafters(recipe.recipeId),
-					};
-				}),
-			reagents: await Promise.all(
-				reagents.map(async (r) => {
-					const item = await itemRow(ctx, r.itemId);
-					// Someone in the guild makes it (Bolt of Silk Cloth, Iron Bar): one level, the first recipe anyone knows.
-					const makers = await ctx.db
-						.query("recipes")
-						.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", r.itemId))
-						.collect();
-					let madeBy: { recipe: string; profession: string; crafters: ReturnType<typeof crafters> } | null = null;
-					for (const m of makers) {
-						const who = crafters(m.recipeId);
-						if (who.length) {
-							madeBy = { recipe: m.name, profession: m.profession, crafters: who };
-							break;
-						}
-					}
-					return {
-						itemId: r.itemId,
-						name: item?.name ?? r.name,
-						quality: item?.quality ?? "COMMON",
-						icon: item?.icon,
-						need: r.need,
-						have: r.have,
-						where: r.where.sort((a, b) => b.count - a.count),
-						for: r.for,
-						vendor: r.itemId in VENDOR_REAGENTS,
-						madeBy,
-					};
-				}),
-			).then((list) =>
-				// Still needed first, most missing first; then the ones you have enough of.
-				list.sort((a, b) => {
-					const missA = Math.max(0, a.need - a.have);
-					const missB = Math.max(0, b.need - b.have);
-					return Number(missB > 0) - Number(missA > 0) || missB - missA || a.name.localeCompare(b.name);
-				}),
-			),
-		};
+		return await trackedList(ctx, userId);
 	},
 });
+
+/** `list` for `userId` (the site, and AI apps: mcpPlayer.ts). */
+export async function trackedList(ctx: QueryCtx, userId: Id<"users">) {
+	const { crafts, reagents } = await trackedReagents(ctx, userId);
+	if (crafts.length === 0) return { crafts: [], reagents: [] };
+
+	// Who in the player's guilds knows what: for the crafts and for reagents someone can make.
+	const owned = await ownedCharacters(ctx, userId);
+	const mine = new Set(owned.map((c) => `${c.region}/${c.slug}`));
+	const guildIds = new Set<Id<"guilds">>();
+	for (const c of owned) {
+		const roster = await ctx.db
+			.query("characters")
+			.withIndex("by_slug", (q) => q.eq("flavor", "forever").eq("region", c.region).eq("slug", c.slug))
+			.first();
+		if (roster?.inRoster) guildIds.add(roster.guildId);
+	}
+	const members: Doc<"characters">[] = [];
+	for (const guildId of guildIds) {
+		members.push(
+			...(await ctx.db
+				.query("characters")
+				.withIndex("by_guild", (q) => q.eq("guildId", guildId).eq("inRoster", true))
+				.collect()),
+		);
+	}
+	const known = await Promise.all(
+		members.map(async (m) => new Set((await pickProfile(ctx, m)).professions.flatMap((p) => p.knownRecipes ?? []))),
+	);
+	const crafters = (recipeId: number) =>
+		members
+			.filter((_, i) => known[i].has(recipeId))
+			.map((m) => ({
+				name: m.name,
+				slug: m.slug,
+				region: m.region,
+				classId: m.classId,
+				mine: mine.has(`${m.region}/${m.slug}`),
+			}))
+			.sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name));
+
+	const byId = new Map(reagents.map((r) => [r.itemId, r]));
+	return {
+		crafts: crafts
+			.sort((a, b) => b.tracked.addedAt - a.tracked.addedAt)
+			.map(({ tracked, recipe, made }) => {
+				const short = recipe.reagents.filter((r) => {
+					const pool = byId.get(r.itemId);
+					return !pool || pool.have < r.quantity * tracked.quantity;
+				}).length;
+				return {
+					recipeId: recipe.recipeId,
+					quantity: tracked.quantity,
+					name: recipe.name,
+					profession: recipe.profession,
+					item: made ? { itemId: made.itemId, name: made.name, quality: made.quality, icon: made.icon } : null,
+					/** Reagents with fewer than it needs (counting all tracked crafts' share as available to it). */
+					short,
+					crafters: crafters(recipe.recipeId),
+				};
+			}),
+		reagents: await Promise.all(
+			reagents.map(async (r) => {
+				const item = await itemRow(ctx, r.itemId);
+				// Someone in the guild makes it (Bolt of Silk Cloth, Iron Bar): one level, the first recipe anyone knows.
+				const makers = await ctx.db
+					.query("recipes")
+					.withIndex("by_craftedItemId", (q) => q.eq("craftedItemId", r.itemId))
+					.collect();
+				let madeBy: { recipe: string; profession: string; crafters: ReturnType<typeof crafters> } | null = null;
+				for (const m of makers) {
+					const who = crafters(m.recipeId);
+					if (who.length) {
+						madeBy = { recipe: m.name, profession: m.profession, crafters: who };
+						break;
+					}
+				}
+				return {
+					itemId: r.itemId,
+					name: item?.name ?? r.name,
+					quality: item?.quality ?? "COMMON",
+					icon: item?.icon,
+					need: r.need,
+					have: r.have,
+					where: r.where.sort((a, b) => b.count - a.count),
+					for: r.for,
+					vendor: r.itemId in VENDOR_REAGENTS,
+					madeBy,
+				};
+			}),
+		).then((list) =>
+			// Still needed first, most missing first; then the ones you have enough of.
+			list.sort((a, b) => {
+				const missA = Math.max(0, a.need - a.have);
+				const missB = Math.max(0, b.need - b.have);
+				return Number(missB > 0) - Number(missA > 0) || missB - missA || a.name.localeCompare(b.name);
+			}),
+		),
+	};
+}

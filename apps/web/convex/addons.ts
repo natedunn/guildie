@@ -15,7 +15,7 @@ import { requireUserId } from "./users";
 // page). "Guild" means members of the guild being looked at.
 
 /** Addons summed up, with what CurseForge says about them. */
-async function summarize(ctx: QueryCtx, people: { list: AddonEntry[] }[]) {
+export async function summarize(ctx: QueryCtx, people: { list: AddonEntry[] }[]) {
 	const folders = await foldersFor(
 		ctx,
 		people.flatMap((p) => p.list.filter((a) => !a.curseId).map((a) => a.name)),

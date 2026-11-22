@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ago, capped, fold, gearType, matches, quality, slotName, statKey } from "./shared/mcpText.ts";
+import {
+	ago,
+	capped,
+	fold,
+	gearType,
+	gold,
+	listed,
+	matches,
+	paged,
+	quality,
+	slotName,
+	statKey,
+} from "./shared/mcpText.ts";
 
 test("ago: short relative times", () => {
 	const now = 1_000_000_000_000;
@@ -22,6 +34,29 @@ test("fold and matches: case, accents, punctuation, word order", () => {
 test("capped: says how many were left out", () => {
 	assert.deepEqual(capped(["a", "b"], 2, "Narrow it."), ["a", "b"]);
 	assert.deepEqual(capped(["a", "b", "c"], 2, "Narrow it."), ["a", "b", "…and 1 more. Narrow it."]);
+});
+
+test("listed: names in a sentence, capped", () => {
+	assert.equal(listed(["a", "b"], 3), "a, b");
+	assert.equal(listed(["a", "b", "c", "d"], 2), "a, b and 2 more");
+});
+
+test("paged: one page, then where it stands", () => {
+	const lines = ["a", "b", "c", "d", "e"];
+	assert.deepEqual(paged(lines, undefined, 2), ["a", "b", "Page 1 of 3; ask for page 2 for more."]);
+	assert.deepEqual(paged(lines, 3, 2), ["e", "Page 3 of 3."]);
+	assert.deepEqual(paged(lines, 9, 2), ["e", "Page 3 of 3."]);
+	assert.deepEqual(paged(["a"], 1, 2), ["a"]);
+	assert.deepEqual(paged([], 1, 2), []);
+});
+
+test("gold: copper as the game shows it", () => {
+	assert.equal(gold(undefined), "");
+	assert.equal(gold(0), "0c");
+	assert.equal(gold(5), "5c");
+	assert.equal(gold(123456), "12g 34s 56c");
+	assert.equal(gold(1_000_000), "100g");
+	assert.equal(gold(10_200), "1g 2s");
 });
 
 test("quality and slot names", () => {

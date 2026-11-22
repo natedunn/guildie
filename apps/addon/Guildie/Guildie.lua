@@ -251,6 +251,8 @@ local function capture(reason, recipes)
         level = UnitLevel("player"),
         xp = UnitXP and UnitXP("player") or nil,
         xpMax = UnitXPMax and UnitXPMax("player") or nil,
+        -- Copper on hand: only the player sees it on Guildie (and their AI apps).
+        money = GetMoney and GetMoney() or nil,
         classToken = classToken,
         raceToken = raceToken,
         capturedAt = now,

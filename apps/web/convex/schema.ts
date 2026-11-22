@@ -434,6 +434,8 @@ export default defineSchema({
 		level: v.optional(v.number()),
 		xp: v.optional(v.number()),
 		xpMax: v.optional(v.number()),
+		/** Gold on hand, in copper (addon 0.26+). Private: only the character's own player sees it. */
+		money: v.optional(v.number()),
 		classToken: v.optional(v.string()),
 		raceToken: v.optional(v.string()),
 		guild: v.optional(v.object({ name: v.string(), rank: v.optional(v.string()), rankIndex: v.optional(v.number()) })),
@@ -954,6 +956,12 @@ export default defineSchema({
 		 * connection made before writing existed.
 		 */
 		canWrite: v.optional(v.boolean()),
+		/**
+		 * The player let it act for them in their guilds: make, answer and
+		 * close requests, track crafts, mark notifications read (OAuth scope
+		 * guildie:act). Unset for connections made before that existed.
+		 */
+		canAct: v.optional(v.boolean()),
 	}).index("by_user", ["userId"]),
 
 	/**

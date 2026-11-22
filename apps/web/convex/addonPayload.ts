@@ -134,6 +134,8 @@ export type AddonCharacter = {
 	level?: number;
 	xp?: number;
 	xpMax?: number;
+	/** Copper on hand (addon 0.26+). */
+	money?: number;
 	classToken?: string;
 	raceToken?: string;
 	/** ms (the addon sends game server time in seconds). */
@@ -547,6 +549,7 @@ export function parseCharacter(raw: unknown, now: number): Parsed {
 			level: opt(c.level, (l) => int(l, "level", 1, 100)),
 			xp: opt(c.xp, (n) => int(n, "xp", 0, 1_000_000_000)),
 			xpMax: opt(c.xpMax, (n) => int(n, "xpMax", 0, 1_000_000_000)),
+			money: opt(c.money, (n) => int(n, "money", 0, 100_000_000_000)),
 			classToken: opt(c.classToken, (s) => str(s, "classToken", 24)),
 			raceToken: opt(c.raceToken, (s) => str(s, "raceToken", 32)),
 			capturedAt: time(c.capturedAt, "capturedAt", now),

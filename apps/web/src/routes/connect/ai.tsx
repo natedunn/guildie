@@ -21,19 +21,26 @@ export const Route = createFileRoute("/connect/ai")({
 		host: typeof search.host === "string" ? search.host.slice(0, 120) : "",
 		/** Only shown: what the app may do is in its OAuth grant (the MCP server's consent page). */
 		access: search.access === "write" ? ("write" as const) : ("read" as const),
+		act: search.act === "1" || search.act === 1 ? ("1" as const) : ("0" as const),
 	}),
 	head: () => ({ meta: [{ title: "Connect an AI app · Guildie" }] }),
 	component: ConnectAi,
 });
 
 function ConnectAi() {
-	const { state, client, host, access } = Route.useSearch();
+	const { state, client, host, access, act } = Route.useSearch();
 	const { data: viewer } = useSuspenseQuery(convexQuery(api.users.viewer, {}));
 	const start = useMutation(api.mcp.startConnect);
 	const [error, setError] = useState<string | null>(null);
 	const [pending, setPending] = useState(false);
 	const name = client || "An AI app";
-	const here = `/connect/ai?${new URLSearchParams({ state, client, host, access })}`;
+	const here = `/connect/ai?${new URLSearchParams({ state, client, host, access, act })}`;
+	const can = [
+		access === "write" ? "change your characters' stat priority and gear preferences" : "",
+		act === "1"
+			? "act for you in your guilds: make, answer and close requests (your guildmates see them and get notified), track crafts and mark your notifications read"
+			: "",
+	].filter(Boolean);
 
 	return (
 		<Page width="narrow">
@@ -54,15 +61,14 @@ function ConnectAi() {
 					<span aria-hidden className="streak" />
 					<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
 						<h2 className="text-sm font-semibold">{name}</h2>
-						<span className="pill px-2 py-0">{access === "write" ? "Reads, sets characters" : "Reads only"}</span>
+						<span className="pill px-2 py-0">{can.length ? "Reads and changes" : "Reads only"}</span>
 					</div>
 					<p className="text-muted-foreground">
 						<span className="text-foreground">{name}</span> will read your Guildie data as{" "}
 						<span className="text-foreground">{viewer.battletag ?? viewer.name}</span>: your guilds' rosters,
-						characters, crafters, requests and activity, and your own bags and banks.{" "}
-						{access === "write"
-							? "It can also change your characters' stat priority and gear preferences, and nothing else."
-							: "It can't change anything."}
+						characters, crafters, quests, addons, requests and activity, public guilds' rosters, and your own bags,
+						banks, gold, quests and notifications.{" "}
+						{can.length ? `It can also ${can.join(", and ")}, and nothing else.` : "It can't change anything."}
 					</p>
 					{host && (
 						<p className="mt-3 text-muted-foreground">
