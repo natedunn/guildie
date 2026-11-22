@@ -261,6 +261,22 @@ your last login or reload.
 - `reagentUseMine` (0.25.0): the same ranking for the player's own claimed
   characters, in a guild or not; per reagent, the professions where one of
   theirs would level, with only `users` (no "what's missing").
+- `waylaid` (0.26.0): who can fill each Waylaid Crate and Waylaid Supplies
+  item (`convex/waylaidUse.ts`). What each takes comes from the game's data
+  (`shared/waylaid.generated.ts`, docs/game-data.md); per profession that
+  makes it (knows a recipe that crafts it, smelting included) or gathers it
+  (`shared/gathering.ts`: Herbalism, Mining, Skinning, Fishing, and
+  Enchanting for disenchanted dust and shards, at the skill each asks for),
+  the best 3 guildmates and how many in all. `of`: how many of the crate's
+  bundles that profession supplies; `covers`: how many each person can.
+  Ranked by covers, then (makers) the color their best recipe for it
+  shows, then higher skill; the tooltip shows only the skill, so who can
+  supply all of a crate comes first without a count. With nobody: the closest gatherer (`closest`,
+  with `need`) or `nobody`. Raw cloth has no source, so a bundle of it
+  names nobody. `waylaidMine`: the same for your own characters, only
+  `users`. The tooltip shows it whether or not the item is bound (Supplies
+  are): it's who to ask for what goes in. Your characters follow "Show your
+  characters on reagents".
 - The older `reagents` (until 0.23.0 addons are gone): guild members whose known recipes use it, most recipes
   first (top 8). Built from Blizzard's recipe catalog (`apps/web/convex/recipes.ts`,
   weekly) and each member's known recipes (with their profile, hourly), in
