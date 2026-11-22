@@ -20,6 +20,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 - **Guildie:** AI apps connected to Guildie can see much more: your quests and their progress (and which guildmates share them), your tracked crafts, what your characters can craft and level with, your requests and notifications, your gold, your guild's dungeon quests and addons, any recipe or item, and public guilds' rosters. If you allow it when connecting (a new, separate box), they can also make, answer and close requests and track crafts for you. Already connected? Disconnect and connect again to allow it.
 - **Addon:** The addon now reads how much gold each character has, so you (and only you) can see it on Guildie.
 
+### Improvements
+
+- **Guildie:** Notifications are easier to read: each shows the item's icon with a small mark for what happened (asked, accepted, mailed, complete, cancelled), and asks that were since cancelled, answered or completed say so, so you don't go looking for a request that's closed.
+
 ## 0.3.49
 
 ### Improvements
