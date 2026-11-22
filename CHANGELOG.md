@@ -15,6 +15,8 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+## 0.3.50
+
 ### New
 
 - **Guildie:** AI apps connected to Guildie can see much more: your quests and their progress (and which guildmates share them), your tracked crafts, what your characters can craft and level with, your requests and notifications, your gold, your guild's dungeon quests and addons, any recipe or item, and public guilds' rosters. If you allow it when connecting (a new, separate box), they can also make, answer and close requests and track crafts for you. Already connected? Disconnect and connect again to allow it.
