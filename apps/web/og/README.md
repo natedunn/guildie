@@ -9,3 +9,6 @@ Playwright: `page.setViewportSize({ width: 1200, height: 630 })` then
 Blizzard's render server). It uses the landing page's look (the map, glow,
 fading heading and lit card from `src/styles/app.css`) and its headline; keep
 them in step. The names in the roster card are made up.
+
+After replacing `og.png`, bump `?refresh=` in `OG_IMAGE` (`src/lib/share.ts`):
+link previews are cached by image URL, so the new number makes them fetch it.

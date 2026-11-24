@@ -7,6 +7,13 @@
 /** The site's own origin, baked in at build (previews get theirs). */
 const SITE = (import.meta.env.VITE_SITE_URL as string | undefined) || "https://guildie.club";
 
+/**
+ * The share image. Bump `refresh` when og.png changes: Discord, iMessage and
+ * social sites cache previews by image URL, so a new query string makes them
+ * fetch the new one.
+ */
+const OG_IMAGE = `${SITE}/og.png?refresh=1`;
+
 export const DEFAULT_TITLE = "Guildie";
 export const DEFAULT_DESCRIPTION =
 	"Your whole guild, in sync: roster, gear, talents and crafters for WoW: Forever, on the web, in a Windows app and on your tooltips in game.";
@@ -18,7 +25,7 @@ export const defaultShareMeta = [
 	{ property: "og:type", content: "website" },
 	{ property: "og:title", content: DEFAULT_TITLE },
 	{ property: "og:description", content: DEFAULT_DESCRIPTION },
-	{ property: "og:image", content: `${SITE}/og.png` },
+	{ property: "og:image", content: OG_IMAGE },
 	{ property: "og:image:width", content: "1200" },
 	{ property: "og:image:height", content: "630" },
 	{
@@ -28,7 +35,7 @@ export const defaultShareMeta = [
 	{ name: "twitter:card", content: "summary_large_image" },
 	{ name: "twitter:title", content: DEFAULT_TITLE },
 	{ name: "twitter:description", content: DEFAULT_DESCRIPTION },
-	{ name: "twitter:image", content: `${SITE}/og.png` },
+	{ name: "twitter:image", content: OG_IMAGE },
 ];
 
 /** A page's own title and description for previews (the image stays the default). */
