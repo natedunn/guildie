@@ -15,6 +15,10 @@ CI checks for it. A release turns `## Unreleased` into that version's section.
 
 ## Unreleased
 
+### Fixes
+
+- **Guildie:** Links to Guildie shared in Discord and elsewhere show the current preview image instead of an old one.
+
 ## 0.3.50
 
 ### New
