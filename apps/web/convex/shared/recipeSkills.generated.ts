@@ -2,14 +2,14 @@
 // run the script (or let .github/workflows/game-data.yml do it). Read it
 // through shared/recipeSkills.ts.
 //
-// WoW: Forever (wowf) build 1.60.1.70959 of 2026-11-17, from the game's
+// WoW: Forever (wowf) build 1.60.1.71139 of 2026-11-25, from the game's
 // SkillLine, SkillLineAbility and SpellName tables as published by wago.tools.
 // Per profession, every recipe that gives skill-ups: `id` is Blizzard's
 // recipe id, `yellow` and `grey` the skill where it turns yellow and grey.
 
 export type GeneratedRecipeSkill = { id: number; name: string; yellow: number; grey: number };
 
-export const RECIPE_SKILLS_BUILD = { product: "wowf", version: "1.60.1.70959", date: "2026-11-17" } as const;
+export const RECIPE_SKILLS_BUILD = { product: "wowf", version: "1.60.1.71139", date: "2026-11-25" } as const;
 
 export const GENERATED_RECIPE_SKILLS: Record<string, GeneratedRecipeSkill[]> = {
 	Alchemy: [
@@ -1618,6 +1618,7 @@ export const GENERATED_RECIPE_SKILLS: Record<string, GeneratedRecipeSkill[]> = {
 		{ id: 2184, name: "Guardian Belt", yellow: 165, grey: 185 },
 		{ id: 4029, name: "Thick Murloc Armor", yellow: 165, grey: 185 },
 		{ id: 4163, name: "Barbaric Shoulders", yellow: 170, grey: 190 },
+		{ id: 60362, name: "Centaur Hoofwarmers", yellow: 170, grey: 180 },
 		{ id: 5050, name: "Dusky Leather Armor", yellow: 170, grey: 190 },
 		{ id: 5051, name: "Green Whelp Armor", yellow: 170, grey: 190 },
 		{ id: 2182, name: "Guardian Armor", yellow: 170, grey: 190 },
